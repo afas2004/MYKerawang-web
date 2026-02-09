@@ -125,7 +125,7 @@ class PostCard extends StatelessWidget {
 
               // 2. TITLE
               Text(
-                post['title'] ?? 'No Title',
+                post['title'] ?? 'No ',
                 style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, height: 1.3),
               ),
               const SizedBox(height: 6),
