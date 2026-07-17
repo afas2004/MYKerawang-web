@@ -1,49 +1,47 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'theme/app_themes.dart';
 
-// 1. The State now holds Mode AND Color
+// State holds the selected named theme (DESIGN_SPEC.md §2).
+// The old seedColor/darkMode model is migrated on first load.
 class ThemeState {
-  final ThemeMode themeMode;
-  final Color seedColor;
-
-  ThemeState({required this.themeMode, required this.seedColor});
+  final AppTheme appTheme;
+  ThemeState({required this.appTheme});
 }
 
 class ThemeCubit extends Cubit<ThemeState> {
-  // Default: Purple & System Mode
-  ThemeCubit() : super(ThemeState(themeMode: ThemeMode.system, seedColor: const Color(0xFF5B3E96))) {
+  // Default: Kampus Bold
+  ThemeCubit() : super(ThemeState(appTheme: AppTheme.kampus)) {
     _loadSettings();
   }
 
-  // 2. Change Color
-  void changeColor(Color color) async {
-    emit(ThemeState(themeMode: state.themeMode, seedColor: color));
+  void changeTheme(AppTheme theme) async {
+    emit(ThemeState(appTheme: theme));
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('seedColor', color.value);
+    await prefs.setString('appTheme', theme.name);
   }
 
-  // 3. Toggle Light/Dark
-  void toggleTheme(bool isDark) async {
-    final mode = isDark ? ThemeMode.dark : ThemeMode.light;
-    emit(ThemeState(themeMode: mode, seedColor: state.seedColor));
-    
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isDarkMode', isDark);
-  }
-
-  // 4. Load Saved Settings
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    final isDark = prefs.getBool('isDarkMode');
-    final colorValue = prefs.getInt('seedColor');
 
-    ThemeMode mode = ThemeMode.system;
-    if (isDark != null) mode = isDark ? ThemeMode.dark : ThemeMode.light;
+    final saved = prefs.getString('appTheme');
+    if (saved != null) {
+      final theme =
+          AppTheme.values.where((t) => t.name == saved).firstOrNull;
+      if (theme != null) {
+        emit(ThemeState(appTheme: theme));
+        return;
+      }
+    }
 
-    Color color = const Color(0xFF5B3E96);
-    if (colorValue != null) color = Color(colorValue);
-
-    emit(ThemeState(themeMode: mode, seedColor: color));
+    // Legacy migration: users who had dark mode on get Noir once,
+    // everyone else starts on the Kampus default.
+    final legacyDark = prefs.getBool('isDarkMode');
+    if (legacyDark == true) {
+      emit(ThemeState(appTheme: AppTheme.noir));
+      await prefs.setString('appTheme', AppTheme.noir.name);
+    }
+    await prefs.remove('isDarkMode');
+    await prefs.remove('seedColor');
   }
 }

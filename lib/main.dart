@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:mykerawang/screens/main_scaffold.dart';
 import 'package:mykerawang/screens/onboarding_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'theme_cubit.dart';
+import 'theme/app_themes.dart';
 import 'language_cubit.dart';
 // --- IMPORT YOUR SERVICES ---
 import 'services/notification_service.dart';
@@ -45,48 +45,6 @@ void main() async {
   runApp(const MyApp());
 }
 
-/// Songket gold — MYKerawang's secondary identity color,
-/// used for highlights, ornaments and "featured" accents.
-const Color kSongketGold = Color(0xFFC9A227);
-
-/// Builds the Kerawang theme: Material 3 from the user's seed color,
-/// with a crafted serif (Fraunces) for headings and songket gold as
-/// the tertiary accent.
-ThemeData buildKerawangTheme(Color seedColor, Brightness brightness) {
-  final scheme = ColorScheme.fromSeed(
-    seedColor: seedColor,
-    brightness: brightness,
-  ).copyWith(tertiary: kSongketGold);
-
-  final base = ThemeData(useMaterial3: true, colorScheme: scheme);
-
-  TextStyle? serif(TextStyle? s) =>
-      s == null ? null : GoogleFonts.fraunces(textStyle: s);
-
-  return base.copyWith(
-    textTheme: base.textTheme.copyWith(
-      displayLarge: serif(base.textTheme.displayLarge),
-      displayMedium: serif(base.textTheme.displayMedium),
-      displaySmall: serif(base.textTheme.displaySmall),
-      headlineLarge: serif(base.textTheme.headlineLarge),
-      headlineMedium: serif(base.textTheme.headlineMedium),
-      headlineSmall: serif(base.textTheme.headlineSmall),
-      titleLarge: serif(base.textTheme.titleLarge),
-    ),
-    appBarTheme: AppBarTheme(
-      titleTextStyle: GoogleFonts.fraunces(
-        textStyle: base.textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.w600,
-          color: scheme.onSurface,
-        ),
-      ),
-    ),
-    navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: scheme.surfaceContainer,
-    ),
-  );
-}
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -112,12 +70,8 @@ class MyApp extends StatelessWidget {
             // full-width on phones. See lib/utils/responsive.dart.
             builder: (context, child) => ResponsiveShell(child: child!),
 
-            // 3. LIGHT + DARK: Kerawang theme (serif headings, songket gold)
-            theme: buildKerawangTheme(themeState.seedColor, Brightness.light),
-            darkTheme: buildKerawangTheme(themeState.seedColor, Brightness.dark),
-
-            // 5. CONNECT THE MODE
-            themeMode: themeState.themeMode,
+            // 3. Named theme (Kampus Bold / Istana Modern / Songket Noir)
+            theme: buildAppTheme(themeState.appTheme),
             home: const AuthGate(),
           );
         },

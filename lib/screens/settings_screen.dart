@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'login_screen.dart';
 import 'package:mykerawang/theme_cubit.dart';
+import '../theme/app_themes.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../utils/responsive.dart';
@@ -91,8 +92,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final themeState = context.watch<ThemeCubit>().state;
-    final isDarkMode = themeState.themeMode == ThemeMode.dark;
+    final currentTheme = context.watch<ThemeCubit>().state.appTheme;
     return Scaffold(
       appBar: AppBar(title: const Text("Settings")),
       body: PageBody(child: _isLoading 
@@ -100,14 +100,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
         : ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              _sectionHeader("Event Alerts"),
-              SwitchListTile(
-                title: const Text("Dark Mode"),
-                subtitle: const Text("Easy on the eyes"),
-                secondary: Icon(isDarkMode ? Icons.dark_mode : Icons.light_mode),
-                value: isDarkMode,
-                onChanged: (val) => context.read<ThemeCubit>().toggleTheme(val),
+              // --- THEME (three named moods, DESIGN_SPEC §2) ---
+              const ListTile(
+                leading: Icon(Icons.palette_outlined),
+                title: Text("Theme"),
               ),
+              SizedBox(
+                height: 110,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  children: AppTheme.values
+                      .map((t) => _themeCard(context, t, t == currentTheme))
+                      .toList(),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              _sectionHeader("Event Alerts"),
 
               // --- LANGUAGE ---
               ListTile(
@@ -240,36 +250,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 ),
               ),
-              // --- COLOR PICKER ---
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Text("App Theme", style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
-              ),
-              Builder(
-                builder: (context) {
-                  // 1. Get the current active color
-                  final currentSeed = context.watch<ThemeCubit>().state.seedColor;
-
-                  // 2. Helper to check if colors match (safer to compare integer values)
-                  bool isSelected(Color c) => currentSeed.value == c.value;
-
-                  return SizedBox(
-                    height: 60,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      children: [
-                        _colorButton(context, const Color(0xFF5B3E96), isSelected(const Color(0xFF5B3E96))), // UiTM Purple
-                        _colorButton(context, Colors.blue, isSelected(Colors.blue)),
-                        _colorButton(context, Colors.teal, isSelected(Colors.teal)),
-                        _colorButton(context, Colors.orange, isSelected(Colors.orange)),
-                        _colorButton(context, Colors.red, isSelected(Colors.red)),
-                        _colorButton(context, Colors.green, isSelected(Colors.green)),
-                      ],
-                    ),
-                  );
-                },
-              ),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
@@ -294,6 +274,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _themeCard(BuildContext context, AppTheme theme, bool selected) {
+    final spec = kThemeSpecs[theme]!;
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: InkWell(
+        onTap: () => context.read<ThemeCubit>().changeTheme(theme),
+        borderRadius: kerawangCut,
+        child: Container(
+          width: 140,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: spec.surface,
+            borderRadius: kerawangCut,
+            border: Border.all(
+              color: selected ? scheme.primary : spec.border,
+              width: selected ? 2.5 : 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _swatch(spec.background),
+                  _swatch(spec.primary),
+                  _swatch(spec.gold),
+                  const Spacer(),
+                  if (selected)
+                    Icon(Icons.check_circle, size: 18, color: scheme.primary),
+                ],
+              ),
+              const Spacer(),
+              Text(spec.displayName,
+                  style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: spec.text)),
+              Text(spec.tagline,
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: spec.text.withValues(alpha: 0.6))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _swatch(Color c) => Container(
+        width: 16,
+        height: 16,
+        margin: const EdgeInsets.only(right: 4),
+        decoration: BoxDecoration(
+          color: c,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.black12),
+        ),
+      );
+
   Widget _sectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0, left: 16),
@@ -302,29 +342,3 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-Widget _colorButton(BuildContext context, Color color, bool isSelected) {
-  return GestureDetector(
-    onTap: () => context.read<ThemeCubit>().changeColor(color),
-    child: Container(
-      width: 45, // Made slightly bigger for better touch target
-      height: 45,
-      margin: const EdgeInsets.only(right: 12),
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: Border.all(
-          // Highlight the border if selected
-          color: isSelected ? Colors.black : Colors.grey.shade300, 
-          width: isSelected ? 3 : 2,
-        ),
-        boxShadow: isSelected 
-            ? [BoxShadow(color: color.withOpacity(0.4), blurRadius: 8, offset: const Offset(0, 4))] 
-            : [],
-      ),
-      // SHOW CHECKMARK IF SELECTED
-      child: isSelected 
-          ? const Icon(Icons.check, color: Colors.white, size: 24) 
-          : null,
-    ),
-  );
-}

@@ -116,6 +116,20 @@ Visual test passed on all three breakpoints; commit landed. Then per Fahmi's dec
 - **Settings** — new Language section with SegmentedButton: English / B. Melayu / 日本語.
 - Note: Fraunces has no Japanese glyphs; JA headings fall back to system font (acceptable).
 
+## Session 4 — DESIGN_SPEC build order #1: three-theme system
+
+Direction docs created earlier this session: PRODUCT_NOTES.md (announcements hub + room selection) and DESIGN_SPEC.md (the requirements doc; build order in §11). Also fixed: edge-to-edge desktop (shell no-ops ≥900), global mouse drag-scroll, HoverCarousel chevrons on Home.
+
+Theme system (spec §2):
+- **lib/theme/app_themes.dart (NEW)** — `AppTheme` enum {kampus, istana, noir}, `kThemeSpecs` palette table, `kerawangCut` signature border radius, `buildAppTheme()` with per-theme button shapes (kampus pills / others kerawang cut), Fraunces headings, gold as tertiary.
+- **theme_cubit.dart (REWRITTEN)** — state is now just the named theme; persisted as 'appTheme'; legacy migration (old dark-mode users → Noir once; old seedColor prefs removed).
+- **main.dart** — single `theme:` (no darkTheme/themeMode); old buildKerawangTheme removed.
+- **settings_screen.dart** — Dark Mode switch + 6-color picker replaced by three horizontal theme cards (palette swatches, name, tagline, selected ring); dead `_colorButton` removed.
+
+Verified via grep: no stale seedColor/toggleTheme/changeColor/themeMode references. Needs `flutter analyze` + visual pass on all three themes before commit.
+
+Note for future sessions: the sandbox mount can serve stale file reads to bash — verify file state with host-side Read/Grep tools, not `tail`/`grep` in bash.
+
 ### Still to do
 
 1. `flutter analyze` + visual test at multiple window widths (phone, ~1000px, ≥1200px).
