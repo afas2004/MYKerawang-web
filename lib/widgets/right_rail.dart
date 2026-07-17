@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../language_cubit.dart';
 import '../screens/event_detail_screen.dart';
 import '../screens/item_detail_screen.dart';
 
@@ -65,7 +66,7 @@ class _RightRailState extends State<RightRail> {
           if (_events.isNotEmpty) ...[
             _railCard(
               theme,
-              title: "Acara minggu ini",
+              title: context.l10n.eventsThisWeek,
               icon: Icons.calendar_month,
               child: Column(
                 children: _events.map((e) {
@@ -111,7 +112,7 @@ class _RightRailState extends State<RightRail> {
           if (_items.isNotEmpty)
             _railCard(
               theme,
-              title: "Baru masuk pasar",
+              title: context.l10n.newInMarket,
               icon: Icons.auto_awesome,
               iconColor: theme.colorScheme.tertiary,
               child: GridView.count(

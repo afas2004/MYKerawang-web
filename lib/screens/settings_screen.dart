@@ -5,6 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'login_screen.dart';
 import 'package:mykerawang/theme_cubit.dart';
+import '../l10n/app_strings.dart';
+import '../language_cubit.dart';
 import '../utils/responsive.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -106,6 +108,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 value: isDarkMode,
                 onChanged: (val) => context.read<ThemeCubit>().toggleTheme(val),
               ),
+
+              // --- LANGUAGE ---
+              ListTile(
+                leading: const Icon(Icons.translate),
+                title: Text(context.l10n.language),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: SegmentedButton<AppLanguage>(
+                  segments: const [
+                    ButtonSegment(value: AppLanguage.en, label: Text("English")),
+                    ButtonSegment(value: AppLanguage.ms, label: Text("B. Melayu")),
+                    ButtonSegment(value: AppLanguage.ja, label: Text("日本語")),
+                  ],
+                  selected: {context.watch<LanguageCubit>().state.language},
+                  onSelectionChanged: (sel) =>
+                      context.read<LanguageCubit>().changeLanguage(sel.first),
+                ),
+              ),
+              const SizedBox(height: 8),
               SwitchListTile(
                 title: const Text("New Events"),
                 subtitle: const Text("Get notified when new events are posted"),

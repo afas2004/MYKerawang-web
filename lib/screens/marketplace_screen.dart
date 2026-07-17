@@ -5,6 +5,7 @@ import 'package:mykerawang/widgets/linear_refresher';
 import 'item_detail_screen.dart';
 import 'create_listing_screen.dart';
 import 'marketplace_cubit.dart'; // Ensure this matches your file name
+import '../language_cubit.dart';
 import '../utils/responsive.dart';
 
 class MarketplaceScreen extends StatelessWidget {
@@ -44,7 +45,7 @@ class _MarketplaceViewState extends State<MarketplaceView> {
       builder: (context, state) {
         return Scaffold(
           appBar: AppBar(
-            title: const Text("Marketplace"),
+            title: Text(context.l10n.marketplaceTitle),
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(50),
               child: SizedBox(
@@ -91,7 +92,7 @@ class _MarketplaceViewState extends State<MarketplaceView> {
                           // Call Cubit on change
                           onChanged: (v) => context.read<MarketplaceCubit>().updateSearch(v),
                           decoration: InputDecoration(
-                            hintText: "Search items...",
+                            hintText: context.l10n.searchItems,
                             prefixIcon: Icon(Icons.search, color: Theme.of(context).colorScheme.onSurfaceVariant),
                             filled: true,
                             fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -104,7 +105,7 @@ class _MarketplaceViewState extends State<MarketplaceView> {
                       Expanded(
                         // Use state.displayedItems from Cubit
                         child: state.displayedItems.isEmpty
-                            ? const Center(child: Text("No items found"))
+                            ? Center(child: Text(context.l10n.noItemsFound))
                             : LayoutBuilder(builder: (context, constraints) {
                                 return GridView.builder(
                                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),

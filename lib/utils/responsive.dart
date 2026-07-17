@@ -55,22 +55,22 @@ class ResponsiveShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    if (media.size.width <= Responsive.maxContentWidth) return child;
+    final width = media.size.width;
 
+    // Desktop (>=900): MainScaffold lays out sidebar/feed/rail itself and
+    // should span edge-to-edge like a real web app. Phones: no-op.
+    if (width >= 900 || width <= 840) return child;
+
+    // Awkward mid-band (840-900): clamp the mobile layout so it doesn't
+    // stretch, since the desktop layout hasn't kicked in yet.
     final theme = Theme.of(context);
     return ColoredBox(
-      // Gutter color on the sides of the centered app
       color: theme.colorScheme.surfaceContainerHighest,
       child: Center(
         child: ConstrainedBox(
-          constraints:
-              const BoxConstraints(maxWidth: Responsive.maxContentWidth),
-          // Keep MediaQuery consistent with the constrained width so
-          // width-based logic inside screens behaves correctly.
+          constraints: const BoxConstraints(maxWidth: 840),
           child: MediaQuery(
-            data: media.copyWith(
-              size: Size(Responsive.maxContentWidth, media.size.height),
-            ),
+            data: media.copyWith(size: Size(840, media.size.height)),
             child: child,
           ),
         ),

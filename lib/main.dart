@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:mykerawang/screens/main_scaffold.dart';
@@ -6,6 +7,7 @@ import 'package:mykerawang/screens/onboarding_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'theme_cubit.dart';
+import 'language_cubit.dart';
 // --- IMPORT YOUR SERVICES ---
 import 'services/notification_service.dart';
 import 'utils/responsive.dart';
@@ -17,6 +19,17 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'screens/events_cubit.dart';
 import 'screens/marketplace_cubit.dart';
 import 'screens/profile_cubit.dart';
+
+/// Lets mouse users drag-scroll lists (like touch), on top of the wheel.
+class AppScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.stylus,
+        PointerDeviceKind.trackpad,
+      };
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -86,12 +99,14 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (context) => MarketplaceCubit()),
         BlocProvider(create: (context) => ProfileCubit()),
         BlocProvider(create: (context) => ThemeCubit()),
+        BlocProvider(create: (context) => LanguageCubit()),
       ],
       child: BlocBuilder<ThemeCubit, ThemeState>(
         builder: (context, themeState) {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             title: 'MYKerawang',
+            scrollBehavior: AppScrollBehavior(),
 
             // Center the app at a comfortable width on desktop/web,
             // full-width on phones. See lib/utils/responsive.dart.

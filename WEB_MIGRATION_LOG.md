@@ -105,6 +105,17 @@ Flutter web ships a service worker + manifest automatically. Manifest and iOS me
 
 `flutter analyze` after the PageBody script revealed 5 files with truncated tails (script bug). All repaired: settings/create_event/create_listing/item_detail restored from git HEAD content, edit_profile rebuilt manually. Then audit fixes applied: **A1** web refresh button + **A6** tooltips on Home app bar actions (BM: Muat semula/Notifikasi/Tetapan), **B4** Home error state with "Cuba semula" retry button, **A3** "Take Photo" hidden on web in both create screens, **B2** create-event description box uses theme color (dark mode fix), **B3** settings switches now follow the user's chosen accent color instead of hardcoded purple.
 
+### Session 3c — i18n (EN default / BM / JA)
+
+Visual test passed on all three breakpoints; commit landed. Then per Fahmi's decision, UI language switched to English-default with a switcher:
+
+- **lib/l10n/app_strings.dart (NEW)** — `AppStrings` with full EN / MS / JA string sets (~35 keys).
+- **lib/language_cubit.dart (NEW)** — `LanguageCubit` persisted via shared_preferences (same pattern as ThemeCubit) + `context.l10n` shorthand extension.
+- **pubspec.yaml** — `shared_preferences` promoted to a direct dependency (was transitive; fixes lint).
+- Strings applied to: MainScaffold (nav labels, Jom post→Create post), Home (section headers, tooltips, error state), Login (all copy), Marketplace (title, search hint, empty state), RightRail (both card titles).
+- **Settings** — new Language section with SegmentedButton: English / B. Melayu / 日本語.
+- Note: Fraunces has no Japanese glyphs; JA headings fall back to system font (acceptable).
+
 ### Still to do
 
 1. `flutter analyze` + visual test at multiple window widths (phone, ~1000px, ≥1200px).

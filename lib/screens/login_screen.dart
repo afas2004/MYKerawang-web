@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../main.dart'; // This goes up one level to find main.dart
+import '../language_cubit.dart';
 import '../widgets/kerawang_motif.dart';
 import 'login_cubit.dart'; // This looks in the SAME folder
 
@@ -52,6 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
           },
           builder: (context, state) {
             final scheme = Theme.of(context).colorScheme;
+            final s = context.l10n;
             // 3. Build UI based on State
             return Center(
               child: SingleChildScrollView(
@@ -74,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const KerawangDivider(),
                     const SizedBox(height: 16),
                     Text(
-                      state.isLoginMode ? "Selamat kembali" : "Jom sertai MYKerawang",
+                      state.isLoginMode ? s.welcomeBack : s.joinApp,
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.w600,
@@ -82,9 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      state.isLoginMode
-                          ? "Log masuk untuk teruskan"
-                          : "Daftar akaun untuk mula",
+                      state.isLoginMode ? s.loginToContinue : s.registerToStart,
                       style: TextStyle(color: scheme.onSurfaceVariant),
                     ),
                     const SizedBox(height: 40),
@@ -92,10 +92,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextField(
                       controller: _emailCtrl,
                       textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: "Email",
-                        prefixIcon: Icon(Icons.email_outlined),
-                        border: OutlineInputBorder(
+                      decoration: InputDecoration(
+                        labelText: s.email,
+                        prefixIcon: const Icon(Icons.email_outlined),
+                        border: const OutlineInputBorder(
                           borderRadius: BorderRadius.all(Radius.circular(12)),
                         ),
                       ),
@@ -111,10 +111,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           .read<LoginCubit>()
                           .submit(_emailCtrl.text, _passCtrl.text),
                       decoration: InputDecoration(
-                        labelText: "Kata laluan",
+                        labelText: s.password,
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
-                          tooltip: _obscurePassword ? "Tunjuk" : "Sembunyi",
+                          tooltip: _obscurePassword ? s.showPassword : s.hidePassword,
                           icon: Icon(_obscurePassword
                               ? Icons.visibility_outlined
                               : Icons.visibility_off_outlined),
@@ -152,7 +152,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: state.isLoading
                             ? CircularProgressIndicator(color: scheme.onPrimary)
                             : Text(
-                                state.isLoginMode ? "Log masuk" : "Daftar",
+                                state.isLoginMode ? s.login : s.signUp,
                                 style: const TextStyle(
                                     fontSize: 16, fontWeight: FontWeight.bold),
                               ),
@@ -166,7 +166,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ? null 
                           : () => context.read<LoginCubit>().signInWithGoogle(),
                       icon: const Icon(Icons.g_mobiledata, size: 28), // Or use a Google Logo asset
-                      label: const Text("Teruskan dengan Google"),
+                      label: Text(s.continueWithGoogle),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         minimumSize: const Size(double.infinity, 50),
@@ -181,12 +181,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: RichText(
                         text: TextSpan(
                           text: state.isLoginMode
-                              ? "Pengguna baru? "
-                              : "Dah ada akaun? ",
+                              ? s.newUserPrefix
+                              : s.haveAccountPrefix,
                           style: TextStyle(color: scheme.onSurfaceVariant),
                           children: [
                             TextSpan(
-                              text: state.isLoginMode ? "Daftar sini" : "Log masuk",
+                              text: state.isLoginMode ? s.createAccount : s.loginLink,
                               style: TextStyle(
                                 color: scheme.primary,
                                 fontWeight: FontWeight.bold,

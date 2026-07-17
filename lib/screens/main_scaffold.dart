@@ -6,6 +6,7 @@ import 'events_screen.dart';
 import 'profile_screen.dart';
 import 'search_screen.dart';
 import 'create_post_screen.dart';
+import '../language_cubit.dart';
 import '../utils/responsive.dart';
 import '../widgets/kerawang_motif.dart';
 import '../widgets/right_rail.dart';
@@ -27,13 +28,16 @@ class _MainScaffoldState extends State<MainScaffold> {
     });
   }
 
-  static const _navItems = [
-    (Icons.home_outlined, Icons.home, 'Utama'),
-    (Icons.search, Icons.saved_search, 'Cari'),
-    (Icons.storefront_outlined, Icons.storefront, 'Pasar'),
-    (Icons.calendar_today_outlined, Icons.calendar_month, 'Acara'),
-    (Icons.person_outline, Icons.person, 'Profil'),
-  ];
+  List<(IconData, IconData, String)> _navItems(BuildContext context) {
+    final s = context.l10n;
+    return [
+      (Icons.home_outlined, Icons.home, s.navHome),
+      (Icons.search, Icons.saved_search, s.navSearch),
+      (Icons.storefront_outlined, Icons.storefront, s.navMarket),
+      (Icons.calendar_today_outlined, Icons.calendar_month, s.navEvents),
+      (Icons.person_outline, Icons.person, s.navProfile),
+    ];
+  }
 
   List<Widget> get _pages => [
     HomeScreen(onTabChange: _switchTab),
@@ -58,6 +62,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   // ---------- MOBILE: bottom tabs (unchanged behavior) ----------
   Widget _buildMobile(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final navItems = _navItems(context);
     return Scaffold(
       body: IndexedStack(index: _selectedIndex, children: _pages),
       bottomNavigationBar: Container(
@@ -75,7 +80,7 @@ class _MainScaffoldState extends State<MainScaffold> {
           selectedIndex: _selectedIndex,
           onDestinationSelected: (idx) => setState(() => _selectedIndex = idx),
           indicatorColor: scheme.secondaryContainer,
-          destinations: _navItems
+          destinations: navItems
               .map((item) => NavigationDestination(
                     icon: Icon(item.$1, color: scheme.onSurfaceVariant),
                     selectedIcon:
@@ -92,6 +97,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   Widget _buildDesktop(BuildContext context, bool showRail) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final navItems = _navItems(context);
 
     return Scaffold(
       body: Row(
@@ -121,10 +127,10 @@ class _MainScaffoldState extends State<MainScaffold> {
                     ),
                   ),
                 ),
-                for (int i = 0; i < _navItems.length; i++)
+                for (int i = 0; i < navItems.length; i++)
                   _SideNavTile(
-                    icon: _selectedIndex == i ? _navItems[i].$2 : _navItems[i].$1,
-                    label: _navItems[i].$3,
+                    icon: _selectedIndex == i ? navItems[i].$2 : navItems[i].$1,
+                    label: navItems[i].$3,
                     selected: _selectedIndex == i,
                     onTap: () => setState(() => _selectedIndex = i),
                   ),
@@ -135,7 +141,7 @@ class _MainScaffoldState extends State<MainScaffold> {
                     MaterialPageRoute(builder: (_) => const CreatePostScreen()),
                   ),
                   icon: const Icon(Icons.add),
-                  label: const Text("Jom post"),
+                  label: Text(context.l10n.createPost),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),

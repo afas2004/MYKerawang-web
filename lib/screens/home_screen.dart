@@ -6,6 +6,8 @@ import 'package:mykerawang/screens/create_listing_screen.dart';
 import 'package:mykerawang/screens/post_detail_screen.dart';
 import 'package:mykerawang/widgets/linear_refresher';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../language_cubit.dart';
+import '../widgets/hover_carousel.dart';
 import '../widgets/universal_card.dart';
 import '../widgets/post_card.dart';
 import 'event_detail_screen.dart';
@@ -139,17 +141,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 // Refresh button: pull-to-refresh has no mouse equivalent on web
                 if (kIsWeb)
                   IconButton(
-                    tooltip: "Muat semula",
+                    tooltip: context.l10n.refresh,
                     icon: const Icon(Icons.refresh),
                     onPressed: _fetchFeedData,
                   ),
                 IconButton(
-                  tooltip: "Notifikasi",
+                  tooltip: context.l10n.notifications,
                   icon: const Icon(Icons.notifications_outlined),
                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationScreen())),
                 ),
                 IconButton(
-                  tooltip: "Tetapan",
+                  tooltip: context.l10n.settings,
                   icon: const Icon(Icons.settings_outlined),
                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
                 ),
@@ -169,12 +171,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           size: 48,
                           color: Theme.of(context).colorScheme.onSurfaceVariant),
                       const SizedBox(height: 12),
-                      const Text("Tak dapat sambung. Cuba lagi?"),
+                      Text(context.l10n.connectionError),
                       const SizedBox(height: 12),
                       FilledButton.icon(
                         onPressed: _fetchFeedData,
                         icon: const Icon(Icons.refresh),
-                        label: const Text("Cuba semula"),
+                        label: Text(context.l10n.tryAgain),
                       ),
                     ],
                   ),
@@ -187,24 +189,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _sectionHeader("Happening Soon", () => widget.onTabChange(3)), 
-                    SizedBox(
+                    _sectionHeader(context.l10n.happeningSoon, () => widget.onTabChange(3)),
+                    HoverCarousel(
                       height: 280,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: _featuredEvents.length,
-                        itemBuilder: (context, index) {
-                          return Container(
-                            width: 260,
-                            margin: const EdgeInsets.only(right: 12, bottom: 10),
-                            child: UniversalCard(
-                              data: _featuredEvents[index], 
-                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => EventDetailScreen(event: _featuredEvents[index]))),
-                            ),
-                          );
-                        },
-                      ),
+                      itemCount: _featuredEvents.length,
+                      itemBuilder: (context, index) {
+                        return Container(
+                          width: 260,
+                          margin: const EdgeInsets.only(right: 12, bottom: 10),
+                          child: UniversalCard(
+                            data: _featuredEvents[index],
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => EventDetailScreen(event: _featuredEvents[index]))),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -216,24 +214,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _sectionHeader("Fresh Finds", () => widget.onTabChange(2)), 
-                    SizedBox(
-                      height: 280, 
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: _freshMarketItems.length,
-                        itemBuilder: (context, index) {
-                          return Container(
-                            width: 200, 
-                            margin: const EdgeInsets.only(right: 12, bottom: 10),
-                            child: UniversalCard(
-                              data: _freshMarketItems[index], 
-                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ItemDetailScreen(item: _freshMarketItems[index]))),
-                            ),
-                          );
-                        },
-                      ),
+                    _sectionHeader(context.l10n.freshFinds, () => widget.onTabChange(2)),
+                    HoverCarousel(
+                      height: 280,
+                      itemCount: _freshMarketItems.length,
+                      itemBuilder: (context, index) {
+                        return Container(
+                          width: 200,
+                          margin: const EdgeInsets.only(right: 12, bottom: 10),
+                          child: UniversalCard(
+                            data: _freshMarketItems[index],
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ItemDetailScreen(item: _freshMarketItems[index]))),
+                          ),
+                        );
+                      },
                     ),
                     const Divider(thickness: 8, height: 24), 
                   ],
