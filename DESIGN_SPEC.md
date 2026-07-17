@@ -18,6 +18,8 @@ The requirements document. Every new screen and change gets checked against this
 - **Kerawang cut**: signature asymmetric corner radius `(topLeft 2, topRight 14, bottomRight 2, bottomLeft 14)` on hero cards, buttons, and images. Regular cards use 12.
 - **Motif**: `KerawangDivider` in section breaks, empty states, login, sidebar footer. Gold, always subtle.
 - **Type**: Fraunces for display/headline/titleLarge + wordmark; system/default for body. Scale: 26/20/17/15/13/11.
+  - Decision: fonts stay constant across all three themes (identity > variety). Parked idea: per-theme heading fonts (e.g. geometric sans for Kampus) if themes ever need more distinction — 5-line change in buildAppTheme.
+  - Known gap: many screens use hand-set `TextStyle(...)` that bypass the theme, so Fraunces currently shows only in AppBar titles/wordmark/login. Rule: every screen touched from now on migrates its text to theme styles (`textTheme.titleMedium` etc.), no new hand-set styles.
 - **Spacing scale**: 4 / 8 / 12 / 16 / 24 / 32 only. No arbitrary values.
 - **Gold rule**: gold marks *specialness only* — official badges, category labels on embeds, motif, prices. Never large fills, never body text.
 - **Voice**: BM-mix in default locale ("Jom post", "Apa cerita kat kolej?"), localized via AppStrings.

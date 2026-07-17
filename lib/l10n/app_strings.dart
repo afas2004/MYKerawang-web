@@ -26,6 +26,11 @@ class AppStrings {
   final String eventsThisWeek;
   final String newInMarket;
 
+  // Composer + embeds
+  final String composerHint;
+  final String viewItem;
+  final String viewEvent;
+
   // Login
   final String welcomeBack;
   final String loginToContinue;
@@ -67,6 +72,9 @@ class AppStrings {
     required this.tryAgain,
     required this.eventsThisWeek,
     required this.newInMarket,
+    required this.composerHint,
+    required this.viewItem,
+    required this.viewEvent,
     required this.welcomeBack,
     required this.loginToContinue,
     required this.joinApp,
@@ -104,6 +112,9 @@ class AppStrings {
     tryAgain: "Try again",
     eventsThisWeek: "Events this week",
     newInMarket: "Fresh in the market",
+    composerHint: "What's happening at kolej?",
+    viewItem: "View item",
+    viewEvent: "View event",
     welcomeBack: "Welcome back",
     loginToContinue: "Login to continue",
     joinApp: "Join MYKerawang",
@@ -141,6 +152,9 @@ class AppStrings {
     tryAgain: "Cuba semula",
     eventsThisWeek: "Acara minggu ini",
     newInMarket: "Baru masuk pasar",
+    composerHint: "Apa cerita kat kolej?",
+    viewItem: "Lihat barang",
+    viewEvent: "Jom join",
     welcomeBack: "Selamat kembali",
     loginToContinue: "Log masuk untuk teruskan",
     joinApp: "Jom sertai MYKerawang",
@@ -178,6 +192,9 @@ class AppStrings {
     tryAgain: "再試行",
     eventsThisWeek: "今週のイベント",
     newInMarket: "マーケット新着",
+    composerHint: "キャンパスで何かあった？",
+    viewItem: "商品を見る",
+    viewEvent: "参加する",
     welcomeBack: "おかえりなさい",
     loginToContinue: "ログインして続ける",
     joinApp: "MYKerawangへようこそ",

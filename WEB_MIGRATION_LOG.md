@@ -130,6 +130,14 @@ Verified via grep: no stale seedColor/toggleTheme/changeColor/themeMode referenc
 
 Note for future sessions: the sandbox mount can serve stale file reads to bash — verify file state with host-side Read/Grep tools, not `tail`/`grep` in bash.
 
+## Session 4b — build order #2: web home restructure
+
+- **lib/widgets/embed_card.dart (NEW)** — IG-style feed embed (spec §4): 16:9 image with kerawang cut, gold ◆ PASAR/ACARA label, title, price (items) or date·location (events), full-width CTA (l10n: View item/Lihat barang/商品を見る etc). Uses theme text styles only.
+- **lib/widgets/feed_composer.dart (NEW)** — Threads-style composer launcher at top of web feed; opens CreatePostScreen as a centered kerawang-cut dialog on ≥900px (posting "never leaves the feed"), normal push below; shows user avatar via ProfileCubit; refreshes feed on post.
+- **home_screen.dart** — feed split: `_purePosts` (web) vs `_socialFeed` (mobile). Injection now deterministic: injectables alternate event/listing in natural order, exactly one after every 6th post; `Random()`/shuffle removed (fixes the "reshuffles on refresh" grievance). Carousels render mobile-only (rail owns discovery on web). FAB hidden on desktop (sidebar + composer cover creation). Old "Suggested Event/Featured Item" wide-card rendering replaced by EmbedCard on both platforms.
+- **l10n** — added composerHint / viewItem / viewEvent in EN/MS/JA.
+- Spec updated with typography decisions (fonts constant across themes; parked per-theme font idea; theme-text-style migration rule).
+
 ### Still to do
 
 1. `flutter analyze` + visual test at multiple window widths (phone, ~1000px, ≥1200px).

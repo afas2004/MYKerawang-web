@@ -1,4 +1,3 @@
-import 'dart:math'; // Import this for Random()
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:mykerawang/screens/create_event_screen.dart';
@@ -7,6 +6,8 @@ import 'package:mykerawang/screens/post_detail_screen.dart';
 import 'package:mykerawang/widgets/linear_refresher';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../language_cubit.dart';
+import '../widgets/embed_card.dart';
+import '../widgets/feed_composer.dart';
 import '../widgets/hover_carousel.dart';
 import '../widgets/universal_card.dart';
 import '../widgets/post_card.dart';
@@ -30,7 +31,8 @@ class _HomeScreenState extends State<HomeScreen> {
   
   bool _isLoading = true;
   bool _hasError = false;
-  List<dynamic> _socialFeed = [];
+  List<dynamic> _socialFeed = []; // mobile: posts + injected embeds
+  List<dynamic> _purePosts = []; // web: posts only (rail owns discovery)
   List<dynamic> _featuredEvents = [];
   List<dynamic> _freshMarketItems = [];
 
@@ -65,34 +67,26 @@ class _HomeScreenState extends State<HomeScreen> {
           .order('created_at', ascending: false)
           .limit(50); // Fetch enough posts
 
-      // 4. PREPARE MIXED FEED
+      // 4. PREPARE FEEDS (DESIGN_SPEC §4)
+      final purePosts = posts.map((p) => {...p, 'type': 'post'}).toList();
+
+      // Injectables: alternate event/listing, in their natural order.
+      // Deterministic — same data always produces the same feed.
+      final List<dynamic> injectables = [];
+      for (int i = 0; i < events.length || i < listings.length; i++) {
+        if (i < events.length) injectables.add({...events[i], 'type': 'event'});
+        if (i < listings.length) {
+          injectables.add({...listings[i], 'type': 'listing'});
+        }
+      }
+
+      // Mobile feed: exactly one embed after every 6th post.
       final List<dynamic> mixedFeed = [];
-      
-      // Create a pool of "Injectable" items (Events + Listings)
-      final List<dynamic> injectables = [
-        ...events.map((e) => {...e, 'type': 'event'}),
-        ...listings.map((l) => {...l, 'type': 'listing'})
-      ];
-      injectables.shuffle(); // Shuffle so it's not always the same items
-
-      int postCounter = 0;
-      int injectionInterval = 5 + Random().nextInt(4); // Random interval: 5, 6, 7, or 8
-
-      for (var p in posts) {
-        // Add the post
-        mixedFeed.add({...p, 'type': 'post'});
-        postCounter++;
-
-        // Check if it's time to inject
-        if (postCounter >= injectionInterval) {
-          if (injectables.isNotEmpty) {
-            // Take one item from the pool and insert it
-            mixedFeed.add(injectables.removeAt(0));
-            
-            // Reset counter and pick a new random interval
-            postCounter = 0;
-            injectionInterval = 5 + Random().nextInt(4);
-          }
+      int injectIndex = 0;
+      for (int i = 0; i < purePosts.length; i++) {
+        mixedFeed.add(purePosts[i]);
+        if ((i + 1) % 6 == 0 && injectIndex < injectables.length) {
+          mixedFeed.add(injectables[injectIndex++]);
         }
       }
 
@@ -101,6 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _featuredEvents = events.take(8).toList(); // Keep top 8 for carousel
           _freshMarketItems = listings.take(8).toList();
           _socialFeed = mixedFeed;
+          _purePosts = purePosts;
           _isLoading = false;
         });
       }
@@ -118,13 +113,21 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final double topPadding = MediaQuery.of(context).padding.top + kToolbarHeight;
+    // Desktop: composer + pure posts; discovery lives in the right rail.
+    // Mobile: carousels + deterministic embeds (DESIGN_SPEC §4).
+    final bool isDesktop = MediaQuery.sizeOf(context).width >= 900;
+    final List<dynamic> feed = isDesktop ? _purePosts : _socialFeed;
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showCreateOptions(context),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        child: Icon(Icons.add, color: Theme.of(context).colorScheme.onPrimary),
-      ),
+      floatingActionButton: isDesktop
+          ? null // sidebar "Jom post" + composer cover creation on desktop
+          : FloatingActionButton(
+              onPressed: () => _showCreateOptions(context),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              child: Icon(Icons.add,
+                  color: Theme.of(context).colorScheme.onPrimary),
+            ),
       body: LinearRefresher(
         onRefresh: _fetchFeedData,
         offset: topPadding,
@@ -159,6 +162,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
 
+            // COMPOSER (desktop web only) — posting without leaving the feed
+            if (isDesktop && !_isLoading)
+              SliverToBoxAdapter(
+                child: FeedComposer(onPosted: _fetchFeedData),
+              ),
+
             // ERROR STATE: network failed and we have nothing to show
             if (!_isLoading && _hasError && _socialFeed.isEmpty)
               SliverFillRemaining(
@@ -183,8 +192,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-            // 2. EVENTS CAROUSEL (Horizontal)
-            if (!_isLoading && _featuredEvents.isNotEmpty)
+            // 2. EVENTS CAROUSEL (Horizontal — mobile only; rail owns this on web)
+            if (!isDesktop && !_isLoading && _featuredEvents.isNotEmpty)
               SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -208,8 +217,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-            // 3. MARKETPLACE CAROUSEL (Horizontal)
-            if (!_isLoading && _freshMarketItems.isNotEmpty)
+            // 3. MARKETPLACE CAROUSEL (Horizontal — mobile only)
+            if (!isDesktop && !_isLoading && _freshMarketItems.isNotEmpty)
               SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,56 +249,36 @@ class _HomeScreenState extends State<HomeScreen> {
               : SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
-                      final item = _socialFeed[index];
-                      
-                      // RENDER INJECTED CARDS (Event or Listing)
+                      final item = feed[index];
+
+                      // RENDER INJECTED EMBEDS (IG-style, DESIGN_SPEC §4)
                       if (item['type'] == 'event' || item['type'] == 'listing') {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Text(
-                                  item['type'] == 'event' ? "Suggested Event" : "Featured Item",
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.primary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                    letterSpacing: 1.0,
-                                  ),
-                                ),
-                              ),
-                              UniversalCard(
-                                data: item, 
-                                onTap: () {
-                                  if (item['type'] == 'event') {
-                                    Navigator.push(context, MaterialPageRoute(builder: (_) => EventDetailScreen(event: item)));
-                                  } else {
-                                    Navigator.push(context, MaterialPageRoute(builder: (_) => ItemDetailScreen(item: item)));
-                                  }
-                                }
-                              ),
-                              const SizedBox(height: 8),
-                              const Divider(),
-                            ],
-                          ),
+                        final isEvent = item['type'] == 'event';
+                        return EmbedCard(
+                          data: item,
+                          isEvent: isEvent,
+                          onTap: () {
+                            if (isEvent) {
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => EventDetailScreen(event: item)));
+                            } else {
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => ItemDetailScreen(item: item)));
+                            }
+                          },
                         );
                       }
-                      
+
                       // RENDER POST
                       return PostCard(
                         post: item,
                         onTap: () {
                            Navigator.push(
-                            context, 
+                            context,
                             MaterialPageRoute(builder: (_) => PostDetailScreen(post: item))
                           );
                         },
                       );
                     },
-                    childCount: _socialFeed.length,
+                    childCount: feed.length,
                   ),
                 ),
           ],
