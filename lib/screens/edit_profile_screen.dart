@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 import '../utils/image_compressor.dart'; // Ensure you have this file from previous steps
+import '../utils/local_image.dart';
+import '../utils/responsive.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -27,8 +28,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String? _originalUsername;
   
   // Images
-  File? _avatarFile;
-  File? _qrFile;
+  LocalImage? _avatarFile;
+  LocalImage? _qrFile;
   String? _currentAvatarUrl;
   String? _currentQrUrl;
 
@@ -67,11 +68,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery);
     if (picked != null) {
+      final img = await LocalImage.fromXFile(picked);
       setState(() {
         if (isAvatar) {
-          _avatarFile = File(picked.path);
+          _avatarFile = img;
         } else {
-          _qrFile = File(picked.path);
+          _qrFile = img;
         }
       });
     }
@@ -124,17 +126,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       // 2. Upload Images (With Compression)
       if (_avatarFile != null) {
-        // Try compressing, fallback to original if utility missing
-        final fileToUpload = await ImageCompressor.compress(_avatarFile!);
+        // Compress bytes (skipped automatically on web), then upload
+        final bytesToUpload = await ImageCompressor.compressBytes(_avatarFile!.bytes);
         final path = 'avatars/${user!.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        await supabase.storage.from('images').upload(path, fileToUpload);
+        await supabase.storage.from('images').uploadBinary(
+              path,
+              bytesToUpload,
+              fileOptions: const FileOptions(contentType: 'image/jpeg'),
+            );
         newAvatarUrl = supabase.storage.from('images').getPublicUrl(path);
       }
-      
+
       if (_qrFile != null) {
-        final fileToUpload = await ImageCompressor.compress(_qrFile!);
+        final bytesToUpload = await ImageCompressor.compressBytes(_qrFile!.bytes);
         final uniquePath = 'qrs/${user!.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        await supabase.storage.from('images').upload(uniquePath, fileToUpload);
+        await supabase.storage.from('images').uploadBinary(
+              uniquePath,
+              bytesToUpload,
+              fileOptions: const FileOptions(contentType: 'image/jpeg'),
+            );
         newQrUrl = supabase.storage.from('images').getPublicUrl(uniquePath);
       }
 
@@ -177,7 +187,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           )
         ],
       ),
-      body: Form(
+      body: PageBody(child: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -188,8 +198,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 onTap: () => _pickImage(true),
                 child: CircleAvatar(
                   radius: 50,
-                  backgroundImage: _avatarFile != null 
-                    ? FileImage(_avatarFile!) 
+                  backgroundImage: _avatarFile != null
+                    ? MemoryImage(_avatarFile!.bytes)
                     : (_currentAvatarUrl != null ? NetworkImage(_currentAvatarUrl!) : null) as ImageProvider?,
                   child: _avatarFile == null && _currentAvatarUrl == null 
                     ? const Icon(Icons.camera_alt, size: 30) 
@@ -268,8 +278,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   border: Border.all(color: Colors.grey.withOpacity(0.5)),
                   borderRadius: BorderRadius.circular(12),
                   color: theme.colorScheme.surfaceContainerHighest,
-                  image: _qrFile != null 
-                      ? DecorationImage(image: FileImage(_qrFile!), fit: BoxFit.cover)
+                  image: _qrFile != null
+                      ? DecorationImage(image: MemoryImage(_qrFile!.bytes), fit: BoxFit.cover)
                       : (_currentQrUrl != null ? DecorationImage(image: NetworkImage(_currentQrUrl!), fit: BoxFit.cover) : null),
                 ),
                 child: (_qrFile == null && _currentQrUrl == null)
@@ -286,7 +296,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 40),
           ],
         ),
-      ),
+      )),
     );
   }
 

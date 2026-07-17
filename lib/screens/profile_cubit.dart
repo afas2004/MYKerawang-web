@@ -1,5 +1,5 @@
-import 'dart:io';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // 1. The State
@@ -95,14 +95,15 @@ class ProfileCubit extends Cubit<ProfileState> {
     }
   }
 
-  Future<void> uploadAvatar(File imageFile) async {
+  Future<void> uploadAvatar(XFile imageFile) async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return;
       emit(state.copyWith(isLoading: true));
-      final fileExt = imageFile.path.split('.').last;
+      final fileExt = imageFile.name.split('.').last;
       final fileName = '${user.id}/avatar_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
-      await _supabase.storage.from('avatars').upload(fileName, imageFile, fileOptions: const FileOptions(upsert: true));
+      final bytes = await imageFile.readAsBytes();
+      await _supabase.storage.from('avatars').uploadBinary(fileName, bytes, fileOptions: const FileOptions(upsert: true));
       final imageUrl = _supabase.storage.from('avatars').getPublicUrl(fileName);
       await _supabase.from('profiles').update({'avatar_url': imageUrl}).eq('id', user.id);
       await loadProfile();

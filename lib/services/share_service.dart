@@ -1,7 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -58,16 +56,21 @@ class ShareService {
         final response = await http.get(uri);
         
         if (response.statusCode == 200) {
-          // B. Save to Temp Folder
-          final tempDir = await getTemporaryDirectory();
-          final file = await File('${tempDir.path}/shared_image.jpg').create();
-          file.writeAsBytesSync(response.bodyBytes);
+          // B. Share Image + Text directly from bytes
+          // (XFile.fromData works on every platform, including web —
+          //  no temp file or dart:io needed)
+          final imageFile = XFile.fromData(
+            response.bodyBytes,
+            name: 'shared_image.jpg',
+            mimeType: 'image/jpeg',
+          );
 
-          // C. Share Image + Text
           await Share.shareXFiles(
-            [XFile(file.path)],
+            [imageFile],
             text: shareText,
-            sharePositionOrigin: box!.localToGlobal(Offset.zero) & box.size,
+            sharePositionOrigin: box != null
+                ? box.localToGlobal(Offset.zero) & box.size
+                : null,
           );
           return;
         }

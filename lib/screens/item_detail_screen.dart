@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:gal/gal.dart';
 import 'package:http/http.dart' as http;
@@ -10,6 +11,7 @@ import 'create_listing_screen.dart';
 import 'create_post_screen.dart'; // Ensure this exists
 import 'profile_screen.dart'; 
 import 'gallery_view_screen.dart';
+import '../utils/responsive.dart';
 
 class ItemDetailScreen extends StatefulWidget {
   final Map<String, dynamic> item;
@@ -117,11 +119,18 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 
   Future<void> _saveQR(String url) async {
     try {
+      // WEB: gal has no web support — open the image in a new tab
+      // so the user can right-click / long-press to save it.
+      if (kIsWeb) {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Saving QR..."), duration: Duration(seconds: 1)));
-      
+
       // 1. Download bytes using existing http package
       final response = await http.get(Uri.parse(url));
-      
+
       // 2. Save to Gallery
       await Gal.putImageBytes(response.bodyBytes);
       
@@ -181,10 +190,20 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                           setModalState(() => isSaving = true);
 
                           try {
+                            if (kIsWeb) {
+                              // WEB: no gallery — open image in new tab instead
+                              await launchUrl(Uri.parse(qrUrl), mode: LaunchMode.externalApplication);
+                              setModalState(() {
+                                isSaving = false;
+                                isSaved = true;
+                              });
+                              return;
+                            }
+
                             // 2. Download & Save
                             final response = await http.get(Uri.parse(qrUrl));
                             await Gal.putImageBytes(response.bodyBytes);
-                            
+
                             // 3. Update UI to "Success"
                             setModalState(() {
                               isSaving = false;
@@ -253,7 +272,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     ];
 
     return Scaffold(
-      body: CustomScrollView(
+      body: PageBody(child: CustomScrollView(
         slivers: [
           SliverAppBar(
             expandedHeight: 400,
@@ -419,7 +438,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
             ),
           )
         ],
-      ),
+      )),
       
       // --- OWNER CONTROLS ---
       bottomSheet: Container(

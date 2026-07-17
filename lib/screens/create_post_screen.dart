@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/responsive.dart';
 
 class CreatePostScreen extends StatefulWidget {
   final Map<String, dynamic>? sharedEvent;
@@ -101,7 +102,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           )
         ],
       ),
-      body: ListView(
+      body: PageBody(child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           if (isEvent || isListing)
@@ -180,7 +181,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             )).toList(),
           )
         ],
-      ),
+      )),
     );
   }
 }

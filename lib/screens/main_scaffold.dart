@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'home_screen.dart';
 import 'marketplace_screen.dart';
-import 'create_listing_screen.dart';
 import 'events_screen.dart';
 import 'profile_screen.dart';
 import 'search_screen.dart';
+import 'create_post_screen.dart';
+import '../utils/responsive.dart';
+import '../widgets/kerawang_motif.dart';
+import '../widgets/right_rail.dart';
 
 class MainScaffold extends StatefulWidget {
   const MainScaffold({super.key});
@@ -23,28 +27,45 @@ class _MainScaffoldState extends State<MainScaffold> {
     });
   }
 
+  static const _navItems = [
+    (Icons.home_outlined, Icons.home, 'Utama'),
+    (Icons.search, Icons.saved_search, 'Cari'),
+    (Icons.storefront_outlined, Icons.storefront, 'Pasar'),
+    (Icons.calendar_today_outlined, Icons.calendar_month, 'Acara'),
+    (Icons.person_outline, Icons.person, 'Profil'),
+  ];
+
   List<Widget> get _pages => [
     HomeScreen(onTabChange: _switchTab),
-    const SearchScreen(), // Search Tab
-    const MarketplaceScreen(), // The full list
-    const EventsScreen(), // Events Tab
-    const ProfileScreen(), // Profile Tab
+    const SearchScreen(),
+    const MarketplaceScreen(),
+    const EventsScreen(),
+    const ProfileScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, constraints) {
+      final width = constraints.maxWidth;
+      final isDesktop = width >= 900;
+      final showRail = width >= 1150;
+
+      if (!isDesktop) return _buildMobile(context);
+      return _buildDesktop(context, showRail);
+    });
+  }
+
+  // ---------- MOBILE: bottom tabs (unchanged behavior) ----------
+  Widget _buildMobile(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _pages,
-      ),
+      body: IndexedStack(index: _selectedIndex, children: _pages),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          // Adapts background color based on current theme brightness
-          color: Theme.of(context).colorScheme.surfaceContainer,
+          color: scheme.surfaceContainer,
           border: Border(
             top: BorderSide(
-              color: Theme.of(context).dividerColor.withOpacity(0.1),
+              color: Theme.of(context).dividerColor.withValues(alpha: 0.1),
             ),
           ),
         ),
@@ -53,64 +74,144 @@ class _MainScaffoldState extends State<MainScaffold> {
           elevation: 0,
           selectedIndex: _selectedIndex,
           onDestinationSelected: (idx) => setState(() => _selectedIndex = idx),
+          indicatorColor: scheme.secondaryContainer,
+          destinations: _navItems
+              .map((item) => NavigationDestination(
+                    icon: Icon(item.$1, color: scheme.onSurfaceVariant),
+                    selectedIcon:
+                        Icon(item.$2, color: scheme.onSecondaryContainer),
+                    label: item.$3,
+                  ))
+              .toList(),
+        ),
+      ),
+    );
+  }
 
-          // THE CRITICAL PART:
-          // This ensures the "pill" highlight matches your custom seed color
-          // secondaryContainer is the standard Material 3 token for selected indicators
-          indicatorColor: Theme.of(context).colorScheme.secondaryContainer,
+  // ---------- DESKTOP: sidebar + content + optional right rail ----------
+  Widget _buildDesktop(BuildContext context, bool showRail) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
-          destinations: [
-            NavigationDestination(
-              icon: Icon(
-                Icons.home_outlined,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+    return Scaffold(
+      body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // --- SIDEBAR ---
+          Container(
+            width: 220,
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerLow,
+              border: Border(
+                right: BorderSide(color: scheme.outlineVariant),
               ),
-              selectedIcon: Icon(
-                Icons.home,
-                color: Theme.of(context).colorScheme.onSecondaryContainer,
-              ),
-              label: 'Home',
             ),
-            // 2. NEW SEARCH TAB
-            NavigationDestination(
-              icon: Icon(Icons.search),
-              selectedIcon: Icon(Icons.search, weight: 700), // Thicker icon when selected
-              label: 'Search',
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 8, bottom: 20),
+                  child: Text(
+                    "MYKerawang",
+                    style: GoogleFonts.fraunces(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                      color: scheme.primary,
+                    ),
+                  ),
+                ),
+                for (int i = 0; i < _navItems.length; i++)
+                  _SideNavTile(
+                    icon: _selectedIndex == i ? _navItems[i].$2 : _navItems[i].$1,
+                    label: _navItems[i].$3,
+                    selected: _selectedIndex == i,
+                    onTap: () => setState(() => _selectedIndex = i),
+                  ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CreatePostScreen()),
+                  ),
+                  icon: const Icon(Icons.add),
+                  label: const Text("Jom post"),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+                const Spacer(),
+                const KerawangDivider(),
+                const SizedBox(height: 4),
+              ],
             ),
-            NavigationDestination(
-              icon: Icon(
-                Icons.storefront,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+
+          // --- MAIN CONTENT ---
+          Expanded(
+            child: Center(
+              child: ConstrainedBox(
+                constraints:
+                    BoxConstraints(maxWidth: Responsive.feedMaxWidth),
+                child: IndexedStack(index: _selectedIndex, children: _pages),
               ),
-              selectedIcon: Icon(
-                Icons.store,
-                color: Theme.of(context).colorScheme.onSecondaryContainer,
-              ),
-              label: 'Market',
             ),
-            NavigationDestination(
-              icon: Icon(
-                Icons.calendar_today_outlined,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+
+          // --- RIGHT RAIL (wide screens only) ---
+          if (showRail) const RightRail(),
+        ],
+      ),
+    );
+  }
+}
+
+class _SideNavTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _SideNavTile({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          decoration: BoxDecoration(
+            color: selected ? scheme.secondaryContainer : null,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              Icon(icon,
+                  size: 20,
+                  color: selected
+                      ? scheme.onSecondaryContainer
+                      : scheme.onSurfaceVariant),
+              const SizedBox(width: 12),
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                  color: selected
+                      ? scheme.onSecondaryContainer
+                      : scheme.onSurfaceVariant,
+                ),
               ),
-              selectedIcon: Icon(
-                Icons.calendar_month,
-                color: Theme.of(context).colorScheme.onSecondaryContainer,
-              ),
-              label: 'Events',
-            ),
-            NavigationDestination(
-              icon: Icon(
-                Icons.person_outline,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              selectedIcon: Icon(
-                Icons.person,
-                color: Theme.of(context).colorScheme.onSecondaryContainer,
-              ),
-              label: 'Profile',
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

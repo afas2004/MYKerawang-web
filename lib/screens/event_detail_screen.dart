@@ -11,6 +11,7 @@ import 'profile_screen.dart';
 import 'create_post_screen.dart'; 
 import 'create_event_screen.dart';
 import 'gallery_view_screen.dart';
+import '../utils/responsive.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final Map<String, dynamic> event;
@@ -241,7 +242,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         : startDate.add(const Duration(hours: 4)).isBefore(DateTime.now());
 
     return Scaffold(
-      body: CustomScrollView(
+      body: PageBody(child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
             // 1. App Bar (Keep your existing code)
@@ -620,7 +621,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               ),
             ),
           ],
-        ),
+        )),
       
       // 3. BOTTOM SHEET LOGIC (This is where the magic happens)
       bottomSheet: Container(

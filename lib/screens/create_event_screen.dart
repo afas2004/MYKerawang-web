@@ -1,10 +1,12 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 import '../utils/image_compressor.dart'; // Ensure this exists from previous step
+import '../utils/local_image.dart';
 import 'gallery_view_screen.dart'; // Ensure this exists
+import '../utils/responsive.dart';
 
 class CreateEventScreen extends StatefulWidget {
   final Map<String, dynamic>? eventToEdit; 
@@ -86,14 +88,16 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       if (source == ImageSource.camera) {
         final XFile? picked = await picker.pickImage(source: ImageSource.camera);
         if (picked != null) {
-          setState(() => _mediaItems.add(File(picked.path)));
+          final img = await LocalImage.fromXFile(picked);
+          setState(() => _mediaItems.add(img));
         }
       } else {
         // Multi-picker for Gallery
         final List<XFile> pickedList = await picker.pickMultiImage();
         if (pickedList.isNotEmpty) {
+          final imgs = await Future.wait(pickedList.map(LocalImage.fromXFile));
           setState(() {
-            _mediaItems.addAll(pickedList.map((x) => File(x.path)));
+            _mediaItems.addAll(imgs);
           });
         }
       }
@@ -108,11 +112,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       builder: (_) => SafeArea(
         child: Wrap(
           children: [
-            ListTile(
-              leading: const Icon(Icons.photo_camera),
-              title: const Text('Take Photo'),
-              onTap: () { Navigator.pop(context); _pickImage(ImageSource.camera); },
-            ),
+            // Camera capture is unreliable in desktop browsers — mobile only
+            if (!kIsWeb)
+              ListTile(
+                leading: const Icon(Icons.photo_camera),
+                title: const Text('Take Photo'),
+                onTap: () { Navigator.pop(context); _pickImage(ImageSource.camera); },
+              ),
             ListTile(
               leading: const Icon(Icons.photo_library),
               title: const Text('Select from Gallery'),
@@ -145,11 +151,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         final item = _mediaItems[i];
         String url;
 
-        if (item is File) {
-          // It's a new file: Compress -> Upload
-          final compressed = await ImageCompressor.compress(item);
+        if (item is LocalImage) {
+          // It's a new image: Compress -> Upload (bytes — works on web and mobile)
+          final compressed = await ImageCompressor.compressBytes(item.bytes);
           final path = 'events/${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
-          await supabase.storage.from('images').upload(path, compressed);
+          await supabase.storage.from('images').uploadBinary(
+                path,
+                compressed,
+                fileOptions: const FileOptions(contentType: 'image/jpeg'),
+              );
           url = supabase.storage.from('images').getPublicUrl(path);
         } else {
           // It's already a URL
@@ -231,7 +241,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(isEditing ? 'Edit Event' : 'Create Event')),
-      body: SingleChildScrollView(
+      body: PageBody(child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
@@ -300,8 +310,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                               // Image
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
-                                child: item is File 
-                                    ? Image.file(item, fit: BoxFit.cover) 
+                                child: item is LocalImage
+                                    ? Image.memory(item.bytes, fit: BoxFit.cover)
                                     : Image.network(item as String, fit: BoxFit.cover),
                               ),
                               
@@ -366,7 +376,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: Theme.of(context).colorScheme.surfaceContainer,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 // REPLACE TextField WITH THIS:
@@ -389,7 +399,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             ],
           ),
         ),
-      ),
+      )),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(

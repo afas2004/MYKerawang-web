@@ -1,11 +1,11 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart'; // Add 'photo_view' to pubspec.yaml
 import 'package:cached_network_image/cached_network_image.dart';
+import '../utils/local_image.dart';
 
 class GalleryViewScreen extends StatefulWidget {
-  final List<dynamic> galleryItems; // Can be String (URL) or File
+  final List<dynamic> galleryItems; // Can be String (URL) or LocalImage
   final int initialIndex;
 
   const GalleryViewScreen({
@@ -49,8 +49,8 @@ class _GalleryViewScreenState extends State<GalleryViewScreen> {
           final item = widget.galleryItems[index];
           ImageProvider provider;
 
-          if (item is File) {
-            provider = FileImage(item);
+          if (item is LocalImage) {
+            provider = MemoryImage(item.bytes);
           } else {
             provider = CachedNetworkImageProvider(item as String);
           }

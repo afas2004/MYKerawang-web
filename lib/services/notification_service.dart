@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -7,6 +8,9 @@ class NotificationService {
 
   // 1. Initialize the System
   static Future<void> init() async {
+    // flutter_local_notifications has no web support — skip on web.
+    if (kIsWeb) return;
+
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher'); // Uses your app icon
 
@@ -30,11 +34,14 @@ class NotificationService {
 
   // 2. Ask for Permission (The Popup you wanted)
   static Future<void> requestPermission() async {
+    if (kIsWeb) return; // permission_handler has no web support
     await Permission.notification.request();
   }
 
   // 3. Trigger the Popup
   static Future<void> showNotification(String title, String body) async {
+    if (kIsWeb) return; // No system notifications on web (yet)
+
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'high_importance_channel',
       'High Importance Notifications',

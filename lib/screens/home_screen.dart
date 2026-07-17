@@ -1,4 +1,5 @@
 import 'dart:math'; // Import this for Random()
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:mykerawang/screens/create_event_screen.dart';
 import 'package:mykerawang/screens/create_listing_screen.dart';
@@ -26,9 +27,10 @@ class _HomeScreenState extends State<HomeScreen> {
   final _supabase = Supabase.instance.client;
   
   bool _isLoading = true;
-  List<dynamic> _socialFeed = []; 
-  List<dynamic> _featuredEvents = []; 
-  List<dynamic> _freshMarketItems = []; 
+  bool _hasError = false;
+  List<dynamic> _socialFeed = [];
+  List<dynamic> _featuredEvents = [];
+  List<dynamic> _freshMarketItems = [];
 
   @override
   void initState() {
@@ -37,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _fetchFeedData() async {
+    if (mounted && _hasError) setState(() => _hasError = false);
     try {
       final now = DateTime.now().toIso8601String();
 
@@ -101,7 +104,12 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       debugPrint("Error fetching feed: $e");
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+        });
+      }
     }
   }
 
@@ -128,17 +136,50 @@ class _HomeScreenState extends State<HomeScreen> {
               title: const Text("MYKerawang", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5)),
               centerTitle: false,
               actions: [
+                // Refresh button: pull-to-refresh has no mouse equivalent on web
+                if (kIsWeb)
+                  IconButton(
+                    tooltip: "Muat semula",
+                    icon: const Icon(Icons.refresh),
+                    onPressed: _fetchFeedData,
+                  ),
                 IconButton(
+                  tooltip: "Notifikasi",
                   icon: const Icon(Icons.notifications_outlined),
                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationScreen())),
                 ),
                 IconButton(
+                  tooltip: "Tetapan",
                   icon: const Icon(Icons.settings_outlined),
                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
                 ),
                 const SizedBox(width: 8),
               ],
             ),
+
+            // ERROR STATE: network failed and we have nothing to show
+            if (!_isLoading && _hasError && _socialFeed.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.wifi_off,
+                          size: 48,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      const SizedBox(height: 12),
+                      const Text("Tak dapat sambung. Cuba lagi?"),
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        onPressed: _fetchFeedData,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text("Cuba semula"),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
             // 2. EVENTS CAROUSEL (Horizontal)
             if (!_isLoading && _featuredEvents.isNotEmpty)

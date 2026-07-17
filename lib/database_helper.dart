@@ -1,5 +1,10 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+
+// NOTE: sqflite does not support web. On web the cache is simply skipped —
+// the app falls back to fetching directly from Supabase, which is fine
+// because this DB is only an offline cache.
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -50,6 +55,7 @@ class DatabaseHelper {
 
   // UPSERT METHODS (Save Supabase data to local phone)
   Future<void> cacheListings(List<Map<String, dynamic>> items) async {
+    if (kIsWeb) return; // No local cache on web
     final db = await instance.database;
     await db.transaction((txn) async {
       await txn.delete('listings'); // Clear old cache
@@ -69,6 +75,7 @@ class DatabaseHelper {
   }
 
   Future<void> cacheEvents(List<Map<String, dynamic>> items) async {
+    if (kIsWeb) return; // No local cache on web
     final db = await instance.database;
     await db.transaction((txn) async {
       await txn.delete('events');
@@ -86,11 +93,13 @@ class DatabaseHelper {
   }
 
   Future<List<Map<String, dynamic>>> getCachedListings() async {
+    if (kIsWeb) return []; // No local cache on web
     final db = await instance.database;
     return await db.query('listings');
   }
 
   Future<List<Map<String, dynamic>>> getCachedEvents() async {
+    if (kIsWeb) return []; // No local cache on web
     final db = await instance.database;
     return await db.query('events');
   }

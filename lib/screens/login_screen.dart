@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:mykerawang/screens/main_scaffold.dart';
 import '../main.dart'; // This goes up one level to find main.dart
+import '../widgets/kerawang_motif.dart';
 import 'login_cubit.dart'; // This looks in the SAME folder
 
 class LoginScreen extends StatefulWidget {
@@ -14,6 +14,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -28,7 +29,6 @@ class _LoginScreenState extends State<LoginScreen> {
     return BlocProvider(
       create: (context) => LoginCubit(),
       child: Scaffold(
-        backgroundColor: Colors.white,
         // 2. Listen to State Changes (Logic)
         body: BlocConsumer<LoginCubit, LoginState>(
           listener: (context, state) {
@@ -51,36 +51,47 @@ class _LoginScreenState extends State<LoginScreen> {
             }
           },
           builder: (context, state) {
+            final scheme = Theme.of(context).colorScheme;
             // 3. Build UI based on State
             return Center(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24.0),
-                child: Column(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     // --- ORIGINAL UI ELEMENTS START ---
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF5B3E96).withOpacity(0.1),
+                        color: scheme.primaryContainer.withValues(alpha: 0.5),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.school, size: 60, color: Color(0xFF5B3E96)),
+                      child: Icon(Icons.school, size: 60, color: scheme.primary),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
+                    const KerawangDivider(),
+                    const SizedBox(height: 16),
                     Text(
-                      state.isLoginMode ? "Welcome Back" : "Join MYKerawang",
-                      style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                      state.isLoginMode ? "Selamat kembali" : "Jom sertai MYKerawang",
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      state.isLoginMode ? "Login to continue" : "Create an account to get started",
-                      style: const TextStyle(color: Colors.grey),
+                      state.isLoginMode
+                          ? "Log masuk untuk teruskan"
+                          : "Daftar akaun untuk mula",
+                      style: TextStyle(color: scheme.onSurfaceVariant),
                     ),
                     const SizedBox(height: 40),
 
                     TextField(
                       controller: _emailCtrl,
+                      textInputAction: TextInputAction.next,
                       decoration: const InputDecoration(
                         labelText: "Email",
                         prefixIcon: Icon(Icons.email_outlined),
@@ -93,11 +104,24 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 16),
                     TextField(
                       controller: _passCtrl,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: "Password",
-                        prefixIcon: Icon(Icons.lock_outline),
-                        border: OutlineInputBorder(
+                      obscureText: _obscurePassword,
+                      textInputAction: TextInputAction.done,
+                      // Enter key submits (desktop/web expectation)
+                      onSubmitted: (_) => context
+                          .read<LoginCubit>()
+                          .submit(_emailCtrl.text, _passCtrl.text),
+                      decoration: InputDecoration(
+                        labelText: "Kata laluan",
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          tooltip: _obscurePassword ? "Tunjuk" : "Sembunyi",
+                          icon: Icon(_obscurePassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined),
+                          onPressed: () => setState(
+                              () => _obscurePassword = !_obscurePassword),
+                        ),
+                        border: const OutlineInputBorder(
                           borderRadius: BorderRadius.all(Radius.circular(12)),
                         ),
                       ),
@@ -118,17 +142,17 @@ class _LoginScreenState extends State<LoginScreen> {
                                     );
                               },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF5B3E96),
-                          foregroundColor: Colors.white,
+                          backgroundColor: scheme.primary,
+                          foregroundColor: scheme.onPrimary,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
                           elevation: 0,
                         ),
                         child: state.isLoading
-                            ? const CircularProgressIndicator(color: Colors.white)
+                            ? CircularProgressIndicator(color: scheme.onPrimary)
                             : Text(
-                                state.isLoginMode ? "Login" : "Sign Up",
+                                state.isLoginMode ? "Log masuk" : "Daftar",
                                 style: const TextStyle(
                                     fontSize: 16, fontWeight: FontWeight.bold),
                               ),
@@ -142,7 +166,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ? null 
                           : () => context.read<LoginCubit>().signInWithGoogle(),
                       icon: const Icon(Icons.g_mobiledata, size: 28), // Or use a Google Logo asset
-                      label: const Text("Continue with Google"),
+                      label: const Text("Teruskan dengan Google"),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         minimumSize: const Size(double.infinity, 50),
@@ -156,13 +180,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: () => context.read<LoginCubit>().toggleLoginMode(),
                       child: RichText(
                         text: TextSpan(
-                          text: state.isLoginMode ? "New user? " : "Have an account? ",
-                          style: const TextStyle(color: Colors.grey),
+                          text: state.isLoginMode
+                              ? "Pengguna baru? "
+                              : "Dah ada akaun? ",
+                          style: TextStyle(color: scheme.onSurfaceVariant),
                           children: [
                             TextSpan(
-                              text: state.isLoginMode ? "Create account" : "Login",
-                              style: const TextStyle(
-                                color: Color(0xFF5B3E96),
+                              text: state.isLoginMode ? "Daftar sini" : "Log masuk",
+                              style: TextStyle(
+                                color: scheme.primary,
                                 fontWeight: FontWeight.bold,
                               ),
                             )
@@ -172,6 +198,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     )
                     // --- ORIGINAL UI ELEMENTS END ---
                   ],
+                  ),
                 ),
               ),
             );

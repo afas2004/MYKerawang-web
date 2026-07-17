@@ -1,10 +1,12 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 // Ensure you have this utility (or copy it from previous steps)
-import '../utils/image_compressor.dart'; 
+import '../utils/image_compressor.dart';
+import '../utils/local_image.dart';
 import 'gallery_view_screen.dart';
+import '../utils/responsive.dart';
 
 class CreateListingScreen extends StatefulWidget {
   final Map<String, dynamic>? itemToEdit; 
@@ -29,7 +31,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   final List<String> _categories = ['Electronics', 'Books', 'Furniture', 'Clothing', 'Sports', 'Others'];
   bool _isLoading = false;
 
-  // UNIFIED MEDIA LIST (Stores both Strings/URLs and Files)
+  // UNIFIED MEDIA LIST (Stores both Strings/URLs and LocalImages)
   // Index 0 is ALWAYS the Cover Photo.
   final List<dynamic> _mediaItems = [];
 
@@ -76,13 +78,15 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
       if (source == ImageSource.camera) {
         final XFile? picked = await picker.pickImage(source: ImageSource.camera);
         if (picked != null) {
-          setState(() => _mediaItems.add(File(picked.path)));
+          final img = await LocalImage.fromXFile(picked);
+          setState(() => _mediaItems.add(img));
         }
       } else {
         final List<XFile> pickedList = await picker.pickMultiImage();
         if (pickedList.isNotEmpty) {
+          final imgs = await Future.wait(pickedList.map(LocalImage.fromXFile));
           setState(() {
-            _mediaItems.addAll(pickedList.map((x) => File(x.path)));
+            _mediaItems.addAll(imgs);
           });
         }
       }
@@ -97,11 +101,13 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
       builder: (_) => SafeArea(
         child: Wrap(
           children: [
-            ListTile(
-              leading: const Icon(Icons.photo_camera),
-              title: const Text('Take Photo'),
-              onTap: () { Navigator.pop(context); _pickImage(ImageSource.camera); },
-            ),
+            // Camera capture is unreliable in desktop browsers — mobile only
+            if (!kIsWeb)
+              ListTile(
+                leading: const Icon(Icons.photo_camera),
+                title: const Text('Take Photo'),
+                onTap: () { Navigator.pop(context); _pickImage(ImageSource.camera); },
+              ),
             ListTile(
               leading: const Icon(Icons.photo_library),
               title: const Text('Select from Gallery'),
@@ -136,11 +142,15 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         final item = _mediaItems[i];
         String url;
 
-        if (item is File) {
-          // Compress & Upload
-          final compressed = await ImageCompressor.compress(item);
+        if (item is LocalImage) {
+          // Compress & Upload (bytes — works on web and mobile)
+          final compressed = await ImageCompressor.compressBytes(item.bytes);
           final path = 'listings/${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
-          await _supabase.storage.from('images').upload(path, compressed);
+          await _supabase.storage.from('images').uploadBinary(
+                path,
+                compressed,
+                fileOptions: const FileOptions(contentType: 'image/jpeg'),
+              );
           url = _supabase.storage.from('images').getPublicUrl(path);
         } else {
           // Already a URL
@@ -232,7 +242,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(isEditing ? 'Edit Listing' : 'Sell Item')),
-      body: SingleChildScrollView(
+      body: PageBody(child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
@@ -302,8 +312,8 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                             children: [
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
-                                child: item is File 
-                                    ? Image.file(item, fit: BoxFit.cover) 
+                                child: item is LocalImage
+                                    ? Image.memory(item.bytes, fit: BoxFit.cover)
                                     : Image.network(item as String, fit: BoxFit.cover),
                               ),
                               if (isCover)
@@ -378,7 +388,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
             ],
           ),
         ),
-      ),
+      )),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(

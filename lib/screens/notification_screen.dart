@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import '../utils/responsive.dart';
 
 class NotificationScreen extends StatelessWidget {
   const NotificationScreen({super.key});
@@ -11,7 +12,7 @@ class NotificationScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text("Notifications")),
-      body: userId == null 
+      body: PageBody(child: userId == null 
         ? const Center(child: Text("Please login to see notifications"))
         : StreamBuilder(
             stream: Supabase.instance.client
@@ -64,7 +65,7 @@ class NotificationScreen extends StatelessWidget {
                 },
               );
             },
-          ),
+          )),
     );
   }
 }

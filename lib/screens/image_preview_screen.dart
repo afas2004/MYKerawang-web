@@ -1,20 +1,20 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'dart:io';
 import 'package:photo_view/photo_view.dart'; // Ensure you have this package
 import 'package:cached_network_image/cached_network_image.dart';
 
 class ImagePreviewScreen extends StatelessWidget {
-  final File? imageFile;
+  final Uint8List? imageBytes;
   final String? imageUrl;
 
-  const ImagePreviewScreen({super.key, this.imageFile, this.imageUrl});
+  const ImagePreviewScreen({super.key, this.imageBytes, this.imageUrl});
 
   @override
   Widget build(BuildContext context) {
     // 1. Determine which ImageProvider to use
-    // If we have a local file, use FileImage. Otherwise, try CachedNetworkImage.
-    final ImageProvider? provider = imageFile != null 
-        ? FileImage(imageFile!) 
+    // If we have local bytes, use MemoryImage. Otherwise, try CachedNetworkImage.
+    final ImageProvider? provider = imageBytes != null
+        ? MemoryImage(imageBytes!)
         : (imageUrl != null ? CachedNetworkImageProvider(imageUrl!) : null);
 
     return Scaffold(

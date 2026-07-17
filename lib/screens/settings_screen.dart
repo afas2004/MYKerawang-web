@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'login_screen.dart';
 import 'package:mykerawang/theme_cubit.dart';
+import '../utils/responsive.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -19,7 +21,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _marketplaceUpdates = false;
   bool _isLoading = true;
 
-  final primary = const Color(0xFF5B3E96);
   final _supabase = Supabase.instance.client;
 
   @override
@@ -92,7 +93,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final isDarkMode = themeState.themeMode == ThemeMode.dark;
     return Scaffold(
       appBar: AppBar(title: const Text("Settings")),
-      body: _isLoading 
+      body: PageBody(child: _isLoading 
         ? const Center(child: CircularProgressIndicator())
         : ListView(
             padding: const EdgeInsets.all(16),
@@ -109,7 +110,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: const Text("New Events"),
                 subtitle: const Text("Get notified when new events are posted"),
                 value: _newEvents,
-                activeThumbColor: primary,
+                activeThumbColor: Theme.of(context).colorScheme.primary,
                 onChanged: (v) {
                   setState(() => _newEvents = v);
                   _updateSetting('notify_new_events', v); // Save to DB
@@ -119,21 +120,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: const Text("Reminders"),
                 subtitle: const Text("1 hour before events you joined"),
                 value: _eventReminders,
-                activeThumbColor: primary,
+                activeThumbColor: Theme.of(context).colorScheme.primary,
                 onChanged: (v) {
                   setState(() => _eventReminders = v);
                   _updateSetting('notify_reminders', v); // Save to DB
                 },
               ),
-              ListTile(
-                leading: const Icon(Icons.settings_applications, color: Colors.orange),
-                title: const Text("Fix Notification Permissions"),
-                subtitle: const Text("Open system settings to enable"),
-                onTap: () async {
-                  // This forces the phone's App Settings page to open
-                  await openAppSettings(); 
-                },
-              ),
+              // App-settings shortcut only makes sense on mobile
+              if (!kIsWeb)
+                ListTile(
+                  leading: const Icon(Icons.settings_applications, color: Colors.orange),
+                  title: const Text("Fix Notification Permissions"),
+                  subtitle: const Text("Open system settings to enable"),
+                  onTap: () async {
+                    // This forces the phone's App Settings page to open
+                    await openAppSettings();
+                  },
+                ),
               
               const Divider(height: 40),
               _sectionHeader("Marketplace"),
@@ -141,7 +144,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: const Text("Price Drops"),
                 subtitle: const Text("Notify when saved items drop in price"),
                 value: _marketplaceUpdates,
-                activeThumbColor: primary,
+                activeThumbColor: Theme.of(context).colorScheme.primary,
                 onChanged: (v) {
                   setState(() => _marketplaceUpdates = v);
                   _updateSetting('notify_marketplace', v); // Save to DB
@@ -265,7 +268,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Text("Version 1.0.0", style: TextStyle(color: Colors.grey, fontSize: 12)),
               ),
             ],
-          ),
+          )),
     );
   }
 

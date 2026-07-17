@@ -5,6 +5,7 @@ import 'package:mykerawang/widgets/linear_refresher';
 import 'item_detail_screen.dart';
 import 'create_listing_screen.dart';
 import 'marketplace_cubit.dart'; // Ensure this matches your file name
+import '../utils/responsive.dart';
 
 class MarketplaceScreen extends StatelessWidget {
   const MarketplaceScreen({super.key});
@@ -104,10 +105,12 @@ class _MarketplaceViewState extends State<MarketplaceView> {
                         // Use state.displayedItems from Cubit
                         child: state.displayedItems.isEmpty
                             ? const Center(child: Text("No items found"))
-                            : GridView.builder(
+                            : LayoutBuilder(builder: (context, constraints) {
+                                return GridView.builder(
                                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  // 2 columns on phones, 3-4 on wider screens
+                                  crossAxisCount: Responsive.gridColumns(constraints.maxWidth),
                                   childAspectRatio: 0.7,
                                   crossAxisSpacing: 16,
                                   mainAxisSpacing: 16,
@@ -176,7 +179,8 @@ class _MarketplaceViewState extends State<MarketplaceView> {
                                     ),
                                   );
                                 },
-                              ),
+                              );
+                              }),
                       ),
                     ],
                   ),

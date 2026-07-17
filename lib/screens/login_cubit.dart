@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -89,7 +90,10 @@ class LoginCubit extends Cubit<LoginState> {
       // NOTE: Ensure you have "Google" enabled in Supabase Auth Providers
       await supabase.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: 'mykerawang://login-callback', // Match this with Supabase URL settings
+        // WEB: come back to this same page after Google login.
+        // MOBILE: deep link back into the app (must match Supabase URL settings
+        // and the AndroidManifest intent filter).
+        redirectTo: kIsWeb ? Uri.base.origin : 'mykerawang://login-callback',
       );
       
       // Note: OAuth flow continues outside the app usually. 

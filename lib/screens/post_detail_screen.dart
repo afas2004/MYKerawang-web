@@ -7,6 +7,7 @@ import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../widgets/post_card.dart';
+import '../utils/responsive.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final Map<String, dynamic> post;
@@ -144,7 +145,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Thread")),
-      body: Column(
+      body: PageBody(child: Column(
         children: [
           Expanded(
             // 2. REFRESH INDICATOR WRAPPER
@@ -307,7 +308,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             ),
           ),
         ],
-      ),
+      )),
     );
   }
 }
