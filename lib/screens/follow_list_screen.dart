@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'profile_screen.dart';
+import '../utils/adaptive.dart';
+import '../utils/app_nav.dart';
+import '../utils/responsive.dart';
 
 class FollowListScreen extends StatefulWidget {
   final String userId;
@@ -63,12 +65,13 @@ class _FollowListScreenState extends State<FollowListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: appBarConstrained(
+        context,
         title: Text(widget.type == 'followers' ? 'Followers' : 'Following'),
       ),
-      body: _isLoading 
+      body: PageBody(child: _isLoading
         ? const Center(child: CircularProgressIndicator())
-        : _users.isEmpty 
+        : _users.isEmpty
           ? const Center(child: Text("List is empty"))
           : ListView.builder(
               itemCount: _users.length,
@@ -85,18 +88,10 @@ class _FollowListScreenState extends State<FollowListScreen> {
                   ),
                   title: Text(user['display_name'] ?? 'User'),
                   subtitle: Text("@${user['username'] ?? ''}"),
-                  onTap: () {
-                    // Navigate to their profile
-                    Navigator.push(
-                      context, 
-                      MaterialPageRoute(
-                        builder: (_) => ProfileScreen(userId: user['id'])
-                      )
-                    );
-                  },
+                  onTap: () => context.goUser(user['id']),
                 );
               },
-            ),
+            )),
     );
   }
 }

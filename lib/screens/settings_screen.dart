@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'login_screen.dart';
 import 'package:mykerawang/theme_cubit.dart';
 import '../theme/app_themes.dart';
+import '../utils/adaptive.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../utils/responsive.dart';
@@ -94,7 +95,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final currentTheme = context.watch<ThemeCubit>().state.appTheme;
     return Scaffold(
-      appBar: AppBar(title: const Text("Settings")),
+      appBar: appBarConstrained(context, title: Text(context.l10n.settingsTitle)),
       body: PageBody(child: _isLoading 
         ? const Center(child: CircularProgressIndicator())
         : ListView(
@@ -117,9 +118,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 8),
 
-              _sectionHeader("Event Alerts"),
-
-              // --- LANGUAGE ---
+              // --- LANGUAGE (belongs with Appearance, not Event Alerts) ---
               ListTile(
                 leading: const Icon(Icons.translate),
                 title: Text(context.l10n.language),
@@ -137,7 +136,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       context.read<LanguageCubit>().changeLanguage(sel.first),
                 ),
               ),
-              const SizedBox(height: 8),
+
+              const Divider(height: 40),
+              _sectionHeader("Event Alerts"),
+
               SwitchListTile(
                 title: const Text("New Events"),
                 subtitle: const Text("Get notified when new events are posted"),
@@ -184,90 +186,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               
               const Divider(height: 40),
-
-              // --- THEME PREVIEW CARD ---
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Preview", style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).cardColor,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.1)),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              // Fake Avatar
-                              CircleAvatar(
-                                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                                child: Icon(Icons.person, color: Theme.of(context).colorScheme.onPrimaryContainer),
-                              ),
-                              const SizedBox(width: 12),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text("John Doe", style: TextStyle(fontWeight: FontWeight.bold)),
-                                  Text("UiTM Student", style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                                ],
-                              ),
-                              const Spacer(),
-                              // Fake "Follow" Button
-                              ElevatedButton(
-                                onPressed: () {},
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Theme.of(context).colorScheme.primary,
-                                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                                  minimumSize: const Size(60, 30),
-                                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                                ),
-                                child: const Text("Follow"),
-                              )
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          // Fake Tag
-                          Row(
-                            children: [
-                              Chip(
-                                label: const Text("Active"), 
-                                backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-                                labelStyle: TextStyle(color: Theme.of(context).colorScheme.onSecondaryContainer, fontSize: 12),
-                                side: BorderSide.none,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
+              // Preview card removed — it didn't show anything the live
+              // theme cards don't already demonstrate (H4/14.7).
+              const SizedBox(height: 4),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
+                child: OutlinedButton(
                   onPressed: _signOut,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red[50],
-                    foregroundColor: Colors.red,
+                  // Theme error colour — the old red[50] fill was unreadable
+                  // on Songket Noir (verified in browser).
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                    side: BorderSide(color: Theme.of(context).colorScheme.error),
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    elevation: 0,
-                    side: const BorderSide(color: Colors.red, width: 1),
                   ),
                   child: const Text("Sign Out", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
               const SizedBox(height: 10),
-              const Center(
-                child: Text("Version 1.0.0", style: TextStyle(color: Colors.grey, fontSize: 12)),
+              Center(
+                child: Text("Version 1.0.0",
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant)),
               ),
             ],
           )),

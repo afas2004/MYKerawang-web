@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../language_cubit.dart';
+import '../utils/adaptive.dart';
 import '../utils/responsive.dart';
 
 class CreatePostScreen extends StatefulWidget {
@@ -16,11 +18,37 @@ class CreatePostScreen extends StatefulWidget {
 class _CreatePostScreenState extends State<CreatePostScreen> {
   final _bodyCtrl = TextEditingController();
   final _titleCtrl = TextEditingController();
+  final _tagsCtrl = TextEditingController();
   bool _isAnon = false;
   bool _isLoading = false;
-  String? _selectedTag;
-  
+
+  /// Suggested shortcuts — users can also type anything they like.
   final List<String> _tags = ['Question', 'Confession', 'Lost&Found', 'Rant', 'Academic'];
+
+  /// Tags currently in the field, normalised to lowercase without '#'.
+  List<String> get _currentTags => RegExp(r'#?([\w&-]+)')
+      .allMatches(_tagsCtrl.text)
+      .map((m) => m.group(1)!.toLowerCase())
+      .where((t) => t.isNotEmpty)
+      .toSet()
+      .toList();
+
+  @override
+  void dispose() {
+    _bodyCtrl.dispose();
+    _titleCtrl.dispose();
+    _tagsCtrl.dispose();
+    super.dispose();
+  }
+
+  void _appendTag(String tag) {
+    if (_currentTags.contains(tag.toLowerCase())) return;
+    final text = _tagsCtrl.text.trimRight();
+    _tagsCtrl.text = text.isEmpty ? "#$tag " : "$text #$tag ";
+    _tagsCtrl.selection =
+        TextSelection.collapsed(offset: _tagsCtrl.text.length);
+    setState(() {});
+  }
 
   Future<void> _submit() async {
     if (_titleCtrl.text.isEmpty) return;
@@ -38,7 +66,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         'is_anonymous': _isAnon,
         'shared_event_id': widget.sharedEvent?['id'],
         'shared_listing_id': widget.sharedListing?['id'],
-        'tags': _selectedTag != null ? [_selectedTag] : [],
+        'tags': _currentTags,
       }).select().single(); // <--- CRITICAL CHANGE
 
       // Trigger the notifications using the new ID
@@ -93,12 +121,20 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     final bool isEvent = widget.sharedEvent != null;
     final bool isListing = widget.sharedListing != null;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Create Post"),
+      appBar: appBarConstrained(
+        context,
+        // In a dialog on desktop a ✕ reads better than a back arrow (H4/2.1)
+        leading: IconButton(
+          tooltip: "Close",
+          icon: Icon(isWide(context) ? Icons.close : Icons.arrow_back),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        title: Text(context.l10n.createPostTitle),
         actions: [
           TextButton(
             onPressed: _isLoading ? null : _submit,
-            child: const Text("POST", style: TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(context.l10n.post,
+                style: const TextStyle(fontWeight: FontWeight.bold)),
           )
         ],
       ),
@@ -156,7 +192,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           const Divider(),
           MentionInput(
             controller: _bodyCtrl,
-            hintText: "What's on your mind?",
+            hintText: context.l10n.whatsOnYourMind,
             isMultiLine: true,
           ),
           const SizedBox(height: 20),
@@ -170,15 +206,30 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           ),
           
           const SizedBox(height: 10),
-          const Text("Add Tag", style: TextStyle(fontWeight: FontWeight.bold)),
+          Text(context.l10n.addTags,
+              style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          // Free-text hashtags. Chips are shortcuts that append into the
+          // field; they can't be added twice.
+          TextField(
+            controller: _tagsCtrl,
+            decoration: InputDecoration(
+              hintText: context.l10n.tagsHint,
+              prefixIcon: const Icon(Icons.tag),
+            ),
+            onChanged: (_) => setState(() {}), // refresh chip states
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
-            children: _tags.map((tag) => ChoiceChip(
-              label: Text(tag),
-              selected: _selectedTag == tag,
-              onSelected: (val) => setState(() => _selectedTag = val ? tag : null),
-            )).toList(),
+            children: _tags.map((tag) {
+              final already = _currentTags.contains(tag.toLowerCase());
+              return ActionChip(
+                avatar: Icon(already ? Icons.check : Icons.add, size: 16),
+                label: Text(tag),
+                onPressed: already ? null : () => _appendTag(tag),
+              );
+            }).toList(),
           )
         ],
       )),

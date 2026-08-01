@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
@@ -6,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import '../utils/image_compressor.dart';
 import '../utils/local_image.dart';
 import 'gallery_view_screen.dart';
+import '../language_cubit.dart';
+import '../utils/adaptive.dart';
 import '../utils/responsive.dart';
 
 class CreateListingScreen extends StatefulWidget {
@@ -96,21 +97,21 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   }
 
   void _showAddOptions() {
-    showModalBottomSheet(
+    showAdaptiveSheet(
       context: context,
       builder: (_) => SafeArea(
         child: Wrap(
           children: [
-            // Camera capture is unreliable in desktop browsers — mobile only
-            if (!kIsWeb)
+            // Desktop browsers can't capture; phone PWAs can (see canUseCamera)
+            if (canUseCamera(context))
               ListTile(
                 leading: const Icon(Icons.photo_camera),
-                title: const Text('Take Photo'),
+                title: Text(context.l10n.takePhoto),
                 onTap: () { Navigator.pop(context); _pickImage(ImageSource.camera); },
               ),
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('Select from Gallery'),
+              title: Text(context.l10n.chooseFromGallery),
               onTap: () { Navigator.pop(context); _pickImage(ImageSource.gallery); },
             ),
           ],
@@ -194,7 +195,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
   // --- 3. UI HELPER: IMAGE MENU ---
   void _showImageMenu(int index) {
-    showModalBottomSheet(
+    showAdaptiveSheet(
       context: context,
       builder: (_) => SafeArea(
         child: Wrap(
@@ -202,7 +203,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
             if (index != 0)
               ListTile(
                 leading: const Icon(Icons.star_border),
-                title: const Text('Set as Cover Photo'),
+                title: Text(context.l10n.setAsCover),
                 onTap: () {
                   Navigator.pop(context);
                   setState(() {
@@ -213,12 +214,10 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
               ),
             ListTile(
               leading: const Icon(Icons.fullscreen),
-              title: const Text('View Fullscreen'),
+              title: Text(context.l10n.viewFullscreen),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(
-                  builder: (_) => GalleryViewScreen(galleryItems: _mediaItems, initialIndex: index)
-                ));
+                showGallery(context, items: _mediaItems, initialIndex: index);
               },
             ),
             ListTile(
@@ -241,7 +240,8 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: Text(isEditing ? 'Edit Listing' : 'Sell Item')),
+      appBar: appBarConstrained(context,
+          title: Text(isEditing ? 'Edit Listing' : 'Sell Item')),
       body: PageBody(child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(

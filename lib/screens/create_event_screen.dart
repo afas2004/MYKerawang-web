@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -6,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import '../utils/image_compressor.dart'; // Ensure this exists from previous step
 import '../utils/local_image.dart';
 import 'gallery_view_screen.dart'; // Ensure this exists
+import '../language_cubit.dart';
+import '../utils/adaptive.dart';
 import '../utils/responsive.dart';
 
 class CreateEventScreen extends StatefulWidget {
@@ -107,21 +108,21 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   void _showAddOptions() {
-    showModalBottomSheet(
+    showAdaptiveSheet(
       context: context,
       builder: (_) => SafeArea(
         child: Wrap(
           children: [
-            // Camera capture is unreliable in desktop browsers — mobile only
-            if (!kIsWeb)
+            // Desktop browsers can't capture; phone PWAs can (see canUseCamera)
+            if (canUseCamera(context))
               ListTile(
                 leading: const Icon(Icons.photo_camera),
-                title: const Text('Take Photo'),
+                title: Text(context.l10n.takePhoto),
                 onTap: () { Navigator.pop(context); _pickImage(ImageSource.camera); },
               ),
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('Select from Gallery'),
+              title: Text(context.l10n.chooseFromGallery),
               onTap: () { Navigator.pop(context); _pickImage(ImageSource.gallery); },
             ),
           ],
@@ -240,7 +241,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     final isEditing = widget.eventToEdit != null;
 
     return Scaffold(
-      appBar: AppBar(title: Text(isEditing ? 'Edit Event' : 'Create Event')),
+      appBar: appBarConstrained(context,
+          title: Text(isEditing ? 'Edit Event' : 'Create Event')),
       body: PageBody(child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -424,7 +426,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
   // --- HELPER: Image Menu ---
   void _showImageMenu(int index) {
-    showModalBottomSheet(
+    showAdaptiveSheet(
       context: context,
       builder: (_) => SafeArea(
         child: Wrap(
@@ -432,7 +434,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             if (index != 0) // Only show "Make Cover" if it's not already cover
               ListTile(
                 leading: const Icon(Icons.star_border),
-                title: const Text('Set as Cover Photo'),
+                title: Text(context.l10n.setAsCover),
                 onTap: () {
                   Navigator.pop(context);
                   setState(() {
@@ -443,12 +445,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               ),
             ListTile(
               leading: const Icon(Icons.fullscreen),
-              title: const Text('View Fullscreen'),
+              title: Text(context.l10n.viewFullscreen),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(
-                  builder: (_) => GalleryViewScreen(galleryItems: _mediaItems, initialIndex: index)
-                ));
+                showGallery(context, items: _mediaItems, initialIndex: index);
               },
             ),
             ListTile(

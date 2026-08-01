@@ -164,6 +164,33 @@ ThemeData buildAppTheme(AppTheme theme) {
         foregroundColor: isDark ? spec.gold : spec.primary,
       ),
     ),
+    // Floating, width-limited toasts instead of a full-bleed bar glued to
+    // the bottom of a wide window (UI_UX_AUDIT G4).
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      width: 420,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ),
+
+    // Every form field in the app inherits this — no per-screen borders.
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: scheme.surfaceContainer,
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: spec.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: spec.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: spec.primary, width: 2),
+      ),
+    ),
     chipTheme: base.chipTheme.copyWith(
       shape: spec.pillButtons
           ? const StadiumBorder()

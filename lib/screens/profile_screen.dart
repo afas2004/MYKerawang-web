@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:mykerawang/screens/edit_profile_screen.dart';
-import 'package:mykerawang/screens/event_detail_screen.dart';
 import 'package:mykerawang/screens/follow_list_screen.dart';
-import 'package:mykerawang/screens/image_preview_screen.dart';
-import 'package:mykerawang/screens/post_detail_screen.dart';
+import 'package:mykerawang/language_cubit.dart';
+import 'package:mykerawang/widgets/image_crop_dialog.dart';
+import 'package:mykerawang/utils/app_nav.dart';
 import 'package:mykerawang/utils/report_helper.dart';
 import 'package:mykerawang/widgets/linear_refresher';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:qr_flutter/qr_flutter.dart'; 
-import '../widgets/universal_card.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../widgets/post_card.dart';
-import 'settings_screen.dart';
-import 'item_detail_screen.dart'; // Needed for navigation
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -58,7 +55,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       final profileData = await _supabase.from('profiles').select().eq('id', targetUid).single();
       
       // 2. Fetch Content (Posts, Events, AND Listings)
-      final posts = await _supabase.from('posts').select('*,profiles(*), events(*), listings(*)').eq('user_id', targetUid).order('created_at', ascending: false);
+      // posts_public nulls user_id on anonymous rows, so anonymous posts no
+      // longer appear on anyone's profile — including the author's own.
+      // That's deliberate: a profile page is public, so listing them here
+      // would deanonymise them.
+      final posts = await _supabase.from('posts_public').select('*').eq('user_id', targetUid).order('created_at', ascending: false);
       final events = await _supabase.from('events').select().eq('organizer_id', targetUid).order('start_datetime', ascending: false);
       
       // <--- NEW: Fetch Listings
@@ -226,10 +227,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                 if (code.startsWith("mykerawang://user/")) {
                                   final userId = code.split("/").last;
                                   Navigator.pop(ctx);
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (_) => ProfileScreen(userId: userId)),
-                                  );
+                                  context.goUser(userId);
                                   break;
                                 }
                               }
@@ -260,14 +258,25 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       appBar: AppBar(
         title: Text(_profile!['username'] != null ? "@${_profile!['username']}" : "Profile"),
         actions: [
-          IconButton(icon: const Icon(Icons.qr_code), onPressed: _showQRCode),
+          IconButton(
+            tooltip: context.l10n.refresh,
+            icon: const Icon(Icons.refresh),
+            onPressed: _fetchProfileData,
+          ),
+          IconButton(
+            tooltip: "QR code",
+            icon: const Icon(Icons.qr_code),
+            onPressed: _showQRCode,
+          ),
           if (_isMe)
             IconButton(
+              tooltip: context.l10n.settings,
               icon: const Icon(Icons.settings),
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+              onPressed: () => context.goSettings(),
             )
           else
             PopupMenuButton<String>(
+              tooltip: "More",
               onSelected: (value) => showReportDialog(context, widget.userId!, 'user'),
               itemBuilder: (context) => [
                 const PopupMenuItem(
@@ -294,12 +303,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   // Avatar
                   GestureDetector(
                     onTap: () {
-                      if (_profile!['avatar_url'] != null) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => ImagePreviewScreen(imageUrl: _profile!['avatar_url'])),
-                        );
-                      }
+                      final url = _profile!['avatar_url'];
+                      if (url == null) return;
+                      // Full original image, uncropped (BoxFit.contain)
+                      showImagePreview(context, url: url);
                     },
                     child: CircleAvatar(
                         radius: 40,
@@ -417,7 +424,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                             post: _userPosts[index],
                             showProfileHeader: false, // remove profile header in post card
                             onTap: () { 
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(post: _userPosts[index]))); 
+                              context.goPost(_userPosts[index]);
                             },
                           );
                         },
@@ -470,10 +477,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           onTap: () {
             // Navigate to details
             if (isEvent) {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => EventDetailScreen(event: item)));
+              context.goEvent(item);
             } else {
               // Check type (Listing vs Post) if mixed, otherwise assume Listing
-              Navigator.push(context, MaterialPageRoute(builder: (_) => ItemDetailScreen(item: item)));
+              context.goItem(item);
             }
           },
           onLongPress: () {

@@ -39,7 +39,9 @@ class PageBody extends StatelessWidget {
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
+        // Let users select and copy prices, phone numbers, descriptions —
+        // a basic web expectation (UI_UX_AUDIT A5 / 0.16).
+        child: SelectionArea(child: child),
       ),
     );
   }

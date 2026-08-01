@@ -24,7 +24,9 @@ class FeedComposer extends StatelessWidget {
               clipBehavior: Clip.antiAlias,
               shape: const RoundedRectangleBorder(borderRadius: kerawangCut),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 620, maxHeight: 640),
+                // Sized to the form rather than a fixed tall box, so the
+                // dialog doesn't trail empty space below the tags (H4/2.1)
+                constraints: const BoxConstraints(maxWidth: 620, maxHeight: 560),
                 child: const CreatePostScreen(),
               ),
             ),

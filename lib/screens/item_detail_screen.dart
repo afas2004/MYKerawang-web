@@ -1,15 +1,17 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:gal/gal.dart';
 import 'package:http/http.dart' as http;
 import 'package:mykerawang/services/share_service.dart';
 import 'package:mykerawang/utils/report_helper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart'; 
+ 
 import 'create_listing_screen.dart'; 
 import 'create_post_screen.dart'; // Ensure this exists
-import 'profile_screen.dart'; 
+import '../language_cubit.dart';
+import '../utils/adaptive.dart';
+import '../utils/app_nav.dart';
+import '../utils/file_saver.dart';
 import 'gallery_view_screen.dart';
 import '../utils/responsive.dart';
 
@@ -117,30 +119,6 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     }
   }
 
-  Future<void> _saveQR(String url) async {
-    try {
-      // WEB: gal has no web support — open the image in a new tab
-      // so the user can right-click / long-press to save it.
-      if (kIsWeb) {
-        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Saving QR..."), duration: Duration(seconds: 1)));
-
-      // 1. Download bytes using existing http package
-      final response = await http.get(Uri.parse(url));
-
-      // 2. Save to Gallery
-      await Gal.putImageBytes(response.bodyBytes);
-      
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("QR Saved to Gallery!")));
-    } catch (e) {
-      debugPrint("Save error: $e");
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Could not save image. Check permissions.")));
-    }
-  }
-  
   Future<void> _showPurchaseDialog() async {
     if (_sellerProfile == null) return;
 
@@ -152,7 +130,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     bool isSaving = false;
     bool isSaved = false;
 
-    showModalBottomSheet(
+    showAdaptiveSheet(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(
@@ -190,24 +168,18 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                           setModalState(() => isSaving = true);
 
                           try {
-                            if (kIsWeb) {
-                              // WEB: no gallery — open image in new tab instead
-                              await launchUrl(Uri.parse(qrUrl), mode: LaunchMode.externalApplication);
-                              setModalState(() {
-                                isSaving = false;
-                                isSaved = true;
-                              });
-                              return;
-                            }
-
-                            // 2. Download & Save
+                            // One button, right behaviour per platform:
+                            // browser download on web, gallery on mobile.
                             final response = await http.get(Uri.parse(qrUrl));
-                            await Gal.putImageBytes(response.bodyBytes);
+                            final ok = await saveImageBytes(
+                              response.bodyBytes,
+                              filename:
+                                  'duitnow-${_sellerProfile?['username'] ?? 'qr'}.jpg',
+                            );
 
-                            // 3. Update UI to "Success"
                             setModalState(() {
                               isSaving = false;
-                              isSaved = true;
+                              isSaved = ok;
                             });
                           } catch (e) {
                             debugPrint("Save error: $e");
@@ -220,7 +192,11 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                       : Icon(isSaved ? Icons.check_circle : Icons.save_alt, color: isSaved ? Colors.green : null),
                     // Dynamic Text
                     label: Text(
-                      isSaving ? "Saving..." : (isSaved ? "Saved to Gallery!" : "Save to Gallery"),
+                      isSaving
+                          ? context.l10n.saving
+                          : (isSaved
+                              ? context.l10n.saved
+                              : (kIsWeb ? "Download QR" : "Save to Gallery")),
                       style: TextStyle(
                         color: isSaved ? Colors.green : null, 
                         fontWeight: isSaved ? FontWeight.bold : null
@@ -241,11 +217,22 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     label: const Text("Chat on WhatsApp"),
                     style: FilledButton.styleFrom(backgroundColor: Colors.green, padding: const EdgeInsets.symmetric(vertical: 12)),
                     onPressed: () {
-                       // ... (Paste your existing WhatsApp logic here) ...
-                       // Short version for context:
-                       if (phone != null && phone.isNotEmpty) {
-                         // ShareService.openWhatsApp(...);
-                       }
+                      // Was a placeholder comment — the button did nothing.
+                      final raw = (phone ?? '').toString().trim();
+                      if (raw.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text(
+                                  "This seller hasn't added a phone number yet")),
+                        );
+                        return;
+                      }
+                      ShareService.openWhatsApp(
+                        context,
+                        raw,
+                        "Hi! I'm interested in your listing "
+                        "\"${_itemData['title']}\" (RM ${_itemData['price']}) on MYKerawang.",
+                      );
                     },
                   ),
                 ),
@@ -297,7 +284,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     itemBuilder: (context, index) {
                       return GestureDetector(
                         onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => GalleryViewScreen(galleryItems: allImages, initialIndex: index)));
+                          showGallery(context, items: allImages, initialIndex: index);
                         },
                         child: Hero(
                           tag: index == 0 ? _itemData['id'] : "gallery_$index", 
@@ -364,7 +351,16 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                       IconButton(
                         icon: const CircleAvatar(backgroundColor: Colors.black45, child: Icon(Icons.share, color: Colors.white, size: 20)),
                         onPressed: () {
-                          ShareService.shareContent(context, _itemData['title'], "Price: RM ${_itemData['price']}\n${_itemData['description'] ?? ''}", _itemData['image_url']);
+                          // Pass cover + gallery so every photo can be shared
+                          ShareService.shareContent(
+                            context,
+                            _itemData['title'],
+                            "Price: RM ${_itemData['price']}\n${_itemData['description'] ?? ''}",
+                            [
+                              if (_itemData['image_url'] != null) _itemData['image_url'],
+                              ...?(_itemData['gallery_urls'] as List?)?.cast<String>(),
+                            ],
+                          );
                         },
                       ),
                       PopupMenuButton<String>(
@@ -389,7 +385,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 
                   if (_sellerProfile != null)
                     InkWell(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(userId: _sellerProfile!['id']))),
+                      onTap: () => context.goUser(_sellerProfile!['id']),
                       child: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.2)), borderRadius: BorderRadius.circular(12), color: Theme.of(context).colorScheme.surfaceContainer),
@@ -441,7 +437,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       )),
       
       // --- OWNER CONTROLS ---
-      bottomSheet: Container(
+      bottomSheet: bottomBarConstrained(context, Container(
         padding: const EdgeInsets.all(16),
         width: double.infinity,
         decoration: BoxDecoration(
@@ -508,7 +504,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
-      ),
+      )),
     );
   }
 }

@@ -39,6 +39,15 @@ class EventsState {
   }
 }
 
+/// Has this event finished? Ended events stay visible (greyed out) —
+/// history is content (DESIGN_SPEC §6).
+bool isEventEnded(Map<String, dynamic> event) {
+  final raw = event['end_datetime'] ?? event['start_datetime'];
+  final end = DateTime.tryParse(raw ?? '');
+  if (end == null) return false;
+  return end.toUtc().isBefore(DateTime.now().toUtc());
+}
+
 class EventsCubit extends Cubit<EventsState> {
   EventsCubit() : super(EventsState()) {
     loadData();
@@ -52,8 +61,7 @@ class EventsCubit extends Cubit<EventsState> {
     emit(state.copyWith(isLoading: true));
 
     final cachedData = await DatabaseHelper.instance.getCachedEvents();
-    final nowStr = DateTime.now().toUtc().toIso8601String();
-    
+
     if (cachedData.isNotEmpty) {
       final filtered = _applyFilters(cachedData, state.selectedTag, state.searchQuery);
       emit(state.copyWith(
@@ -64,10 +72,10 @@ class EventsCubit extends Cubit<EventsState> {
     }
 
     // 3. SLOW: Subscribe to Supabase (Background Download)
+    // Ended events are kept and greyed out in the UI, not hidden.
     _subscription = _supabase
         .from('events')
         .stream(primaryKey: ['id'])
-        .gte('end_datetime', nowStr) // Only show future events
         .order('created_at', ascending: false)
         .listen((data) async {
           final items = List<Map<String, dynamic>>.from(data);
@@ -86,7 +94,12 @@ class EventsCubit extends Cubit<EventsState> {
             ));
           }
         }, onError: (error) {
-          if (!isClosed) emit(state.copyWith(errorMessage: error.toString()));
+          // Must clear isLoading, otherwise the screen spins forever when
+          // offline (UI_UX_AUDIT 15.5).
+          if (!isClosed) {
+            emit(state.copyWith(
+                isLoading: false, errorMessage: error.toString()));
+          }
         });
   }
 
@@ -102,16 +115,31 @@ class EventsCubit extends Cubit<EventsState> {
 
   List<Map<String, dynamic>> _applyFilters(
       List<Map<String, dynamic>> items, String tag, String query) {
-    return items.where((e) {
+    final filtered = items.where((e) {
       final title = (e['title'] as String).toLowerCase();
       final search = query.toLowerCase();
       final eventTags = List<String>.from(e['tags'] ?? []);
-      
+
       final matchesSearch = title.contains(search);
       final matchesTag = tag == 'All' || eventTags.contains(tag);
-      
+
       return matchesSearch && matchesTag;
     }).toList();
+
+    // Upcoming first (soonest first), then ended (most recent first).
+    DateTime start(Map<String, dynamic> e) =>
+        DateTime.tryParse(e['start_datetime'] ?? '') ?? DateTime(1970);
+
+    filtered.sort((a, b) {
+      final aEnded = isEventEnded(a);
+      final bEnded = isEventEnded(b);
+      if (aEnded != bEnded) return aEnded ? 1 : -1;
+      return aEnded
+          ? start(b).compareTo(start(a))
+          : start(a).compareTo(start(b));
+    });
+
+    return filtered;
   }
 
   @override

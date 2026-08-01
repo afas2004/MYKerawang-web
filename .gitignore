@@ -44,3 +44,19 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 android/build/
+
+# Working documentation — lives in Project\documentation\mykerawang_web
+# The repo is public; audits, schema dumps and product notes stay out of it.
+# Applied schema changes belong in supabase/migrations/ instead.
+/*_AUDIT.md
+/DESIGN_SPEC.md
+/PRODUCT_NOTES.md
+/WEB_MIGRATION_LOG.md
+/WEB_QA_CHECKLIST.md
+/web_qa_checklist.html
+/qa-results-*.md
+/admin_page_mockup.html
+/supabase_audit.txt
+/supabase_anonymity_fix.sql
+/supabase_roles_owner.sql
+/verify_security.js

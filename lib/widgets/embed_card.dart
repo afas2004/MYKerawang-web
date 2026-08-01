@@ -13,11 +13,16 @@ class EmbedCard extends StatelessWidget {
   final bool isEvent;
   final VoidCallback onTap;
 
+  /// Compact horizontal variant, used for content cross-posted inside a
+  /// post so the embed supports the post rather than dominating it.
+  final bool compact;
+
   const EmbedCard({
     super.key,
     required this.data,
     required this.isEvent,
     required this.onTap,
+    this.compact = false,
   });
 
   @override
@@ -40,6 +45,98 @@ class EmbedCard extends StatelessWidget {
     } else {
       final price = data['price'];
       contextLine = price is num ? "RM ${price.toStringAsFixed(2)}" : '';
+    }
+
+    if (compact) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: kerawangCut,
+          child: Container(
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: kerawangCut,
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 88,
+                  height: 88,
+                  child: (imageUrl != null && imageUrl.isNotEmpty)
+                      ? CachedNetworkImage(
+                          imageUrl: imageUrl,
+                          fit: BoxFit.cover,
+                          memCacheWidth: 260,
+                          placeholder: (_, __) =>
+                              Container(color: scheme.surfaceContainerHighest),
+                          errorWidget: (_, __, ___) => Container(
+                            color: scheme.surfaceContainerHighest,
+                            child: Icon(
+                                isEvent ? Icons.event : Icons.storefront,
+                                color: scheme.onSurfaceVariant),
+                          ),
+                        )
+                      : Container(
+                          color: scheme.surfaceContainerHighest,
+                          child: Icon(isEvent ? Icons.event : Icons.storefront,
+                              color: scheme.onSurfaceVariant),
+                        ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          "◆ $label",
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: scheme.tertiary,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        if (contextLine.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            contextLine,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: isEvent
+                                  ? scheme.onSurfaceVariant
+                                  : scheme.primary,
+                              fontWeight: isEvent ? null : FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: Icon(Icons.arrow_forward_ios,
+                      size: 14, color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
     return Padding(

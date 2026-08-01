@@ -2,11 +2,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mykerawang/widgets/linear_refresher';
-import 'item_detail_screen.dart';
 import 'create_listing_screen.dart';
+import '../utils/app_nav.dart';
 import 'marketplace_cubit.dart'; // Ensure this matches your file name
 import '../language_cubit.dart';
+import '../utils/adaptive.dart';
 import '../utils/responsive.dart';
+import '../widgets/error_state.dart';
 
 class MarketplaceScreen extends StatelessWidget {
   const MarketplaceScreen({super.key});
@@ -46,6 +48,24 @@ class _MarketplaceViewState extends State<MarketplaceView> {
         return Scaffold(
           appBar: AppBar(
             title: Text(context.l10n.marketplaceTitle),
+            // Desktop has no FAB, so creation lives here instead (H1.1).
+            actions: [
+              if (isWide(context))
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilledButton.icon(
+                    onPressed: () async {
+                      final result = await Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => const CreateListingScreen()));
+                      if (result == true && context.mounted) {
+                        context.read<MarketplaceCubit>().loadData();
+                      }
+                    },
+                    icon: const Icon(Icons.add, size: 18),
+                    label: Text(context.l10n.sellItem),
+                  ),
+                ),
+            ],
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(50),
               child: SizedBox(
@@ -83,6 +103,9 @@ class _MarketplaceViewState extends State<MarketplaceView> {
             },
             child: state.isLoading
                 ? const Center(child: CircularProgressIndicator())
+                : (state.errorMessage != null && state.allItems.isEmpty)
+                ? ErrorState(
+                    onRetry: () => context.read<MarketplaceCubit>().loadData())
                 : Column(
                     children: [
                       Padding(
@@ -119,12 +142,15 @@ class _MarketplaceViewState extends State<MarketplaceView> {
                                 itemCount: state.displayedItems.length,
                                 itemBuilder: (context, index) {
                                   final item = state.displayedItems[index];
-                                  return GestureDetector(
-                                    onTap: () => Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                            builder: (_) => ItemDetailScreen(item: item))),
-                                    child: Container(
+                                  final isSold = item['is_sold'] == true;
+                                  // InkWell (not GestureDetector) so desktop
+                                  // gets a pointer cursor + hover ripple (G6)
+                                  return InkWell(
+                                    onTap: () => context.goItem(item),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Opacity(
+                                      opacity: isSold ? 0.6 : 1,
+                                      child: Container(
                                       decoration: BoxDecoration(
                                         color: Theme.of(context).cardColor,
                                         borderRadius: BorderRadius.circular(12),
@@ -136,14 +162,18 @@ class _MarketplaceViewState extends State<MarketplaceView> {
                                           Expanded(
                                             child: ClipRRect(
                                               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                                              child: CachedNetworkImage(
+                                              child: Stack(
+                                                fit: StackFit.expand,
+                                                children: [
+                                              CachedNetworkImage(
                                                 imageUrl: item['image_url'] ?? '',
-                                                fadeInDuration: Duration.zero,  
+                                                fadeInDuration: Duration.zero,
                                                 fadeOutDuration: Duration.zero,
                                                 fit: BoxFit.cover,
                                                 width: double.infinity,
+                                                memCacheWidth: 500,
                                                 placeholder: (context, url) => Container(
-                                                  color: Theme.of(context).colorScheme.surfaceContainerHighest, 
+                                                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                                   child: const Center(child: CircularProgressIndicator())
                                                 ),
                                                 errorWidget: (context, url, error) => Container(
@@ -152,6 +182,28 @@ class _MarketplaceViewState extends State<MarketplaceView> {
                                                     child: Icon(Icons.store_mall_directory_outlined, color: Colors.grey, size: 30)
                                                   ),
                                                 ),
+                                              ),
+                                              // SOLD badge (4.7)
+                                              if (isSold)
+                                                Positioned(
+                                                  top: 8,
+                                                  left: 8,
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(
+                                                        horizontal: 10, vertical: 4),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.black.withValues(alpha: 0.75),
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    child: const Text("SOLD",
+                                                        style: TextStyle(
+                                                            color: Colors.white,
+                                                            fontSize: 11,
+                                                            fontWeight: FontWeight.w700,
+                                                            letterSpacing: 1)),
+                                                  ),
+                                                ),
+                                                ],
                                               ),
                                             ),
                                           ),
@@ -163,13 +215,18 @@ class _MarketplaceViewState extends State<MarketplaceView> {
                                                 Text(item['title'],
                                                     maxLines: 2,
                                                     overflow: TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                        fontWeight: FontWeight.bold)),
+                                                    style: Theme.of(context).textTheme.titleSmall
+                                                        ?.copyWith(fontWeight: FontWeight.w600)),
                                                 const SizedBox(height: 4),
                                                 Text(
                                                     "RM ${(item['price'] as num).toStringAsFixed(2)}",
                                                     style: TextStyle(
-                                                        color: Theme.of(context).colorScheme.primary,
+                                                        color: isSold
+                                                            ? Theme.of(context).colorScheme.onSurfaceVariant
+                                                            : Theme.of(context).colorScheme.primary,
+                                                        decoration: isSold
+                                                            ? TextDecoration.lineThrough
+                                                            : null,
                                                         fontWeight: FontWeight.bold,
                                                         fontSize: 16)),
                                               ],
@@ -177,6 +234,7 @@ class _MarketplaceViewState extends State<MarketplaceView> {
                                           )
                                         ],
                                       ),
+                                    ),
                                     ),
                                   );
                                 },
@@ -186,7 +244,8 @@ class _MarketplaceViewState extends State<MarketplaceView> {
                     ],
                   ),
           ),
-          floatingActionButton: FloatingActionButton(
+          // See G5 — no floating corner button on desktop.
+          floatingActionButton: isWide(context) ? null : FloatingActionButton(
             heroTag: 'market_fab',
             onPressed: () => Navigator.push(
                 context, MaterialPageRoute(builder: (_) => const CreateListingScreen())),

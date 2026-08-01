@@ -2,18 +2,17 @@ import 'dart:async';
 import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
-import 'package:mykerawang/screens/main_scaffold.dart';
-import 'package:mykerawang/screens/onboarding_screen.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'theme_cubit.dart';
 import 'theme/app_themes.dart';
 import 'language_cubit.dart';
+import 'router.dart';
 // --- IMPORT YOUR SERVICES ---
 import 'services/notification_service.dart';
 import 'utils/responsive.dart';
-
-// --- IMPORT YOUR SCREENS ---
-import 'screens/login_screen.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'screens/events_cubit.dart';
@@ -34,6 +33,10 @@ class AppScrollBehavior extends MaterialScrollBehavior {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Clean URLs on web (/market instead of /#/market). Firebase Hosting
+  // rewrites all paths to index.html, so deep links resolve correctly.
+  usePathUrlStrategy();
+
   // 1. Initialize Supabase
   await Supabase.initialize(
     url: 'https://zxjuqpqzyzmegdjttzyz.supabase.co',
@@ -45,8 +48,15 @@ void main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  final _router = buildRouter();
 
   @override
   Widget build(BuildContext context) {
@@ -61,18 +71,20 @@ class MyApp extends StatelessWidget {
       ],
       child: BlocBuilder<ThemeCubit, ThemeState>(
         builder: (context, themeState) {
-          return MaterialApp(
+          return MaterialApp.router(
             debugShowCheckedModeBanner: false,
             title: 'MYKerawang',
             scrollBehavior: AppScrollBehavior(),
+            routerConfig: _router,
 
-            // Center the app at a comfortable width on desktop/web,
-            // full-width on phones. See lib/utils/responsive.dart.
-            builder: (context, child) => ResponsiveShell(child: child!),
+            // Centre the app on desktop + run session side effects
+            // (onboarding redirect, notification stream) above every route.
+            builder: (context, child) => SessionWatcher(
+              child: ResponsiveShell(child: child!),
+            ),
 
             // 3. Named theme (Kampus Bold / Istana Modern / Songket Noir)
             theme: buildAppTheme(themeState.appTheme),
-            home: const AuthGate(),
           );
         },
       ),
@@ -80,62 +92,52 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// --- UPDATED AUTH GATE ---
-// This widget watches for Login/Logout AND listens for new Notifications
-class AuthGate extends StatefulWidget {
-  const AuthGate({super.key});
+/// Session side effects that used to live in AuthGate: send new users to
+/// onboarding, request notification permission on fresh sign-in, and keep
+/// the realtime notification stream running.
+class SessionWatcher extends StatefulWidget {
+  final Widget child;
+  const SessionWatcher({super.key, required this.child});
 
   @override
-  State<AuthGate> createState() => _AuthGateState();
+  State<SessionWatcher> createState() => _SessionWatcherState();
 }
 
-class _AuthGateState extends State<AuthGate> {
-  bool _isLoading = true;
-  bool _hasProfile = false;
-  // Keep track of the subscription to cancel it later
+class _SessionWatcherState extends State<SessionWatcher> {
   late final StreamSubscription<AuthState> _authSubscription;
+  StreamSubscription<List<Map<String, dynamic>>>? _notificationSubscription;
 
   @override
   void initState() {
     super.initState();
-    _setupAuthListener();
-  }
 
-  void _setupAuthListener() {
-    // 1. Listen to Auth Changes (Login, Logout, Deep Links)
-    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+    // Handle a session that already exists at startup.
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session != null) {
+      _checkUserProfile(session.user.id);
+      _startNotificationStream(session.user.id);
+    }
+
+    _authSubscription =
+        Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       final session = data.session;
       final event = data.event;
 
-      if (session != null) {
-        // User just logged in (or was already logged in)
-        // 1. Check their profile status to decide navigation
-        _checkUserProfile(session.user.id);
-        
-        // 2. Trigger your Notification Logic (Only if it's a fresh sign-in)
-        if (event == AuthChangeEvent.signedIn) {
-           NotificationService.requestPermission();
-           _startNotificationStream(session.user.id);
-        }
-        
-        // 3. Ensure notification stream runs if we just booted up already logged in
-        if (event == AuthChangeEvent.initialSession) {
-           _startNotificationStream(session.user.id);
-        }
+      if (session == null) {
+        _notificationSubscription?.cancel();
+        _notificationSubscription = null;
+        return;
+      }
 
-      } else {
-        // User is logged out
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            _hasProfile = false;
-          });
-        }
+      if (event == AuthChangeEvent.signedIn) {
+        NotificationService.requestPermission();
+        _checkUserProfile(session.user.id);
+        _startNotificationStream(session.user.id);
       }
     });
   }
 
-  // Your original logic to check if they completed onboarding
+  /// New users (no username yet) go to onboarding.
   Future<void> _checkUserProfile(String userId) async {
     try {
       final data = await Supabase.instance.client
@@ -144,81 +146,52 @@ class _AuthGateState extends State<AuthGate> {
           .eq('id', userId)
           .maybeSingle();
 
-      if (mounted) {
-        setState(() {
-          _hasProfile = (data != null && data['username'] != null);
-          _isLoading = false; // Stop buffering!
+      final needsOnboarding = data == null || data['username'] == null;
+      if (needsOnboarding && mounted) {
+        // Defer so the router is ready before we navigate.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) GoRouter.of(context).go('/onboarding');
         });
       }
     } catch (e) {
-      debugPrint("AuthGate Error: $e");
-      // Fallback: Stop buffering even if error, so they aren't stuck
-      if (mounted) {
-        setState(() {
-          _hasProfile = true; // Fail open (assume profile exists) to let them into Home
-          _isLoading = false;
-        });
-      }
+      debugPrint("Profile check error: $e");
+      // Fail open — let them into the app.
     }
   }
 
-  // Extracted your notification logic into a clean function
   void _startNotificationStream(String userId) {
+    _notificationSubscription?.cancel();
     debugPrint("🔔 Notification Listener STARTED for $userId");
-    
-    Supabase.instance.client
+
+    _notificationSubscription = Supabase.instance.client
         .from('notifications')
         .stream(primaryKey: ['id'])
         .eq('user_id', userId)
         .listen((List<Map<String, dynamic>> data) {
-          
-          if (data.isNotEmpty) {
-            final latest = data.last; 
-            
-            // Timezone Fix
-            final created = DateTime.parse(latest['created_at']).toUtc(); 
-            final now = DateTime.now().toUtc(); 
-            final difference = now.difference(created).inSeconds.abs();
+          if (data.isEmpty) return;
+          final latest = data.last;
 
-            if (difference < 30) {
-                NotificationService.showNotification(
-                  latest['title'], 
-                  latest['message'] ?? latest['body'] ?? 'New Notification'
-                );
-            }
+          // Timezone Fix
+          final created = DateTime.parse(latest['created_at']).toUtc();
+          final now = DateTime.now().toUtc();
+          final difference = now.difference(created).inSeconds.abs();
+
+          if (difference < 30) {
+            NotificationService.showNotification(
+              latest['title'],
+              latest['message'] ?? latest['body'] ?? 'New Notification',
+            );
           }
         });
   }
 
   @override
   void dispose() {
-    _authSubscription.cancel(); // Prevent memory leaks
+    _authSubscription.cancel();
+    _notificationSubscription?.cancel();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) {
-    // 1. Loading Spinner
-    if (_isLoading) {
-      return const Scaffold(
-        // No hardcoded color — follows light/dark theme
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    final session = Supabase.instance.client.auth.currentSession;
-
-    // 2. Not Logged In -> Login Screen
-    if (session == null) {
-      return const LoginScreen();
-    }
-
-    // 3. Logged In BUT No Profile -> Onboarding
-    if (!_hasProfile) {
-      return const OnboardingScreen(); 
-    }
-
-    // 4. Fully Ready -> Main App
-    return const MainScaffold();
-  }
+  Widget build(BuildContext context) => widget.child;
 }

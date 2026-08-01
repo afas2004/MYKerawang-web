@@ -1,12 +1,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_parsed_text/flutter_parsed_text.dart';
-import 'package:mykerawang/screens/profile_screen.dart';
+import 'package:mykerawang/utils/app_nav.dart';
 import 'package:mykerawang/utils/report_helper.dart';
 import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../widgets/post_card.dart';
+import '../language_cubit.dart';
+import '../utils/adaptive.dart';
 import '../utils/responsive.dart';
 
 class PostDetailScreen extends StatefulWidget {
@@ -40,8 +42,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     try {
       // Fetch the specific post again to get new 'comment_count'
       final freshPost = await _supabase
-          .from('posts')
-          .select('*, profiles(*), events(*), listings(*)')
+          .from('posts_public') // anonymity-safe view
+          .select('*')
           .eq('id', _postData['id'])
           .single();
       
@@ -70,8 +72,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   Future<List<Map<String, dynamic>>> _fetchComments() async {
     final response = await _supabase
-        .from('comments')
-        .select('*, profiles(*)')
+        .from('comments_public') // anonymity-safe view
+        .select('*')
         .eq('post_id', widget.post['id'])
         .order('created_at', ascending: true);
     return List<Map<String, dynamic>>.from(response);
@@ -144,7 +146,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Thread")),
+      appBar: appBarConstrained(context, title: Text(context.l10n.threadTitle)),
       body: PageBody(child: Column(
         children: [
           Expanded(
@@ -196,13 +198,25 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                             final username = isAnon ? null : profile?['username'];
 
                             return ListTile(
-                              leading: CircleAvatar(
-                                radius: 16,
-                                backgroundColor: isAnon ? Colors.grey : Theme.of(context).colorScheme.primaryContainer,
-                                backgroundImage: avatarUrl != null ? CachedNetworkImageProvider(avatarUrl) : null,
-                                child: (avatarUrl == null) 
-                                    ? Icon(isAnon ? Icons.visibility_off : Icons.person, size: 16, color: isAnon ? Colors.white : Theme.of(context).colorScheme.onPrimaryContainer)
-                                    : null,
+                              leading: Tooltip(
+                                // Explain what the crossed-eye icon means
+                                message: isAnon
+                                    ? context.l10n.postedAnonymously
+                                    : displayName,
+                                child: CircleAvatar(
+                                  radius: 16,
+                                  backgroundColor: isAnon
+                                      ? Theme.of(context).colorScheme.surfaceContainerHighest
+                                      : Theme.of(context).colorScheme.primaryContainer,
+                                  backgroundImage: avatarUrl != null ? CachedNetworkImageProvider(avatarUrl) : null,
+                                  child: (avatarUrl == null)
+                                      ? Icon(isAnon ? Icons.visibility_off : Icons.person,
+                                          size: 16,
+                                          color: isAnon
+                                              ? Theme.of(context).colorScheme.onSurfaceVariant
+                                              : Theme.of(context).colorScheme.onPrimaryContainer)
+                                      : null,
+                                ),
                               ),
                               title: Row(
                                 children: [
@@ -235,7 +249,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
                                       // 2. Navigate
                                       if (user != null && context.mounted) {
-                                        Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(userId: user['id'])));
+                                        context.goUser(user['id']);
                                       } else if (context.mounted) {
                                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User not found")));
                                       }

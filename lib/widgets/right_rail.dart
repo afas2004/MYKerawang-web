@@ -2,8 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../language_cubit.dart';
-import '../screens/event_detail_screen.dart';
-import '../screens/item_detail_screen.dart';
+import '../utils/app_nav.dart';
 
 /// Desktop-only right rail (Instagram/Facebook style): upcoming events
 /// and fresh marketplace items, using the space next to the feed.
@@ -18,6 +17,7 @@ class _RightRailState extends State<RightRail> {
   List<dynamic> _events = [];
   List<dynamic> _items = [];
   bool _loading = true;
+  bool _showingPastEvents = false;
 
   @override
   void initState() {
@@ -29,12 +29,23 @@ class _RightRailState extends State<RightRail> {
     try {
       final supabase = Supabase.instance.client;
       final now = DateTime.now().toIso8601String();
-      final events = await supabase
+      // Prefer upcoming events; if there are none, show the most recent
+      // past ones rather than leaving the rail empty.
+      var events = await supabase
           .from('events')
           .select()
           .gt('end_datetime', now)
           .order('start_datetime', ascending: true)
           .limit(3);
+
+      if (events.isEmpty) {
+        events = await supabase
+            .from('events')
+            .select()
+            .order('start_datetime', ascending: false)
+            .limit(3);
+        _showingPastEvents = events.isNotEmpty;
+      }
       final items = await supabase
           .from('listings')
           .select()
@@ -66,16 +77,16 @@ class _RightRailState extends State<RightRail> {
           if (_events.isNotEmpty) ...[
             _railCard(
               theme,
-              title: context.l10n.eventsThisWeek,
+              // Don't call past events "this week" (H3)
+              title: _showingPastEvents
+                  ? context.l10n.pastEvents
+                  : context.l10n.eventsThisWeek,
               icon: Icons.calendar_month,
               child: Column(
                 children: _events.map((e) {
                   return InkWell(
                     borderRadius: BorderRadius.circular(8),
-                    onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => EventDetailScreen(event: e))),
+                    onTap: () => context.goEvent(e),
                     child: Container(
                       width: double.infinity,
                       margin: const EdgeInsets.only(bottom: 8),
@@ -124,10 +135,7 @@ class _RightRailState extends State<RightRail> {
                 children: _items.map((item) {
                   return InkWell(
                     borderRadius: BorderRadius.circular(8),
-                    onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => ItemDetailScreen(item: item))),
+                    onTap: () => context.goItem(item),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: Stack(

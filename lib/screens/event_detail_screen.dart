@@ -7,7 +7,8 @@ import 'package:mykerawang/utils/report_helper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:timeago/timeago.dart' as timeago;
-import 'profile_screen.dart';
+import '../utils/adaptive.dart';
+import '../utils/app_nav.dart';
 import 'create_post_screen.dart'; 
 import 'create_event_screen.dart';
 import 'gallery_view_screen.dart';
@@ -86,13 +87,30 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     }
   }
 
-  Stream<List<Map<String, dynamic>>> _commentsStream() {
-    return Supabase.instance.client
+  /// Realtime can only subscribe to a real table, and a raw `comments`
+  /// stream carries `user_id` even for anonymous comments. So the stream is
+  /// used purely as a change signal; the rows actually rendered come from
+  /// `comments_public`, which blanks the author.
+  Stream<List<Map<String, dynamic>>> _commentsStream() async* {
+    yield await _fetchEventComments();
+
+    final signal = Supabase.instance.client
         .from('comments')
         .stream(primaryKey: ['id'])
+        .eq('event_id', _event['id']);
+
+    await for (final _ in signal) {
+      yield await _fetchEventComments();
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchEventComments() async {
+    final rows = await Supabase.instance.client
+        .from('comments_public')
+        .select('*')
         .eq('event_id', _event['id'])
-        .order('created_at', ascending: true)
-        .map((data) => List<Map<String, dynamic>>.from(data));
+        .order('created_at', ascending: true);
+    return List<Map<String, dynamic>>.from(rows);
   }
 
   Future<void> _postComment() async {
@@ -270,18 +288,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       onPageChanged: (index) => setState(() => _currentImageIndex = index),
                       itemBuilder: (context, index) {
                         return GestureDetector(
-                          onTap: () {
-                            // Open your GalleryViewScreen when tapped
-                            Navigator.push(
-                              context, 
-                              MaterialPageRoute(
-                                builder: (_) => GalleryViewScreen(
-                                  galleryItems: allImages, 
-                                  initialIndex: index
-                                )
-                              )
-                            );
-                          },
+                          onTap: () => showGallery(context,
+                              items: allImages, initialIndex: index),
                           child: Hero(
                             tag: "gallery_$index", // Unique tag for smooth animation
                             child: CachedNetworkImage(
@@ -376,10 +384,18 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                           ),
                           onPressed: () {
                             ShareService.shareContent(
-                              context, 
-                              _event['title'], 
-                              "Event Details: ${_event['description'] ?? ''}", 
-                              _event['image_url']
+                              context,
+                              _event['title'],
+                              [
+                                if (_event['location'] != null) "📍 ${_event['location']}",
+                                if (_event['start_datetime'] != null)
+                                  "🗓 ${DateFormat('d MMM yyyy, h:mm a').format(DateTime.parse(_event['start_datetime']).toLocal())}",
+                                if (_event['description'] != null) "\n${_event['description']}",
+                              ].join('\n'),
+                              [
+                                if (_event['image_url'] != null) _event['image_url'],
+                                ...?(_event['gallery_urls'] as List?)?.cast<String>(),
+                              ],
                             );
                           },
                         ),
@@ -474,7 +490,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                         title: Text(_organizer!['display_name'] ?? 'Organizer', style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text(_organizer!['role'] == 'club' ? "Official Club" : "Student Host"),
                         trailing: OutlinedButton(
-                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(userId: _organizer!['id']))),
+                          onPressed: () => context.goUser(_organizer!['id']),
                           child: const Text("View Profile"),
                         ),
                       ),
@@ -524,7 +540,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                   .maybeSingle();
 
                               if (user != null && context.mounted) {
-                                Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(userId: user['id'])));
+                                context.goUser(user['id']);
                               }
                             },
                           ),
@@ -624,7 +640,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         )),
       
       // 3. BOTTOM SHEET LOGIC (This is where the magic happens)
-      bottomSheet: Container(
+      bottomSheet: bottomBarConstrained(context, Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: theme.scaffoldBackgroundColor,
@@ -677,7 +693,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   ],
                 ),
         ),
-      ),
+      )),
     );
   }
 

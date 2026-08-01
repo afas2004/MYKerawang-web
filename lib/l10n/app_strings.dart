@@ -24,6 +24,7 @@ class AppStrings {
 
   // Right rail
   final String eventsThisWeek;
+  final String pastEvents;
   final String newInMarket;
 
   // Composer + embeds
@@ -47,11 +48,53 @@ class AppStrings {
   final String createAccount;
   final String haveAccountPrefix;
   final String loginLink;
+  final String forgotPassword;
+  final String enterEmailFirst;
+  final String resetLinkSent;
 
   // Marketplace
   final String marketplaceTitle;
   final String searchItems;
   final String noItemsFound;
+
+  // Create actions
+  final String sellItem;
+  final String newEvent;
+  final String takePhoto;
+  final String chooseFromGallery;
+  final String viewFullscreen;
+  final String setAsCover;
+  final String removePhoto;
+  final String createPostTitle;
+  final String post;
+  final String save;
+  final String cancel;
+  final String delete;
+  final String edit;
+  final String share;
+  final String report;
+  final String searchEvents;
+  final String eventsTitle;
+  final String profileTitle;
+  final String threadTitle;
+  final String notificationsTitle;
+  final String settingsTitle;
+  final String noNotifications;
+  final String comments;
+  final String whatsOnYourMind;
+  final String postedAnonymously;
+  final String addTags;
+  final String tagsHint;
+  final String saveChanges;
+  final String saved;
+  final String saving;
+  final String changePhoto;
+  final String cropHint;
+  final String editProfile;
+  final String followers;
+  final String following;
+  final String follow;
+  final String unfollow;
 
   // Settings
   final String language;
@@ -71,6 +114,7 @@ class AppStrings {
     required this.connectionError,
     required this.tryAgain,
     required this.eventsThisWeek,
+    required this.pastEvents,
     required this.newInMarket,
     required this.composerHint,
     required this.viewItem,
@@ -90,9 +134,49 @@ class AppStrings {
     required this.createAccount,
     required this.haveAccountPrefix,
     required this.loginLink,
+    required this.forgotPassword,
+    required this.enterEmailFirst,
+    required this.resetLinkSent,
     required this.marketplaceTitle,
     required this.searchItems,
     required this.noItemsFound,
+    required this.sellItem,
+    required this.newEvent,
+    required this.takePhoto,
+    required this.chooseFromGallery,
+    required this.viewFullscreen,
+    required this.setAsCover,
+    required this.removePhoto,
+    required this.createPostTitle,
+    required this.post,
+    required this.save,
+    required this.cancel,
+    required this.delete,
+    required this.edit,
+    required this.share,
+    required this.report,
+    required this.searchEvents,
+    required this.eventsTitle,
+    required this.profileTitle,
+    required this.threadTitle,
+    required this.notificationsTitle,
+    required this.settingsTitle,
+    required this.noNotifications,
+    required this.comments,
+    required this.whatsOnYourMind,
+    required this.postedAnonymously,
+    required this.addTags,
+    required this.tagsHint,
+    required this.saveChanges,
+    required this.saved,
+    required this.saving,
+    required this.changePhoto,
+    required this.cropHint,
+    required this.editProfile,
+    required this.followers,
+    required this.following,
+    required this.follow,
+    required this.unfollow,
     required this.language,
   });
 
@@ -111,6 +195,7 @@ class AppStrings {
     connectionError: "Couldn't connect. Try again?",
     tryAgain: "Try again",
     eventsThisWeek: "Events this week",
+    pastEvents: "Past events",
     newInMarket: "Fresh in the market",
     composerHint: "What's happening at kolej?",
     viewItem: "View item",
@@ -130,9 +215,49 @@ class AppStrings {
     createAccount: "Create account",
     haveAccountPrefix: "Have an account? ",
     loginLink: "Login",
+    forgotPassword: "Forgot password?",
+    enterEmailFirst: "Enter your email first",
+    resetLinkSent: "Password reset link sent — check your email",
     marketplaceTitle: "Marketplace",
     searchItems: "Search items...",
     noItemsFound: "No items found",
+    sellItem: "Sell item",
+    newEvent: "New event",
+    takePhoto: "Take photo",
+    chooseFromGallery: "Choose from gallery",
+    viewFullscreen: "View fullscreen",
+    setAsCover: "Set as cover photo",
+    removePhoto: "Remove photo",
+    createPostTitle: "Create post",
+    post: "POST",
+    save: "SAVE",
+    cancel: "Cancel",
+    delete: "Delete",
+    edit: "Edit",
+    share: "Share",
+    report: "Report",
+    searchEvents: "Search events...",
+    eventsTitle: "Events",
+    profileTitle: "Profile",
+    threadTitle: "Thread",
+    notificationsTitle: "Notifications",
+    settingsTitle: "Settings",
+    noNotifications: "No new notifications",
+    comments: "Comments",
+    whatsOnYourMind: "What's on your mind?",
+    postedAnonymously: "Posted anonymously",
+    addTags: "Tags",
+    tagsHint: "#studygroup #kolej ...",
+    saveChanges: "Save changes",
+    saved: "Saved",
+    saving: "Saving...",
+    changePhoto: "Change photo",
+    cropHint: "Drag and pinch to position",
+    editProfile: "Edit profile",
+    followers: "Followers",
+    following: "Following",
+    follow: "Follow",
+    unfollow: "Unfollow",
     language: "Language",
   );
 
@@ -151,6 +276,7 @@ class AppStrings {
     connectionError: "Tak dapat sambung. Cuba lagi?",
     tryAgain: "Cuba semula",
     eventsThisWeek: "Acara minggu ini",
+    pastEvents: "Acara lepas",
     newInMarket: "Baru masuk pasar",
     composerHint: "Apa cerita kat kolej?",
     viewItem: "Lihat barang",
@@ -170,9 +296,49 @@ class AppStrings {
     createAccount: "Daftar sini",
     haveAccountPrefix: "Dah ada akaun? ",
     loginLink: "Log masuk",
+    forgotPassword: "Lupa kata laluan?",
+    enterEmailFirst: "Masukkan emel dulu",
+    resetLinkSent: "Pautan set semula dihantar — semak emel anda",
     marketplaceTitle: "Pasar",
     searchItems: "Cari barang...",
     noItemsFound: "Tiada barang dijumpai",
+    sellItem: "Jual barang",
+    newEvent: "Acara baru",
+    takePhoto: "Ambil gambar",
+    chooseFromGallery: "Pilih dari galeri",
+    viewFullscreen: "Lihat skrin penuh",
+    setAsCover: "Jadikan gambar utama",
+    removePhoto: "Buang gambar",
+    createPostTitle: "Buat post",
+    post: "HANTAR",
+    save: "SIMPAN",
+    cancel: "Batal",
+    delete: "Padam",
+    edit: "Edit",
+    share: "Kongsi",
+    report: "Lapor",
+    searchEvents: "Cari acara...",
+    eventsTitle: "Acara",
+    profileTitle: "Profil",
+    threadTitle: "Bicara",
+    notificationsTitle: "Notifikasi",
+    settingsTitle: "Tetapan",
+    noNotifications: "Tiada notifikasi baru",
+    comments: "Komen",
+    whatsOnYourMind: "Apa dalam fikiran anda?",
+    postedAnonymously: "Dihantar tanpa nama",
+    addTags: "Tag",
+    tagsHint: "#studygroup #kolej ...",
+    saveChanges: "Simpan perubahan",
+    saved: "Disimpan",
+    saving: "Menyimpan...",
+    changePhoto: "Tukar gambar",
+    cropHint: "Seret dan cubit untuk laraskan",
+    editProfile: "Edit profil",
+    followers: "Pengikut",
+    following: "Mengikuti",
+    follow: "Ikut",
+    unfollow: "Berhenti ikut",
     language: "Bahasa",
   );
 
@@ -191,6 +357,7 @@ class AppStrings {
     connectionError: "接続できません。もう一度？",
     tryAgain: "再試行",
     eventsThisWeek: "今週のイベント",
+    pastEvents: "過去のイベント",
     newInMarket: "マーケット新着",
     composerHint: "キャンパスで何かあった？",
     viewItem: "商品を見る",
@@ -210,9 +377,49 @@ class AppStrings {
     createAccount: "アカウント作成",
     haveAccountPrefix: "アカウントをお持ちの方？ ",
     loginLink: "ログイン",
+    forgotPassword: "パスワードをお忘れですか？",
+    enterEmailFirst: "先にメールを入力してください",
+    resetLinkSent: "再設定リンクを送信しました",
     marketplaceTitle: "マーケット",
     searchItems: "商品を検索...",
     noItemsFound: "商品が見つかりません",
+    sellItem: "出品する",
+    newEvent: "イベント作成",
+    takePhoto: "写真を撮る",
+    chooseFromGallery: "ギャラリーから選択",
+    viewFullscreen: "全画面表示",
+    setAsCover: "カバーに設定",
+    removePhoto: "写真を削除",
+    createPostTitle: "投稿を作成",
+    post: "投稿",
+    save: "保存",
+    cancel: "キャンセル",
+    delete: "削除",
+    edit: "編集",
+    share: "共有",
+    report: "報告",
+    searchEvents: "イベントを検索...",
+    eventsTitle: "イベント",
+    profileTitle: "プロフィール",
+    threadTitle: "スレッド",
+    notificationsTitle: "通知",
+    settingsTitle: "設定",
+    noNotifications: "新しい通知はありません",
+    comments: "コメント",
+    whatsOnYourMind: "いま何してる？",
+    postedAnonymously: "匿名で投稿",
+    addTags: "タグ",
+    tagsHint: "#studygroup #kolej ...",
+    saveChanges: "変更を保存",
+    saved: "保存しました",
+    saving: "保存中...",
+    changePhoto: "写真を変更",
+    cropHint: "ドラッグ・ピンチで調整",
+    editProfile: "プロフィール編集",
+    followers: "フォロワー",
+    following: "フォロー中",
+    follow: "フォロー",
+    unfollow: "フォロー解除",
     language: "言語",
   );
 

@@ -1,26 +1,22 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mykerawang/screens/create_event_screen.dart';
 import 'package:mykerawang/screens/create_listing_screen.dart';
-import 'package:mykerawang/screens/post_detail_screen.dart';
 import 'package:mykerawang/widgets/linear_refresher';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../language_cubit.dart';
+import '../utils/adaptive.dart';
+import '../utils/app_nav.dart';
 import '../widgets/embed_card.dart';
 import '../widgets/feed_composer.dart';
 import '../widgets/hover_carousel.dart';
 import '../widgets/universal_card.dart';
 import '../widgets/post_card.dart';
-import 'event_detail_screen.dart';
-import 'item_detail_screen.dart';
-import 'settings_screen.dart';
-import 'notification_screen.dart'; 
-import 'create_post_screen.dart'; 
+import 'create_post_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  final Function(int) onTabChange;
-
-  const HomeScreen({super.key, required this.onTabChange});
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -61,9 +57,10 @@ class _HomeScreenState extends State<HomeScreen> {
           .order('created_at', ascending: false)
           .limit(20);
 
-      // 3. Fetch Posts
-      final posts = await _supabase.from('posts')
-          .select('*,profiles(*), events(*), listings(*)')
+      // 3. Fetch Posts — from the view, which blanks user_id/profiles on
+      //    anonymous rows. Joins are baked into the view.
+      final posts = await _supabase.from('posts_public')
+          .select('*')
           .order('created_at', ascending: false)
           .limit(50); // Fetch enough posts
 
@@ -138,7 +135,11 @@ class _HomeScreenState extends State<HomeScreen> {
             SliverAppBar(
               floating: true,
               snap: true,
-              title: const Text("MYKerawang", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+              // On desktop the sidebar already carries the wordmark (F2.7)
+              title: Text(
+                isDesktop ? context.l10n.navHome : "MYKerawang",
+                style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5),
+              ),
               centerTitle: false,
               actions: [
                 // Refresh button: pull-to-refresh has no mouse equivalent on web
@@ -151,12 +152,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 IconButton(
                   tooltip: context.l10n.notifications,
                   icon: const Icon(Icons.notifications_outlined),
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationScreen())),
+                  onPressed: () => context.goNotifications(),
                 ),
                 IconButton(
                   tooltip: context.l10n.settings,
                   icon: const Icon(Icons.settings_outlined),
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                  onPressed: () => context.goSettings(),
                 ),
                 const SizedBox(width: 8),
               ],
@@ -198,7 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _sectionHeader(context.l10n.happeningSoon, () => widget.onTabChange(3)),
+                    _sectionHeader(context.l10n.happeningSoon, () => context.go('/events')),
                     HoverCarousel(
                       height: 280,
                       itemCount: _featuredEvents.length,
@@ -208,7 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           margin: const EdgeInsets.only(right: 12, bottom: 10),
                           child: UniversalCard(
                             data: _featuredEvents[index],
-                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => EventDetailScreen(event: _featuredEvents[index]))),
+                            onTap: () => context.goEvent(_featuredEvents[index]),
                           ),
                         );
                       },
@@ -223,7 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _sectionHeader(context.l10n.freshFinds, () => widget.onTabChange(2)),
+                    _sectionHeader(context.l10n.freshFinds, () => context.go('/market')),
                     HoverCarousel(
                       height: 280,
                       itemCount: _freshMarketItems.length,
@@ -233,7 +234,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           margin: const EdgeInsets.only(right: 12, bottom: 10),
                           child: UniversalCard(
                             data: _freshMarketItems[index],
-                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ItemDetailScreen(item: _freshMarketItems[index]))),
+                            onTap: () => context.goItem(_freshMarketItems[index]),
                           ),
                         );
                       },
@@ -257,25 +258,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         return EmbedCard(
                           data: item,
                           isEvent: isEvent,
-                          onTap: () {
-                            if (isEvent) {
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => EventDetailScreen(event: item)));
-                            } else {
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => ItemDetailScreen(item: item)));
-                            }
-                          },
+                          onTap: () =>
+                              isEvent ? context.goEvent(item) : context.goItem(item),
                         );
                       }
 
                       // RENDER POST
                       return PostCard(
                         post: item,
-                        onTap: () {
-                           Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => PostDetailScreen(post: item))
-                          );
-                        },
+                        onTap: () => context.goPost(item),
                       );
                     },
                     childCount: feed.length,
@@ -301,7 +292,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showCreateOptions(BuildContext context) {
-    showModalBottomSheet(
+    showAdaptiveSheet(
       context: context,
       builder: (ctx) => SafeArea(
         child: Wrap(

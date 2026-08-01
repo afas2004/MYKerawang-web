@@ -3,9 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:mykerawang/widgets/linear_refresher';
-import 'event_detail_screen.dart';
 import 'create_event_screen.dart';
 import 'events_cubit.dart'; // Ensure this matches your file structure
+import '../language_cubit.dart';
+import '../theme/app_themes.dart';
+import '../utils/adaptive.dart';
+import '../utils/app_nav.dart';
+import '../widgets/error_state.dart';
 
 class EventsScreen extends StatelessWidget {
   const EventsScreen({super.key});
@@ -45,7 +49,25 @@ class _EventsViewState extends State<EventsView> {
       builder: (context, state) {
         return Scaffold(
           appBar: AppBar(
-            title: const Text("Events"),
+            title: Text(context.l10n.navEvents),
+            // Desktop has no FAB, so creation lives here instead (H1.1).
+            actions: [
+              if (isWide(context))
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilledButton.icon(
+                    onPressed: () async {
+                      final result = await Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => const CreateEventScreen()));
+                      if (result == true && context.mounted) {
+                        context.read<EventsCubit>().loadData();
+                      }
+                    },
+                    icon: const Icon(Icons.add, size: 18),
+                    label: Text(context.l10n.newEvent),
+                  ),
+                ),
+            ],
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(50),
               child: SizedBox(
@@ -89,6 +111,9 @@ class _EventsViewState extends State<EventsView> {
             },
             child: state.isLoading
                 ? const Center(child: CircularProgressIndicator())
+                : (state.errorMessage != null && state.allEvents.isEmpty)
+                ? ErrorState(
+                    onRetry: () => context.read<EventsCubit>().loadData())
                 : Column(
                     children: [
                       Padding(
@@ -98,7 +123,7 @@ class _EventsViewState extends State<EventsView> {
                           // Call Cubit
                           onChanged: (v) => context.read<EventsCubit>().updateSearch(v),
                           decoration: InputDecoration(
-                            hintText: "Search events...",
+                            hintText: context.l10n.searchEvents,
                             prefixIcon: Icon(Icons.search, color: Theme.of(context).colorScheme.onSurfaceVariant),
                             filled: true,
                             fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -119,33 +144,29 @@ class _EventsViewState extends State<EventsView> {
                                   final event = state.displayedEvents[index];
                                   // Parse date exactly as before
                                   final date = DateTime.parse(event['start_datetime']);
-                                  
-                                  return GestureDetector(
-                                    onTap: () => Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                            builder: (_) => EventDetailScreen(event: event))),
+                                  final ended = isEventEnded(event);
+
+                                  return Opacity(
+                                    // Ended events stay visible but recede (spec §6)
+                                    opacity: ended ? 0.55 : 1,
+                                    child: GestureDetector(
+                                    onTap: () => context.goEvent(event),
                                     child: Container(
                                       decoration: BoxDecoration(
                                         color: Theme.of(context).colorScheme.surfaceContainer,
+                                        borderRadius: kerawangCut,
                                         border: Border.all(
-                                          color: Theme.of(context).dividerColor.withOpacity(0.1),
+                                          color: Theme.of(context).colorScheme.outlineVariant,
                                           width: 1,
                                         ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(0.05), // Subtle shadow
-                                            blurRadius: 10,
-                                            offset: const Offset(0, 4),
-                                          )
-                                        ],
                                       ),
+                                      clipBehavior: Clip.antiAlias,
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          ClipRRect(
-                                            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                                            child: CachedNetworkImage(
+                                          Stack(
+                                            children: [
+                                          CachedNetworkImage(
                                               imageUrl: event['image_url'] ?? '',
                                               fadeInDuration: Duration.zero,
                                               fadeOutDuration: Duration.zero,
@@ -159,12 +180,35 @@ class _EventsViewState extends State<EventsView> {
                                               ),
                                               errorWidget: (context, url, error) => Container(
                                                 height: 180,
-                                                color: Theme.of(context).colorScheme.surfaceContainerHighest, 
+                                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                                 child: Center(
                                                   child: Icon(Icons.event_busy, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 40),
                                                 ),
                                               ),
                                             ),
+                                            if (ended)
+                                              Positioned(
+                                                top: 10,
+                                                left: 10,
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(
+                                                      horizontal: 10, vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.black.withValues(alpha: 0.7),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: const Text(
+                                                    "TAMAT",
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w700,
+                                                      letterSpacing: 1,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                           Padding(
                                             padding: const EdgeInsets.all(16),
@@ -222,6 +266,7 @@ class _EventsViewState extends State<EventsView> {
                                         ],
                                       ),
                                     ),
+                                  ),
                                   );
                                 },
                               ),
@@ -229,7 +274,9 @@ class _EventsViewState extends State<EventsView> {
                     ],
                   ),
           ),
-          floatingActionButton: FloatingActionButton(
+          // Desktop creates from the sidebar / header — a FAB floating in
+          // the far corner of a wide window is a phone pattern (G5).
+          floatingActionButton: isWide(context) ? null : FloatingActionButton(
             heroTag: 'events_fab',
             onPressed: () => Navigator.push(
                 context, MaterialPageRoute(builder: (_) => const CreateEventScreen())),

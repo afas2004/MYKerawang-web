@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../main.dart'; // This goes up one level to find main.dart
+import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../language_cubit.dart';
+import '../widgets/app_logo.dart';
 import '../widgets/kerawang_motif.dart';
 import 'login_cubit.dart'; // This looks in the SAME folder
 
@@ -24,6 +26,24 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _sendPasswordReset() async {
+    final email = _emailCtrl.text.trim();
+    final messenger = ScaffoldMessenger.of(context);
+    final s = context.l10n;
+
+    if (email.isEmpty) {
+      messenger.showSnackBar(SnackBar(content: Text(s.enterEmailFirst)));
+      return;
+    }
+
+    try {
+      await Supabase.instance.client.auth.resetPasswordForEmail(email);
+      messenger.showSnackBar(SnackBar(content: Text(s.resetLinkSent)));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text("$e")));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // 1. Inject the Cubit
@@ -35,20 +55,20 @@ class _LoginScreenState extends State<LoginScreen> {
           listener: (context, state) {
             // Handle Errors
             if (state.errorMessage != null) {
+              final scheme = Theme.of(context).colorScheme;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(state.errorMessage!),
-                  backgroundColor: Colors.red,
+                  content: Text(state.errorMessage!,
+                      style: TextStyle(color: scheme.onError)),
+                  backgroundColor: scheme.error,
                 ),
               );
             }
 
-            // Handle Navigation on Success
+            // Handle Navigation on Success — the router's redirect takes
+            // over from here (and drops any OAuth query string).
             if (state.isSuccess) {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const AuthGate()), // <--- Point to AuthGate
-                (route) => false,
-              );
+              context.go('/home');
             }
           },
           builder: (context, state) {
@@ -64,16 +84,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     // --- ORIGINAL UI ELEMENTS START ---
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: scheme.primaryContainer.withValues(alpha: 0.5),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(Icons.school, size: 60, color: scheme.primary),
-                    ),
+                    const AppLogo(size: 104),
                     const SizedBox(height: 16),
-                    const KerawangDivider(),
+                    const KerawangDivider(size: 11),
                     const SizedBox(height: 16),
                     Text(
                       state.isLoginMode ? s.welcomeBack : s.joinApp,
@@ -87,17 +100,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       state.isLoginMode ? s.loginToContinue : s.registerToStart,
                       style: TextStyle(color: scheme.onSurfaceVariant),
                     ),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 32),
 
                     TextField(
                       controller: _emailCtrl,
                       textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.email],
                       decoration: InputDecoration(
                         labelText: s.email,
                         prefixIcon: const Icon(Icons.email_outlined),
-                        border: const OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(12)),
-                        ),
                       ),
                       keyboardType: TextInputType.emailAddress,
                     ),
@@ -106,6 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       controller: _passCtrl,
                       obscureText: _obscurePassword,
                       textInputAction: TextInputAction.done,
+                      autofillHints: const [AutofillHints.password],
                       // Enter key submits (desktop/web expectation)
                       onSubmitted: (_) => context
                           .read<LoginCubit>()
@@ -121,13 +133,20 @@ class _LoginScreenState extends State<LoginScreen> {
                           onPressed: () => setState(
                               () => _obscurePassword = !_obscurePassword),
                         ),
-                        border: const OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(12)),
-                        ),
                       ),
                     ),
 
-                    const SizedBox(height: 32),
+                    // Forgot password
+                    if (state.isLoginMode)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: _sendPasswordReset,
+                          child: Text(s.forgotPassword),
+                        ),
+                      ),
+
+                    const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       height: 52,
@@ -141,13 +160,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                       _passCtrl.text,
                                     );
                               },
+                        // Shape comes from the theme (pill on Kampus Bold,
+                        // kerawang cut on Istana/Noir) — DESIGN_SPEC §2.
                         style: ElevatedButton.styleFrom(
                           backgroundColor: scheme.primary,
                           foregroundColor: scheme.onPrimary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
                         ),
                         child: state.isLoading
                             ? CircularProgressIndicator(color: scheme.onPrimary)
@@ -165,12 +182,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: state.isLoading 
                           ? null 
                           : () => context.read<LoginCubit>().signInWithGoogle(),
-                      icon: const Icon(Icons.g_mobiledata, size: 28), // Or use a Google Logo asset
+                      icon: const _GoogleMark(),
                       label: Text(s.continueWithGoogle),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        minimumSize: const Size(double.infinity, 50),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        minimumSize: const Size(double.infinity, 52),
                       ),
                     ),
                     
@@ -207,4 +222,54 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+}
+
+/// Google's four-colour "G", drawn simply so we don't ship the stock
+/// Material glyph (which reads as off-brand).
+class _GoogleMark extends StatelessWidget {
+  const _GoogleMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 20,
+      height: 20,
+      child: CustomPaint(painter: _GooglePainter()),
+    );
+  }
+}
+
+class _GooglePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final stroke = size.width * 0.22;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.butt;
+
+    final arc = rect.deflate(stroke / 2);
+
+    // Four brand-coloured quadrants of the ring
+    paint.color = const Color(0xFF4285F4); // blue
+    canvas.drawArc(arc, -0.55, 1.15, false, paint);
+    paint.color = const Color(0xFF34A853); // green
+    canvas.drawArc(arc, 0.75, 1.4, false, paint);
+    paint.color = const Color(0xFFFBBC05); // yellow
+    canvas.drawArc(arc, 2.2, 1.35, false, paint);
+    paint.color = const Color(0xFFEA4335); // red
+    canvas.drawArc(arc, 3.6, 1.6, false, paint);
+
+    // The G's crossbar
+    final bar = Paint()..color = const Color(0xFF4285F4);
+    canvas.drawRect(
+      Rect.fromLTWH(size.width * 0.5, size.height * 0.4, size.width * 0.5,
+          size.height * 0.2),
+      bar,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

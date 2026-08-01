@@ -1,7 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import '../language_cubit.dart';
+import '../utils/adaptive.dart';
 import '../utils/responsive.dart';
+
+/// Icon per notification type so the list is scannable.
+IconData _iconFor(String? type) => switch (type) {
+      'mention' => Icons.alternate_email,
+      'follow' => Icons.person_add_alt,
+      'comment' => Icons.chat_bubble_outline,
+      'event' => Icons.event_available,
+      'listing' => Icons.storefront,
+      _ => Icons.notifications,
+    };
+
+/// Opens whatever the notification refers to (UI_UX_AUDIT 12.1).
+/// Payload lives in the `data` json column.
+void _openTarget(BuildContext context, Map<String, dynamic> notif) {
+  final data = notif['data'];
+  if (data is! Map) return;
+
+  final postId = data['post_id'];
+  final eventId = data['event_id'];
+  final listingId = data['listing_id'] ?? data['item_id'];
+  final actorId = notif['actor_id'];
+
+  if (postId != null) {
+    context.push('/post/$postId');
+  } else if (eventId != null) {
+    context.push('/event/$eventId');
+  } else if (listingId != null) {
+    context.push('/item/$listingId');
+  } else if (notif['type'] == 'follow' && actorId != null) {
+    context.push('/u/$actorId');
+  }
+}
 
 class NotificationScreen extends StatelessWidget {
   const NotificationScreen({super.key});
@@ -11,7 +46,8 @@ class NotificationScreen extends StatelessWidget {
     final userId = Supabase.instance.client.auth.currentUser?.id;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Notifications")),
+      appBar: appBarConstrained(context,
+          title: Text(context.l10n.notificationsTitle)),
       body: PageBody(child: userId == null 
         ? const Center(child: Text("Please login to see notifications"))
         : StreamBuilder(
@@ -26,13 +62,15 @@ class NotificationScreen extends StatelessWidget {
               
               final notifications = snapshot.data!;
               if (notifications.isEmpty) {
-                return const Center(
+                return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.notifications_none, size: 64, color: Colors.grey),
-                      SizedBox(height: 16),
-                      Text("No new notifications"),
+                      Icon(Icons.notifications_none,
+                          size: 64,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      const SizedBox(height: 16),
+                      Text(context.l10n.noNotifications),
                     ],
                   ),
                 );
@@ -46,10 +84,20 @@ class NotificationScreen extends StatelessWidget {
                   final isRead = notif['is_read'] ?? false;
                   
                   return ListTile(
-                    tileColor: isRead ? null : Theme.of(context).colorScheme.primary.withOpacity(0.05),
+                    tileColor: isRead
+                        ? null
+                        : Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
                     leading: CircleAvatar(
-                      backgroundColor: isRead ? Colors.grey[200] : Theme.of(context).colorScheme.primaryContainer,
-                      child: Icon(Icons.notifications, color: isRead ? Colors.grey : Theme.of(context).colorScheme.primary),
+                      backgroundColor: isRead
+                          ? Theme.of(context).colorScheme.surfaceContainerHighest
+                          : Theme.of(context).colorScheme.primaryContainer,
+                      child: Icon(
+                        _iconFor(notif['type']),
+                        size: 20,
+                        color: isRead
+                            ? Theme.of(context).colorScheme.onSurfaceVariant
+                            : Theme.of(context).colorScheme.primary,
+                      ),
                     ),
                     title: Text(notif['title'], style: TextStyle(fontWeight: isRead ? FontWeight.normal : FontWeight.bold)),
                     subtitle: Text(notif['body'] ?? notif['message'] ?? ''),
@@ -58,8 +106,11 @@ class NotificationScreen extends StatelessWidget {
                       style: const TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                     onTap: () {
-                      // Mark as read
-                      Supabase.instance.client.from('notifications').update({'is_read': true}).eq('id', notif['id']);
+                      // Mark as read, then open what it refers to (12.1)
+                      Supabase.instance.client
+                          .from('notifications')
+                          .update({'is_read': true}).eq('id', notif['id']);
+                      _openTarget(context, notif);
                     },
                   );
                 },

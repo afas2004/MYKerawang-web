@@ -3,10 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
-import 'event_detail_screen.dart';
-import 'item_detail_screen.dart';
-import 'profile_screen.dart';
-import 'post_detail_screen.dart'; // Ensure this exists
+import '../utils/app_nav.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -132,9 +129,10 @@ class _SearchScreenState extends State<SearchScreen> {
           postFilter += ', shared_listing_id.in.(${foundListingIds.join(',')})';
         }
 
-        final posts = await _supabase.from('posts')
-            // Fetch related data to show nice titles
-            .select('*, profiles(display_name, avatar_url), events(title), listings(title)') 
+        final posts = await _supabase.from('posts_public')
+            // The view already embeds profiles/events/listings as JSON,
+            // and blanks the author on anonymous rows.
+            .select('*')
             .or(postFilter)
             .order('created_at', ascending: false)
             .limit(limitPerCategory);
@@ -298,12 +296,7 @@ class _SearchScreenState extends State<SearchScreen> {
       title: Text(item['display_name'] ?? item['full_name'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.bold)),
       subtitle: Text(item['role'] == 'student' ? 'Student' : 'Club/Admin'),
       trailing: const Icon(Icons.chevron_right),
-      onTap: () {
-        Navigator.push(
-          context, 
-          MaterialPageRoute(builder: (_) => ProfileScreen(userId: item['id']))
-        );
-      },
+      onTap: () => context.goUser(item['id']),
     );
   }
 
@@ -345,11 +338,11 @@ class _SearchScreenState extends State<SearchScreen> {
     return GestureDetector(
       onTap: () {
         if (isEvent) {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => EventDetailScreen(event: item)));
+          context.goEvent(item);
         } else if (isPost) {
            _navigateToPost(item['id']);
         } else {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => ItemDetailScreen(item: item)));
+          context.goItem(item);
         }
       },
       child: Container(
@@ -421,9 +414,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _navigateToPost(String postId) async {
     try {
-      final post = await _supabase.from('posts').select('*, profiles(*), events(*), listings(*)').eq('id', postId).single();
+      final post = await _supabase.from('posts_public').select('*').eq('id', postId).single();
       if (mounted) {
-         Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)));
+         context.goPost(post);
       }
     } catch (e) {
       debugPrint("Error opening post: $e");

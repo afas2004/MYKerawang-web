@@ -1,10 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_parsed_text/flutter_parsed_text.dart';
-import 'package:mykerawang/screens/event_detail_screen.dart';
-import 'package:mykerawang/screens/item_detail_screen.dart';
-import 'package:mykerawang/screens/profile_screen.dart'; // Import ProfileScreen
+import 'package:mykerawang/utils/app_nav.dart';
 import 'package:mykerawang/utils/report_helper.dart';
+import 'package:mykerawang/widgets/embed_card.dart';
+import 'package:mykerawang/theme/app_themes.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
@@ -37,12 +37,14 @@ class PostCard extends StatelessWidget {
     final String? username = isAnon ? null : profile?['username'];
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0, 
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      elevation: 0,
+      // Signature kerawang cut — DESIGN_SPEC §2
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(0),
-        side: BorderSide(color: theme.dividerColor.withOpacity(0.2)),
+        borderRadius: kerawangCut,
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
       ),
+      clipBehavior: Clip.antiAlias,
       color: theme.cardColor,
       child: InkWell(
         onTap: onTap,
@@ -59,7 +61,7 @@ class PostCard extends StatelessWidget {
                     GestureDetector(
                       onTap: (isAnon || profile == null) 
                           ? null 
-                        : () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(userId: profile['id']))),
+                        : () => context.goUser(profile['id']),
                     child: CircleAvatar(
                       radius: 16, // Slightly larger for better visibility
                       backgroundColor: isAnon ? Colors.grey : theme.colorScheme.primaryContainer,
@@ -126,7 +128,8 @@ class PostCard extends StatelessWidget {
               // 2. TITLE
               Text(
                 post['title'] ?? 'No Title',
-                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, height: 1.3),
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w700, height: 1.3),
               ),
               const SizedBox(height: 6),
 
@@ -151,7 +154,7 @@ class PostCard extends StatelessWidget {
 
                         if (user != null && context.mounted) {
                           // Navigate to their profile
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(userId: user['id'])));
+                          context.goUser(user['id']);
                         } else if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User not found")));
                         }
@@ -160,32 +163,22 @@ class PostCard extends StatelessWidget {
                   ],
                 ),
               
-              // 4. SHARED CONTENT (Event OR Listing)
-              if (post['events'] != null) ...[
-                GestureDetector(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => EventDetailScreen(event: post['events']))),
-                  child: _buildSharedContainer(
-                    context, 
-                    label: "EVENT DISCUSSION", 
-                    title: post['events']['title'], 
-                    imageUrl: post['events']['image_url'],
-                    icon: Icons.event,
-                    theme: theme
-                  ),
+              // 4. SHARED CONTENT (Event OR Listing) — same embed language
+              // as the feed, compact so it supports rather than dominates.
+              if (post['events'] != null)
+                EmbedCard(
+                  data: post['events'],
+                  isEvent: true,
+                  compact: true,
+                  onTap: () => context.goEvent(post['events']),
                 )
-              ] else if (post['listings'] != null) ...[
-                GestureDetector(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ItemDetailScreen(item: post['listings']))),
-                  child: _buildSharedContainer(
-                    context, 
-                    label: "MARKETPLACE ITEM", 
-                    title: post['listings']['title'], 
-                    imageUrl: post['listings']['image_url'],
-                    icon: Icons.shopping_bag,
-                    theme: theme
-                  ),
+              else if (post['listings'] != null)
+                EmbedCard(
+                  data: post['listings'],
+                  isEvent: false,
+                  compact: true,
+                  onTap: () => context.goItem(post['listings']),
                 ),
-              ],
 
               const SizedBox(height: 16),
 
@@ -195,10 +188,16 @@ class PostCard extends StatelessWidget {
                   // Comment Count
                   Icon(Icons.chat_bubble_outline, size: 18, color: theme.colorScheme.onSurfaceVariant),
                   const SizedBox(width: 6),
-                  Text(
-                    "${post['comment_count'] ?? 0} Replies", // Uses real DB count
-                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.w500),
-                  ),
+                  Builder(builder: (context) {
+                    final count = post['comment_count'] ?? 0;
+                    return Text(
+                      "$count ${count == 1 ? 'Reply' : 'Replies'}",
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    );
+                  }),
                   
                   const Spacer(),
                   PopupMenuButton<String>(
@@ -232,55 +231,4 @@ class PostCard extends StatelessWidget {
     );
   }
 
-  Widget _buildSharedContainer(
-  BuildContext context, {
-  required String label,
-  required String title,
-  required String? imageUrl,
-  required IconData icon,
-  required ThemeData theme,
-}) {
-  return Container(
-    margin: const EdgeInsets.only(top: 12),
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: theme.dividerColor.withOpacity(0.5)),
-    ),
-    child: Row(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(6),
-          child: Container(
-            width: 50, height: 50,
-            color: Colors.grey[300],
-            child: imageUrl != null
-                ? CachedNetworkImage(imageUrl: imageUrl, fit: BoxFit.cover)
-                : Icon(icon, color: theme.colorScheme.primary),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label, 
-                style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: theme.colorScheme.primary, letterSpacing: 0.5)
-              ),
-              Text(
-                title, 
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), 
-                maxLines: 1, 
-                overflow: TextOverflow.ellipsis
-              ),
-            ],
-          ),
-        ),
-        const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
-      ],
-    ),
-  );
-}
 }

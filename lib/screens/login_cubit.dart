@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart' show LaunchMode;
 
 // 1. Define the detailed States for your screen
 class LoginState {
@@ -94,11 +95,16 @@ class LoginCubit extends Cubit<LoginState> {
         // MOBILE: deep link back into the app (must match Supabase URL settings
         // and the AndroidManifest intent filter).
         redirectTo: kIsWeb ? Uri.base.origin : 'mykerawang://login-callback',
+        // iOS WebKit blocks the storage access a popup needs to finish the
+        // credential exchange (ITP), so the popup silently dies after account
+        // selection. A same-tab, full-page redirect avoids popups entirely.
+        authScreenLaunchMode:
+            kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
       );
-      
-      // Note: OAuth flow continues outside the app usually. 
-      // When they return, AuthGate in main.dart will catch the session change.
-      // We don't strictly need to emit success here because the app will reload.
+
+      // The flow leaves the page here. On return, SessionWatcher + the
+      // router's auth redirect pick up the restored session — that's this
+      // app's equivalent of Firebase's getRedirectResult().
     } catch (e) {
       emit(state.copyWith(isLoading: false, errorMessage: "Google Sign-In failed: $e"));
     }

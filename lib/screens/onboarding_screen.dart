@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:mykerawang/screens/main_scaffold.dart'; // Ensure this points to your MainScaffold
+import 'package:go_router/go_router.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -111,11 +111,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       });
 
       if (mounted) {
-        // Go to Home and remove history
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const MainScaffold()), 
-          (route) => false
-        );
+        // Go to Home (router replaces the stack)
+        context.go('/home');
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
