@@ -9,6 +9,7 @@ import '../services/post_service.dart';
 import '../theme/app_themes.dart';
 import '../utils/adaptive.dart';
 import '../utils/responsive.dart';
+import '../utils/tags.dart';
 import '../widgets/media_picker_grid.dart';
 
 /// Opens the form to edit [post] — a dialog on desktop, a page on mobile,
@@ -63,15 +64,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       widget.sharedListing ?? widget.editPost?['listings'];
 
   /// Suggested shortcuts — users can also type anything they like.
-  final List<String> _tags = ['Question', 'Confession', 'Lost&Found', 'Rant', 'Academic'];
+  /// Shown as typed; saved through [normalizeTag] (LostFound → lostfound).
+  final List<String> _tags = ['Question', 'Confession', 'LostFound', 'Rant', 'Academic'];
 
-  /// Tags currently in the field, normalised to lowercase without '#'.
-  List<String> get _currentTags => RegExp(r'#?([\w&-]+)')
-      .allMatches(_tagsCtrl.text)
-      .map((m) => m.group(1)!.toLowerCase())
-      .where((t) => t.isNotEmpty)
-      .toSet()
-      .toList();
+  /// Tags currently in the field, in stored form (see utils/tags.dart).
+  List<String> get _currentTags => parseTags(_tagsCtrl.text);
 
   @override
   void initState() {
@@ -80,7 +77,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     if (post != null) {
       _titleCtrl.text = post['title'] ?? '';
       _bodyCtrl.text = post['body'] ?? '';
-      final tags = List<String>.from(post['tags'] ?? const []);
+      final tags = List<String>.from(post['tags'] ?? const []).map(normalizeTag).toSet();
       if (tags.isNotEmpty) {
         _tagsCtrl.text = "${tags.map((t) => '#$t').join(' ')} ";
       }
@@ -98,7 +95,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   void _appendTag(String tag) {
-    if (_currentTags.contains(tag.toLowerCase())) return;
+    if (_currentTags.contains(normalizeTag(tag))) return;
     final text = _tagsCtrl.text.trimRight();
     _tagsCtrl.text = text.isEmpty ? "#$tag " : "$text #$tag ";
     _tagsCtrl.selection =
@@ -305,7 +302,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           Wrap(
             spacing: 8,
             children: _tags.map((tag) {
-              final already = _currentTags.contains(tag.toLowerCase());
+              final already = _currentTags.contains(normalizeTag(tag));
               return ActionChip(
                 avatar: Icon(already ? Icons.check : Icons.add, size: 16),
                 label: Text(tag),

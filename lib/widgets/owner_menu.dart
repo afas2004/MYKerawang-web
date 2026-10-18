@@ -37,11 +37,15 @@ class OwnerMenuButton extends StatelessWidget {
   final VoidCallback onDelete;
   final double? iconSize;
 
+  /// Names the button for screen readers; defaults to "More".
+  final String? tooltip;
+
   const OwnerMenuButton({
     super.key,
     required this.onEdit,
     required this.onDelete,
     this.iconSize,
+    this.tooltip,
   });
 
   @override
@@ -49,7 +53,7 @@ class OwnerMenuButton extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final s = context.l10n;
     return PopupMenuButton<String>(
-      tooltip: s.more,
+      tooltip: tooltip ?? s.more,
       icon: Icon(Icons.more_vert,
           size: iconSize, color: scheme.onSurfaceVariant),
       onSelected: (v) => v == 'edit' ? onEdit() : onDelete(),

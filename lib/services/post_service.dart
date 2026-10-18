@@ -29,7 +29,13 @@ class PostService {
   PostService._();
 
   static SupabaseClient get _db => Supabase.instance.client;
-  static String? get _myId => _db.auth.currentUser?.id;
+  static String? get _myId => debugCurrentUserId != null
+      ? debugCurrentUserId!()
+      : _db.auth.currentUser?.id;
+
+  /// Lets widget tests render cards without initialising Supabase.
+  @visibleForTesting
+  static String? Function()? debugCurrentUserId;
 
   /// Max photos on one post.
   static const maxPhotos = 4;
