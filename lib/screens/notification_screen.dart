@@ -216,7 +216,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 label: Text(s.social.markAllRead),
               ),
             ),
-          const SizedBox(width: 8),
+          const SizedBox(width: KSpace.s),
         ],
       ),
       body: PageBody(child: _userId == null
@@ -346,7 +346,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               leading,
-              const SizedBox(width: 16),
+              const SizedBox(width: KSpace.l),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -358,7 +358,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     Text(_sentence(s, notif, actor),
                         style: theme.textTheme.bodyMedium
                             ?.copyWith(color: scheme.onSurfaceVariant)),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: KSpace.xs),
                     Text(
                       formatRelative(context, DateTime.parse(notif['created_at'])),
                       style: theme.textTheme.bodySmall
@@ -398,12 +398,12 @@ class _NotificationScreenState extends State<NotificationScreen> {
     return Container(
       color: scheme.secondaryContainer,
       alignment: align,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: KSpace.xl),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.mark_email_read_outlined, color: scheme.onSecondaryContainer),
-          const SizedBox(width: 8),
+          const SizedBox(width: KSpace.s),
           Text(context.l10n.shell.markRead,
               style: TextStyle(color: scheme.onSecondaryContainer)),
         ],

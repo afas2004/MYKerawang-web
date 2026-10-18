@@ -126,7 +126,7 @@ class _RightRailState extends State<RightRail> {
                               ],
                             ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: KSpace.l),
                 _RailCard(
                   header: SectionHeader(
                     title: s.newInMarket,
@@ -158,7 +158,7 @@ class _RailCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(KSpace.m),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
         borderRadius: KRadius.cut,
@@ -182,7 +182,7 @@ class _RailEmpty extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: KSpace.m),
       child: Text(context.l10n.shell.railNothing,
           textAlign: TextAlign.center,
           style: theme.textTheme.bodySmall
@@ -206,7 +206,7 @@ class _EventRow extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 48),
         child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 4),
+          margin: const EdgeInsets.symmetric(vertical: KSpace.xs),
           padding: const EdgeInsets.only(left: 10),
           decoration: BoxDecoration(
             border: Border(left: BorderSide(color: scheme.primary, width: 3)),

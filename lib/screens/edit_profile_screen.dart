@@ -420,7 +420,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: KSpace.l),
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
                       onPressed: () => _pickImage(true),
@@ -448,7 +448,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   // Not auto-saved: refreshes the dirty state only.
                   onChanged: (_) => setState(() {}),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: KSpace.l),
                 TextFormField(
                   controller: _nameCtrl,
                   decoration: _inputDeco(s.displayName)
@@ -456,7 +456,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   validator: (v) => v!.isEmpty ? s.required : null,
                   onChanged: (v) => _autoSave('display_name', v),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: KSpace.l),
                 TextFormField(
                   controller: _bioCtrl,
                   maxLines: 3,
@@ -465,7 +465,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   maxLength: 150,
                   onChanged: (v) => _autoSave('bio', v),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: KSpace.s),
                 TextField(
                   controller: _websiteCtrl,
                   keyboardType: TextInputType.url,
@@ -506,11 +506,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     if (v.isEmpty || v.length >= 9) _autoSave('phone_number', v);
                   },
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: KSpace.xl),
                 Text(s.duitnowForSelling, style: theme.textTheme.titleSmall),
                 Text(s.duitnowHelp,
                     style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                const SizedBox(height: 12),
+                const SizedBox(height: KSpace.m),
                 // Square, centred — a QR isn't a banner (H4/10.2)
                 Center(
                   child: InkWell(
@@ -619,7 +619,7 @@ class _FormSection extends StatelessWidget {
     final scheme = theme.colorScheme;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(KSpace.l),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
         borderRadius: KRadius.cut,
@@ -646,7 +646,7 @@ class _FormSection extends StatelessWidget {
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: scheme.onSurfaceVariant)),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: KSpace.l),
           ...children,
         ],
       ),

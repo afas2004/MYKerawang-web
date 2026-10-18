@@ -377,7 +377,7 @@ class _SearchScreenState extends State<SearchScreen> {
         );
       }
       return ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(vertical: KSpace.s),
         children: [
           _SectionTitle(
             title: s.shell.recentSearches,
@@ -458,7 +458,7 @@ class _SearchScreenState extends State<SearchScreen> {
         ],
         // --- SHOW MORE (end of list) ---
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: KSpace.s),
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : Center(
@@ -582,7 +582,7 @@ class _SearchScreenState extends State<SearchScreen> {
             // Text Section
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: KSpace.m, vertical: KSpace.s),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -604,7 +604,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: KSpace.xs),
                     Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
                   ],
                 ),

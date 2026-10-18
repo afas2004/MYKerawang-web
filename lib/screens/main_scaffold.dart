@@ -116,7 +116,7 @@ class ShellFrame extends StatelessWidget {
             groupAlignment: -0.6,
             leading: Column(
               children: [
-                const SizedBox(height: 8),
+                const SizedBox(height: KSpace.s),
                 FloatingActionButton(
                   heroTag: 'shell-create',
                   tooltip: s.shell.create,
@@ -127,7 +127,7 @@ class ShellFrame extends StatelessWidget {
                   onPressed: () => showCreateSheet(context),
                   child: const Icon(Icons.add),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: KSpace.m),
                 IconButton(
                   tooltip: s.navSearch,
                   isSelected: currentIndex == ShellBranch.search,
@@ -139,7 +139,7 @@ class ShellFrame extends StatelessWidget {
             ),
             trailing: Column(
               children: [
-                const SizedBox(height: 16),
+                const SizedBox(height: KSpace.l),
                 IconButton(
                   tooltip: s.notifications,
                   icon: const UnreadBadge(
@@ -298,7 +298,7 @@ class _BarItem extends StatelessWidget {
               ),
               child: Icon(selected ? selectedIcon : icon, color: fg, size: 24),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: KSpace.xs),
             Text(
               label,
               maxLines: 1,

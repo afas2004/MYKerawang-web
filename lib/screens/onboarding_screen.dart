@@ -190,15 +190,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 children: [
                   // --- STEP 1: IDENTITY ---
                   Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(KSpace.xl),
                     child: SingleChildScrollView(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(s.setupTitle, style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: KSpace.s),
                           Text(s.setupSubtitle),
-                          const SizedBox(height: 32),
+                          const SizedBox(height: KSpace.xxl),
                           
                           // Username
                           TextFormField(
@@ -212,7 +212,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             onChanged: _onUsernameChanged,
                             validator: (v) => (v!.length < 3) ? s.usernameMin : null,
                           ),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: KSpace.xl),
                           
                           // Display Name
                           TextFormField(
@@ -230,15 +230,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
                   // --- STEP 2: CONTACT & ROLE ---
                   Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(KSpace.xl),
                     child: SingleChildScrollView(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(s.contactDetails, style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: KSpace.s),
                           Text(s.contactSubtitle),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: KSpace.xl),
                           
                           // PHONE NUMBER (optional until they sell)
                           TextFormField(
@@ -251,13 +251,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             ),
                           ),
                           
-                          const SizedBox(height: 32),
+                          const SizedBox(height: KSpace.xxl),
                           const Divider(),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: KSpace.l),
 
                           // CLUB TOGGLE
                           Container(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(KSpace.l),
                             decoration: BoxDecoration(
                               border: Border.all(color: _isClub ? scheme.primary : scheme.outlineVariant),
                               borderRadius: BorderRadius.circular(12),
@@ -276,7 +276,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 
                                 // Verification Field (Only if Club is ON)
                                 if (_isClub) ...[
-                                  const SizedBox(height: 12),
+                                  const SizedBox(height: KSpace.m),
                                   TextFormField(
                                     controller: _clubReasonCtrl,
                                     decoration: InputDecoration(
@@ -298,7 +298,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             
             // BOTTOM BUTTONS
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(KSpace.xl),
               child: Row(
                 children: [
                   if (_step > 0)
@@ -339,7 +339,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
             Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(KSpace.xl),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 520, maxHeight: 760),
                   child: Material(
@@ -381,16 +381,16 @@ class _StepHeader extends StatelessWidget {
           Row(
             children: [
               const Flexible(child: Wordmark(fontSize: 22)),
-              const SizedBox(width: 12),
+              const SizedBox(width: KSpace.m),
               const KerawangDivider(size: 6),
               const Spacer(),
-              const SizedBox(width: 12),
+              const SizedBox(width: KSpace.m),
               Text(s.shell.stepOf.fill([step + 1, total]),
                   style: theme.textTheme.labelLarge
                       ?.copyWith(color: scheme.onSurfaceVariant)),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: KSpace.m),
           Semantics(
             label: s.shell.stepOf.fill([step + 1, total]),
             child: Row(

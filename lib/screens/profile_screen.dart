@@ -217,7 +217,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(KSpace.l),
                             decoration: BoxDecoration(
                               color: theme.colorScheme.surfaceContainer,
                               borderRadius: BorderRadius.circular(16),
@@ -256,7 +256,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(Icons.videocam_off, color: theme.colorScheme.onSurfaceVariant, size: 40),
-                                  const SizedBox(height: 12),
+                                  const SizedBox(height: KSpace.m),
                                   Text(
                                     s.cameraError.fill([error.errorCode.name]),
                                     style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
@@ -492,7 +492,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     Icon(Icons.verified, color: scheme.tertiary, size: 22),
                 ],
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: KSpace.xs),
               Wrap(
                 crossAxisAlignment: WrapCrossAlignment.center,
                 spacing: 8,
@@ -506,10 +506,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 ],
               ),
               if ((p['bio'] ?? '').toString().trim().isNotEmpty) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: KSpace.m),
                 Text(p['bio'], style: theme.textTheme.bodyMedium),
               ],
-              const SizedBox(height: 16),
+              const SizedBox(height: KSpace.l),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -599,7 +599,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     return LayoutBuilder(builder: (context, c) {
       if (c.maxWidth < 900) {
         return ListView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(KSpace.l),
           itemCount: _userPosts.length,
           itemBuilder: (_, i) => card(_userPosts[i]),
         );
@@ -607,12 +607,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       final left = [for (var i = 0; i < _userPosts.length; i += 2) _userPosts[i]];
       final right = [for (var i = 1; i < _userPosts.length; i += 2) _userPosts[i]];
       return SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(KSpace.l),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(child: Column(children: left.map(card).toList())),
-            const SizedBox(width: 16),
+            const SizedBox(width: KSpace.l),
             Expanded(child: Column(children: right.map(card).toList())),
           ],
         ),
@@ -626,7 +626,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     return LayoutBuilder(builder: (context, c) {
       final cols = Responsive.gridColumnsFor(c.maxWidth - 2 * KSpace.l);
       return GridView.builder(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(KSpace.l),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: cols,
           crossAxisSpacing: 12,
@@ -743,7 +743,7 @@ class _StatChip extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 48),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: KSpace.l),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

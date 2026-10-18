@@ -333,7 +333,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         borderRadius: KRadius.cut,
         child: Container(
           width: 140,
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(KSpace.m),
           decoration: BoxDecoration(
             color: spec.surface,
             borderRadius: KRadius.cut,
@@ -426,7 +426,7 @@ class _SettingsGroup extends StatelessWidget {
               child: Row(
                 children: [
                   Icon(icon, size: 18, color: scheme.primary),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: KSpace.s),
                   Text(title, style: theme.textTheme.titleMedium),
                 ],
               ),
@@ -487,7 +487,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(s.social.deleteAccountBody),
-          const SizedBox(height: 16),
+          const SizedBox(height: KSpace.l),
           TextField(
             controller: _ctrl,
             autofocus: true,

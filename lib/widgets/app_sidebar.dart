@@ -77,7 +77,7 @@ class AppSidebar extends StatelessWidget {
                         borderRadius: BorderRadius.circular(8),
                         onTap: () => context.go('/home'),
                         child: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: EdgeInsets.symmetric(horizontal: KSpace.s, vertical: KSpace.xs),
                           child: Wordmark(fontSize: 24),
                         ),
                       ),
@@ -96,7 +96,7 @@ class AppSidebar extends StatelessWidget {
                         }
                       },
                     ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: KSpace.s),
                   Divider(height: 16, color: scheme.outlineVariant),
                   SideNavTile(
                     icon: onNotifications
@@ -118,7 +118,7 @@ class AppSidebar extends StatelessWidget {
                     },
                   ),
                   const AdminNavEntry(),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: KSpace.l),
                   FilledButton.icon(
                     onPressed: () => showCreateSheet(context),
                     icon: const Icon(Icons.add),
@@ -201,7 +201,7 @@ class _SideNavTileState extends State<SideNavTile> {
           child: AnimatedContainer(
             duration: KMotion.of(context).fast,
             constraints: const BoxConstraints(minHeight: 48),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: KSpace.m),
             decoration: BoxDecoration(
               color: widget.selected ? scheme.secondaryContainer : null,
               borderRadius: radius,
@@ -213,7 +213,7 @@ class _SideNavTileState extends State<SideNavTile> {
             child: Row(
               children: [
                 widget.showUnread ? UnreadBadge(child: icon) : icon,
-                const SizedBox(width: 12),
+                const SizedBox(width: KSpace.m),
                 Expanded(
                   child: Text(
                     widget.label,
