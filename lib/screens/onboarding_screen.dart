@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
+import '../l10n/app_strings.dart';
+import '../language_cubit.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -78,7 +80,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       final res = await _supabase.from('profiles').select('id').eq('username', value).maybeSingle();
       if (mounted) {
         setState(() {
-          _usernameError = res != null ? "Username already taken" : null;
+          _usernameError = res != null ? context.l10nRead.usernameTakenShort : null;
         });
       }
     });
@@ -90,7 +92,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     
     // Club Verification Check
     if (_isClub && _clubReasonCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please provide club details/ID for verification.")));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.clubDetailsNeeded)));
       return;
     }
 
@@ -115,7 +117,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         context.go('/home');
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.errorWithDetail.fill([e]))));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -125,7 +127,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     // Validate Step 1 before moving
     if (_step == 0) {
       if (_usernameCtrl.text.isEmpty || _nameCtrl.text.isEmpty || _usernameError != null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fix errors first.")));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.fixErrorsFirst)));
         return;
       }
     }
@@ -142,9 +144,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+    final scheme = theme.colorScheme;
+    final s = context.l10n;
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Welcome!"), automaticallyImplyLeading: false),
+      appBar: AppBar(title: Text(s.welcomeTitle), automaticallyImplyLeading: false),
       body: Form(
         key: _formKey,
         child: Column(
@@ -167,35 +171,33 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("Let's get you set up.", style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          Text(s.setupTitle, style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
                           const SizedBox(height: 8),
-                          const Text("Create a unique ID so friends can find you."),
+                          Text(s.setupSubtitle),
                           const SizedBox(height: 32),
                           
                           // Username
                           TextFormField(
                             controller: _usernameCtrl,
                             decoration: InputDecoration(
-                              labelText: "Username",
+                              labelText: s.username,
                               prefixText: "@",
                               errorText: _usernameError,
-                              border: const OutlineInputBorder(),
-                              helperText: "Unique ID (e.g. fahmi_99)",
+                              helperText: s.usernameHelper,
                             ),
                             onChanged: _onUsernameChanged,
-                            validator: (v) => (v!.length < 3) ? "Too short" : null,
+                            validator: (v) => (v!.length < 3) ? s.usernameMin : null,
                           ),
                           const SizedBox(height: 24),
                           
                           // Display Name
                           TextFormField(
                             controller: _nameCtrl,
-                            decoration: const InputDecoration(
-                              labelText: "Display Name",
-                              border: OutlineInputBorder(),
-                              helperText: "Your real name or club name",
+                            decoration: InputDecoration(
+                              labelText: s.displayName,
+                              helperText: s.displayNameHelper,
                             ),
-                            validator: (v) => v!.isEmpty ? "Required" : null,
+                            validator: (v) => v!.isEmpty ? s.required : null,
                           ),
                         ],
                       ),
@@ -209,22 +211,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("Contact Details", style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          Text(s.contactDetails, style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
                           const SizedBox(height: 8),
-                          const Text("How should people contact you regarding events or items?"),
+                          Text(s.contactSubtitle),
                           const SizedBox(height: 24),
                           
                           // PHONE NUMBER (Crucial)
                           TextFormField(
                             controller: _phoneCtrl,
                             keyboardType: TextInputType.phone,
-                            decoration: const InputDecoration(
-                              labelText: "WhatsApp Number",
-                              prefixIcon: Icon(Icons.phone),
-                              border: OutlineInputBorder(),
-                              helperText: "Required for Marketplace & Events",
+                            decoration: InputDecoration(
+                              labelText: s.whatsappNumber,
+                              prefixIcon: const Icon(Icons.phone),
+                              helperText: s.whatsappHelper,
                             ),
-                            validator: (v) => v!.isEmpty ? "Phone number is required" : null,
+                            validator: (v) => v!.isEmpty ? s.phoneRequired : null,
                           ),
                           
                           const SizedBox(height: 32),
@@ -235,16 +236,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              border: Border.all(color: _isClub ? theme.primaryColor : Colors.grey.shade300),
+                              border: Border.all(color: _isClub ? scheme.primary : scheme.outlineVariant),
                               borderRadius: BorderRadius.circular(12),
-                              color: _isClub ? theme.primaryColor.withOpacity(0.05) : null,
+                              color: _isClub ? scheme.primary.withValues(alpha: 0.05) : null,
                             ),
                             child: Column(
                               children: [
                                 SwitchListTile(
                                   contentPadding: EdgeInsets.zero,
-                                  title: const Text("I am registering a Club"),
-                                  subtitle: const Text("Switch to Club Account (Requires Approval)"),
+                                  title: Text(s.registeringClub),
+                                  subtitle: Text(s.registeringClubSub),
                                   value: _isClub,
                                   onChanged: (val) => setState(() => _isClub = val),
                                   secondary: const Icon(Icons.groups),
@@ -255,12 +256,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                   const SizedBox(height: 12),
                                   TextFormField(
                                     controller: _clubReasonCtrl,
-                                    decoration: const InputDecoration(
-                                      labelText: "Club ID / Reference",
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                      border: OutlineInputBorder(),
-                                      helperText: "Provide ID for admin verification",
+                                    decoration: InputDecoration(
+                                      labelText: s.clubReference,
+                                      helperText: s.clubReferenceHelper,
                                     ),
                                   ),
                                 ]
@@ -281,7 +279,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: Row(
                 children: [
                   if (_step > 0)
-                    TextButton(onPressed: _prevPage, child: const Text("Back")),
+                    TextButton(onPressed: _prevPage, child: Text(s.back)),
                   const Spacer(),
                   FilledButton(
                     onPressed: _isLoading ? null : () {
@@ -293,8 +291,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     },
                     style: FilledButton.styleFrom(minimumSize: const Size(120, 50)),
                     child: _isLoading 
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
-                      : Text(_step == 0 ? "Next" : "Finish"),
+                      ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onPrimary))
+                      : Text(_step == 0 ? s.next : s.finish),
                   ),
                 ],
               ),

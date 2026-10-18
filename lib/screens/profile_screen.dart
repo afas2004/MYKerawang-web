@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:mykerawang/screens/edit_profile_screen.dart';
 import 'package:mykerawang/screens/follow_list_screen.dart';
+import 'package:mykerawang/l10n/app_strings.dart';
 import 'package:mykerawang/language_cubit.dart';
+import 'package:mykerawang/theme/app_themes.dart';
 import 'package:mykerawang/widgets/image_crop_dialog.dart';
 import 'package:mykerawang/utils/app_nav.dart';
 import 'package:mykerawang/utils/report_helper.dart';
 import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import '../utils/roles.dart';
 import '../widgets/post_card.dart';
+import '../widgets/status_badge.dart';
+import '../widgets/tap_card.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -119,13 +124,15 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         // 2. SEND NOTIFICATION (New!)
         // Fetch my name first so the notification looks nice ("Fahmi followed you")
         final myProfile = await _supabase.from('profiles').select('display_name').eq('id', currentUid).single();
-        
+
+        // Read by the recipient, so written in the canonical language.
+        const n = AppStrings.en;
         await _supabase.from('notifications').insert({
           'user_id': targetUid,      // Send TO target
           'actor_id': currentUid,    // From ME
           'type': 'follow',
-          'title': 'New Follower',
-          'body': '${myProfile['display_name']} started following you.',
+          'title': n.notifFollowTitle,
+          'body': n.notifFollowBody.fill([myProfile['display_name']]),
           'data': {}, // No extra data needed for follow
         });
 
@@ -135,13 +142,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       }
     } catch (e) {
       // Revert if error
-      setState(() => _isFollowing = !_isFollowing); 
+      if (mounted) setState(() => _isFollowing = !_isFollowing);
     }
   }
 
   void _showQRCode() {
     final theme = Theme.of(context);
-    final qrColor = theme.colorScheme.onSurface; 
+    final qrColor = theme.colorScheme.onSurface;
+    final s = context.l10nRead;
 
     showDialog(
       context: context,
@@ -154,8 +162,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             height: 450,
             child: Column(
               children: [
-                const TabBar(
-                  tabs: [Tab(text: "My Code"), Tab(text: "Scan")],
+                TabBar(
+                  tabs: [Tab(text: s.myCode), Tab(text: s.scan)],
                 ),
                 Expanded(
                   child: TabBarView(
@@ -187,8 +195,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                           ),
                           const SizedBox(height: 20),
                           Text(
-                            "@${_profile?['username'] ?? 'User'}",
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                            "@${_profile?['username'] ?? ''}",
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
@@ -203,11 +211,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.videocam_off, color: Colors.grey, size: 40),
+                                  Icon(Icons.videocam_off, color: theme.colorScheme.onSurfaceVariant, size: 40),
                                   const SizedBox(height: 12),
                                   Text(
-                                    "Camera Error: ${error.errorCode}",
-                                    style: const TextStyle(color: Colors.grey),
+                                    s.cameraError.fill([error.errorCode.name]),
+                                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                                   ),
                                 ],
                               ),
@@ -248,15 +256,17 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
+    final s = context.l10n;
     if (_isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (_profile == null) return const Scaffold(body: Center(child: Text("User not found")));
+    if (_profile == null) return Scaffold(body: Center(child: Text(s.userNotFound)));
 
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final isClub = _profile!['role'] == 'club';
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_profile!['username'] != null ? "@${_profile!['username']}" : "Profile"),
+        title: Text(_profile!['username'] != null ? "@${_profile!['username']}" : s.profileTitle),
         actions: [
           IconButton(
             tooltip: context.l10n.refresh,
@@ -264,7 +274,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             onPressed: _fetchProfileData,
           ),
           IconButton(
-            tooltip: "QR code",
+            tooltip: s.qrCode,
             icon: const Icon(Icons.qr_code),
             onPressed: _showQRCode,
           ),
@@ -275,17 +285,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               onPressed: () => context.goSettings(),
             )
           else
-            PopupMenuButton<String>(
-              tooltip: "More",
-              onSelected: (value) => showReportDialog(context, widget.userId!, 'user'),
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'report',
-                  child: Row(
-                    children: [Icon(Icons.flag, color: Colors.red), SizedBox(width: 8), Text("Report User")],
-                  ),
-                ),
-              ],
+            ReportMenuButton(
+              targetId: widget.userId!,
+              type: 'user',
+              label: s.reportUser,
+              icon: const Icon(Icons.more_vert),
             ),
         ],
       ),
@@ -301,7 +305,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               child: Column(
                 children: [
                   // Avatar
-                  GestureDetector(
+                  InkWell(
+                    customBorder: const CircleBorder(),
                     onTap: () {
                       final url = _profile!['avatar_url'];
                       if (url == null) return;
@@ -326,12 +331,13 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        _profile!['display_name'] ?? "UiTM Student",
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        displayNameFor(s, _profile),
+                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                       ),
+                      // Gold marks officialness (DESIGN_SPEC §2)
                       if (_profile!['is_verified'] == true) ...[
                         const SizedBox(width: 4),
-                        const Icon(Icons.verified, color: Colors.blue, size: 20),
+                        Icon(Icons.verified, color: scheme.tertiary, size: 20),
                       ]
                     ],
                   ),
@@ -347,18 +353,18 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _statItem("Posts", "${_userPosts.length}"), // No tap for posts
+                      _statItem(s.posts, "${_userPosts.length}"), // No tap for posts
                       
                       // Followers Tap
                       _statItem(
-                        "Followers", 
+                        s.followers, 
                         "$_followerCount", 
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FollowListScreen(userId: widget.userId ?? _supabase.auth.currentUser!.id, type: 'followers')))
                       ),
                       
                       // Following Tap
                       _statItem(
-                        "Following", 
+                        s.following, 
                         "$_followingCount",
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FollowListScreen(userId: widget.userId ?? _supabase.auth.currentUser!.id, type: 'following')))
                       ),
@@ -372,11 +378,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                       width: double.infinity,
                       child: FilledButton(
                         onPressed: _toggleFollow,
+                        // Scheme roles so it reads on Songket Noir too
                         style: FilledButton.styleFrom(
-                          backgroundColor: _isFollowing ? Colors.grey[300] : theme.colorScheme.primary,
-                          foregroundColor: _isFollowing ? Colors.black : Colors.white,
+                          backgroundColor: _isFollowing ? scheme.surfaceContainerHighest : scheme.primary,
+                          foregroundColor: _isFollowing ? scheme.onSurface : scheme.onPrimary,
                         ),
-                        child: Text(_isFollowing ? "Following" : "Follow"),
+                        child: Text(_isFollowing ? s.following : s.follow),
                       ),
                     ),
                   if (_isMe && !isClub)
@@ -389,7 +396,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                           if (value == true) _fetchProfileData(); // Refresh profile when back
                         });
                       },
-                      child: const Text("Edit Profile"),
+                      child: Text(s.editProfile),
                     ),
                 ],
               ),
@@ -400,13 +407,13 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           children: [
             TabBar(
               controller: _tabController,
-              labelColor: theme.colorScheme.primary,
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: theme.colorScheme.primary,
-              tabs: const [
-                Tab(text: "Activity"),
-                Tab(text: "Events"),
-                Tab(text: "Shop"), // <--- NEW TAB
+              labelColor: scheme.primary,
+              unselectedLabelColor: scheme.onSurfaceVariant,
+              indicatorColor: scheme.primary,
+              tabs: [
+                Tab(text: s.activity),
+                Tab(text: s.navEvents),
+                Tab(text: s.navMarket),
               ],
             ),
             Expanded(
@@ -415,7 +422,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 children: [
                   // Tab 1: Posts
                   _userPosts.isEmpty
-                    ? const Center(child: Text("No posts yet"))
+                    ? Center(child: Text(s.noPostsYet))
                     : ListView.builder(
                         padding: const EdgeInsets.all(16),
                         itemCount: _userPosts.length,
@@ -432,12 +439,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   
                   // Tab 2: Events - SWITCH TO GRID
                   _userEvents.isEmpty 
-                    ? const Center(child: Text("No events hosted"))
+                    ? Center(child: Text(s.noEventsYet))
                     : _buildPhotoGrid(_userEvents, true), // <--- USE YOUR FUNCTION HERE
                     
                   // Tab 3: Shop - SWITCH TO GRID
                   _userListings.isEmpty
-                    ? const Center(child: Text("Not selling anything"))
+                    ? Center(child: Text(s.nothingForSale))
                     : _buildPhotoGrid(_userListings, false), // <--- AND HERE
                 ],
               ),
@@ -450,13 +457,17 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   Widget _statItem(String label, String count, {VoidCallback? onTap}) {
-    return GestureDetector(
+    final theme = Theme.of(context);
+    return TapCard(
       onTap: onTap,
-      child: Column(
-        children: [
-          Text(count, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: Column(
+          children: [
+            Text(count, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            Text(label, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          ],
+        ),
       ),
     );
   }
@@ -473,7 +484,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       itemCount: items.length,
       itemBuilder: (context, index) {
         final item = items[index];
-        return GestureDetector(
+        final s = context.l10n;
+        return TapCard(
+          borderRadius: BorderRadius.zero,
           onTap: () {
             // Navigate to details
             if (isEvent) {
@@ -494,7 +507,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     Image.network(item['image_url'], height: 200, fit: BoxFit.cover),
                     Padding(
                       padding: const EdgeInsets.all(8.0),
-                      child: Text(item['title'] ?? "No Title", style: const TextStyle(fontWeight: FontWeight.bold)),
+                      child: Text(item['title'] ?? s.untitled, style: const TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -509,23 +522,17 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 item['image_url'] ?? '',
                 cacheWidth: 400, // grid tile
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(color: Colors.grey[300], child: const Icon(Icons.image_not_supported)),
+                errorBuilder: (_, __, ___) => Container(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    child: Icon(Icons.image_not_supported, color: Theme.of(context).colorScheme.onSurfaceVariant)),
               ),
 
-              // 2. NEW: "SOLD" Overlay
+              // Same SOLD badge as the market grid
               if (item['is_sold'] == true)
                 Container(
-                  color: Colors.black54, // Darkens the image
-                  child: const Center(
-                    child: Text(
-                      "SOLD",
-                      style: TextStyle(
-                        color: Colors.white, 
-                        fontWeight: FontWeight.bold, 
-                        letterSpacing: 1.5
-                      ),
-                    ),
-                  ),
+                  color: photoScrim(0.35),
+                  alignment: Alignment.center,
+                  child: StatusBadge(s.sold),
                 ),
             ],
           )
