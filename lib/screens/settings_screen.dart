@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'login_screen.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mykerawang/theme_cubit.dart';
 import '../theme/app_themes.dart';
 import '../utils/adaptive.dart';
@@ -76,12 +76,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _signOut() async {
     try {
       await _supabase.auth.signOut();
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-          (route) => false,
-        );
-      }
+      // The router's auth redirect also catches this; go explicitly so the
+      // whole stack (including pushed routes) is replaced.
+      if (mounted) context.go('/login');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -205,7 +202,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 10),
               Center(
-                child: Text("Version 1.0.0",
+                child: Text("Version 1.0.1", // keep in sync with pubspec.yaml
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant)),
               ),

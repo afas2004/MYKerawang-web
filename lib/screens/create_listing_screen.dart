@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 // Ensure you have this utility (or copy it from previous steps)
 import '../utils/image_compressor.dart';
 import '../utils/local_image.dart';
+import '../utils/categories.dart';
 import 'gallery_view_screen.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
@@ -29,7 +30,6 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   
   // State
   String _category = 'Books';
-  final List<String> _categories = ['Electronics', 'Books', 'Furniture', 'Clothing', 'Sports', 'Others'];
   bool _isLoading = false;
 
   // UNIFIED MEDIA LIST (Stores both Strings/URLs and LocalImages)
@@ -46,7 +46,9 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     _descriptionController = TextEditingController(text: item?['description'] ?? '');
     
     if (item != null) {
-      _category = item['category'] ?? 'Books';
+      // Older/seeded listings may carry a category no longer offered
+      final cat = item['category'];
+      _category = kListingCategories.contains(cat) ? cat : 'Others';
       
       // LOAD EXISTING MEDIA
       // 1. Cover
@@ -370,7 +372,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                     child: DropdownButtonFormField<String>(
                       value: _category,
                       decoration: const InputDecoration(labelText: 'Category', border: OutlineInputBorder()),
-                      items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                      items: kListingCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                       onChanged: (v) => setState(() => _category = v!),
                     ),
                   ),

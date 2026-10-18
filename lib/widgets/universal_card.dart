@@ -19,7 +19,7 @@ class UniversalCard extends StatelessWidget {
     bool isEvent = data.containsKey('start_datetime');
     
     if (isEvent) {
-      final date = DateTime.parse(data['start_datetime']);
+      final date = DateTime.parse(data['start_datetime']).toLocal();
       subtitle = DateFormat('d MMM, h:mm a').format(date);
     } else {
       // Marketplace item

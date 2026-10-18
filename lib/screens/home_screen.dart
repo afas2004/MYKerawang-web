@@ -41,7 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchFeedData() async {
     if (mounted && _hasError) setState(() => _hasError = false);
     try {
-      final now = DateTime.now().toIso8601String();
+      final now = DateTime.now().toUtc().toIso8601String();
 
       // 1. Fetch Events (For Carousel & Injection)
       final events = await _supabase.from('events')

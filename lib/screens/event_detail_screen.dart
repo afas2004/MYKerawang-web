@@ -31,6 +31,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   final _commentCtrl = TextEditingController();
   bool _isJoined = false;       // <--- NEW: Did I join?
   int _participantCount = 0;    // <--- NEW: Total count
+  late Stream<List<Map<String, dynamic>>> _commentsStream;
 
   final List<String> _trustedDomains = [
     'uitm.edu.my', 
@@ -45,6 +46,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   void initState() {
     super.initState();
     _event = widget.event;
+    _commentsStream = _fetchCommentsStream();
     _fetchEventDetails();
   }
 
@@ -91,7 +93,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   /// stream carries `user_id` even for anonymous comments. So the stream is
   /// used purely as a change signal; the rows actually rendered come from
   /// `comments_public`, which blanks the author.
-  Stream<List<Map<String, dynamic>>> _commentsStream() async* {
+  Stream<List<Map<String, dynamic>>> _fetchCommentsStream() async* {
     yield await _fetchEventComments();
 
     final signal = Supabase.instance.client
@@ -238,10 +240,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     final theme = Theme.of(context);
     
     // Date Parsing logic remains the same...
-    final startDate = DateTime.parse(_event['start_datetime']);
+    final startDate = DateTime.parse(_event['start_datetime']).toLocal();
     final DateTime? endDate = _event['end_datetime'] != null 
-        ? DateTime.parse(_event['end_datetime']) 
+        ? DateTime.parse(_event['end_datetime']).toLocal() 
         : null;
+    final bool sameDay = endDate != null &&
+        startDate.year == endDate.year && startDate.month == endDate.month && startDate.day == endDate.day;
     final gallery = List<String>.from(_event['gallery_urls'] ?? []);
     
     // 1. PREPARE THE DATA (Handle Empty Strings correctly)
@@ -422,9 +426,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     // Date & Location Rows (Keep your existing logic)
                     _infoRow(
                       Icons.calendar_today, 
-                      endDate != null
-                          ? "${DateFormat('d MMM yyyy').format(startDate)} - ${DateFormat('d MMM yyyy').format(endDate)}"
-                          : DateFormat('d MMM yyyy • h:mm a').format(startDate),
+                      endDate == null
+                          ? DateFormat('d MMM yyyy • h:mm a').format(startDate)
+                          : sameDay
+                              ? "${DateFormat('d MMM yyyy • h:mm a').format(startDate)} – ${DateFormat('h:mm a').format(endDate)}"
+                              : "${DateFormat('d MMM yyyy, h:mm a').format(startDate)} – ${DateFormat('d MMM yyyy, h:mm a').format(endDate)}",
                       theme
                     ),
                     const SizedBox(height: 12),
@@ -584,7 +590,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) 
                             : const Icon(Icons.refresh, size: 20),
                           onPressed: () {
-                            setState(() => _isLoading = true);
+                            setState(() {
+                              _isLoading = true;
+                              _commentsStream = _fetchCommentsStream();
+                            });
                             _fetchEventDetails();
                           },
                           tooltip: "Refresh Comments",
@@ -595,7 +604,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
                     // Comments List (Keep existing)
                     StreamBuilder<List<Map<String, dynamic>>>(
-                      stream: _commentsStream(),
+                      stream: _commentsStream,
                       builder: (context, snapshot) {
                         if (!snapshot.hasData || snapshot.data!.isEmpty) {
                           return const Center(child: Padding(padding: EdgeInsets.all(16), child: Text("No comments yet.")));

@@ -63,6 +63,7 @@ class MarketplaceCubit extends Cubit<MarketplaceState> {
     }
 
     // 2. SLOW: Network Load
+    _subscription?.cancel(); // drop the previous stream before resubscribing
     _subscription = _supabase
         .from('listings')
         .stream(primaryKey: ['id'])

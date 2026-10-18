@@ -154,7 +154,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     decoration: BoxDecoration(border: Border.all(color: Colors.grey[300]!)),
                     child: CachedNetworkImage(
                       imageUrl: qrUrl,
-                      fit: BoxFit.cover,
+                      fit: BoxFit.contain,
                       placeholder: (_,__) => const Center(child: CircularProgressIndicator()),
                     ),
                   ),

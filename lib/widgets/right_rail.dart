@@ -28,7 +28,7 @@ class _RightRailState extends State<RightRail> {
   Future<void> _fetch() async {
     try {
       final supabase = Supabase.instance.client;
-      final now = DateTime.now().toIso8601String();
+      final now = DateTime.now().toUtc().toIso8601String();
       // Prefer upcoming events; if there are none, show the most recent
       // past ones rather than leaving the rail empty.
       var events = await supabase

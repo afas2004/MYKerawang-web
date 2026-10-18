@@ -51,7 +51,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Future<void> _submit() async {
-    if (_titleCtrl.text.isEmpty) return;
+    if (_titleCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please enter a title")));
+      return;
+    }
     
     setState(() => _isLoading = true);
     final user = Supabase.instance.client.auth.currentUser;

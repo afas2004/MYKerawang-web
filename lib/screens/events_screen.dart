@@ -9,6 +9,7 @@ import '../language_cubit.dart';
 import '../theme/app_themes.dart';
 import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
+import '../utils/categories.dart';
 import '../widgets/error_state.dart';
 
 class EventsScreen extends StatelessWidget {
@@ -33,8 +34,7 @@ class EventsView extends StatefulWidget {
 
 class _EventsViewState extends State<EventsView> {
   final TextEditingController _searchCtrl = TextEditingController();
-  // Tags must tally with what you save in Create Event
-  final List<String> _tags = ['All', 'Academic', 'Tech', 'Food', 'Fun', 'Sports', 'Workshop'];
+  final List<String> _tags = ['All', ...kEventTags];
 
   @override
   void dispose() {
@@ -143,7 +143,7 @@ class _EventsViewState extends State<EventsView> {
                                 itemBuilder: (context, index) {
                                   final event = state.displayedEvents[index];
                                   // Parse date exactly as before
-                                  final date = DateTime.parse(event['start_datetime']);
+                                  final date = DateTime.parse(event['start_datetime']).toLocal();
                                   final ended = isEventEnded(event);
 
                                   return Opacity(

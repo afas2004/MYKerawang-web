@@ -15,8 +15,6 @@ import 'services/notification_service.dart';
 import 'utils/responsive.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'screens/events_cubit.dart';
-import 'screens/marketplace_cubit.dart';
 import 'screens/profile_cubit.dart';
 
 /// Lets mouse users drag-scroll lists (like touch), on top of the wheel.
@@ -63,8 +61,6 @@ class _MyAppState extends State<MyApp> {
     // 1. Initialize ALL Cubits here (Global State)
     return MultiBlocProvider(
       providers: [
-        BlocProvider(create: (context) => EventsCubit()),
-        BlocProvider(create: (context) => MarketplaceCubit()),
         BlocProvider(create: (context) => ProfileCubit()),
         BlocProvider(create: (context) => ThemeCubit()),
         BlocProvider(create: (context) => LanguageCubit()),
