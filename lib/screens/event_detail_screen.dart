@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:mykerawang/services/share_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -10,7 +11,9 @@ import '../theme/app_themes.dart';
 import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
 import '../utils/formatters.dart';
+import '../utils/feedback.dart';
 import '../utils/guest_access.dart';
+import '../utils/ics.dart';
 import '../utils/roles.dart';
 import '../widgets/comment_tile.dart';
 import '../widgets/mention_text.dart';
@@ -37,6 +40,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   int _currentImageIndex = 0; 
   final _commentCtrl = TextEditingController();
   bool _isJoined = false;       // <--- NEW: Did I join?
+  bool _joining = false;
+  bool _postingComment = false;
+  bool _savingCalendar = false;
+
+  /// People I follow who joined: total, plus up to 3 for avatars.
+  int _followingGoing = 0;
+  List<Map<String, dynamic>> _followingGoingFaces = const [];
   int _participantCount = 0;    // <--- NEW: Total count
   late Stream<List<Map<String, dynamic>>> _commentsStream;
 
@@ -107,13 +117,68 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           _isLoading = false;
         });
       }
+      if (userId != null) _fetchFollowingGoing(userId);
     } catch (e) {
       debugPrint("Error fetching details: $e");
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  /// Realtime can only subscribe to a real table, and a raw `comments`
+  /// "N people you follow are going". Best-effort: a failure just hides
+  /// the line.
+  Future<void> _fetchFollowingGoing(String myId) async {
+    final db = Supabase.instance.client;
+    try {
+      final follows = await db
+          .from('followers')
+          .select('following_id')
+          .eq('follower_id', myId);
+      final ids = [for (final f in follows) f['following_id'] as String];
+      if (ids.isEmpty) return;
+
+      final going = await db
+          .from('event_participants')
+          .select('user_id')
+          .eq('event_id', _event['id'])
+          .inFilter('user_id', ids);
+      final goingIds = [for (final g in going) g['user_id'] as String];
+      if (goingIds.isEmpty) {
+        if (mounted) setState(() => _followingGoing = 0);
+        return;
+      }
+
+      final faces = await db
+          .from('profiles')
+          .select('id, display_name, avatar_url')
+          .inFilter('id', goingIds.take(3).toList());
+      if (!mounted) return;
+      setState(() {
+        _followingGoing = goingIds.length;
+        _followingGoingFaces = List<Map<String, dynamic>>.from(faces);
+      });
+    } catch (e) {
+      debugPrint("Following-going lookup failed: $e");
+    }
+  }
+
+  Future<void> _addToCalendar() async {
+    if (_savingCalendar) return;
+    final s = context.l10nRead;
+    setState(() => _savingCalendar = true);
+    try {
+      final ics = buildEventIcs(_event,
+          url: ShareService.absoluteUrl('/event/${_event['id']}'));
+      await saveIcs(ics, icsFileName(_event['title']));
+      // Mobile shows the share sheet, which is its own confirmation.
+      if (mounted && kIsWeb) showSuccess(context, s.calendarFileSaved);
+    } catch (e) {
+      if (mounted) showErrorWithRetry(context, e, onRetry: _addToCalendar);
+    } finally {
+      if (mounted) setState(() => _savingCalendar = false);
+    }
+  }
+
+  /// Realtime can only subscribe to a real table,and a raw `comments`
   /// stream carries `user_id` even for anonymous comments. So the stream is
   /// used purely as a change signal; the rows actually rendered come from
   /// `comments_public`, which blanks the author.
@@ -147,20 +212,26 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
   Future<void> _postComment() async {
     if (!requireLogin(context)) return;
-    if (_commentCtrl.text.trim().isEmpty) return;
+    if (_commentCtrl.text.trim().isEmpty || _postingComment) return;
     final user = Supabase.instance.client.auth.currentUser!;
+    final s = context.l10nRead;
 
+    setState(() => _postingComment = true);
     try {
       await Supabase.instance.client.from('comments').insert({
         'event_id': _event['id'],
         'user_id': user.id,
         'body': _commentCtrl.text.trim(),
       });
+      // Text is kept until the insert succeeds, so Retry resends it.
       _commentCtrl.clear();
-      if (mounted) FocusScope.of(context).unfocus();
-    } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.errorWithDetail.fill([e]))));
+      FocusScope.of(context).unfocus();
+      showSuccess(context, s.commentPosted);
+    } catch (e) {
+      if (mounted) showErrorWithRetry(context, e, onRetry: _postComment);
+    } finally {
+      if (mounted) setState(() => _postingComment = false);
     }
   }
 
@@ -197,7 +268,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       _setCancelled(null, context.l10nRead.eventRestored);
 
   Future<void> _setCancelled(String? cancelledAt, String doneMessage) async {
-    final s = context.l10nRead;
     try {
       await Supabase.instance.client
           .from('events')
@@ -205,9 +275,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           .eq('id', _event['id']);
       if (!mounted) return;
       setState(() => _event = {..._event, 'cancelled_at': cancelledAt});
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(doneMessage)));
+      showSuccess(context, doneMessage);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+      if (mounted) {
+        showErrorWithRetry(context, e,
+            onRetry: () => _setCancelled(cancelledAt, doneMessage));
+      }
     }
   }
 
@@ -231,11 +304,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       try {
         await Supabase.instance.client.from('events').delete().eq('id', _event['id']);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.eventDeleted)));
+          showSuccess(context, s.eventDeleted);
           popOrHome(context, true); // true = refresh profile/home
         }
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+        if (mounted) showErrorWithRetry(context, e, onRetry: _deleteEvent);
       }
     }
   }
@@ -290,6 +363,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     if (!requireLogin(context)) return;
     final userId = supabase.auth.currentUser!.id;
     if (_isCancelled && !_isJoined) return;
+    if (_joining) return;
+    _joining = true;
 
     // 1. Instant UI Update (Makes it feel fast)
     setState(() {
@@ -317,8 +392,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           _isJoined = !_isJoined;
           _participantCount += _isJoined ? 1 : -1;
         });
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.errorWithDetail.fill([e]))));
+        showErrorWithRetry(context, e, onRetry: _toggleJoin);
       }
+    } finally {
+      _joining = false;
     }
   }
 
@@ -567,7 +644,20 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     _infoRow(Icons.calendar_today, formatEventRange(startDate, endDate), theme),
                     const SizedBox(height: 12),
                     _infoRow(Icons.location_on, _event['location'] ?? s.locationTba, theme),
-                    
+                    if (!isClosed) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: _savingCalendar ? null : _addToCalendar,
+                          icon: _savingCalendar
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.event_available, size: 18),
+                          label: Text(s.addToCalendar),
+                        ),
+                      ),
+                    ],
+
                     const SizedBox(height: 24),
                     const Divider(),
 
@@ -613,6 +703,48 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                         ],
                       ),
                     ),
+                    if (_followingGoing > 0) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 20.0 * _followingGoingFaces.length + 12,
+                            height: 32,
+                            child: Stack(
+                              children: [
+                                for (var i = 0; i < _followingGoingFaces.length; i++)
+                                  Positioned(
+                                    left: 20.0 * i,
+                                    child: CircleAvatar(
+                                      radius: 16,
+                                      backgroundColor: theme.scaffoldBackgroundColor,
+                                      child: CircleAvatar(
+                                        radius: 14,
+                                        backgroundColor: scheme.primaryContainer,
+                                        backgroundImage: _followingGoingFaces[i]['avatar_url'] != null
+                                            ? CachedNetworkImageProvider(_followingGoingFaces[i]['avatar_url'])
+                                            : null,
+                                        child: _followingGoingFaces[i]['avatar_url'] == null
+                                            ? Icon(Icons.person, size: 14, color: scheme.onPrimaryContainer)
+                                            : null,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _followingGoing == 1
+                                  ? s.followingGoingOne
+                                  : s.followingGoingMany.fill([_followingGoing]),
+                              style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 24),
 
                     // Organizer Tile (Keep existing)
@@ -756,7 +888,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                         ),
                       ),
                     ),
-                    IconButton(tooltip: s.post, icon: Icon(Icons.send, color: scheme.primary), onPressed: _postComment),
+                    IconButton(
+                      tooltip: s.post,
+                      onPressed: _postingComment ? null : _postComment,
+                      icon: _postingComment
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                          : Icon(Icons.send, color: scheme.primary),
+                    ),
                   ],
                 ),
         ),
