@@ -166,14 +166,21 @@ class _SearchScreenState extends State<SearchScreen> {
             .limit(limitPerCategory);
 
         for (var p in posts) {
-          // Smart Title Generation
-          String displayTitle = p['title'] ?? s.kindPost;
-          if ((p['title'] == null || p['title'].toString().trim().isEmpty)) {
-            if (p['events'] != null) {
-              displayTitle = s.replyTo.fill([p['events']['title']]);
-            } else if (p['listings'] != null) {
-              displayTitle = s.replyTo.fill([p['listings']['title']]);
-            }
+          // Titles are optional: fall back to the shared item, then the
+          // first line of the body, then the generic "Post".
+          final rawTitle = '${p['title'] ?? ''}'.trim();
+          final firstLine = '${p['body'] ?? ''}'.trim().split('\n').first.trim();
+          final String displayTitle;
+          if (rawTitle.isNotEmpty) {
+            displayTitle = rawTitle;
+          } else if (p['events']?['title'] != null) {
+            displayTitle = s.replyTo.fill([p['events']['title']]);
+          } else if (p['listings']?['title'] != null) {
+            displayTitle = s.replyTo.fill([p['listings']['title']]);
+          } else if (firstLine.isNotEmpty) {
+            displayTitle = firstLine;
+          } else {
+            displayTitle = s.kindPost;
           }
 
           tempResults.add({

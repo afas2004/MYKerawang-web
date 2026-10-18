@@ -20,58 +20,12 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // Toggle states
-  bool _newEvents = true;
-  bool _eventReminders = true;
-  bool _isLoading = true;
+  // Event-alert toggles (notify_new_events / notify_reminders) are hidden
+  // until something actually sends those notifications; the DB columns
+  // stay. Market "price drops" was removed — there's no saved-items feature.
   bool _checkingUpdate = false;
 
   final _supabase = Supabase.instance.client;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSettings();
-  }
-
-  // 1. Fetch current settings from Supabase
-  Future<void> _loadSettings() async {
-    try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) return;
-
-      final profile = await _supabase
-          .from('profiles')
-          .select('notify_new_events, notify_reminders')
-          .eq('id', user.id)
-          .single();
-
-      if (mounted) {
-        setState(() {
-          _newEvents = profile['notify_new_events'] ?? true;
-          _eventReminders = profile['notify_reminders'] ?? true;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint("Error loading settings: $e");
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  // 2. Save changes to Supabase instantly
-  Future<void> _updateSetting(String column, bool value) async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return;
-
-    try {
-      await _supabase.from('profiles').update({column: value}).eq('id', user.id);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.errorWithDetail.fill([e]))));
-      }
-    }
-  }
 
   Future<void> _checkForUpdates() async {
     setState(() => _checkingUpdate = true);
@@ -111,9 +65,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: appBarConstrained(context, title: Text(s.settingsTitle)),
-      body: PageBody(child: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : ListView(
+      body: PageBody(child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
               // --- THEME (three named moods, DESIGN_SPEC §2) ---
@@ -142,7 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: SegmentedButton<AppLanguage>(
                   segments: [
-                    for (final lang in AppLanguage.values)
+                    for (final lang in kSupportedLanguages)
                       ButtonSegment(value: lang, label: Text(lang.nativeName)),
                   ],
                   selected: {context.watch<LanguageCubit>().state.language},
@@ -151,31 +103,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
 
-              const Divider(height: 40),
-              _sectionHeader(s.eventAlerts),
-
-              SwitchListTile(
-                title: Text(s.newEventsSetting),
-                subtitle: Text(s.newEventsSettingSub),
-                value: _newEvents,
-                activeThumbColor: theme.colorScheme.primary,
-                onChanged: (v) {
-                  setState(() => _newEvents = v);
-                  _updateSetting('notify_new_events', v); // Save to DB
-                },
-              ),
-              SwitchListTile(
-                title: Text(s.reminders),
-                subtitle: Text(s.remindersSub),
-                value: _eventReminders,
-                activeThumbColor: theme.colorScheme.primary,
-                onChanged: (v) {
-                  setState(() => _eventReminders = v);
-                  _updateSetting('notify_reminders', v); // Save to DB
-                },
-              ),
               // App-settings shortcut only makes sense on mobile
-              if (!kIsWeb)
+              if (!kIsWeb) ...[
+                const Divider(height: 40),
+                _sectionHeader(s.notifications),
                 ListTile(
                   leading: Icon(Icons.settings_applications, color: theme.colorScheme.primary),
                   title: Text(s.fixNotifPermissions),
@@ -185,9 +116,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     await openAppSettings();
                   },
                 ),
-              
-              // No Market alerts: there's no saved-items feature for a
-              // "price drops" switch to act on.
+              ],
 
               const Divider(height: 40),
               // Preview card removed — it didn't show anything the live
