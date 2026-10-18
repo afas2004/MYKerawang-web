@@ -14,7 +14,17 @@ class MentionInput extends StatelessWidget {
     required this.hintText,
     this.isMultiLine = false,
     this.reverseDirection = false,
+    this.style,
+    this.minLines,
+    this.maxLines,
+    this.autofocus = false,
   });
+
+  /// Optional look overrides for full editors (create post).
+  final TextStyle? style;
+  final int? minLines;
+  final int? maxLines;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
@@ -32,10 +42,17 @@ class MentionInput extends StatelessWidget {
         return TextField(
           controller: controller, // Use the controller TypeAhead gives us
           focusNode: focusNode,
-          minLines: 1,
-          maxLines: isMultiLine ? 8 : 1,
+          autofocus: autofocus,
+          style: style,
+          minLines: minLines ?? 1,
+          maxLines: maxLines ?? (isMultiLine ? 8 : 1),
           decoration: InputDecoration(
             hintText: hintText,
+            hintStyle: style?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant),
+            filled: false,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
             border: InputBorder.none,
             contentPadding: EdgeInsets.zero,
           ),

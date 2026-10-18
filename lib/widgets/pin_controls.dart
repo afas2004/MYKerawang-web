@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../l10n/app_strings.dart';
 import '../l10n/moderation_strings.dart';
