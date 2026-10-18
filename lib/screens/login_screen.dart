@@ -6,6 +6,7 @@ import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../widgets/app_logo.dart';
+import '../widgets/brand/brand.dart';
 import '../widgets/kerawang_motif.dart';
 import '../utils/guest_access.dart';
 import 'login_cubit.dart'; // This looks in the SAME folder
@@ -353,7 +354,15 @@ class _BrandPanel extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          CustomPaint(painter: _LatticePainter(color: scheme.onPrimary.withValues(alpha: 0.08))),
+          // Lattice field in the on-brand colour (never hardcoded white:
+          // Songket Noir's onPrimary is dark).
+          KerawangLattice(tileSize: 28, color: scheme.onPrimary, opacity: 0.10),
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: KerawangLattice.corner(
+                corner: Alignment.bottomRight, extent: 160, tileSize: 16, color: KTokens.of(context).gold),
+          ),
           Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(48),
@@ -368,7 +377,7 @@ class _BrandPanel extends StatelessWidget {
                     Text(AppStrings.appName,
                         style: theme.textTheme.displaySmall?.copyWith(color: scheme.onPrimary)),
                     const SizedBox(height: 8),
-                    KerawangDivider(size: 9, color: scheme.tertiary),
+                    KerawangDivider(size: 9, color: KTokens.of(context).gold),
                     const SizedBox(height: 24),
                     _ValuePoints(onBrand: true),
                   ],
@@ -395,7 +404,7 @@ class _ValuePoints extends StatelessWidget {
     final fg = onBrand ? scheme.onPrimary : scheme.onSurface;
     final accent = onBrand ? scheme.onPrimary : scheme.primary;
     Widget point(IconData icon, String text) => Padding(
-          padding: const EdgeInsets.only(top: 12),
+          padding: const EdgeInsets.only(top: KSpace.m),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -418,14 +427,13 @@ class _ValuePoints extends StatelessWidget {
   }
 }
 
-/// Thin lattice strip behind the logo on compact layouts.
+/// Lattice panel behind the logo on compact layouts.
 class _LatticeBand extends StatelessWidget {
   final Widget child;
   const _LatticeBand({required this.child});
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return SizedBox(
       height: 112,
       child: Stack(
@@ -433,10 +441,8 @@ class _LatticeBand extends StatelessWidget {
         children: [
           Positioned.fill(
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: CustomPaint(
-                painter: _LatticePainter(color: scheme.primary.withValues(alpha: 0.12)),
-              ),
+              borderRadius: KRadius.cut,
+              child: const KerawangLattice(tileSize: 22),
             ),
           ),
           child,
@@ -444,46 +450,6 @@ class _LatticeBand extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Kerawang-style openwork: a diamond lattice with a small diamond at
-/// each crossing. Decorative only, never behind body text.
-class _LatticePainter extends CustomPainter {
-  final Color color;
-  const _LatticePainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const cell = 36.0;
-    final line = Paint()
-      ..color = color
-      ..strokeWidth = 1.2
-      ..style = PaintingStyle.stroke;
-    final fill = Paint()..color = color;
-
-    // Diagonals both ways make the diamond grid.
-    for (double x = -size.height; x < size.width + size.height; x += cell) {
-      canvas.drawLine(Offset(x, 0), Offset(x + size.height, size.height), line);
-      canvas.drawLine(Offset(x, size.height), Offset(x + size.height, 0), line);
-    }
-    // Ornament at the crossings.
-    for (double y = 0; y <= size.height + cell; y += cell / 2) {
-      final row = (y / (cell / 2)).round();
-      final offset = row.isEven ? 0.0 : cell / 2;
-      for (double x = offset - cell; x <= size.width + cell; x += cell) {
-        final path = Path()
-          ..moveTo(x, y - 3)
-          ..lineTo(x + 3, y)
-          ..lineTo(x, y + 3)
-          ..lineTo(x - 3, y)
-          ..close();
-        canvas.drawPath(path, fill);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_LatticePainter old) => old.color != color;
 }
 
 /// Google's four-colour "G", drawn simply so we don't ship the stock

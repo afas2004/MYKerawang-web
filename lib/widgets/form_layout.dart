@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_themes.dart';
+import 'brand/brand.dart';
 
 /// Layout for the create / edit forms (event, listing): titled sections,
 /// a centred card on wide screens, and a publish bar that stays put.
@@ -11,7 +11,7 @@ class FormPageBody extends StatelessWidget {
   final Widget child;
   const FormPageBody({super.key, required this.child});
 
-  static const double cardFrom = 900;
+  static const double cardFrom = Responsive.desktopBreakpoint;
 
   @override
   Widget build(BuildContext context) {
@@ -19,11 +19,11 @@ class FormPageBody extends StatelessWidget {
     return LayoutBuilder(builder: (context, constraints) {
       final card = constraints.maxWidth >= cardFrom;
       final content = Padding(
-        padding: EdgeInsets.all(card ? 24 : 16),
+        padding: EdgeInsets.all(card ? KSpace.xl : KSpace.l),
         child: child,
       );
       return SingleChildScrollView(
-        padding: EdgeInsets.symmetric(vertical: card ? 24 : 0),
+        padding: EdgeInsets.symmetric(vertical: card ? KSpace.xl : 0),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
@@ -31,7 +31,7 @@ class FormPageBody extends StatelessWidget {
                 ? Container(
                     decoration: BoxDecoration(
                       color: scheme.surfaceContainerLow,
-                      borderRadius: kerawangCut,
+                      borderRadius: KRadius.cut,
                       border: Border.all(color: scheme.outlineVariant),
                     ),
                     child: content,
