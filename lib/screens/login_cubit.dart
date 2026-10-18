@@ -81,7 +81,9 @@ class LoginState {
 class LoginCubit extends Cubit<LoginState> {
   LoginCubit() : super(LoginState());
 
-  final supabase = Supabase.instance.client;
+  // Looked up on use, not at construction, so the screen can be built
+  // in widget tests without a Supabase client.
+  SupabaseClient get supabase => Supabase.instance.client;
 
   // Replaces: setState(() => _isLogin = !_isLogin)
   void toggleLoginMode() {

@@ -3,7 +3,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mykerawang/language_cubit.dart';
 import 'package:mykerawang/screens/events_screen.dart';
+import 'package:mykerawang/screens/login_screen.dart';
 import 'package:mykerawang/screens/marketplace_screen.dart';
+import 'package:mykerawang/l10n/access_strings.dart';
+import 'package:mykerawang/l10n/app_strings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Redesigned cards and pages render without overflow at phone (375),
@@ -141,5 +144,36 @@ void main() {
     expect(marketColumns(768), 3);
     expect(marketColumns(1000), 4);
     expect(marketColumns(1400), 5);
+  });
+
+  // ---- login ----
+  for (final width in widths) {
+    testWidgets('Login fits at ${width.toInt()}px', (tester) async {
+      await pumpAt(tester, width, const LoginScreen(), height: 800);
+      expect(tester.takeException(), isNull);
+      expect(find.text(AppStrings.en.welcomeBack), findsOneWidget);
+      // Value proposition is always there: brand panel (wide) or under
+      // the form (compact).
+      expect(find.text(AppStrings.en.loginValueTitle), findsOneWidget);
+    });
+  }
+
+  testWidgets('sign-up rejects a non-student email inline', (tester) async {
+    await pumpAt(tester, 375, const LoginScreen(), height: 1400);
+    await tester.tap(find.textContaining(AppStrings.en.createAccount, findRichText: true));
+    await tester.pump();
+    await tester.enterText(find.byType(TextFormField).at(0), 'someone@gmail.com');
+    await tester.enterText(find.byType(TextFormField).at(1), 'secret123');
+    // Enter in the password field submits.
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    expect(find.text(AppStrings.en.studentEmailOnly), findsOneWidget);
+  });
+
+  testWidgets('empty login shows field errors, not a request', (tester) async {
+    await pumpAt(tester, 1280, const LoginScreen(), height: 900);
+    await tester.tap(find.widgetWithText(FilledButton, AppStrings.en.login));
+    await tester.pump();
+    expect(find.text(AppStrings.en.fillAllFields), findsNWidgets(2));
   });
 }
