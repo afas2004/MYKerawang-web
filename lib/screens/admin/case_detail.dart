@@ -9,6 +9,7 @@ import '../../utils/moderation_logic.dart';
 import '../../widgets/moderation_ui.dart';
 import 'admin_screen.dart';
 import 'case_list.dart';
+import '../../widgets/brand/brand.dart';
 
 /// What the detail pane can do with a case. Each returns true when the
 /// action completed (the compact detail page then closes itself).
@@ -72,7 +73,7 @@ class CaseDetailPane extends StatelessWidget {
         SizedBox(height: 2, child: busy ? const LinearProgressIndicator(minHeight: 2) : null),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, KSpace.xl),
             children: [
               Wrap(
                 spacing: 6,
@@ -164,21 +165,11 @@ class _Heading extends StatelessWidget {
   const _Heading(this.text, {this.trailing});
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(text,
-                style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.primary)),
-          ),
-          ?trailing,
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => SectionHeader(
+        title: text,
+        trailing: trailing,
+        padding: const EdgeInsets.only(bottom: KSpace.s),
+      );
 }
 
 class _ContentPreview extends StatelessWidget {
@@ -199,13 +190,8 @@ class _ContentPreview extends StatelessWidget {
     final title = '${p['title'] ?? ''}'.trim();
     final body = '${p['body'] ?? ''}'.trim();
     final image = p['image_url'] as String?;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
+    return KCard(
+      padding: const EdgeInsets.all(KSpace.m),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -266,16 +252,11 @@ class _DetailSections extends StatelessWidget {
         if (future == null) return const SizedBox.shrink();
         if (snap.connectionState != ConnectionState.done) {
           return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              for (var i = 0; i < 3; i++)
-                Container(
-                  height: 48,
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    color: scheme.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
+              const KSkeleton(width: 140, height: 16),
+              const SizedBox(height: KSpace.m),
+              KSkeleton.lines(4),
             ],
           );
         }

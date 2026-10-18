@@ -7,9 +7,10 @@ import '../../language_cubit.dart';
 import '../../widgets/moderation_ui.dart';
 import 'case_detail.dart';
 import 'case_list.dart';
+import '../../widgets/brand/brand.dart';
 
 /// Width at which the console shows list and detail side by side.
-const kCaseMasterDetailWidth = 900.0;
+const kCaseMasterDetailWidth = Responsive.desktopBreakpoint;
 
 /// List + detail, responsive. ≥ 900 px: master–detail; narrower: the
 /// list alone, and choosing a case pushes its detail page. Purely
@@ -121,7 +122,7 @@ class CaseWorkspace extends StatelessWidget {
           VerticalDivider(width: 1, color: scheme.outlineVariant),
           Expanded(
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
+              duration: KMotion.of(context).medium,
               child: selected == null
                   ? ModEmptyState(
                       key: const ValueKey('none'),

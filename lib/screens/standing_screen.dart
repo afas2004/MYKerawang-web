@@ -6,7 +6,7 @@ import '../language_cubit.dart';
 import '../services/moderation_service.dart';
 import '../utils/moderation_logic.dart';
 import '../widgets/error_state.dart';
-import '../widgets/kerawang_motif.dart';
+import '../widgets/brand/brand.dart';
 import '../widgets/moderation_ui.dart';
 
 /// /standing — the user's own account status. Calm and explanatory:
@@ -20,9 +20,12 @@ class StandingScreen extends StatefulWidget {
 }
 
 class _StandingScreenState extends State<StandingScreen> {
-  late Future<ModerationStatus> _future = ModerationService.myStatus(force: true);
+  late Future<ModerationStatus> _future = ModerationService.myStatus(
+    force: true,
+  );
 
-  void _reload() => setState(() => _future = ModerationService.myStatus(force: true));
+  void _reload() =>
+      setState(() => _future = ModerationService.myStatus(force: true));
 
   Future<void> _appeal({String? caseId, String? restrictionId}) async {
     final m = modStrings(context);
@@ -36,7 +39,11 @@ class _StandingScreenState extends State<StandingScreen> {
     );
     if (message == null || !mounted) return;
     try {
-      await ModerationService.submitAppeal(caseId: caseId, restrictionId: restrictionId, message: message);
+      await ModerationService.submitAppeal(
+        caseId: caseId,
+        restrictionId: restrictionId,
+        message: message,
+      );
       if (!mounted) return;
       showModSnack(context, m.appealSent);
       _reload();
@@ -91,10 +98,16 @@ class StandingView extends StatelessWidget {
     final theme = Theme.of(context);
     final s = status;
     final restrictions = [...s.restrictions];
-    final legacyBan = s.banned && !restrictions.any((r) => r.scope == ModScope.account);
+    final legacyBan =
+        s.banned && !restrictions.any((r) => r.scope == ModScope.account);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      padding: const EdgeInsets.fromLTRB(
+        KSpace.l,
+        KSpace.l,
+        KSpace.l,
+        KSpace.xxl,
+      ),
       children: [
         Center(
           child: ConstrainedBox(
@@ -106,17 +119,27 @@ class StandingView extends StatelessWidget {
                 if (!s.clean) ...[
                   const SizedBox(height: 24),
                   if (restrictions.isNotEmpty || legacyBan) ...[
-                    Text(m.sectionRestrictions, style: theme.textTheme.titleMedium),
+                    Text(
+                      m.sectionRestrictions,
+                      style: theme.textTheme.titleMedium,
+                    ),
                     const SizedBox(height: 8),
                     if (legacyBan)
                       const _RestrictionCard(
-                        r: Restriction(id: '', scope: ModScope.account, until: null, reason: ''),
+                        r: Restriction(
+                          id: '',
+                          scope: ModScope.account,
+                          until: null,
+                          reason: '',
+                        ),
                         onAppeal: null,
                       ),
                     for (final r in restrictions)
                       _RestrictionCard(
                         r: r,
-                        onAppeal: r.appealStatus == null ? () => onAppealRestriction(r.id) : null,
+                        onAppeal: r.appealStatus == null
+                            ? () => onAppealRestriction(r.id)
+                            : null,
                       ),
                     const SizedBox(height: 16),
                   ],
@@ -126,7 +149,9 @@ class StandingView extends StatelessWidget {
                     for (final c in s.cases)
                       _HistoryItem(
                         c: c,
-                        onAppeal: c['appeal_status'] == null && c['decision'] != 'restored'
+                        onAppeal:
+                            c['appeal_status'] == null &&
+                                c['decision'] != 'restored'
                             ? () => onAppealCase('${c['id']}')
                             : null,
                       ),
@@ -150,33 +175,45 @@ class _Summary extends StatelessWidget {
     final m = context.l10n.mod;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: clean ? scheme.secondaryContainer : scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
+    return KCard(
+      color: clean ? scheme.secondaryContainer : null,
+      padding: EdgeInsets.zero,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(clean ? Icons.verified_user_outlined : Icons.shield_outlined,
-              size: 40, color: clean ? scheme.onSecondaryContainer : scheme.primary),
-          const SizedBox(height: 12),
-          Text(
-            clean ? m.goodStanding : m.accountStatus,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.titleLarge
-                ?.copyWith(color: clean ? scheme.onSecondaryContainer : scheme.onSurface),
+          const LatticeBand(),
+          Padding(
+            padding: const EdgeInsets.all(KSpace.xl),
+            child: Column(
+              children: [
+                Icon(
+                  clean ? Icons.verified_user_outlined : Icons.shield_outlined,
+                  size: 40,
+                  color: clean ? scheme.onSecondaryContainer : scheme.primary,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  clean ? m.goodStanding : m.accountStatus,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: clean
+                        ? scheme.onSecondaryContainer
+                        : scheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  clean ? m.goodStandingBody : m.ui.standingIntro,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: clean
+                        ? scheme.onSecondaryContainer
+                        : scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            clean ? m.goodStandingBody : m.ui.standingIntro,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium
-                ?.copyWith(color: clean ? scheme.onSecondaryContainer : scheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 12),
-          const KerawangDivider(),
         ],
       ),
     );
@@ -228,13 +265,10 @@ class _RestrictionCard extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final fg = scheme.onTertiaryContainer;
-    return Card(
-      elevation: 0,
-      color: scheme.tertiaryContainer,
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: KSpace.s),
+      child: KCard(
+        color: scheme.tertiaryContainer,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -243,23 +277,38 @@ class _RestrictionCard extends StatelessWidget {
                 Icon(Icons.pause_circle_outline, color: fg),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(m.cantTitle(r.scope.db),
-                      style: theme.textTheme.titleSmall?.copyWith(color: fg)),
+                  child: Text(
+                    m.cantTitle(r.scope.db),
+                    style: theme.textTheme.titleSmall?.copyWith(color: fg),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 8),
             if (r.reason.trim().isNotEmpty)
-              Text(m.restrictedReason.fill([r.reason]),
-                  style: theme.textTheme.bodyMedium?.copyWith(color: fg)),
+              Text(
+                m.restrictedReason.fill([r.reason]),
+                style: theme.textTheme.bodyMedium?.copyWith(color: fg),
+              ),
             Text(
-              r.until == null ? m.restrictedPermanent : m.restrictedUntil.fill([formatUntil(r.until!)]),
-              style: theme.textTheme.bodyMedium?.copyWith(color: fg, fontWeight: FontWeight.w600),
+              r.until == null
+                  ? m.restrictedPermanent
+                  : m.restrictedUntil.fill([formatUntil(r.until!)]),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: fg,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             const SizedBox(height: 4),
-            Text(m.ui.canStill, style: theme.textTheme.bodySmall?.copyWith(color: fg)),
+            Text(
+              m.ui.canStill,
+              style: theme.textTheme.bodySmall?.copyWith(color: fg),
+            ),
             if (r.automatic)
-              Text(m.restrictedAuto, style: theme.textTheme.bodySmall?.copyWith(color: fg)),
+              Text(
+                m.restrictedAuto,
+                style: theme.textTheme.bodySmall?.copyWith(color: fg),
+              ),
             const SizedBox(height: 8),
             _AppealFooter(status: r.appealStatus, onAppeal: onAppeal),
           ],
@@ -293,15 +342,9 @@ class _HistoryItem extends StatelessWidget {
     final reason = c['reason'] as String?;
     final when = DateTime.tryParse('${c['decided_at'] ?? c['hidden_at']}');
 
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: scheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: KSpace.s),
+      child: KCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -310,27 +353,48 @@ class _HistoryItem extends StatelessWidget {
                 Icon(icon, size: 18, color: scheme.primary),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text('${m.typeLabel(c['target_type'] as String?)} · $label',
-                      style: theme.textTheme.titleSmall),
+                  child: Text(
+                    '${m.typeLabel(c['target_type'] as String?)} · $label',
+                    style: theme.textTheme.titleSmall,
+                  ),
                 ),
                 if (when != null)
-                  Text(formatUntil(when),
-                      style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+                  Text(
+                    formatUntil(when),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 6),
-            Text(snippet.isEmpty ? m.contentGone : snippet,
-                maxLines: 3, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodyMedium),
+            Text(
+              snippet.isEmpty ? m.contentGone : snippet,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium,
+            ),
             if (categories.isNotEmpty) ...[
               const SizedBox(height: 6),
-              Text(m.reportedAs.fill([categories.map(m.categoryLabel).join(', ')]),
-                  style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+              Text(
+                m.reportedAs.fill([categories.map(m.categoryLabel).join(', ')]),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
             ],
             if (reason != null && reason.isNotEmpty)
-              Text(m.restrictedReason.fill([reason]),
-                  style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+              Text(
+                m.restrictedReason.fill([reason]),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
             const SizedBox(height: 8),
-            _AppealFooter(status: c['appeal_status'] as String?, onAppeal: onAppeal),
+            _AppealFooter(
+              status: c['appeal_status'] as String?,
+              onAppeal: onAppeal,
+            ),
           ],
         ),
       ),

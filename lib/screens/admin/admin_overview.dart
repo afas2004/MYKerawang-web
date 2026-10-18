@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/moderation_strings.dart';
 import '../../language_cubit.dart';
 import '../../utils/moderation_logic.dart';
+import '../../widgets/brand/brand.dart';
 
 /// Bumped by any tab after an action so the overview re-fetches.
 final adminSummaryRefresh = ValueNotifier<int>(0);
@@ -45,22 +46,22 @@ class AdminOverview extends StatelessWidget {
       // Compact: one scrolling row so the queue keeps the screen.
       if (c.maxWidth < 600) {
         return SizedBox(
-          height: 84,
+          height: 88,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: KSpace.m, vertical: KSpace.s),
             itemCount: cards.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            separatorBuilder: (_, __) => const SizedBox(width: KSpace.s),
             itemBuilder: (_, i) => SizedBox(width: 150, child: cards[i]),
           ),
         );
       }
       return Padding(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+        padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.m, KSpace.m, KSpace.xs),
         child: Row(
           children: [
             for (var i = 0; i < cards.length; i++) ...[
-              if (i > 0) const SizedBox(width: 8),
+              if (i > 0) const SizedBox(width: KSpace.s),
               Expanded(child: cards[i]),
             ],
           ],
@@ -83,61 +84,41 @@ class _Stat extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final bg = emphasis ? scheme.tertiaryContainer : scheme.surfaceContainerLow;
+    final bg = emphasis ? scheme.tertiaryContainer : null;
     final fg = emphasis ? scheme.onTertiaryContainer : scheme.onSurface;
-    return Semantics(
-      button: onTap != null,
-      label: '$label: ${value ?? ''}',
-      child: Material(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 64),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: scheme.outlineVariant),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
+    return KCard(
+      onTap: onTap,
+      color: bg,
+      semanticLabel: '$label: ${value ?? ''}',
+      padding: const EdgeInsets.symmetric(horizontal: KSpace.m, vertical: KSpace.s),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Icon(icon, size: 16, color: fg.withValues(alpha: 0.8)),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall?.copyWith(color: fg)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: value == null
-                      ? Container(
-                          key: const ValueKey('loading'),
-                          width: 36,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            color: scheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        )
-                      : Text(value!,
-                          key: ValueKey(value),
-                          style: theme.textTheme.titleLarge
-                              ?.copyWith(color: fg, fontWeight: FontWeight.w700)),
+                Icon(icon, size: 16, color: fg),
+                const SizedBox(width: KSpace.xs + 2),
+                Expanded(
+                  child: Text(label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(color: fg)),
                 ),
               ],
             ),
-          ),
+            const SizedBox(height: KSpace.xs),
+            AnimatedSwitcher(
+              duration: KMotion.of(context).medium,
+              child: value == null
+                  ? const KSkeleton(key: ValueKey('loading'), width: 36, height: 20)
+                  : Text(value!,
+                      key: ValueKey(value),
+                      style: theme.textTheme.titleLarge?.copyWith(color: fg)),
+            ),
+          ],
         ),
       ),
     );

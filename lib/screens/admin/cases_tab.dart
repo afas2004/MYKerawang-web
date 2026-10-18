@@ -12,6 +12,7 @@ import 'admin_overview.dart';
 import 'case_detail.dart';
 import 'case_workspace.dart';
 import 'restrict_dialog.dart';
+import '../../widgets/brand/brand.dart';
 
 /// Data + actions for the queue; layout lives in [CaseWorkspace].
 class CasesTab extends StatefulWidget {
@@ -421,7 +422,6 @@ class _ListSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return ListView.builder(
       physics: const NeverScrollableScrollPhysics(),
       itemCount: 6,
@@ -429,15 +429,15 @@ class _ListSkeleton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
-            CircleAvatar(radius: 20, backgroundColor: scheme.surfaceContainerHighest),
-            const SizedBox(width: 12),
-            Expanded(
+            const KSkeleton.circle(size: 40),
+            const SizedBox(width: KSpace.m),
+            const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(height: 14, width: double.infinity, color: scheme.surfaceContainerHighest),
-                  const SizedBox(height: 6),
-                  Container(height: 10, width: 120, color: scheme.surfaceContainerHigh),
+                  KSkeleton(height: 14),
+                  SizedBox(height: KSpace.s),
+                  KSkeleton(width: 120, height: 10),
                 ],
               ),
             ),

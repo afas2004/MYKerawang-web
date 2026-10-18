@@ -12,6 +12,7 @@ import 'club_approvals_tab.dart';
 import 'log_tab.dart';
 import 'restrictions_tab.dart';
 import 'settings_tab.dart';
+import '../../widgets/brand/brand.dart';
 
 /// /admin — moderation console. The route is reachable by URL, so the
 /// page checks the role itself; the database checks it again on every
@@ -78,12 +79,20 @@ class _AdminScreenState extends State<AdminScreen> {
           child: Scaffold(
             appBar: AppBar(
               title: Text(m.moderation),
-              bottom: TabBar(
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                tabs: [
-                  for (final t in tabs) Tab(icon: Icon(t.$2, size: 20), text: t.$1),
-                ],
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(72 + 9),
+                child: Column(
+                  children: [
+                    TabBar(
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      tabs: [
+                        for (final t in tabs) Tab(icon: Icon(t.$2, size: 20), text: t.$1),
+                      ],
+                    ),
+                    const LatticeBand(),
+                  ],
+                ),
               ),
             ),
             body: Builder(
