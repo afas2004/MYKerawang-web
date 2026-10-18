@@ -7,6 +7,7 @@ import '../language_cubit.dart';
 import '../utils/app_nav.dart';
 import '../utils/formatters.dart';
 import '../utils/roles.dart';
+import '../widgets/status_badge.dart';
 import '../widgets/tap_card.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -64,13 +65,34 @@ class _SearchScreenState extends State<SearchScreen> {
     await _performSearch();
   }
 
+  /// The query as a safe PostgREST filter value. `,` `(` `)` split or
+  /// group `.or()` terms, `"` `\` quote, `:` casts — none mean anything
+  /// to a user, so they become spaces. A leading @ (handle search) is
+  /// dropped so "@ali" and "ali" match the same people.
+  static String _filterSafe(String raw) => raw
+      .replaceAll(RegExp(r'[,()"\\:]'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim()
+      .replaceFirst(RegExp(r'^@+'), '');
+
+  bool _hasEnded(Map<String, dynamic> event) {
+    final end = parseLocal(event['end_datetime']) ??
+        parseLocal(event['start_datetime']);
+    return end != null && end.isBefore(DateTime.now());
+  }
+
   Future<void> _performSearch() async {
     if (_query.isEmpty) return;
+    final term = _filterSafe(_query);
+    if (term.isEmpty) {
+      setState(() => _results = []);
+      return;
+    }
     final s = context.l10nRead;
     setState(() => _isLoading = true);
     
     List<Map<String, dynamic>> tempResults = [];
-    final q = "%$_query%";
+    final q = "%$term%";
     // Split limit across categories if "All" is selected to ensure variety
     final int limitPerCategory = _activeFilter == 'All' ? (_searchLimit ~/ 4) + 2 : _searchLimit;
 
@@ -82,8 +104,8 @@ class _SearchScreenState extends State<SearchScreen> {
       // 1. Search PROFILES
       if (_activeFilter == 'All' || _activeFilter == 'People') {
         final people = await _supabase.from('profiles')
-            .select('id, full_name, display_name, avatar_url, role')
-            .or('full_name.ilike.$q, display_name.ilike.$q')
+            .select('id, full_name, display_name, username, avatar_url, role')
+            .or('full_name.ilike.$q,display_name.ilike.$q,username.ilike.$q')
             .limit(limitPerCategory);
             
         for (var p in people) {
@@ -93,14 +115,17 @@ class _SearchScreenState extends State<SearchScreen> {
 
       // 2. Search EVENTS
       if (_activeFilter == 'All' || _activeFilter == 'Events' || _activeFilter == 'Posts') {
-        final nowStr = DateTime.now().toUtc().toIso8601String();
+        // Ended events stay findable (shown greyed with the Ended badge);
+        // upcoming ones sort first, then most recently ended.
         final events = await _supabase.from('events')
-            .select('id, title, start_datetime, image_url')
+            .select('id, title, start_datetime, end_datetime, image_url')
             .ilike('title', q)
-            .gte('end_datetime', nowStr)
+            .order('start_datetime', ascending: false)
             .limit(limitPerCategory);
-            
-        for (var e in events) {
+        final upcoming = events.where((e) => !_hasEnded(e)).toList().reversed;
+        final ended = events.where(_hasEnded);
+
+        for (var e in [...upcoming, ...ended]) {
           if (_activeFilter != 'Posts') tempResults.add({...e, 'type': 'event'});
           foundEventIds.add(e['id']); 
         }
@@ -123,7 +148,7 @@ class _SearchScreenState extends State<SearchScreen> {
       // 4. Search POSTS (Direct + Contextual)
       if (_activeFilter == 'All' || _activeFilter == 'Posts') {
         // Build robust filter: matches body OR matches related event/item
-        String postFilter = 'title.ilike.$q, body.ilike.$q';
+        String postFilter = 'title.ilike.$q,body.ilike.$q';
         
         if (foundEventIds.isNotEmpty) {
           postFilter += ', shared_event_id.in.(${foundEventIds.join(',')})';
@@ -311,7 +336,10 @@ class _SearchScreenState extends State<SearchScreen> {
         child: item['avatar_url'] == null ? const Icon(Icons.person) : null,
       ),
       title: Text(displayNameFor(s, item), style: const TextStyle(fontWeight: FontWeight.bold)),
-      subtitle: Text(roleLabel(s, item['role'])),
+      subtitle: Text([
+        if (item['username'] != null) '@${item['username']}',
+        roleLabel(s, item['role']),
+      ].join(' · ')),
       trailing: const Icon(Icons.chevron_right),
       onTap: () => context.goUser(item['id']),
     );
@@ -327,6 +355,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
     final title = item['title'] ?? s.untitled;
     final image = item['image_url'];
+    final ended = isEvent && _hasEnded(item);
     
     String subtitle;
     String badgeLabel;
@@ -354,7 +383,7 @@ class _SearchScreenState extends State<SearchScreen> {
       placeholderIcon = Icons.store;
     }
 
-    return TapCard(
+    final card = TapCard(
       color: theme.cardColor,
       border: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
       onTap: () {
@@ -376,7 +405,10 @@ class _SearchScreenState extends State<SearchScreen> {
               child: SizedBox(
                 width: 100,
                 height: 100,
-                child: image != null
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                image != null
                     ? CachedNetworkImage(
                         imageUrl: image, 
                         memCacheWidth: 300,
@@ -388,6 +420,10 @@ class _SearchScreenState extends State<SearchScreen> {
                         color: scheme.surfaceContainerHighest,
                         child: Icon(placeholderIcon, color: scheme.onSurfaceVariant),
                       ),
+                if (ended)
+                  Center(child: StatusBadge(s.ended)),
+                  ],
+                ),
               ),
             ),
             // Text Section
@@ -425,7 +461,12 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
       ),
     );
+    return _greyIfEnded(card, ended);
   }
+
+  /// Past events stay tappable but read as inactive.
+  Widget _greyIfEnded(Widget card, bool ended) =>
+      ended ? Opacity(opacity: 0.6, child: card) : card;
 
   Future<void> _navigateToPost(String postId) async {
     try {
