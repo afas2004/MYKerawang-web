@@ -23,6 +23,7 @@ class ShellStrings {
   final String aboutYou;
   final String contactPayments;
   final String publicProfile;
+  final String contactPrivate;
 
   // Settings
   final String appearance;
@@ -60,6 +61,7 @@ class ShellStrings {
     required this.aboutYou,
     required this.contactPayments,
     required this.publicProfile,
+    required this.contactPrivate,
     required this.appearance,
     required this.account,
     required this.today,
@@ -90,6 +92,7 @@ class ShellStrings {
     aboutYou: "About you",
     contactPayments: "Contact & payments",
     publicProfile: "Everyone can see this",
+    contactPrivate: "Private. Only a buyer who taps Contact on your listing gets these.",
     appearance: "Appearance",
     account: "Account",
     today: "Today",
@@ -120,6 +123,7 @@ class ShellStrings {
     aboutYou: "Tentang anda",
     contactPayments: "Hubungan & bayaran",
     publicProfile: "Semua orang boleh lihat",
+    contactPrivate: "Peribadi. Hanya pembeli yang tekan Hubungi pada iklan anda akan dapat.",
     appearance: "Paparan",
     account: "Akaun",
     today: "Hari ini",

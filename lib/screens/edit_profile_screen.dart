@@ -9,7 +9,9 @@ import '../utils/image_compressor.dart'; // Ensure you have this file from previ
 import '../utils/local_image.dart';
 import '../widgets/image_crop_dialog.dart';
 import '../l10n/app_strings.dart';
+import '../l10n/shell_strings.dart';
 import '../l10n/social_strings.dart';
+import '../theme/app_themes.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
 import '../utils/responsive.dart';
@@ -382,168 +384,195 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       body: PageBody(child: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
-            // --- AVATAR ---
-            Center(
-              child: InkWell(
-                onTap: () => _pickImage(true),
-                borderRadius: BorderRadius.circular(50),
-                child: Stack(
-                  alignment: Alignment.bottomRight,
+            // --- PROFILE PHOTO ---
+            _FormSection(
+              title: s.shell.profilePhoto,
+              children: [
+                Row(
                   children: [
-                    CircleAvatar(
-                      radius: 50,
-                      backgroundImage: _avatarFile != null
-                        ? MemoryImage(_avatarFile!.bytes)
-                        : (_currentAvatarUrl != null ? NetworkImage(_currentAvatarUrl!) : null) as ImageProvider?,
-                      child: _avatarFile == null && _currentAvatarUrl == null
-                        ? const Icon(Icons.camera_alt, size: 30)
-                        : null,
+                    Semantics(
+                      button: true,
+                      label: s.changePhoto,
+                      child: InkWell(
+                        onTap: () => _pickImage(true),
+                        customBorder: const CircleBorder(),
+                        child: Stack(
+                          alignment: Alignment.bottomRight,
+                          children: [
+                            CircleAvatar(
+                              radius: 40,
+                              backgroundColor: theme.colorScheme.primaryContainer,
+                              backgroundImage: _avatarFile != null
+                                ? MemoryImage(_avatarFile!.bytes)
+                                : (_currentAvatarUrl != null ? NetworkImage(_currentAvatarUrl!) : null) as ImageProvider?,
+                              child: _avatarFile == null && _currentAvatarUrl == null
+                                ? Icon(Icons.camera_alt, size: 28, color: theme.colorScheme.onPrimaryContainer)
+                                : null,
+                            ),
+                            CircleAvatar(
+                              radius: 13,
+                              backgroundColor: theme.colorScheme.primary,
+                              child: Icon(Icons.edit,
+                                  size: 14, color: theme.colorScheme.onPrimary),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    CircleAvatar(
-                      radius: 14,
-                      backgroundColor: theme.colorScheme.primary,
-                      child: Icon(Icons.edit,
-                          size: 14, color: theme.colorScheme.onPrimary),
+                    const SizedBox(width: 16),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+                      onPressed: () => _pickImage(true),
+                      icon: const Icon(Icons.photo_library_outlined),
+                      label: Text(s.changePhoto),
                     ),
                   ],
                 ),
-              ),
-            ),
-            Center(
-              child: TextButton(
-                onPressed: () => _pickImage(true),
-                child: Text(context.l10n.changePhoto),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // --- USERNAME & NAME ---
-            TextFormField(
-              controller: _usernameCtrl,
-              decoration: _inputDeco(s.username).copyWith(
-                helperText: s.social.usernameSavedOnSave,
-                prefixText: "@ ",
-              ),
-              validator: _validateUsername,
-              // Not auto-saved: refreshes the dirty state only.
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _nameCtrl,
-              decoration: _inputDeco(s.displayName)
-                  .copyWith(suffixIcon: _statusIcon('display_name')),
-              validator: (v) => v!.isEmpty ? s.required : null,
-              onChanged: (v) => _autoSave('display_name', v),
-            ),
-            const SizedBox(height: 16),
-
-            // --- BIO ---
-            TextFormField(
-              controller: _bioCtrl,
-              maxLines: 3,
-              decoration:
-                  _inputDeco(s.bio).copyWith(suffixIcon: _statusIcon('bio')),
-              maxLength: 150,
-              onChanged: (v) => _autoSave('bio', v),
-            ),
-            const SizedBox(height: 16),
-
-            
-            // --- CONTACT INFO ---
-            const Divider(),
-            const SizedBox(height: 16),
-            Text(s.contactDetails, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            
-            TextFormField(
-              controller: _phoneCtrl,
-              decoration: InputDecoration(
-                labelText: s.phoneNumber,
-                hintText: s.phoneHint,
-                prefixText: '+60 ', // Visual cue
-                suffixIcon: _statusIcon('phone_number'),
-              ),
-              // 1. Show Number Pad only
-              keyboardType: TextInputType.phone,
-
-              // 2. BLOCK letters/symbols completely
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly, // Only allows 0-9
-                LengthLimitingTextInputFormatter(11),   // Limit length (optional)
               ],
-              // Optional, but needed before selling (create_listing).
-              validator: (val) {
-                if (val == null || val.isEmpty) return null;
-                if (val.length < 9) return s.phoneInvalid;
-                return null;
-              },
-              onChanged: (v) {
-                if (v.isEmpty || v.length >= 9) _autoSave('phone_number', v);
-              },
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _websiteCtrl,
-              decoration: _inputDeco(s.website)
-                  .copyWith(suffixIcon: _statusIcon('website')),
-              onChanged: (v) => _autoSave('website', v),
-            ),
-            const SizedBox(height: 24),
 
-            // --- DUITNOW QR ---
-            Text(s.duitnowForSelling, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-            Text(s.duitnowHelp,
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-            const SizedBox(height: 8),
-            // Square, centred — a QR isn't a banner (H4/10.2)
-            Center(
-              child: InkWell(
-                onTap: () => _pickImage(false),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  height: 200,
-                  width: 200,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: theme.colorScheme.outlineVariant),
-                    borderRadius: BorderRadius.circular(12),
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    image: _qrFile != null
-                        ? DecorationImage(image: MemoryImage(_qrFile!.bytes), fit: BoxFit.contain)
-                        : (_currentQrUrl != null ? DecorationImage(image: NetworkImage(_currentQrUrl!), fit: BoxFit.contain) : null),
+            // --- ABOUT YOU (public) ---
+            _FormSection(
+              title: s.shell.aboutYou,
+              subtitle: s.shell.publicProfile,
+              children: [
+                TextFormField(
+                  controller: _usernameCtrl,
+                  decoration: _inputDeco(s.username).copyWith(
+                    helperText: s.social.usernameSavedOnSave,
+                    helperMaxLines: 2,
+                    prefixText: "@ ",
                   ),
-                  child: (_qrFile == null && _currentQrUrl == null)
-                      ? Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.qr_code_2, size: 44, color: theme.colorScheme.onSurfaceVariant),
-                            const SizedBox(height: 6),
-                            Text(s.tapToUploadQr,
-                                style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
-                          ],
-                        )
-                      : null,
+                  validator: _validateUsername,
+                  // Not auto-saved: refreshes the dirty state only.
+                  onChanged: (_) => setState(() {}),
                 ),
-              ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _nameCtrl,
+                  decoration: _inputDeco(s.displayName)
+                      .copyWith(suffixIcon: _statusIcon('display_name')),
+                  validator: (v) => v!.isEmpty ? s.required : null,
+                  onChanged: (v) => _autoSave('display_name', v),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _bioCtrl,
+                  maxLines: 3,
+                  decoration:
+                      _inputDeco(s.bio).copyWith(suffixIcon: _statusIcon('bio')),
+                  maxLength: 150,
+                  onChanged: (v) => _autoSave('bio', v),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _websiteCtrl,
+                  keyboardType: TextInputType.url,
+                  decoration: _inputDeco(s.website)
+                      .copyWith(suffixIcon: _statusIcon('website')),
+                  onChanged: (v) => _autoSave('website', v),
+                ),
+              ],
             ),
-            // Always offer a way to change an existing QR
-            if (_qrFile != null || _currentQrUrl != null)
-              Center(
-                child: TextButton.icon(
-                  onPressed: () => _pickImage(false),
-                  icon: const Icon(Icons.edit, size: 16),
-                  label: Text(s.changeQr),
-                ),
-              ),
-            const SizedBox(height: 32),
 
-            // Text fields save themselves; this commits picked images and
-            // gives an explicit "I'm done" action.
-            SizedBox(
-              width: double.infinity,
+            // --- CONTACT & PAYMENTS (private) ---
+            _FormSection(
+              title: s.shell.contactPayments,
+              subtitle: s.shell.contactPrivate,
+              icon: Icons.lock_outline,
+              children: [
+                TextFormField(
+                  controller: _phoneCtrl,
+                  decoration: _inputDeco(s.phoneNumber).copyWith(
+                    hintText: s.phoneHint,
+                    prefixText: '+60 ', // Visual cue
+                    suffixIcon: _statusIcon('phone_number'),
+                  ),
+                  // 1. Show Number Pad only
+                  keyboardType: TextInputType.phone,
+                  // 2. BLOCK letters/symbols completely
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly, // Only allows 0-9
+                    LengthLimitingTextInputFormatter(11),   // Limit length (optional)
+                  ],
+                  // Optional, but needed before selling (create_listing).
+                  validator: (val) {
+                    if (val == null || val.isEmpty) return null;
+                    if (val.length < 9) return s.phoneInvalid;
+                    return null;
+                  },
+                  onChanged: (v) {
+                    if (v.isEmpty || v.length >= 9) _autoSave('phone_number', v);
+                  },
+                ),
+                const SizedBox(height: 24),
+                Text(s.duitnowForSelling, style: theme.textTheme.titleSmall),
+                Text(s.duitnowHelp,
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                const SizedBox(height: 12),
+                // Square, centred — a QR isn't a banner (H4/10.2)
+                Center(
+                  child: InkWell(
+                    onTap: () => _pickImage(false),
+                    borderRadius: kerawangCut,
+                    child: Container(
+                      height: 200,
+                      width: 200,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: theme.colorScheme.outlineVariant),
+                        borderRadius: kerawangCut,
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        image: _qrFile != null
+                            ? DecorationImage(image: MemoryImage(_qrFile!.bytes), fit: BoxFit.contain)
+                            : (_currentQrUrl != null ? DecorationImage(image: NetworkImage(_currentQrUrl!), fit: BoxFit.contain) : null),
+                      ),
+                      child: (_qrFile == null && _currentQrUrl == null)
+                          ? Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.qr_code_2, size: 44, color: theme.colorScheme.onSurfaceVariant),
+                                const SizedBox(height: 6),
+                                Text(s.tapToUploadQr,
+                                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+                              ],
+                            )
+                          : null,
+                    ),
+                  ),
+                ),
+                // Always offer a way to change an existing QR
+                if (_qrFile != null || _currentQrUrl != null)
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: () => _pickImage(false),
+                      icon: const Icon(Icons.edit, size: 16),
+                      label: Text(s.changeQr),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      )),
+      // Text fields save themselves; this commits the username and picked
+      // images, and is always in reach.
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 648),
               child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  shape: const RoundedRectangleBorder(borderRadius: kerawangCut),
+                ),
                 onPressed: _isSaving ? null : _save,
                 icon: _isSaving
                     ? const SizedBox(
@@ -553,10 +582,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 label: Text(_isSaving ? s.saving : s.saveChanges),
               ),
             ),
-            const SizedBox(height: 40),
-          ],
+          ),
         ),
-      )),
+      ),
     ),
     );
   }
@@ -568,6 +596,61 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       fillColor: Theme.of(context).colorScheme.surfaceContainer,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    );
+  }
+}
+
+/// A titled card grouping related fields.
+class _FormSection extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final IconData? icon;
+  final List<Widget> children;
+
+  const _FormSection({
+    required this.title,
+    this.subtitle,
+    this.icon,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: kerawangCut,
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Semantics(
+            header: true,
+            child: Row(
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 18, color: scheme.onSurfaceVariant),
+                  const SizedBox(width: 6),
+                ],
+                Expanded(child: Text(title, style: theme.textTheme.titleMedium)),
+              ],
+            ),
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 2),
+            Text(subtitle!,
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: scheme.onSurfaceVariant)),
+          ],
+          const SizedBox(height: 16),
+          ...children,
+        ],
+      ),
     );
   }
 }
