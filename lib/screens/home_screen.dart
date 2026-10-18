@@ -7,6 +7,7 @@ import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
+import '../services/unread_notifications.dart';
 import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
 import '../widgets/embed_card.dart';
@@ -158,7 +159,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 IconButton(
                   tooltip: context.l10n.notifications,
-                  icon: const Icon(Icons.notifications_outlined),
+                  icon: const UnreadBadge(
+                      child: Icon(Icons.notifications_outlined)),
                   onPressed: () => context.goNotifications(),
                 ),
                 IconButton(

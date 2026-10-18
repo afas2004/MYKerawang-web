@@ -12,6 +12,7 @@ import 'language_cubit.dart';
 import 'router.dart';
 // --- IMPORT YOUR SERVICES ---
 import 'services/notification_service.dart';
+import 'services/unread_notifications.dart';
 import 'services/update_service.dart';
 import 'widgets/update_banner.dart';
 import 'utils/responsive.dart';
@@ -117,6 +118,7 @@ class _SessionWatcherState extends State<SessionWatcher> {
     if (session != null) {
       _checkUserProfile(session.user.id);
       _startNotificationStream(session.user.id);
+      UnreadNotifications.instance.start(session.user.id);
     }
 
     _authSubscription =
@@ -127,8 +129,12 @@ class _SessionWatcherState extends State<SessionWatcher> {
       if (session == null) {
         _notificationSubscription?.cancel();
         _notificationSubscription = null;
+        UnreadNotifications.instance.stop();
         return;
       }
+
+      // No-op for the same user; swaps channels on an account switch.
+      UnreadNotifications.instance.start(session.user.id);
 
       if (event == AuthChangeEvent.signedIn) {
         NotificationService.requestPermission();
@@ -193,6 +199,7 @@ class _SessionWatcherState extends State<SessionWatcher> {
   void dispose() {
     _authSubscription.cancel();
     _notificationSubscription?.cancel();
+    UnreadNotifications.instance.stop();
     super.dispose();
   }
 
