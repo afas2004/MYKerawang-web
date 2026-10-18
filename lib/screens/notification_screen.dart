@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../l10n/app_strings.dart';
+import '../l10n/shell_strings.dart';
 import '../l10n/social_strings.dart';
 import '../language_cubit.dart';
 import '../services/unread_notifications.dart';
@@ -9,6 +10,7 @@ import '../utils/formatters.dart';
 import '../utils/adaptive.dart';
 import '../utils/responsive.dart';
 import '../utils/roles.dart';
+import '../widgets/kerawang_motif.dart';
 
 /// Icon per notification type so the list is scannable.
 IconData _iconFor(String? type) => switch (type) {
@@ -209,92 +211,293 @@ class _NotificationScreenState extends State<NotificationScreen> {
           if (_userId != null)
             ValueListenableBuilder<int>(
               valueListenable: UnreadNotifications.instance.count,
-              builder: (context, unread, _) => IconButton(
-                tooltip: s.social.markAllRead,
-                icon: const Icon(Icons.done_all),
+              builder: (context, unread, _) => TextButton.icon(
                 onPressed: unread > 0 ? _markAllRead : null,
+                icon: const Icon(Icons.done_all),
+                label: Text(s.social.markAllRead),
               ),
             ),
+          const SizedBox(width: 8),
         ],
       ),
       body: PageBody(child: _userId == null
-        ? Center(child: Text(s.loginToSeeNotifications))
+        ? _NotifEmpty(
+            title: s.loginToSeeNotifications,
+            body: s.shell.notificationsEmptyBody,
+          )
         : StreamBuilder<List<Map<String, dynamic>>>(
             stream: _stream,
             builder: (context, snapshot) {
-              if (snapshot.hasError) return Center(child: Text(s.errorWithDetail.fill([snapshot.error])));
-              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+              if (snapshot.hasError) {
+                return _NotifEmpty(
+                  icon: Icons.wifi_off,
+                  title: s.connectionError,
+                  body: '${snapshot.error}',
+                );
+              }
+              if (!snapshot.hasData) return const _NotifSkeleton();
 
               final notifications = snapshot.data!;
               _resolve(notifications);
               if (notifications.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.notifications_none,
-                          size: 64, color: scheme.onSurfaceVariant),
-                      const SizedBox(height: 16),
-                      Text(s.noNotifications),
-                    ],
-                  ),
+                return _NotifEmpty(
+                  title: s.shell.allCaughtUp,
+                  body: s.shell.notificationsEmptyBody,
                 );
               }
 
-              return ListView.separated(
-                itemCount: notifications.length,
-                separatorBuilder: (_,__) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final notif = notifications[index];
-                  final isRead = notif['is_read'] ?? false;
-                  final actor = _actorOf(notif);
-                  final avatar = actor?['avatar_url'] as String?;
+              // Today / This week / Earlier, newest first within each.
+              final groups = <String, List<Map<String, dynamic>>>{};
+              for (final n in notifications) {
+                final when = parseLocal(n['created_at']) ?? DateTime(2000);
+                final label = switch (notificationBucket(when, DateTime.now())) {
+                  NotifBucket.today => s.shell.today,
+                  NotifBucket.thisWeek => s.shell.thisWeek,
+                  NotifBucket.earlier => s.shell.earlier,
+                };
+                (groups[label] ??= []).add(n);
+              }
 
-                  return ListTile(
-                    tileColor: isRead
-                        ? null
-                        : scheme.primary.withValues(alpha: 0.05),
-                    leading: actor != null
-                        ? CircleAvatar(
-                            backgroundColor: scheme.primaryContainer,
-                            foregroundColor: scheme.onPrimaryContainer,
-                            backgroundImage:
-                                avatar != null ? NetworkImage(avatar) : null,
-                            child: avatar == null
-                                ? Text(displayNameFor(s, actor).characters.first.toUpperCase())
-                                : null,
-                          )
-                        // No (visible) actor: neutral type icon.
-                        : CircleAvatar(
-                            backgroundColor: isRead
-                                ? scheme.surfaceContainerHighest
-                                : scheme.primaryContainer,
-                            child: Icon(
-                              _iconFor(notif['type']),
-                              size: 20,
-                              color: isRead
-                                  ? scheme.onSurfaceVariant
-                                  : scheme.primary,
-                            ),
-                          ),
-                    title: Text(notif['title'] ?? s.notifications,
-                        style: TextStyle(fontWeight: isRead ? FontWeight.normal : FontWeight.bold)),
-                    subtitle: Text(_sentence(s, notif, actor)),
-                    trailing: Text(
-                      formatRelative(context, DateTime.parse(notif['created_at'])),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant),
+              return ListView(
+                padding: const EdgeInsets.only(bottom: 24),
+                children: [
+                  for (final entry in groups.entries) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: Semantics(
+                        header: true,
+                        child: Text(entry.key,
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(color: scheme.onSurfaceVariant)),
+                      ),
                     ),
-                    onTap: () {
-                      // Mark as read, then open what it refers to (12.1)
-                      _markRead(notif);
-                      _openTarget(context, notif);
-                    },
-                  );
-                },
+                    for (final notif in entry.value) _tile(context, notif),
+                  ],
+                ],
               );
             },
           )),
+    );
+  }
+
+  Widget _tile(BuildContext context, Map<String, dynamic> notif) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isRead = notif['is_read'] == true;
+    final actor = _actorOf(notif);
+    final avatar = actor?['avatar_url'] as String?;
+
+    final leading = actor != null
+        ? Stack(
+            clipBehavior: Clip.none,
+            children: [
+              CircleAvatar(
+                backgroundColor: scheme.primaryContainer,
+                foregroundColor: scheme.onPrimaryContainer,
+                backgroundImage: avatar != null ? NetworkImage(avatar) : null,
+                child: avatar == null
+                    ? Text(displayNameFor(s, actor).characters.first.toUpperCase())
+                    : null,
+              ),
+              // Small type glyph on the avatar keeps the list scannable.
+              Positioned(
+                right: -4,
+                bottom: -4,
+                child: CircleAvatar(
+                  radius: 10,
+                  backgroundColor: scheme.surface,
+                  child: Icon(_iconFor(notif['type']), size: 12, color: scheme.primary),
+                ),
+              ),
+            ],
+          )
+        // No (visible) actor: neutral type icon.
+        : CircleAvatar(
+            backgroundColor:
+                isRead ? scheme.surfaceContainerHighest : scheme.primaryContainer,
+            child: Icon(
+              _iconFor(notif['type']),
+              size: 20,
+              color: isRead ? scheme.onSurfaceVariant : scheme.primary,
+            ),
+          );
+
+    final tile = Material(
+      color: isRead ? Colors.transparent : scheme.primaryContainer.withValues(alpha: 0.35),
+      child: InkWell(
+        onTap: () {
+          // Mark as read, then open what it refers to (12.1)
+          _markRead(notif);
+          _openTarget(context, notif);
+        },
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 64),
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+          decoration: BoxDecoration(
+            border: Border(
+              // Unread rows carry a primary edge, not just a tint.
+              left: BorderSide(
+                color: isRead ? Colors.transparent : scheme.primary,
+                width: 3,
+              ),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              leading,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(notif['title'] ?? s.notifications,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: isRead ? FontWeight.w500 : FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text(_sentence(s, notif, actor),
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(color: scheme.onSurfaceVariant)),
+                    const SizedBox(height: 4),
+                    Text(
+                      formatRelative(context, DateTime.parse(notif['created_at'])),
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              if (!isRead)
+                IconButton(
+                  tooltip: s.shell.markRead,
+                  icon: const Icon(Icons.mark_email_read_outlined),
+                  onPressed: () => _markRead(notif),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (isRead) return tile;
+    // Swipe either way to mark read; the row stays (the stream updates it).
+    return Dismissible(
+      key: ValueKey('notif-${notif['id']}'),
+      confirmDismiss: (_) async {
+        await _markRead(notif);
+        return false;
+      },
+      background: _swipeBackground(context, Alignment.centerLeft),
+      secondaryBackground: _swipeBackground(context, Alignment.centerRight),
+      child: tile,
+    );
+  }
+
+  Widget _swipeBackground(BuildContext context, Alignment align) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      color: scheme.secondaryContainer,
+      alignment: align,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.mark_email_read_outlined, color: scheme.onSecondaryContainer),
+          const SizedBox(width: 8),
+          Text(context.l10n.shell.markRead,
+              style: TextStyle(color: scheme.onSecondaryContainer)),
+        ],
+      ),
+    );
+  }
+}
+
+enum NotifBucket { today, thisWeek, earlier }
+
+/// Which date group a notification falls in, relative to [now].
+NotifBucket notificationBucket(DateTime when, DateTime now) {
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(when.year, when.month, when.day);
+  if (!day.isBefore(today)) return NotifBucket.today;
+  if (today.difference(day).inDays < 7) return NotifBucket.thisWeek;
+  return NotifBucket.earlier;
+}
+
+/// Empty / signed-out / error state. Swap for foundation's BrandEmptyState.
+class _NotifEmpty extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String body;
+  const _NotifEmpty({
+    this.icon = Icons.notifications_none,
+    required this.title,
+    required this.body,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 56, color: scheme.onSurfaceVariant),
+            const SizedBox(height: 16),
+            Text(title,
+                textAlign: TextAlign.center, style: theme.textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(body,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: scheme.onSurfaceVariant)),
+            const SizedBox(height: 16),
+            const KerawangDivider(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NotifSkeleton extends StatelessWidget {
+  const _NotifSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).colorScheme.surfaceContainerHighest;
+    Widget bar(double w, double h) => Container(
+          width: w,
+          height: h,
+          decoration:
+              BoxDecoration(color: c, borderRadius: BorderRadius.circular(6)),
+        );
+    return ListView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: 6,
+      itemBuilder: (_, __) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(backgroundColor: c),
+            const SizedBox(width: 16),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                bar(160, 14),
+                const SizedBox(height: 6),
+                bar(220, 12),
+                const SizedBox(height: 6),
+                bar(60, 10),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
