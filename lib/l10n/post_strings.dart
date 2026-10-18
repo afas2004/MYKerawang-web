@@ -22,6 +22,8 @@ class PostStrings {
   final String photoLimit;
   final String anonymityLocked;
   final String postPhoto;
+  final String postEmpty;
+  final String titleOptionalHint;
 
   const PostStrings({
     required this.editPost,
@@ -36,6 +38,8 @@ class PostStrings {
     required this.photoLimit,
     required this.anonymityLocked,
     required this.postPhoto,
+    required this.postEmpty,
+    required this.titleOptionalHint,
   });
 
   static const en = PostStrings(
@@ -51,6 +55,8 @@ class PostStrings {
     photoLimit: "Up to {0} photos per post",
     anonymityLocked: "Anonymity can't be changed after posting",
     postPhoto: "Post photo {0} of {1}",
+    postEmpty: "Write something or add a photo",
+    titleOptionalHint: "Title (optional)",
   );
 
   static const ms = PostStrings(
@@ -66,6 +72,8 @@ class PostStrings {
     photoLimit: "Maksimum {0} gambar setiap post",
     anonymityLocked: "Status tanpa nama tak boleh ditukar lepas post",
     postPhoto: "Gambar post {0} daripada {1}",
+    postEmpty: "Tulis sesuatu atau tambah gambar",
+    titleOptionalHint: "Tajuk (pilihan)",
   );
 
   static const ja = PostStrings(
@@ -81,6 +89,9 @@ class PostStrings {
     photoLimit: "1つの投稿に写真は{0}枚まで",
     anonymityLocked: "匿名設定は投稿後に変更できません",
     postPhoto: "投稿の写真 {0}/{1}",
+    // Japanese is being dropped; new strings stay English.
+    postEmpty: "Write something or add a photo",
+    titleOptionalHint: "Title (optional)",
   );
 
   static PostStrings of(AppLanguage lang) => switch (lang) {

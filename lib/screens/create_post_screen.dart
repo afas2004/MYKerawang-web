@@ -117,8 +117,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Future<void> _submit() async {
-    if (_titleCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.titleRequired)));
+    // Title is optional; a post needs something — title, text or a photo.
+    final title = _titleCtrl.text.trim();
+    final body = _bodyCtrl.text.trim();
+    if (title.isEmpty && body.isEmpty && _photos.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.postL10nRead.postEmpty)));
       return;
     }
 
@@ -133,7 +136,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       if (edit != null) {
         await PostService.updatePost(
           edit['id'],
-          title: _titleCtrl.text,
+          title: title.isEmpty ? null : title,
           body: _bodyCtrl.text,
           tags: _currentTags,
           photoUrls: photoUrls,
@@ -151,7 +154,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       } else {
         final newPost = await Supabase.instance.client.from('posts').insert({
           'user_id': Supabase.instance.client.auth.currentUser!.id,
-          'title': _titleCtrl.text,
+          'title': title.isEmpty ? null : title,
           'body': _bodyCtrl.text,
           'is_anonymous': _isAnon,
           'shared_event_id': widget.sharedEvent?['id'],
@@ -252,7 +255,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           TextField(
             controller: _titleCtrl,
             decoration: InputDecoration(
-              hintText: s.postTitleHint,
+              hintText: ps.titleOptionalHint,
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,

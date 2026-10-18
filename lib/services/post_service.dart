@@ -104,7 +104,7 @@ class PostService {
 
   static Future<void> updatePost(
     String postId, {
-    required String title,
+    required String? title,
     required String body,
     required List<String> tags,
     required List<String> photoUrls,

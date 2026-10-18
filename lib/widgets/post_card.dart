@@ -121,6 +121,8 @@ class _PostCardState extends State<PostCard> {
     final s = context.l10n;
     final isAnon = post['is_anonymous'] ?? false;
     final photos = PostService.photoUrlsOf(post);
+    final title = (post['title'] as String? ?? '').trim();
+    final body = (post['body'] as String? ?? '').trim();
     
     // Safety check for date
     final createdVal = post['created_at'];
@@ -229,17 +231,25 @@ class _PostCardState extends State<PostCard> {
                 
                 const SizedBox(height: 12),
 
-              // 2. TITLE
-              Text(
-                post['title'] ?? s.untitled,
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w700, height: 1.3),
-              ),
-              const SizedBox(height: 6),
+              // 2. TITLE (optional — without one the body is the lead)
+              if (title.isNotEmpty) ...[
+                Text(
+                  title,
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700, height: 1.3),
+                ),
+                const SizedBox(height: 6),
+              ],
 
               // 3. BODY PREVIEW
-              if (post['body'] != null)
-                MentionText(post['body'] ?? ''),
+              if (body.isNotEmpty)
+                MentionText(
+                  body,
+                  style: title.isEmpty
+                      ? theme.textTheme.bodyLarge
+                          ?.copyWith(color: scheme.onSurface, height: 1.4)
+                      : null,
+                ),
 
               if (photos.isNotEmpty) _PostPhotos(urls: photos),
 
