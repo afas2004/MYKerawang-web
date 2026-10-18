@@ -46,13 +46,29 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (user == null) return;
     
     // Fetch what we already know about the user
-    final data = await _supabase.from('profiles').select().eq('id', user.id).maybeSingle();
+    final data = await _supabase
+        .from('profiles')
+        .select('display_name, username')
+        .eq('id', user.id)
+        .maybeSingle();
+
+    // Phone is private (profile_contacts, owner-only).
+    try {
+      final contact = await _supabase
+          .from('profile_contacts')
+          .select('phone_number')
+          .eq('user_id', user.id)
+          .maybeSingle();
+      final phone = contact?['phone_number'];
+      if (phone is String && mounted) _phoneCtrl.text = phone;
+    } catch (e) {
+      debugPrint("Error loading contact details: $e");
+    }
     
     if (data != null && mounted) {
       setState(() {
         // Pre-fill fields so they don't have to type it again
         _nameCtrl.text = data['display_name'] ?? ''; 
-        _phoneCtrl.text = data['phone_number'] ?? '';
         
         // If they managed to set a username before but got stuck, load it too
         if (data['username'] != null) {
@@ -106,13 +122,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         'id': user!.id,
         'username': _usernameCtrl.text.trim().toLowerCase(),
         'display_name': _nameCtrl.text.trim(),
-        // Optional here; create_listing asks for it before selling.
-        'phone_number': _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
         'role': _isClub ? 'club_pending' : 'student',
         // We save the club justification in 'bio' or a separate column for admin review
         'bio': _isClub ? "Club Verification: ${_clubReasonCtrl.text}" : null,
         'updated_at': DateTime.now().toIso8601String(),
       });
+
+      // Optional here; create_listing asks for it before selling.
+      final phone = _phoneCtrl.text.trim();
+      if (phone.isNotEmpty) {
+        await _supabase.from('profile_contacts').upsert({
+          'user_id': user.id,
+          'phone_number': phone,
+          'updated_at': DateTime.now().toIso8601String(),
+        }, onConflict: 'user_id');
+      }
 
       if (mounted) {
         // Go to Home (router replaces the stack)

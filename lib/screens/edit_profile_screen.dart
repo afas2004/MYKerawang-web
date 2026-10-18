@@ -55,24 +55,44 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (user == null) return;
 
     try {
-      final data = await Supabase.instance.client.from('profiles').select().eq('id', user.id).single();
-      
+      final supabase = Supabase.instance.client;
+      final data = await supabase
+          .from('profiles')
+          .select('display_name, username, bio, website, avatar_url')
+          .eq('id', user.id)
+          .single();
+
+      // Phone + payment QR are private: they live in profile_contacts,
+      // readable only by the owner. Separate so a failure here doesn't
+      // block editing the public profile.
+      Map<String, dynamic>? contact;
+      try {
+        contact = await supabase
+            .from('profile_contacts')
+            .select('phone_number, payment_qr_url')
+            .eq('user_id', user.id)
+            .maybeSingle();
+      } catch (e) {
+        debugPrint("Error loading contact details: $e");
+      }
+      if (!mounted) return;
+
       setState(() {
         _loaded = {
           'display_name': data['display_name'] ?? '',
           'username': data['username'] ?? '',
           'bio': data['bio'] ?? '',
           'website': data['website'] ?? '',
-          'phone_number': data['phone_number'] ?? '',
+          'phone_number': contact?['phone_number'] ?? '',
         };
         _nameCtrl.text = data['display_name'] ?? '';
         _usernameCtrl.text = data['username'] ?? ''; // <--- NEW
         _bioCtrl.text = data['bio'] ?? '';
         _websiteCtrl.text = data['website'] ?? '';
-        _phoneCtrl.text = data['phone_number'] ?? '';
+        _phoneCtrl.text = contact?['phone_number'] ?? '';
         
         _currentAvatarUrl = data['avatar_url'];
-        _currentQrUrl = data['payment_qr_url'];
+        _currentQrUrl = contact?['payment_qr_url'];
         
         _originalUsername = data['username']; // Keep track for uniqueness check
         
@@ -216,12 +236,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'display_name': _nameCtrl.text.trim(),
         'username': newUsername, // <--- NEW
         'bio': _bioCtrl.text.trim(),
-        'phone_number': _phoneCtrl.text.trim(),
         'website': _websiteCtrl.text.trim(),
         'avatar_url': newAvatarUrl,
-        'payment_qr_url': newQrUrl,
         'updated_at': DateTime.now().toIso8601String(),
       }).eq('id', user!.id);
+      await _saveContact(user.id, {
+        'phone_number': _nullIfEmpty(_phoneCtrl.text),
+        'payment_qr_url': newQrUrl,
+      });
       _originalUsername = newUsername;
 
       if (mounted) {
@@ -260,6 +282,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final Map<String, Timer?> _debounce = {};
   final Map<String, String> _fieldState = {}; // 'saving' | 'saved'
 
+  /// Private columns, stored in profile_contacts rather than profiles.
+  static const _contactColumns = {'phone_number', 'payment_qr_url'};
+
+  static String? _nullIfEmpty(String v) => v.trim().isEmpty ? null : v.trim();
+
+  /// Upserts the user's own profile_contacts row.
+  Future<void> _saveContact(String userId, Map<String, dynamic> values) =>
+      Supabase.instance.client.from('profile_contacts').upsert({
+        'user_id': userId,
+        ...values,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'user_id');
+
   void _autoSave(String column, String value) {
     _debounce[column]?.cancel();
     _debounce[column] = Timer(const Duration(milliseconds: 900), () async {
@@ -268,9 +303,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       if (mounted) setState(() => _fieldState[column] = 'saving');
       try {
-        await Supabase.instance.client
-            .from('profiles')
-            .update({column: value.trim()}).eq('id', user.id);
+        if (_contactColumns.contains(column)) {
+          await _saveContact(user.id, {column: _nullIfEmpty(value)});
+        } else {
+          await Supabase.instance.client
+              .from('profiles')
+              .update({column: value.trim()}).eq('id', user.id);
+        }
         _loaded[column] = value.trim();
         if (mounted) {
           setState(() => _fieldState[column] = 'saved');

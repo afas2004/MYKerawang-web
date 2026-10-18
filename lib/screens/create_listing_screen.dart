@@ -78,9 +78,9 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
   Future<bool> _hasPhone(String userId) async {
     final row = await _supabase
-        .from('profiles')
+        .from('profile_contacts')
         .select('phone_number')
-        .eq('id', userId)
+        .eq('user_id', userId)
         .maybeSingle();
     final phone = row?['phone_number'];
     return phone is String && phone.trim().isNotEmpty;

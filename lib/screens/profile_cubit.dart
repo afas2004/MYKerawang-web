@@ -115,19 +115,6 @@ class ProfileCubit extends Cubit<ProfileState> {
       }
   }
 
-  // ... (Keep updateProfile and uploadAvatar functions EXACTLY as they were before) ...
-  Future<void> updateProfile({required String fullName, required String phone, required String bio}) async {
-    try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) return;
-      emit(state.copyWith(isLoading: true));
-      await _supabase.from('profiles').update({'full_name': fullName, 'phone_number': phone, 'bio': bio}).eq('id', user.id);
-      await loadProfile();
-    } catch (e) {
-      emit(state.copyWith(isLoading: false, errorMessage: e.toString()));
-    }
-  }
-
   Future<void> uploadAvatar(XFile imageFile) async {
     try {
       final user = _supabase.auth.currentUser;

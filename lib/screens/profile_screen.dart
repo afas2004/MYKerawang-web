@@ -58,7 +58,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
     try {
       // 1. Fetch Profile
-      final profileData = await _supabase.from('profiles').select().eq('id', targetUid).single();
+      final profileData = await _supabase
+          .from('profiles')
+          // Explicit: never pull private columns for someone else's page.
+          .select('id, username, display_name, full_name, avatar_url, bio, is_verified, role')
+          .eq('id', targetUid)
+          .single();
       
       // 2. Fetch Content (Posts, Events, AND Listings)
       // posts_public nulls user_id on anonymous rows, so anonymous posts no
