@@ -4,6 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'create_event_screen.dart';
 import 'events_cubit.dart'; // Ensure this matches your file structure
+import '../l10n/access_strings.dart';
+import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../theme/app_themes.dart';
 import '../utils/adaptive.dart';
@@ -13,6 +15,22 @@ import '../utils/formatters.dart';
 import '../widgets/error_state.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/tap_card.dart';
+
+/// "Today" / "Tomorrow" / "In 3 days" for upcoming events less than a
+/// week away, "Happening now" while one runs; null otherwise. Counted in
+/// calendar days, so 11pm tonight is still "Today".
+String? eventCountdown(AppStrings s, Map<String, dynamic> event, {DateTime? now}) {
+  if (isEventClosed(event)) return null;
+  final start = parseLocal(event['start_datetime']);
+  if (start == null) return null;
+  final current = now ?? DateTime.now();
+  if (!start.isAfter(current)) return s.eventHappeningNow;
+  final days = DateUtils.dateOnly(start).difference(DateUtils.dateOnly(current)).inDays;
+  if (days == 0) return s.eventToday;
+  if (days == 1) return s.eventTomorrow;
+  if (days < 7) return s.eventInDays.fill([days]);
+  return null;
+}
 
 class EventsScreen extends StatelessWidget {
   const EventsScreen({super.key});
@@ -145,7 +163,9 @@ class _EventsViewState extends State<EventsView> {
                                 itemBuilder: (context, index) {
                                   final event = state.displayedEvents[index];
                                   final date = parseLocal(event['start_datetime'])!;
-                                  final ended = isEventEnded(event);
+                                  final cancelled = isEventCancelled(event);
+                                  final ended = isEventClosed(event);
+                                  final countdown = eventCountdown(context.l10n, event);
 
                                   return Opacity(
                                     // Ended events stay visible but recede (spec §6)
@@ -187,7 +207,15 @@ class _EventsViewState extends State<EventsView> {
                                               Positioned(
                                                 top: 10,
                                                 left: 10,
-                                                child: StatusBadge(context.l10n.ended),
+                                                child: StatusBadge(cancelled
+                                                    ? context.l10n.cancelled
+                                                    : context.l10n.ended),
+                                              )
+                                            else if (countdown != null)
+                                              Positioned(
+                                                top: 10,
+                                                left: 10,
+                                                child: _CountdownChip(countdown),
                                               ),
                                             ],
                                           ),
@@ -265,6 +293,35 @@ class _EventsViewState extends State<EventsView> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Upcoming-soon marker on an event cover. Primary container rather than
+/// the dark StatusBadge scrim, so "soon" never reads like "ended".
+class _CountdownChip extends StatelessWidget {
+  final String label;
+  const _CountdownChip(this.label);
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.schedule, size: 14, color: scheme.onPrimaryContainer),
+          const SizedBox(width: 4),
+          Text(label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: scheme.onPrimaryContainer, fontWeight: FontWeight.w700)),
+        ],
+      ),
     );
   }
 }
