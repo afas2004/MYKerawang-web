@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mykerawang/l10n/app_strings.dart';
 import 'package:mykerawang/language_cubit.dart';
 import 'package:mykerawang/services/post_service.dart';
+import 'package:mykerawang/services/moderation_service.dart';
 import 'package:mykerawang/widgets/post_card.dart';
 import 'package:mykerawang/widgets/post_card_skeleton.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,8 +16,14 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     PostService.debugCurrentUserId = () => 'me';
+    ModerationService.debugCurrentUserId = () => 'me';
+    ModerationService.debugMyRole = () async => 'student';
   });
-  tearDown(() => PostService.debugCurrentUserId = null);
+  tearDown(() {
+    PostService.debugCurrentUserId = null;
+    ModerationService.debugCurrentUserId = null;
+    ModerationService.debugMyRole = null;
+  });
 
   Map<String, dynamic> post({
     String? title = 'Lost wallet',

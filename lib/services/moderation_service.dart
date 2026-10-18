@@ -10,7 +10,16 @@ class ModerationService {
   ModerationService._();
 
   static SupabaseClient get _db => Supabase.instance.client;
-  static String? get _uid => _db.auth.currentUser?.id;
+  static String? get _uid => debugCurrentUserId != null
+      ? debugCurrentUserId!()
+      : _db.auth.currentUser?.id;
+
+  /// The signed-in user's id (overridable in tests).
+  static String? get currentUserId => _uid;
+
+  /// Test hooks: widget tests run without a Supabase instance.
+  static String? Function()? debugCurrentUserId;
+  static Future<String?> Function()? debugMyRole;
 
   // ------------------------------------------------------------- roles
   static String? _roleFor;
@@ -18,6 +27,7 @@ class ModerationService {
 
   /// The caller's `profiles.role`, cached per signed-in user.
   static Future<String?> myRole() {
+    if (debugMyRole != null) return debugMyRole!();
     final uid = _uid;
     if (uid == null) return Future.value(null);
     if (_roleFor != uid || _role == null) {

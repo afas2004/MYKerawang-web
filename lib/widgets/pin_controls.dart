@@ -47,7 +47,7 @@ class _PinMenuButtonState extends State<PinMenuButton> {
 
   bool _canPin(String? role) {
     if (role == 'admin' || role == 'owner') return true;
-    final me = Supabase.instance.client.auth.currentUser?.id;
+    final me = ModerationService.currentUserId;
     return role == 'club' &&
         me != null &&
         widget.post['user_id'] == me &&
