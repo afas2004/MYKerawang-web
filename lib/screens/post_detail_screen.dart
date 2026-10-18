@@ -1,12 +1,17 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mykerawang/utils/report_helper.dart';
 import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/mention_service.dart';
+import '../services/post_service.dart';
 import '../widgets/linear_refresher.dart';
 import '../widgets/mention_text.dart';
+import '../widgets/owner_menu.dart';
 import '../widgets/post_card.dart';
 import '../l10n/app_strings.dart';
+import '../l10n/post_strings.dart';
 import '../language_cubit.dart';
 import '../utils/formatters.dart';
 import '../utils/roles.dart';
@@ -78,39 +83,92 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         .select('*')
         .eq('post_id', widget.post['id'])
         .order('created_at', ascending: true);
-    return List<Map<String, dynamic>>.from(response);
+    final comments = List<Map<String, dynamic>>.from(response);
+
+    // Anonymous comments arrive without user_id; only the author's own
+    // ids come back from the RPC, so it reveals nobody else's.
+    final myId = _supabase.auth.currentUser?.id;
+    final hasAnon = comments.any((c) => c['user_id'] == null);
+    final mine = hasAnon
+        ? await PostService.myCommentIds(widget.post['id'])
+        : <String>{};
+    _myCommentIds = {
+      ...mine,
+      for (final c in comments)
+        if (myId != null && c['user_id'] == myId) c['id'] as String,
+    };
+    return comments;
   }
 
-  // PASTE THIS INSIDE _PostDetailScreenState class
-  Future<void> _processMentions(String text, String postId, {String? commentId}) async {
-    final regex = RegExp(r"\@(\w+)");
-    final matches = regex.allMatches(text);
-    final usernames = matches.map((m) => m.group(1)).toSet().toList();
+  Set<String> _myCommentIds = {};
 
-    if (usernames.isEmpty) return;
+  void _reloadComments() {
+    if (!mounted) return;
+    setState(() => _commentsStream = _fetchCommentsStream());
+  }
 
-    final myId = _supabase.auth.currentUser!.id;
-    // Read by the recipient, so written in the canonical language.
-    const n = AppStrings.en;
+  Future<void> _editComment(Map<String, dynamic> c) async {
+    final s = context.l10nRead;
+    final ps = context.postL10nRead;
+    final ctrl = TextEditingController(text: c['body'] ?? '');
+    final body = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ps.editComment),
+        content: SizedBox(
+          width: 480,
+          child: MentionInput(
+            controller: ctrl,
+            hintText: s.commentHint,
+            isMultiLine: true,
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: Text(s.cancel)),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+              child: Text(s.saveChanges)),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (body == null || body.isEmpty || body == c['body']) return;
 
-    final users = await _supabase
-        .from('profiles')
-        .select('id, username')
-        .inFilter('username', usernames);
-
-    for (var user in users) {
-      if (user['id'] == myId) continue;
-
-      await _supabase.from('notifications').insert({
-        'user_id': user['id'],
-        'actor_id': myId,
-        'type': 'mention',
-        'title': n.notifMentionCommentTitle,
-        'body': n.notifMentionCommentBody.fill([text]),
-        'data': {'post_id': postId, 'comment_id': commentId},
-      });
+    try {
+      await PostService.updateComment(c['id'], body);
+      await MentionService.notify(
+        text: body,
+        postId: widget.post['id'],
+        commentId: c['id'],
+        anonymous: c['is_anonymous'] ?? false,
+        alreadyNotified: MentionService.usernamesIn(c['body'] ?? ''),
+      );
+      _reloadComments();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
     }
   }
+
+  Future<void> _deleteComment(Map<String, dynamic> c) async {
+    final s = context.l10nRead;
+    final ps = context.postL10nRead;
+    final ok = await confirmDelete(context,
+        title: ps.deleteComment, message: ps.deleteCommentConfirm);
+    if (!ok || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await PostService.deleteComment(c['id']);
+      messenger.showSnackBar(SnackBar(content: Text(ps.commentDeleted)));
+      await _refreshData();
+      _reloadComments();
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+    }
+  }
+
+  /// A cold deep link has nothing underneath to pop back to.
+  void _leave() => context.canPop() ? context.pop() : context.go('/home');
 
   Future<void> _submitComment() async {
     final text = _commentCtrl.text.trim();
@@ -129,8 +187,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         'is_anonymous': _isAnon,
       }).select().single(); // <--- ADD .select().single()
 
-      // 2. PROCESS MENTIONS (This was missing!)
-      await _processMentions(text, widget.post['id'], commentId: newComment['id']);
+      // 2. Mentions (no author on anonymous comments)
+      await MentionService.notify(
+        text: text,
+        postId: widget.post['id'],
+        commentId: newComment['id'],
+        anonymous: _isAnon,
+      );
 
       // 3. Clear Input & Refresh
       _commentCtrl.clear();
@@ -154,7 +217,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     final scheme = theme.colorScheme;
     final s = context.l10n;
     return Scaffold(
-      appBar: appBarConstrained(context, title: Text(s.threadTitle)),
+      appBar: appBarConstrained(
+        context,
+        leading: IconButton(
+          tooltip: s.back,
+          icon: const BackButtonIcon(),
+          onPressed: _leave,
+        ),
+        title: Text(s.threadTitle),
+      ),
       body: PageBody(child: Column(
         children: [
           Expanded(
@@ -165,7 +236,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 child: Column(
                   children: [
                     // USE DYNAMIC _postData HERE
-                    PostCard(post: _postData, onTap: null),
+                    PostCard(post: _postData, onTap: null, onDeleted: _leave),
                     
                     const Divider(thickness: 4), 
                     
@@ -238,7 +309,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                               ),
 
                               subtitle: MentionText(c['body'] ?? ''),
-                              trailing: ReportMenuButton(targetId: c['id'], type: 'comment', iconSize: 18),
+                              trailing: _myCommentIds.contains(c['id'])
+                                  ? OwnerMenuButton(
+                                      iconSize: 18,
+                                      onEdit: () => _editComment(c),
+                                      onDelete: () => _deleteComment(c),
+                                    )
+                                  : ReportMenuButton(targetId: c['id'], type: 'comment', iconSize: 18),
                             );
                           },
                         );

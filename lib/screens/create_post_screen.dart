@@ -2,15 +2,45 @@ import 'package:flutter/material.dart';
 import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../l10n/app_strings.dart';
+import '../l10n/post_strings.dart';
 import '../language_cubit.dart';
+import '../services/mention_service.dart';
+import '../services/post_service.dart';
+import '../theme/app_themes.dart';
 import '../utils/adaptive.dart';
 import '../utils/responsive.dart';
+import '../widgets/media_picker_grid.dart';
+
+/// Opens the form to edit [post] — a dialog on desktop, a page on mobile,
+/// same as the feed composer. Completes with true when saved.
+Future<bool> openPostEditor(BuildContext context, Map<String, dynamic> post) async {
+  final form = CreatePostScreen(editPost: post);
+  final Future<bool?> route = isWide(context)
+      ? showDialog<bool>(
+          context: context,
+          builder: (_) => Dialog(
+            clipBehavior: Clip.antiAlias,
+            shape: const RoundedRectangleBorder(borderRadius: kerawangCut),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 620, maxHeight: 720),
+              child: form,
+            ),
+          ),
+        )
+      : Navigator.push<bool>(
+          context, MaterialPageRoute(builder: (_) => form));
+  return await route == true;
+}
 
 class CreatePostScreen extends StatefulWidget {
   final Map<String, dynamic>? sharedEvent;
   final Map<String, dynamic>? sharedListing;
 
-  const CreatePostScreen({super.key, this.sharedEvent, this.sharedListing});
+  /// When set, the form edits this post instead of creating one.
+  final Map<String, dynamic>? editPost;
+
+  const CreatePostScreen(
+      {super.key, this.sharedEvent, this.sharedListing, this.editPost});
 
   @override
   State<CreatePostScreen> createState() => _CreatePostScreenState();
@@ -23,6 +53,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   bool _isAnon = false;
   bool _isLoading = false;
 
+  /// Existing URLs (`String`) and picked LocalImages; index 0 is the cover.
+  final List<dynamic> _photos = [];
+
+  bool get _isEdit => widget.editPost != null;
+  Map<String, dynamic>? get _sharedEvent =>
+      widget.sharedEvent ?? widget.editPost?['events'];
+  Map<String, dynamic>? get _sharedListing =>
+      widget.sharedListing ?? widget.editPost?['listings'];
+
   /// Suggested shortcuts — users can also type anything they like.
   final List<String> _tags = ['Question', 'Confession', 'Lost&Found', 'Rant', 'Academic'];
 
@@ -33,6 +72,22 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       .where((t) => t.isNotEmpty)
       .toSet()
       .toList();
+
+  @override
+  void initState() {
+    super.initState();
+    final post = widget.editPost;
+    if (post != null) {
+      _titleCtrl.text = post['title'] ?? '';
+      _bodyCtrl.text = post['body'] ?? '';
+      final tags = List<String>.from(post['tags'] ?? const []);
+      if (tags.isNotEmpty) {
+        _tagsCtrl.text = "${tags.map((t) => '#$t').join(' ')} ";
+      }
+      _isAnon = post['is_anonymous'] ?? false;
+      _photos.addAll(PostService.photoUrlsOf(post));
+    }
+  }
 
   @override
   void dispose() {
@@ -51,36 +106,73 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     setState(() {});
   }
 
+  void _onPhotosChanged() {
+    if (_photos.length > PostService.maxPhotos) {
+      _photos.removeRange(PostService.maxPhotos, _photos.length);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(context.postL10nRead.photoLimit
+              .fill([PostService.maxPhotos]))));
+    }
+    setState(() {});
+  }
+
   Future<void> _submit() async {
     if (_titleCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.titleRequired)));
       return;
     }
-    
+
     final s = context.l10nRead;
+    final ps = context.postL10nRead;
     setState(() => _isLoading = true);
-    final user = Supabase.instance.client.auth.currentUser;
 
     try {
-      // --- CHANGED SECTION START ---
-      // We change .insert() to .select().single() so we get the new Post ID back
-      final newPost = await Supabase.instance.client.from('posts').insert({
-        'user_id': user!.id,
-        'title': _titleCtrl.text,
-        'body': _bodyCtrl.text, // Make sure this uses your controller name
-        'is_anonymous': _isAnon,
-        'shared_event_id': widget.sharedEvent?['id'],
-        'shared_listing_id': widget.sharedListing?['id'],
-        'tags': _currentTags,
-      }).select().single(); // <--- CRITICAL CHANGE
+      final photoUrls = await PostService.uploadPhotos(_photos);
+      final edit = widget.editPost;
 
-      // Trigger the notifications using the new ID
-      await _processMentions(_bodyCtrl.text, newPost['id']);
-      // --- CHANGED SECTION END ---
+      if (edit != null) {
+        await PostService.updatePost(
+          edit['id'],
+          title: _titleCtrl.text,
+          body: _bodyCtrl.text,
+          tags: _currentTags,
+          photoUrls: photoUrls,
+          removedPhotoUrls: PostService.photoUrlsOf(edit)
+              .where((u) => !photoUrls.contains(u))
+              .toList(),
+        );
+        // Only people the edit newly mentions.
+        await MentionService.notify(
+          text: _bodyCtrl.text,
+          postId: edit['id'],
+          anonymous: _isAnon,
+          alreadyNotified: MentionService.usernamesIn(edit['body'] ?? ''),
+        );
+      } else {
+        final newPost = await Supabase.instance.client.from('posts').insert({
+          'user_id': Supabase.instance.client.auth.currentUser!.id,
+          'title': _titleCtrl.text,
+          'body': _bodyCtrl.text,
+          'is_anonymous': _isAnon,
+          'shared_event_id': widget.sharedEvent?['id'],
+          'shared_listing_id': widget.sharedListing?['id'],
+          'tags': _currentTags,
+          'image_url': photoUrls.firstOrNull,
+          'gallery_urls': photoUrls.skip(1).toList(),
+        }).select('id').single();
+        PostService.rememberMine(newPost['id']);
+
+        await MentionService.notify(
+          text: _bodyCtrl.text,
+          postId: newPost['id'],
+          anonymous: _isAnon,
+        );
+      }
 
       if (mounted) {
-        Navigator.pop(context, true); 
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.postedSuccess)));
+        Navigator.pop(context, true);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(edit != null ? ps.postUpdated : s.postedSuccess)));
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
@@ -89,46 +181,14 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
   }
 
-  Future<void> _processMentions(String text, String postId, {String? commentId}) async {
-    // 1. Extract all unique @usernames using Regex
-    final regex = RegExp(r"\@(\w+)");
-    final matches = regex.allMatches(text);
-    final usernames = matches.map((m) => m.group(1)).toSet().toList();
-
-    if (usernames.isEmpty) return;
-
-    final supabase = Supabase.instance.client;
-    final myId = supabase.auth.currentUser!.id;
-
-    // 2. Find User IDs for these usernames
-    final users = await supabase
-        .from('profiles')
-        .select('id, username')
-        .inFilter('username', usernames);
-
-    // 3. Send Notifications (read by the recipient → canonical language)
-    const n = AppStrings.en;
-    for (var user in users) {
-      if (user['id'] == myId) continue; // Don't notify yourself
-
-      await supabase.from('notifications').insert({
-        'user_id': user['id'],
-        'actor_id': myId,
-        'type': 'mention',
-        'title': n.notifMentionTitle,
-        'body': n.notifMentionPostBody,
-        'data': {'post_id': postId, 'comment_id': commentId},
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final bool isEvent = widget.sharedEvent != null;
-    final bool isListing = widget.sharedListing != null;
+    final bool isEvent = _sharedEvent != null;
+    final bool isListing = _sharedListing != null;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final s = context.l10n;
+    final ps = context.postL10n;
     return Scaffold(
       appBar: appBarConstrained(
         context,
@@ -138,11 +198,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           icon: Icon(isWide(context) ? Icons.close : Icons.arrow_back),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
-        title: Text(context.l10n.createPostTitle),
+        title: Text(_isEdit ? ps.editPost : s.createPostTitle),
         actions: [
           TextButton(
             onPressed: _isLoading ? null : _submit,
-            child: Text(context.l10n.post,
+            child: Text(_isEdit ? s.saveChanges : s.post,
                 style: const TextStyle(fontWeight: FontWeight.bold)),
           )
         ],
@@ -162,7 +222,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               children: [
                 // DYNAMIC ICON: Calendar for Event, Shopping Bag for Item
                 Icon(
-                  isEvent ? Icons.event : Icons.shopping_bag, 
+                  isEvent ? Icons.event : Icons.shopping_bag,
                   size: 20,
                   color: scheme.primary,
                 ),
@@ -178,9 +238,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       ),
                       // DYNAMIC TITLE
                       Text(
-                        isEvent ? widget.sharedEvent!['title'] : widget.sharedListing!['title'], 
+                        (isEvent ? _sharedEvent!['title'] : _sharedListing!['title']) ?? '',
                         style: const TextStyle(fontWeight: FontWeight.bold),
-                        maxLines: 1, 
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
@@ -204,21 +264,28 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           const Divider(),
           MentionInput(
             controller: _bodyCtrl,
-            hintText: context.l10n.whatsOnYourMind,
+            hintText: s.whatsOnYourMind,
             isMultiLine: true,
           ),
           const SizedBox(height: 20),
-          
-          // Options
+
+          Text(s.photosCount.fill([_photos.length, PostService.maxPhotos]),
+              style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          MediaPickerGrid(items: _photos, onChanged: _onPhotosChanged),
+          const SizedBox(height: 20),
+
+          // Options. Anonymity is fixed once posted: flipping it later
+          // would expose (or re-attribute) what was already said under it.
           SwitchListTile(
             title: Text(s.postAnonymously),
-            subtitle: Text(s.postAnonymouslySub),
+            subtitle: Text(_isEdit ? ps.anonymityLocked : s.postAnonymouslySub),
             value: _isAnon,
-            onChanged: (val) => setState(() => _isAnon = val),
+            onChanged: _isEdit ? null : (val) => setState(() => _isAnon = val),
           ),
-          
+
           const SizedBox(height: 10),
-          Text(context.l10n.addTags,
+          Text(s.addTags,
               style: const TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           // Free-text hashtags. Chips are shortcuts that append into the
@@ -226,7 +293,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           TextField(
             controller: _tagsCtrl,
             decoration: InputDecoration(
-              hintText: context.l10n.tagsHint,
+              hintText: s.tagsHint,
               prefixIcon: const Icon(Icons.tag),
             ),
             onChanged: (_) => setState(() {}), // refresh chip states
