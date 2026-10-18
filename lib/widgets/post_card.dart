@@ -121,8 +121,11 @@ class _PostCardState extends State<PostCard> {
   Future<void> _delete() async {
     final ps = context.postL10nRead;
     final s = context.l10nRead;
-    final ok = await confirmDelete(context,
-        title: ps.deletePost, message: ps.deletePostConfirm);
+    final ok = await confirmDelete(
+      context,
+      title: ps.deletePost,
+      message: ps.deletePostConfirm,
+    );
     if (!ok || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     try {
@@ -131,7 +134,8 @@ class _PostCardState extends State<PostCard> {
       widget.onDeleted?.call();
     } catch (e) {
       messenger.showSnackBar(
-          SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+        SnackBar(content: Text(s.errorWithDetail.fill([e]))),
+      );
     }
   }
 
@@ -157,10 +161,9 @@ class _PostCardState extends State<PostCard> {
     final photos = PostService.photoUrlsOf(post);
     final title = (post['title'] as String? ?? '').trim();
     final body = (post['body'] as String? ?? '').trim();
-    final tags = List<String>.from(post['tags'] ?? const [])
-        .map(normalizeTag)
-        .where((t) => t.isNotEmpty)
-        .toSet();
+    final tags = List<String>.from(
+      post['tags'] ?? const [],
+    ).map(normalizeTag).where((t) => t.isNotEmpty).toSet();
     final pinned = post['is_pinned'] == true;
 
     final content = Padding(
@@ -192,10 +195,11 @@ class _PostCardState extends State<PostCard> {
                 if (body.isNotEmpty)
                   MentionText(
                     body,
-                    style: (title.isEmpty
-                            ? theme.textTheme.bodyLarge
-                            : theme.textTheme.bodyMedium)
-                        ?.copyWith(color: scheme.onSurface, height: 1.45),
+                    style:
+                        (title.isEmpty
+                                ? theme.textTheme.bodyLarge
+                                : theme.textTheme.bodyMedium)
+                            ?.copyWith(color: scheme.onSurface, height: 1.45),
                   ),
                 if (tags.isNotEmpty)
                   Padding(
@@ -284,7 +288,8 @@ class _AuthorRow extends StatelessWidget {
     final isAnon = post['is_anonymous'] == true;
 
     final rawProfile = post['profiles'];
-    final Map<String, dynamic>? profile = (rawProfile is List && rawProfile.isNotEmpty)
+    final Map<String, dynamic>? profile =
+        (rawProfile is List && rawProfile.isNotEmpty)
         ? rawProfile.first
         : (rawProfile is Map<String, dynamic> ? rawProfile : null);
 
@@ -293,8 +298,11 @@ class _AuthorRow extends StatelessWidget {
     final username = isAnon ? null : profile?['username'] as String?;
     final verified = !isAnon && profile?['is_verified'] == true;
     final official = !isAnon && profile?['role'] == 'club';
-    final created = DateTime.tryParse('${post['created_at']}') ?? DateTime.now();
-    final meta = theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant);
+    final created =
+        DateTime.tryParse('${post['created_at']}') ?? DateTime.now();
+    final meta = theme.textTheme.bodySmall?.copyWith(
+      color: scheme.onSurfaceVariant,
+    );
     final canOpen = !isAnon && profile != null;
 
     return Row(
@@ -315,11 +323,13 @@ class _AuthorRow extends StatelessWidget {
                     ? CachedNetworkImageProvider(avatarUrl)
                     : null,
                 child: avatarUrl == null
-                    ? Icon(isAnon ? Icons.visibility_off : Icons.person,
+                    ? Icon(
+                        isAnon ? Icons.visibility_off : Icons.person,
                         size: 20,
                         color: isAnon
                             ? scheme.onSurfaceVariant
-                            : scheme.onPrimaryContainer)
+                            : scheme.onPrimaryContainer,
+                      )
                     : null,
               ),
             ),
@@ -339,7 +349,9 @@ class _AuthorRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: isAnon ? scheme.onSurfaceVariant : scheme.onSurface,
+                        color: isAnon
+                            ? scheme.onSurfaceVariant
+                            : scheme.onSurface,
                       ),
                     ),
                   ),
@@ -347,16 +359,23 @@ class _AuthorRow extends StatelessWidget {
                     const SizedBox(width: 4),
                     Tooltip(
                       message: fs.verified,
-                      child: Icon(Icons.verified, size: 16, color: scheme.tertiary),
+                      child: Icon(
+                        Icons.verified,
+                        size: 16,
+                        color: scheme.tertiary,
+                      ),
                     ),
                   ],
                   if (official) ...[
                     const SizedBox(width: 6),
-                    Text(fs.official.toUpperCase(),
-                        style: theme.textTheme.labelSmall?.copyWith(
-                            color: scheme.tertiary,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1)),
+                    Text(
+                      fs.official.toUpperCase(),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: scheme.tertiary,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1,
+                      ),
+                    ),
                   ],
                 ],
               ),
@@ -404,41 +423,55 @@ class _ActionRow extends StatelessWidget {
     final count = (post['comment_count'] as num?)?.toInt() ?? 0;
     final muted = scheme.onSurfaceVariant;
 
-    return Row(
-      children: [
-        Semantics(
-          button: true,
-          label: count == 0
-              ? fs.commentAction
-              : (count == 1 ? s.commentCountOne : s.commentCountMany).fill([count]),
-          excludeSemantics: true,
-          child: TextButton.icon(
-            onPressed: onComment,
-            style: TextButton.styleFrom(
-              foregroundColor: muted,
-              minimumSize: const Size(48, 48),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+    // Every icon button in the row (save, share, pin, the menus) gets a
+    // 48 px target, also under compact desktop density.
+    return IconButtonTheme(
+      data: IconButtonThemeData(
+        style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+      ),
+      child: Row(
+        children: [
+          Semantics(
+            button: true,
+            label: count == 0
+                ? fs.commentAction
+                : (count == 1 ? s.commentCountOne : s.commentCountMany).fill([
+                    count,
+                  ]),
+            excludeSemantics: true,
+            child: TextButton.icon(
+              onPressed: onComment,
+              style: TextButton.styleFrom(
+                foregroundColor: muted,
+                minimumSize: const Size(48, 48),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              icon: const Icon(Icons.chat_bubble_outline, size: 20),
+              label: Text(count == 0 ? fs.commentAction : '$count'),
             ),
-            icon: const Icon(Icons.chat_bubble_outline, size: 20),
-            label: Text(count == 0 ? fs.commentAction : '$count'),
           ),
-        ),
-        SaveButton(type: SavedType.post, id: post['id'], iconSize: 20, color: muted),
-        IconButton(
-          tooltip: fs.shareAction,
-          onPressed: onShare,
-          icon: Icon(Icons.ios_share, size: 20, color: muted),
-        ),
-        const Spacer(),
-        PinMenuButton(post: post),
-        mine
-            ? OwnerMenuButton(
-                onEdit: onEdit,
-                onDelete: onDelete,
-                tooltip: context.postL10n.postOptions,
-              )
-            : ReportMenuButton(targetId: post['id'], type: 'post'),
-      ],
+          SaveButton(
+            type: SavedType.post,
+            id: post['id'],
+            iconSize: 20,
+            color: muted,
+          ),
+          IconButton(
+            tooltip: fs.shareAction,
+            onPressed: onShare,
+            icon: Icon(Icons.ios_share, size: 20, color: muted),
+          ),
+          const Spacer(),
+          PinMenuButton(post: post),
+          mine
+              ? OwnerMenuButton(
+                  onEdit: onEdit,
+                  onDelete: onDelete,
+                  tooltip: context.postL10n.postOptions,
+                )
+              : ReportMenuButton(targetId: post['id'], type: 'post'),
+        ],
+      ),
     );
   }
 }
@@ -467,8 +500,9 @@ class _TagLink extends StatelessWidget {
           child: Text(
             label,
             style: theme.textTheme.labelLarge?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w600),
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),
@@ -499,43 +533,55 @@ class PostPhotoLayout extends StatelessWidget {
       grid = tile(0);
     } else if (n == 2) {
       ratio = 2 / 1.2;
-      grid = Row(children: [
-        Expanded(child: tile(0)),
-        const SizedBox(width: _gap),
-        Expanded(child: tile(1)),
-      ]);
+      grid = Row(
+        children: [
+          Expanded(child: tile(0)),
+          const SizedBox(width: _gap),
+          Expanded(child: tile(1)),
+        ],
+      );
     } else if (n == 3) {
       ratio = 4 / 3;
-      grid = Row(children: [
-        Expanded(flex: 2, child: tile(0)),
-        const SizedBox(width: _gap),
-        Expanded(
-          child: Column(children: [
-            Expanded(child: tile(1)),
-            const SizedBox(height: _gap),
-            Expanded(child: tile(2)),
-          ]),
-        ),
-      ]);
+      grid = Row(
+        children: [
+          Expanded(flex: 2, child: tile(0)),
+          const SizedBox(width: _gap),
+          Expanded(
+            child: Column(
+              children: [
+                Expanded(child: tile(1)),
+                const SizedBox(height: _gap),
+                Expanded(child: tile(2)),
+              ],
+            ),
+          ),
+        ],
+      );
     } else {
       ratio = 1;
-      grid = Column(children: [
-        Expanded(
-          child: Row(children: [
-            Expanded(child: tile(0)),
-            const SizedBox(width: _gap),
-            Expanded(child: tile(1)),
-          ]),
-        ),
-        const SizedBox(height: _gap),
-        Expanded(
-          child: Row(children: [
-            Expanded(child: tile(2)),
-            const SizedBox(width: _gap),
-            Expanded(child: tile(3, extra: n - 4)),
-          ]),
-        ),
-      ]);
+      grid = Column(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(child: tile(0)),
+                const SizedBox(width: _gap),
+                Expanded(child: tile(1)),
+              ],
+            ),
+          ),
+          const SizedBox(height: _gap),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(child: tile(2)),
+                const SizedBox(width: _gap),
+                Expanded(child: tile(3, extra: n - 4)),
+              ],
+            ),
+          ),
+        ],
+      );
     }
 
     return ClipRRect(
@@ -581,8 +627,10 @@ class _PhotoTile extends StatelessWidget {
                   ColoredBox(color: scheme.surfaceContainerHighest),
               errorWidget: (_, __, ___) => ColoredBox(
                 color: scheme.surfaceContainerHighest,
-                child: Icon(Icons.broken_image_outlined,
-                    color: scheme.onSurfaceVariant),
+                child: Icon(
+                  Icons.broken_image_outlined,
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
             ),
             if (extra > 0)
@@ -591,8 +639,9 @@ class _PhotoTile extends StatelessWidget {
                 child: Center(
                   child: Text(
                     context.feedL10n.morePhotos.fill([extra]),
-                    style: theme.textTheme.headlineSmall
-                        ?.copyWith(color: kOnPhoto),
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: kOnPhoto,
+                    ),
                   ),
                 ),
               ),
