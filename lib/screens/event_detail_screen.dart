@@ -19,11 +19,11 @@ import '../widgets/comment_tile.dart';
 import 'events_screen.dart' show CountdownChip, DateBlock, eventCountdown, isOfficialProfile;
 import '../widgets/mention_text.dart';
 import '../widgets/status_badge.dart';
+import '../widgets/brand/brand.dart';
 import '../widgets/tap_card.dart';
 import 'create_post_screen.dart'; 
 import 'create_event_screen.dart';
 import 'gallery_view_screen.dart';
-import '../utils/responsive.dart';
 import '../widgets/restriction_gate.dart';
 import '../widgets/save_button.dart';
 
@@ -441,7 +441,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
   /// Two columns (media + content left, sticky info card right) once the
   /// page is given this much width.
-  static const double _wideFrom = 900;
+  static const double _wideFrom = Responsive.desktopBreakpoint;
 
   @override
   Widget build(BuildContext context) {
@@ -460,7 +460,18 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 actions: [..._actions(context, onPhoto: false), const SizedBox(width: 8)],
               )
             : null,
-        body: wide ? _wideBody(context) : _compactBody(context),
+        body: AdaptiveScaffoldBody(
+          primaryFlex: 3,
+          secondaryFlex: 2,
+          compact: _compactBody(context),
+          // ---- left: media, title, about, comments ----
+          primary: _primaryPane(context),
+          // ---- right: info card, scrolling on its own (stays in view) ----
+          secondary: SingleChildScrollView(
+            padding: const EdgeInsets.only(top: KSpace.s, bottom: KSpace.xl),
+            child: _infoCard(context),
+          ),
+        ),
         // Compact: the comment box is pinned to the bottom. Wide: it sits
         // under the comments instead.
         bottomSheet: wide ? null : bottomBarConstrained(context, _composerBar(context)),
@@ -496,8 +507,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             flexibleSpace: FlexibleSpaceBar(
               background: ClipRRect(
                 borderRadius: BorderRadius.only(
-                  bottomLeft: kerawangCut.bottomLeft,
-                  bottomRight: kerawangCut.bottomRight,
+                  bottomLeft: KRadius.cut.bottomLeft,
+                  bottomRight: KRadius.cut.bottomRight,
                 ),
                 child: _heroCarousel(context, withTitle: true),
               ),
@@ -524,56 +535,34 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     );
   }
 
-  Widget _wideBody(BuildContext context) {
+  Widget _primaryPane(BuildContext context) {
     final theme = Theme.of(context);
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1200),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ---- left: media, title, about, comments ----
-            Expanded(
-              child: SelectionArea(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 48),
-                  children: [
-                    AspectRatio(
-                      aspectRatio: 16 / 9,
-                      child: ClipRRect(
-                        borderRadius: kerawangCut,
-                        child: _heroCarousel(context, withTitle: false),
-                      ),
-                    ),
-                    if (_images.length > 1) ...[
-                      const SizedBox(height: 12),
-                      _thumbnails(context),
-                    ],
-                    const SizedBox(height: 24),
-                    Text(_event['title'] ?? '',
-                        style: theme.textTheme.headlineMedium
-                            ?.copyWith(fontWeight: FontWeight.w700)),
-                    if (_isCancelled) ...[const SizedBox(height: 16), _cancelledBanner(context)],
-                    const SizedBox(height: 24),
-                    _aboutSection(context),
-                    const SizedBox(height: 32),
-                    _commentsSection(context),
-                    const SizedBox(height: 16),
-                    _composerBar(context, inline: true),
-                  ],
-                ),
-              ),
+    return SelectionArea(
+      child: ListView(
+        padding: const EdgeInsets.only(top: KSpace.s, bottom: KSpace.xxl),
+        children: [
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: ClipRRect(
+              borderRadius: KRadius.cut,
+              child: _heroCarousel(context, withTitle: false),
             ),
-            // ---- right: sticky info card (its own scroll) ----
-            SizedBox(
-              width: 360,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(0, 8, 24, 24),
-                child: _infoCard(context),
-              ),
-            ),
+          ),
+          if (_images.length > 1) ...[
+            const SizedBox(height: KSpace.m),
+            _thumbnails(context),
           ],
-        ),
+          const SizedBox(height: KSpace.xl),
+          Text(_event['title'] ?? '',
+              style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700)),
+          if (_isCancelled) ...[const SizedBox(height: KSpace.l), _cancelledBanner(context)],
+          const SizedBox(height: KSpace.xl),
+          _aboutSection(context),
+          const SizedBox(height: KSpace.xxl),
+          _commentsSection(context),
+          const SizedBox(height: KSpace.l),
+          _composerBar(context, inline: true),
+        ],
       ),
     );
   }
@@ -881,13 +870,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     final location = (_event['location'] ?? '').toString().trim();
     final isOwner = _isOwner;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainer,
-        borderRadius: kerawangCut,
-        border: Border.all(color: scheme.outlineVariant),
-      ),
+    return KCard(
+      borderRadius: KRadius.cut,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1063,11 +1047,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     final scheme = theme.colorScheme;
     final o = _organizer!;
     final official = isOfficialProfile(o);
-    return TapCard(
+    return KCard(
       onTap: () => context.goUser(o['id']),
-      borderRadius: BorderRadius.circular(12),
+      official: official,
+      semanticLabel: '${s.organizer}: ${o['display_name'] ?? ''}',
+      padding: const EdgeInsets.all(KSpace.m),
+      color: scheme.surfaceContainerHigh,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
+        padding: EdgeInsets.zero,
         child: Row(
           children: [
             CircleAvatar(

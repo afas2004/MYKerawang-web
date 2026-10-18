@@ -20,9 +20,9 @@ import '../utils/guest_access.dart';
 import '../utils/listing_status.dart';
 import '../utils/roles.dart';
 import '../widgets/status_badge.dart';
+import '../widgets/brand/brand.dart';
 import '../widgets/tap_card.dart';
 import 'gallery_view_screen.dart';
-import '../utils/responsive.dart';
 import '../widgets/save_button.dart';
 
 class ItemDetailScreen extends StatefulWidget {
@@ -357,7 +357,7 @@ int _currentImageIndex = 0;
       ];
 
   /// Two columns (gallery left, summary card right) from this width.
-  static const double _wideFrom = 900;
+  static const double _wideFrom = Responsive.desktopBreakpoint;
 
   @override
   Widget build(BuildContext context) {
@@ -376,7 +376,45 @@ int _currentImageIndex = 0;
                 actions: [..._actions(context, onPhoto: false), const SizedBox(width: 8)],
               )
             : null,
-        body: wide ? _wideBody(context) : _compactBody(context),
+        body: AdaptiveScaffoldBody(
+          primaryFlex: 3,
+          secondaryFlex: 2,
+          compact: _compactBody(context),
+          // ---- left: gallery + thumbnails, description ----
+          primary: SelectionArea(
+            child: ListView(
+              padding: const EdgeInsets.only(top: KSpace.s, bottom: KSpace.xxl),
+              children: [
+                AspectRatio(
+                  aspectRatio: 1,
+                  child: ClipRRect(borderRadius: KRadius.cut, child: _gallery(context)),
+                ),
+                if (_images.length > 1) ...[
+                  const SizedBox(height: KSpace.m),
+                  _thumbnails(context),
+                ],
+                const SizedBox(height: KSpace.xxl),
+                _descriptionSection(context),
+              ],
+            ),
+          ),
+          // ---- right: price, status, seller, Contact ----
+          secondary: SingleChildScrollView(
+            padding: const EdgeInsets.only(top: KSpace.s, bottom: KSpace.xl),
+            child: KCard(
+              borderRadius: KRadius.cut,
+              padding: const EdgeInsets.all(KSpace.l + KSpace.xs),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _summary(context),
+                  const SizedBox(height: KSpace.l + KSpace.xs),
+                  _actionBar(context),
+                ],
+              ),
+            ),
+          ),
+        ),
         // Compact: Contact (or owner controls) pinned to the bottom.
         bottomSheet: wide
             ? null
@@ -427,8 +465,8 @@ int _currentImageIndex = 0;
             flexibleSpace: FlexibleSpaceBar(
               background: ClipRRect(
                 borderRadius: BorderRadius.only(
-                  bottomLeft: kerawangCut.bottomLeft,
-                  bottomRight: kerawangCut.bottomRight,
+                  bottomLeft: KRadius.cut.bottomLeft,
+                  bottomRight: KRadius.cut.bottomRight,
                 ),
                 child: _gallery(context),
               ),
@@ -448,61 +486,6 @@ int _currentImageIndex = 0;
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _wideBody(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1200),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: SelectionArea(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 48),
-                  children: [
-                    AspectRatio(
-                      aspectRatio: 1,
-                      child: ClipRRect(borderRadius: kerawangCut, child: _gallery(context)),
-                    ),
-                    if (_images.length > 1) ...[
-                      const SizedBox(height: 12),
-                      _thumbnails(context),
-                    ],
-                    const SizedBox(height: 32),
-                    _descriptionSection(context),
-                  ],
-                ),
-              ),
-            ),
-            SizedBox(
-              width: 380,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(0, 8, 24, 24),
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: scheme.surfaceContainer,
-                    borderRadius: kerawangCut,
-                    border: Border.all(color: scheme.outlineVariant),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _summary(context),
-                      const SizedBox(height: 20),
-                      _actionBar(context),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
