@@ -1,14 +1,19 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_parsed_text/flutter_parsed_text.dart';
-import 'package:intl/intl.dart';
 import 'package:mykerawang/services/share_service.dart';
 import 'package:mykerawang/utils/report_helper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:timeago/timeago.dart' as timeago;
+import '../l10n/app_strings.dart';
+import '../language_cubit.dart';
+import '../theme/app_themes.dart';
 import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
+import '../utils/formatters.dart';
+import '../utils/roles.dart';
+import '../widgets/mention_text.dart';
+import '../widgets/status_badge.dart';
+import '../widgets/tap_card.dart';
 import 'create_post_screen.dart'; 
 import 'create_event_screen.dart';
 import 'gallery_view_screen.dart';
@@ -127,24 +132,26 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         'body': _commentCtrl.text.trim(),
       });
       _commentCtrl.clear();
-      FocusScope.of(context).unfocus();
+      if (mounted) FocusScope.of(context).unfocus();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.errorWithDetail.fill([e]))));
     }
   }
 
   // --- NEW: Delete Logic ---
   Future<void> _deleteEvent() async {
+    final s = context.l10nRead;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Cancel Event"),
-        content: const Text("Are you sure? This cannot be undone."),
+        title: Text(s.cancelEvent),
+        content: Text(s.cancelEventConfirm),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Keep")),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(s.keepEvent)),
           TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text("Delete", style: TextStyle(color: Colors.red))),
+              child: Text(s.delete, style: TextStyle(color: Theme.of(ctx).colorScheme.error))),
         ],
       ),
     );
@@ -154,10 +161,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         await Supabase.instance.client.from('events').delete().eq('id', _event['id']);
         if (mounted) {
           Navigator.pop(context, true); // Return true to refresh profile/home
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Event cancelled.")));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.eventCancelled)));
         }
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
       }
     }
   }
@@ -174,19 +181,24 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
       // Unknown -> Warning Dialog
+      final s = context.l10nRead;
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Row(children: [Icon(Icons.warning_amber, color: Colors.orange), SizedBox(width: 8), Text("Leaving App")]),
-          content: Text("This link goes to an external site:\n\n$host\n\nAre you sure it's safe?"),
+          title: Row(children: [
+            Icon(Icons.warning_amber, color: Theme.of(ctx).colorScheme.error),
+            const SizedBox(width: 8),
+            Expanded(child: Text(s.leavingApp)),
+          ]),
+          content: Text(s.externalLinkWarning.fill([host])),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(s.cancel)),
             FilledButton(
               onPressed: () {
                 Navigator.pop(ctx);
                 launchUrl(uri, mode: LaunchMode.externalApplication);
               },
-              child: const Text("Open Anyway"),
+              child: Text(s.openAnyway),
             ),
           ],
         ),
@@ -198,7 +210,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     final supabase = Supabase.instance.client;
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please login to join.")));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.loginToJoin)));
       return;
     }
 
@@ -228,7 +240,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           _isJoined = !_isJoined;
           _participantCount += _isJoined ? 1 : -1;
         });
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.errorWithDetail.fill([e]))));
       }
     }
   }
@@ -238,20 +250,16 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     final currentUser = Supabase.instance.client.auth.currentUser;
     final isOwner = currentUser != null && currentUser.id == _event['organizer_id'];
     final theme = Theme.of(context);
-    
-    // Date Parsing logic remains the same...
-    final startDate = DateTime.parse(_event['start_datetime']).toLocal();
-    final DateTime? endDate = _event['end_datetime'] != null 
-        ? DateTime.parse(_event['end_datetime']).toLocal() 
-        : null;
-    final bool sameDay = endDate != null &&
-        startDate.year == endDate.year && startDate.month == endDate.month && startDate.day == endDate.day;
-    final gallery = List<String>.from(_event['gallery_urls'] ?? []);
-    
+    final scheme = theme.colorScheme;
+    final s = context.l10n;
+
+    final startDate = parseLocal(_event['start_datetime'])!;
+    final DateTime? endDate = parseLocal(_event['end_datetime']);
+
     // 1. PREPARE THE DATA (Handle Empty Strings correctly)
     final String rawDesc = _event['description'] ?? '';
-    final String descriptionText = rawDesc.trim().isEmpty 
-        ? 'No details provided.' 
+    final String descriptionText = rawDesc.trim().isEmpty
+        ? s.noDetails
         : rawDesc;
 
     final List<String> allImages = [
@@ -274,9 +282,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               leading: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: CircleAvatar(
-                  backgroundColor: Colors.black45,
+                  backgroundColor: photoScrim(0.45),
                   child: IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                    icon: const Icon(Icons.arrow_back, color: kOnPhoto),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ),
@@ -291,7 +300,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       itemCount: allImages.length,
                       onPageChanged: (index) => setState(() => _currentImageIndex = index),
                       itemBuilder: (context, index) {
-                        return GestureDetector(
+                        return TapCard(
+                          borderRadius: BorderRadius.zero,
                           onTap: () => showGallery(context,
                               items: allImages, initialIndex: index),
                           child: Hero(
@@ -300,7 +310,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                               imageUrl: allImages[index],
                               fit: BoxFit.cover,
                               placeholder: (_,__) => const Center(child: CircularProgressIndicator()),
-                              errorWidget: (_,__,___) => Container(color: Colors.grey, child: const Icon(Icons.event)),
+                              errorWidget: (_,__,___) => Container(color: scheme.surfaceContainerHighest, child: Icon(Icons.event, color: scheme.onSurfaceVariant)),
                             ),
                           ),
                         );
@@ -309,20 +319,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
                     if (isPast)
                     Positioned.fill(
-                      child: Container(
-                        color: Colors.black.withOpacity(0.4),
-                        child: Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.white, width: 2),
-                              color: Colors.black54,
-                            ),
-                            child: const Text(
-                              "EVENT ENDED",
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20, letterSpacing: 2),
-                            ),
-                          ),
+                      child: IgnorePointer(
+                        child: Container(
+                          color: photoScrim(0.4),
+                          child: Center(child: StatusBadge.stamp(s.ended)),
                         ),
                       ),
                     ),
@@ -335,17 +335,17 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.7),
+                            color: photoScrim(0.7),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.photo_library, color: Colors.white, size: 14),
+                              const Icon(Icons.photo_library, color: kOnPhoto, size: 14),
                               const SizedBox(width: 6),
                               Text(
                                 "${_currentImageIndex + 1} / ${allImages.length}",
-                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                style: theme.textTheme.labelMedium?.copyWith(color: kOnPhoto, fontWeight: FontWeight.bold),
                               ),
                             ],
                           ),
@@ -356,12 +356,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     Positioned(
                       top: 0, left: 0, right: 0,
                       height: 100,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [Colors.black.withOpacity(0.6), Colors.transparent],
+                      child: IgnorePointer(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [photoScrim(0.6), photoScrim(0)],
+                            ),
                           ),
                         ),
                       ),
@@ -380,61 +382,35 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   children: [
                     Row(
                       children: [
-                        Expanded( child:Text(_event['title'], style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold))),
+                        Expanded(child: Text(_event['title'], style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold))),
+                        // Body icons sit on the page, not on the photo, so
+                        // they take scheme colours (the old black circles
+                        // vanished on Songket Noir).
                         IconButton(
-                          icon: const CircleAvatar(
-                            backgroundColor: Colors.black45,
-                            child: Icon(Icons.share, color: Colors.white, size: 20),
-                          ),
+                          tooltip: s.share,
+                          icon: Icon(Icons.share, color: scheme.onSurfaceVariant),
                           onPressed: () {
                             ShareService.shareContent(
                               context,
                               _event['title'],
                               [
                                 if (_event['location'] != null) "📍 ${_event['location']}",
-                                if (_event['start_datetime'] != null)
-                                  "🗓 ${DateFormat('d MMM yyyy, h:mm a').format(DateTime.parse(_event['start_datetime']).toLocal())}",
+                                "🗓 ${formatEventRange(startDate, endDate)}",
                                 if (_event['description'] != null) "\n${_event['description']}",
                               ].join('\n'),
-                              [
-                                if (_event['image_url'] != null) _event['image_url'],
-                                ...?(_event['gallery_urls'] as List?)?.cast<String>(),
-                              ],
+                              allImages,
                             );
                           },
                         ),
-                        PopupMenuButton<String>(
-                          icon: const CircleAvatar(
-                            backgroundColor: Colors.black45, 
-                            child: Icon(Icons.more_vert, color: Colors.white)
-                          ),
-                          onSelected: (val) {
-                            // Change 'listing' to 'event' depending on the screen
-                            showReportDialog(context, _event['id'], 'event'); 
-                          },
-                          itemBuilder: (ctx) => [
-                            const PopupMenuItem(
-                              value: 'report',
-                              child: Text("Report this content", style: TextStyle(color: Colors.red)),
-                            ),
-                          ],
-                        ),
+                        ReportMenuButton(targetId: _event['id'], type: 'event'),
                       ],
                     ),
                     const SizedBox(height: 16),
 
                     // Date & Location Rows (Keep your existing logic)
-                    _infoRow(
-                      Icons.calendar_today, 
-                      endDate == null
-                          ? DateFormat('d MMM yyyy • h:mm a').format(startDate)
-                          : sameDay
-                              ? "${DateFormat('d MMM yyyy • h:mm a').format(startDate)} – ${DateFormat('h:mm a').format(endDate)}"
-                              : "${DateFormat('d MMM yyyy, h:mm a').format(startDate)} – ${DateFormat('d MMM yyyy, h:mm a').format(endDate)}",
-                      theme
-                    ),
+                    _infoRow(Icons.calendar_today, formatEventRange(startDate, endDate), theme),
                     const SizedBox(height: 12),
-                    _infoRow(Icons.location_on, _event['location'] ?? 'Campus', theme),
+                    _infoRow(Icons.location_on, _event['location'] ?? s.locationTba, theme),
                     
                     const SizedBox(height: 24),
                     const Divider(),
@@ -443,16 +419,16 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                        color: scheme.surfaceContainerHighest.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.1)),
+                        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.1)),
                       ),
                       child: Row(
                         children: [
                           // 1. The Count
-                          Icon(Icons.group, size: 20, color: Theme.of(context).colorScheme.primary),
+                          Icon(Icons.group, size: 20, color: scheme.primary),
                           const SizedBox(width: 8),
-                          Text("$_participantCount Attending", style: const TextStyle(fontWeight: FontWeight.bold)),
+                          Text(s.attendingCount.fill([_participantCount]), style: const TextStyle(fontWeight: FontWeight.bold)),
                           
                           const Spacer(),
 
@@ -464,20 +440,16 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                   ? OutlinedButton.icon(
                                       onPressed: _toggleJoin,
                                       icon: const Icon(Icons.check, size: 16),
-                                      label: const Text("Joined"),
+                                      label: Text(s.joined),
                                       style: OutlinedButton.styleFrom(
-                                        foregroundColor: Colors.green,
-                                        side: const BorderSide(color: Colors.green),
+                                        foregroundColor: scheme.primary,
+                                        side: BorderSide(color: scheme.primary),
                                       ),
                                     )
                                   : FilledButton.icon(
                                       onPressed: _toggleJoin,
                                       icon: const Icon(Icons.add, size: 16),
-                                      label: const Text("Join"),
-                                      style: FilledButton.styleFrom(
-                                        backgroundColor: Theme.of(context).colorScheme.primary,
-                                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                                      ),
+                                      label: Text(s.join),
                                     ),
                             ),
                         ],
@@ -493,11 +465,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                           backgroundImage: _organizer!['avatar_url'] != null ? NetworkImage(_organizer!['avatar_url']) : null,
                           child: _organizer!['avatar_url'] == null ? const Icon(Icons.person) : null,
                         ),
-                        title: Text(_organizer!['display_name'] ?? 'Organizer', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(_organizer!['role'] == 'club' ? "Official Club" : "Student Host"),
+                        title: Text(_organizer!['display_name'] ?? s.organizer, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(roleLabel(s, _organizer!['role'])),
                         trailing: OutlinedButton(
                           onPressed: () => context.goUser(_organizer!['id']),
-                          child: const Text("View Profile"),
+                          child: Text(s.viewProfile),
                         ),
                       ),
 
@@ -509,48 +481,23 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text("About Event", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                        Text(s.aboutEvent, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                         TextButton.icon(
                           onPressed: () {
                             Navigator.push(context, MaterialPageRoute(builder: (_) => CreatePostScreen(sharedEvent: _event)));
                           },
                           icon: const Icon(Icons.repeat, size: 16),
-                          label: const Text("Repost"),
+                          label: Text(s.repost),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
 
-                    // 2. RENDER THE WIDGET
-                    Container(
+                    SizedBox(
                       width: double.infinity,
-                      // Add a subtle background color temporarily to debug if it's invisible
-                      color: Colors.transparent, 
-                      child: ParsedText(
-                        text: descriptionText,
-                        style: TextStyle(
-                          fontSize: 16, 
-                          height: 1.5, 
-                          color: Theme.of(context).colorScheme.onSurface, // Adapts to Dark/Light mode
-                        ),
-                        parse: [
-                          MatchText(
-                            pattern: r"\@(\w+)",
-                            style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
-                            onTap: (username) async {
-                              final cleanName = username.substring(1);
-                              final user = await Supabase.instance.client
-                                  .from('profiles')
-                                  .select('id')
-                                  .eq('username', cleanName)
-                                  .maybeSingle();
-
-                              if (user != null && context.mounted) {
-                                context.goUser(user['id']);
-                              }
-                            },
-                          ),
-                        ],
+                      child: MentionText(
+                        descriptionText,
+                        style: theme.textTheme.bodyLarge?.copyWith(height: 1.5, color: scheme.onSurface),
                       ),
                     ),
                     const SizedBox(height: 32),
@@ -561,11 +508,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       width: double.infinity,
                       child: FilledButton.icon(
                         icon: Icon(isPast ? Icons.event_busy : Icons.link),
-                        label: Text(isPast ? "Registration Closed" : "Register Online"),
+                        label: Text(isPast ? s.registrationClosed : s.registerOnline),
+                        // Past = onPressed null, so the theme's disabled colours apply
                         style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          // Disable color if past
-                          backgroundColor: isPast ? Colors.grey : theme.colorScheme.primary,
                         ),
                         onPressed: isPast 
                           ? null // DISABLE CLICK
@@ -582,7 +528,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text("Discussion", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                        Text(s.comments, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                         
                         // NEW REFRESH BUTTON HERE
                         IconButton(
@@ -596,7 +542,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             });
                             _fetchEventDetails();
                           },
-                          tooltip: "Refresh Comments",
+                          tooltip: s.refreshComments,
                         ),
                       ],
                     ),
@@ -607,7 +553,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       stream: _commentsStream,
                       builder: (context, snapshot) {
                         if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                          return const Center(child: Padding(padding: EdgeInsets.all(16), child: Text("No comments yet.")));
+                          return Center(child: Padding(padding: const EdgeInsets.all(16), child: Text(s.noComments, style: TextStyle(color: scheme.onSurfaceVariant))));
                         }
                         return ListView.builder(
                           shrinkWrap: true,
@@ -618,23 +564,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             return ListTile(
                               contentPadding: EdgeInsets.zero,
                               leading: const CircleAvatar(radius: 14, child: Icon(Icons.person, size: 14)),
-                              title: Text(c['body']),
-                              subtitle: Text(timeago.format(DateTime.parse(c['created_at'])), style: const TextStyle(fontSize: 10)),
-                              trailing: PopupMenuButton<String>(
-                                icon: const Icon(Icons.more_vert, size: 18, color: Colors.grey),
-                                onSelected: (value) {
-                                  if (value == 'report') {
-                                    // Pass 'comment' as the type
-                                    showReportDialog(context, c['id'], 'comment');
-                                  }
-                                },
-                                itemBuilder: (context) => [
-                                  const PopupMenuItem(
-                                    value: 'report',
-                                    child: Text("Report Comment", style: TextStyle(color: Colors.red)),
-                                  ),
-                                ],
-                              ),
+                              title: MentionText(c['body'] ?? ''),
+                              subtitle: Text(formatRelative(context, DateTime.parse(c['created_at'])),
+                                  style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+                              trailing: ReportMenuButton(targetId: c['id'], type: 'comment', iconSize: 18),
                             );
                           },
                         );
@@ -653,7 +586,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: theme.scaffoldBackgroundColor,
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5, offset: const Offset(0, -2))],
+          boxShadow: [BoxShadow(color: scheme.shadow.withValues(alpha: 0.05), blurRadius: 5, offset: const Offset(0, -2))],
         ),
         child: SafeArea(
           child: isOwner
@@ -663,8 +596,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: _deleteEvent,
-                        style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: const BorderSide(color: Colors.red)),
-                        child: const Text("Cancel Event"),
+                        style: OutlinedButton.styleFrom(foregroundColor: scheme.error, side: BorderSide(color: scheme.error)),
+                        child: Text(s.cancelEvent),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -678,8 +611,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                           );
                           if (result == true) _fetchEventDetails();
                         },
-                        style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.primary, foregroundColor: Colors.white),
-                        child: const Text("Edit"),
+                        style: ElevatedButton.styleFrom(backgroundColor: scheme.primary, foregroundColor: scheme.onPrimary),
+                        child: Text(s.edit),
                       ),
                     ),
                   ],
@@ -691,14 +624,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       child: TextField(
                         controller: _commentCtrl,
                         decoration: InputDecoration(
-                          hintText: "Ask about this event...",
+                          hintText: s.askAboutEvent,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
                           filled: true,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                         ),
                       ),
                     ),
-                    IconButton(icon: const Icon(Icons.send), onPressed: _postComment),
+                    IconButton(tooltip: s.post, icon: Icon(Icons.send, color: scheme.primary), onPressed: _postComment),
                   ],
                 ),
         ),
@@ -711,7 +644,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       children: [
         Icon(icon, size: 20, color: theme.colorScheme.primary),
         const SizedBox(width: 12),
-        Expanded(child: Text(text, style: const TextStyle(fontSize: 16))),
+        Expanded(child: Text(text, style: theme.textTheme.bodyLarge)),
       ],
     );
   }
