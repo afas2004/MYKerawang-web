@@ -84,6 +84,13 @@ extension AccessStrings on AppStrings {
       "Bayar hanya selepas jumpa penjual atau dah setuju urusan.",
       "支払いは出品者と会うか、取引に合意してからにしましょう。");
 
+  String get tooManyContactRequests => _t(
+      "Too many contact requests, try again later.",
+      "Terlalu banyak permintaan hubungan, cuba lagi nanti.",
+      "連絡先のリクエストが多すぎます。しばらくしてからお試しください。");
+  String get listingNowSold => _t("This item has just been sold.",
+      "Barang ini baru sahaja terjual.", "この商品は売り切れになりました。");
+
   // ---- listing status ----
   String get statusAvailable => _t("Available", "Ada", "販売中");
   String get statusReserved => _t("Reserved", "Ditempah", "取引中");

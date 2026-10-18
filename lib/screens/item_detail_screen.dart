@@ -161,7 +161,18 @@ int _currentImageIndex = 0;
       final list = rows is List ? rows : const [];
       contact = list.isEmpty ? <String, dynamic>{} : Map<String, dynamic>.from(list.first);
     } catch (e) {
-      if (mounted) showErrorWithRetry(context, e, onRetry: _showPurchaseDialog);
+      if (!mounted) return;
+      // get_listing_contact's limits (20261019002600): no Retry, since
+      // retrying straight away can't succeed.
+      final text = e.toString();
+      if (text.contains('rate_limited')) {
+        showErrorWithRetry(context, e, message: context.l10nRead.tooManyContactRequests);
+      } else if (text.contains('listing_sold')) {
+        setState(() => _itemData = {..._itemData, 'status': 'sold', 'is_sold': true});
+        showErrorWithRetry(context, e, message: context.l10nRead.listingNowSold);
+      } else {
+        showErrorWithRetry(context, e, onRetry: _showPurchaseDialog);
+      }
       return;
     } finally {
       if (mounted) setState(() => _loadingContact = false);
