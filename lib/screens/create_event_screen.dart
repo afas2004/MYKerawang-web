@@ -35,7 +35,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   // Index 0 is ALWAYS the Cover Photo.
   final List<dynamic> _mediaItems = [];
   
-  final List<String> _availableTags = ['Academic', 'Tech', 'Food', 'Fun', 'Sports', 'Workshop', 'Arts'];
   List<String> _selectedTags = [];
 
   @override
@@ -87,14 +86,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     final picker = ImagePicker();
     try {
       if (source == ImageSource.camera) {
-        final XFile? picked = await picker.pickImage(source: ImageSource.camera);
+        final XFile? picked = await picker.pickImage(source: ImageSource.camera, maxWidth: kPhotoMaxDimension, maxHeight: kPhotoMaxDimension, imageQuality: kPhotoQuality);
         if (picked != null) {
           final img = await LocalImage.fromXFile(picked);
           setState(() => _mediaItems.add(img));
         }
       } else {
         // Multi-picker for Gallery
-        final List<XFile> pickedList = await picker.pickMultiImage();
+        final List<XFile> pickedList = await picker.pickMultiImage(maxWidth: kPhotoMaxDimension, maxHeight: kPhotoMaxDimension, imageQuality: kPhotoQuality);
         if (pickedList.isNotEmpty) {
           final imgs = await Future.wait(pickedList.map(LocalImage.fromXFile));
           setState(() {
@@ -159,7 +158,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           await supabase.storage.from('images').uploadBinary(
                 path,
                 compressed,
-                fileOptions: const FileOptions(contentType: 'image/jpeg'),
+                fileOptions: FileOptions(contentType: imageContentType(compressed)),
               );
           url = supabase.storage.from('images').getPublicUrl(path);
         } else {
@@ -353,7 +352,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
               // ... REST OF THE FORM (Title, Date, etc.) ...
               _label("Event Title"),
-              _input(_titleController, "Enter a catchy title"),
+              _input(_titleController, "Enter a catchy title", validator: _required("Title")),
               
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -367,7 +366,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               ),
 
               _label("Location", topPad: 0),
-              _input(_locationController, "e.g. Dewan Aspirasi"),
+              _input(_locationController, "e.g. Dewan Aspirasi", validator: _required("Location")),
 
               _label("Registration Link (Optional)"),
               _input(_linkController, "https://forms.gle/...", icon: Icons.link),
@@ -475,7 +474,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         GestureDetector(
           onTap: () => _pickDateTime(isStart),
           child: AbsorbPointer(
-            child: _input(TextEditingController(text: _formatDate(date)), "Select", icon: Icons.calendar_today),
+            child: _input(
+              TextEditingController(text: _formatDate(date)), "Select",
+              icon: Icons.calendar_today,
+              readOnly: true,
+              validator: isStart ? null : (_) => (_startDate != null && _endDate != null && !_endDate!.isAfter(_startDate!))
+                  ? "Must be after start"
+                  : null,
+            ),
           ),
         ),
       ],
@@ -517,9 +523,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     child: Text(text, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))
   );
 
-  Widget _input(TextEditingController c, String h, {IconData? icon}) => TextField(
+  String? Function(String?) _required(String field) =>
+      (v) => (v == null || v.trim().isEmpty) ? "$field is required" : null;
+
+  Widget _input(TextEditingController c, String h, {IconData? icon, bool readOnly = false, String? Function(String?)? validator}) => TextFormField(
     controller: c, 
-    readOnly: icon != null,
+    readOnly: readOnly,
+    validator: validator,
     decoration: _inputDeco(h, Theme.of(context), icon: icon)
   );
 

@@ -63,10 +63,12 @@ class MarketplaceCubit extends Cubit<MarketplaceState> {
     }
 
     // 2. SLOW: Network Load
+    _subscription?.cancel(); // drop the previous stream before resubscribing
     _subscription = _supabase
         .from('listings')
         .stream(primaryKey: ['id'])
         .order('created_at')
+        .limit(200) // newest 200 — not the whole table over mobile data
         .listen((data) async {
           final items = List<Map<String, dynamic>>.from(data);
           

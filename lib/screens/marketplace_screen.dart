@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mykerawang/widgets/linear_refresher';
 import 'create_listing_screen.dart';
 import '../utils/app_nav.dart';
+import '../utils/categories.dart';
 import 'marketplace_cubit.dart'; // Ensure this matches your file name
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
@@ -32,7 +33,7 @@ class MarketplaceView extends StatefulWidget {
 
 class _MarketplaceViewState extends State<MarketplaceView> {
   final TextEditingController _searchCtrl = TextEditingController();
-  final List<String> _filters = ['All', 'Books', 'Electronics', 'Food', 'Others'];
+  final List<String> _filters = ['All', ...kListingCategories];
 
   @override
   void dispose() {

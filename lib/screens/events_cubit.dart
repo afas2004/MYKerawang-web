@@ -73,10 +73,12 @@ class EventsCubit extends Cubit<EventsState> {
 
     // 3. SLOW: Subscribe to Supabase (Background Download)
     // Ended events are kept and greyed out in the UI, not hidden.
+    _subscription?.cancel(); // drop the previous stream before resubscribing
     _subscription = _supabase
         .from('events')
         .stream(primaryKey: ['id'])
         .order('created_at', ascending: false)
+        .limit(200) // newest 200 — not the whole table over mobile data
         .listen((data) async {
           final items = List<Map<String, dynamic>>.from(data);
           

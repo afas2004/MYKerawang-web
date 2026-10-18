@@ -55,7 +55,8 @@ class NotificationScreen extends StatelessWidget {
                 .from('notifications')
                 .stream(primaryKey: ['id'])
                 .eq('user_id', userId)
-                .order('created_at', ascending: false),
+                .order('created_at', ascending: false)
+                .limit(100),
             builder: (context, snapshot) {
               if (snapshot.hasError) return Center(child: Text("Error: ${snapshot.error}"));
               if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());

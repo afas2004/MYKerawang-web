@@ -364,6 +364,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 child: image != null
                     ? CachedNetworkImage(
                         imageUrl: image, 
+                        memCacheWidth: 300,
                         fit: BoxFit.cover,
                         placeholder: (_,__) => Container(color: Theme.of(context).colorScheme.surfaceContainerHighest),
                         errorWidget: (_,__,___) => const Icon(Icons.broken_image),

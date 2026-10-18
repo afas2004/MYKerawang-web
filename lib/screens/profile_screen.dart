@@ -507,6 +507,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               // 1. The Image (Keep existing)
               Image.network(
                 item['image_url'] ?? '',
+                cacheWidth: 400, // grid tile
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => Container(color: Colors.grey[300], child: const Icon(Icons.image_not_supported)),
               ),

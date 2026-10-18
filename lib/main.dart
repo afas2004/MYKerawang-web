@@ -12,11 +12,11 @@ import 'language_cubit.dart';
 import 'router.dart';
 // --- IMPORT YOUR SERVICES ---
 import 'services/notification_service.dart';
+import 'services/update_service.dart';
+import 'widgets/update_banner.dart';
 import 'utils/responsive.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'screens/events_cubit.dart';
-import 'screens/marketplace_cubit.dart';
 import 'screens/profile_cubit.dart';
 
 /// Lets mouse users drag-scroll lists (like touch), on top of the wheel.
@@ -45,6 +45,9 @@ void main() async {
 
   await NotificationService.init();
 
+  // Web: poll for newer deploys so phones don't sit on a stale build.
+  UpdateService.instance.start();
+
   runApp(const MyApp());
 }
 
@@ -63,8 +66,6 @@ class _MyAppState extends State<MyApp> {
     // 1. Initialize ALL Cubits here (Global State)
     return MultiBlocProvider(
       providers: [
-        BlocProvider(create: (context) => EventsCubit()),
-        BlocProvider(create: (context) => MarketplaceCubit()),
         BlocProvider(create: (context) => ProfileCubit()),
         BlocProvider(create: (context) => ThemeCubit()),
         BlocProvider(create: (context) => LanguageCubit()),
@@ -80,7 +81,7 @@ class _MyAppState extends State<MyApp> {
             // Centre the app on desktop + run session side effects
             // (onboarding redirect, notification stream) above every route.
             builder: (context, child) => SessionWatcher(
-              child: ResponsiveShell(child: child!),
+              child: UpdateBanner(child: ResponsiveShell(child: child!)),
             ),
 
             // 3. Named theme (Kampus Bold / Istana Modern / Songket Noir)
@@ -167,9 +168,12 @@ class _SessionWatcherState extends State<SessionWatcher> {
         .from('notifications')
         .stream(primaryKey: ['id'])
         .eq('user_id', userId)
+        // Only the newest row is used — don't pull the whole history.
+        .order('created_at', ascending: false)
+        .limit(1)
         .listen((List<Map<String, dynamic>> data) {
           if (data.isEmpty) return;
-          final latest = data.last;
+          final latest = data.first;
 
           // Timezone Fix
           final created = DateTime.parse(latest['created_at']).toUtc();

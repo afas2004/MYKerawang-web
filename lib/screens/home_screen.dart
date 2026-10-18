@@ -41,28 +41,34 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchFeedData() async {
     if (mounted && _hasError) setState(() => _hasError = false);
     try {
-      final now = DateTime.now().toIso8601String();
+      final now = DateTime.now().toUtc().toIso8601String();
 
-      // 1. Fetch Events (For Carousel & Injection)
-      final events = await _supabase.from('events')
-          .select()
-          .gt('end_datetime', now)
-          .order('start_datetime', ascending: true)
-          .limit(20); // Fetch more for injection
-      
-      // 2. Fetch Listings (For Horizontal & Injection)
-      final listings = await _supabase.from('listings')
-          .select()
-          .eq('is_sold', false)
-          .order('created_at', ascending: false)
-          .limit(20);
+      // All three run in parallel — one round trip on mobile, not three.
+      final results = await Future.wait<List<Map<String, dynamic>>>([
+        // 1. Events (For Carousel & Injection)
+        _supabase.from('events')
+            .select()
+            .gt('end_datetime', now)
+            .order('start_datetime', ascending: true)
+            .limit(20), // Fetch more for injection
 
-      // 3. Fetch Posts — from the view, which blanks user_id/profiles on
-      //    anonymous rows. Joins are baked into the view.
-      final posts = await _supabase.from('posts_public')
-          .select('*')
-          .order('created_at', ascending: false)
-          .limit(50); // Fetch enough posts
+        // 2. Listings (For Horizontal & Injection)
+        _supabase.from('listings')
+            .select()
+            .eq('is_sold', false)
+            .order('created_at', ascending: false)
+            .limit(20),
+
+        // 3. Posts — from the view, which blanks user_id/profiles on
+        //    anonymous rows. Joins are baked into the view.
+        _supabase.from('posts_public')
+            .select('*')
+            .order('created_at', ascending: false)
+            .limit(50), // Fetch enough posts
+      ]);
+      final events = results[0];
+      final listings = results[1];
+      final posts = results[2];
 
       // 4. PREPARE FEEDS (DESIGN_SPEC §4)
       final purePosts = posts.map((p) => {...p, 'type': 'post'}).toList();
