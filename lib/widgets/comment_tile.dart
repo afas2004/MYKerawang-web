@@ -14,7 +14,17 @@ import 'mention_text.dart';
 class CommentTile extends StatelessWidget {
   final Map<String, dynamic> comment;
 
-  const CommentTile({super.key, required this.comment});
+  /// Author to mark with [highlightLabel] — e.g. the event's organiser,
+  /// so their answers stand out in the questions thread.
+  final String? highlightUserId;
+  final String? highlightLabel;
+
+  const CommentTile({
+    super.key,
+    required this.comment,
+    this.highlightUserId,
+    this.highlightLabel,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +72,19 @@ class CommentTile extends StatelessWidget {
         children: [
           Text(displayName,
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          if (authorId != null &&
+              authorId == highlightUserId &&
+              highlightLabel != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: scheme.tertiaryContainer,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(highlightLabel!,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                      color: scheme.onTertiaryContainer, fontWeight: FontWeight.w700)),
+            ),
           if (username != null) Text("@$username", style: meta),
           Text("· ${formatRelative(context, DateTime.parse(c['created_at']))}",
               style: meta),
