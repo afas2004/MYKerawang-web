@@ -1,9 +1,16 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../language_cubit.dart';
+import '../theme/app_themes.dart';
 import '../utils/formatters.dart';
 import 'tap_card.dart';
 
+/// Small event / listing card for horizontal lists and grids: photo,
+/// gold kind label, title, date range or price.
+///
+/// In a slot with a fixed height (carousels) the photo takes whatever the
+/// text doesn't, so the card never overflows; unconstrained it uses a
+/// 4:3 photo.
 class UniversalCard extends StatelessWidget {
   final Map<String, dynamic> data;
   final VoidCallback onTap;
@@ -16,106 +23,93 @@ class UniversalCard extends StatelessWidget {
     final scheme = theme.colorScheme;
     final s = context.l10n;
     final title = data['title'] ?? s.untitled;
-    final image = data['image_url'];
-    
-    // Determine subtitle based on type (Event date vs Price)
-    String subtitle = '';
-    bool isEvent = data.containsKey('start_datetime');
-    
-    if (isEvent) {
-      subtitle = formatEventRange(parseLocal(data['start_datetime'])!,
-          parseLocal(data['end_datetime']));
-    } else {
-      // Marketplace item
-      subtitle = formatPrice(data['price']);
-    }
+    final image = data['image_url'] as String?;
+    final isEvent = data.containsKey('start_datetime');
+
+    final start = isEvent ? parseLocal(data['start_datetime']) : null;
+    final subtitle = isEvent
+        ? (start == null
+            ? ''
+            : formatEventRange(start, parseLocal(data['end_datetime'])))
+        : formatPrice(data['price']);
+
+    final photo = image != null && image.isNotEmpty
+        ? CachedNetworkImage(
+            imageUrl: image,
+            memCacheWidth: 600,
+            fit: BoxFit.cover,
+            fadeInDuration: const Duration(milliseconds: 200),
+            placeholder: (_, __) =>
+                ColoredBox(color: scheme.surfaceContainerHighest),
+            errorWidget: (_, __, ___) => ColoredBox(
+              color: scheme.surfaceContainerHighest,
+              child: Icon(Icons.broken_image_outlined,
+                  color: scheme.onSurfaceVariant),
+            ),
+          )
+        : ColoredBox(
+            color: scheme.surfaceContainerHighest,
+            child: Icon(isEvent ? Icons.event : Icons.storefront,
+                size: 36, color: scheme.onSurfaceVariant),
+          );
+
+    final text = Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Gold kind label — specialness marker (spec §2)
+          Text(
+            "◆ ${(isEvent ? s.kindEvent : s.navMarket).toUpperCase()}",
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: scheme.tertiary,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: isEvent ? scheme.onSurfaceVariant : scheme.primary,
+              fontWeight: isEvent ? FontWeight.w500 : FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
 
     return TapCard(
       onTap: onTap,
+      borderRadius: kerawangCut,
       color: theme.cardColor,
-      border: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
-      child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min, // <--- CRITICAL: Shrink-wraps the card
-          children: [
-            // 1. IMAGE SECTION
-            // FIX: Replaced 'Expanded' with 'AspectRatio' or 'SizedBox'
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              child: SizedBox(
-                height: 150, // <--- FIXED HEIGHT for Image
-                width: double.infinity,
-                child: image != null
-                    ? CachedNetworkImage(
-                        imageUrl: image,
-                        memCacheWidth: 600,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(color: theme.colorScheme.surfaceContainerHighest),
-                        errorWidget: (context, url, error) => Container(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          child: Icon(Icons.broken_image, color: scheme.onSurfaceVariant),
-                        ),
-                      )
-                    : Container(
-                        color: theme.colorScheme.surfaceContainerHighest,
-                        child: Icon(
-                          isEvent ? Icons.event : Icons.store, 
-                          size: 40, 
-                          color: theme.colorScheme.onSurfaceVariant
-                        ),
-                      ),
-              ),
-            ),
-
-            // 2. TEXT SECTION
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Badge (Event/Market)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: isEvent
-                          ? scheme.primaryContainer
-                          : scheme.tertiary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      (isEvent ? s.kindEvent : s.navMarket).toUpperCase(),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: isEvent
-                            ? scheme.onPrimaryContainer
-                            : scheme.tertiary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4),
-
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w500
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+      border: BorderSide(color: scheme.outlineVariant),
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final bounded = box.hasBoundedHeight;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: bounded ? MainAxisSize.max : MainAxisSize.min,
+            children: [
+              if (bounded)
+                Expanded(child: photo)
+              else
+                AspectRatio(aspectRatio: 4 / 3, child: photo),
+              text,
+            ],
+          );
+        },
+      ),
     );
   }
 }

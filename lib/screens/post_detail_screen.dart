@@ -1,22 +1,19 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:mykerawang/utils/report_helper.dart';
 import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/mention_service.dart';
 import '../services/post_service.dart';
 import '../widgets/linear_refresher.dart';
-import '../widgets/mention_text.dart';
+import '../widgets/comment_tile.dart';
 import '../widgets/owner_menu.dart';
 import '../widgets/post_card.dart';
 import '../l10n/app_strings.dart';
+import '../l10n/feed_strings.dart';
 import '../l10n/post_strings.dart';
 import '../language_cubit.dart';
-import '../utils/formatters.dart';
-import '../utils/roles.dart';
 import '../utils/adaptive.dart';
-import '../utils/responsive.dart';
+import '../widgets/brand/brand.dart';
 import '../widgets/restriction_gate.dart';
 
 class PostDetailScreen extends StatefulWidget {
@@ -33,6 +30,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   static const _commentPage = 30;
 
   final _commentCtrl = TextEditingController();
+  final _composerFocus = FocusNode();
   final _supabase = Supabase.instance.client;
 
   bool _isSending = false;
@@ -83,6 +81,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (channel != null) _supabase.removeChannel(channel);
     _commentCtrl.removeListener(_onTextChanged);
     _commentCtrl.dispose();
+    _composerFocus.dispose();
     super.dispose();
   }
 
@@ -270,8 +269,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
 
   Widget _buildComments(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final scheme = Theme.of(context).colorScheme;
     final s = context.l10n;
     final ps = context.postL10n;
 
@@ -299,13 +297,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
 
     if (_comments.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Text(s.beFirstToComment, style: TextStyle(color: scheme.onSurfaceVariant)),
+      return BrandEmptyState(
+        compact: true,
+        icon: Icons.chat_bubble_outline,
+        title: s.beFirstToComment,
       );
     }
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (_hasEarlier)
           Padding(
@@ -313,90 +313,44 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             child: _loadingEarlier
                 ? const Padding(
                     padding: EdgeInsets.all(12),
-                    child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2)))
+                    child: Center(
+                      child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2)),
+                    ))
                 : TextButton.icon(
                     onPressed: _showEarlier,
                     icon: const Icon(Icons.expand_less),
                     label: Text(ps.showEarlierComments),
                   ),
           ),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _comments.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
-          itemBuilder: (context, index) {
-            final c = _comments[index];
-            final isAnon = c['is_anonymous'] ?? false;
-
-            final profile = c['profiles'];
-            final displayName = displayNameFor(s, profile, anonymous: isAnon);
-            final avatarUrl = isAnon ? null : profile?['avatar_url'];
-            final username = isAnon ? null : profile?['username'];
-
-            return ListTile(
-              leading: Tooltip(
-                // Explain what the crossed-eye icon means
-                message: isAnon ? s.postedAnonymously : displayName,
-                child: CircleAvatar(
-                  radius: 16,
-                  backgroundColor: isAnon
-                      ? scheme.surfaceContainerHighest
-                      : scheme.primaryContainer,
-                  backgroundImage: avatarUrl != null ? CachedNetworkImageProvider(avatarUrl) : null,
-                  child: (avatarUrl == null)
-                      ? Icon(isAnon ? Icons.visibility_off : Icons.person,
-                          size: 16,
-                          color: isAnon
-                              ? scheme.onSurfaceVariant
-                              : scheme.onPrimaryContainer)
-                      : null,
-                ),
-              ),
-              title: Row(
-                children: [
-                  Flexible(
-                    child: Text(displayName,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  ),
-                  if (!isAnon && username != null) ...[
-                    const SizedBox(width: 4),
-                    Text("@$username", style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
-                  ],
-                  const SizedBox(width: 8),
-                  Text(formatRelative(context, DateTime.parse(c['created_at'])), style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
-                ],
-              ),
-              subtitle: MentionText(c['body'] ?? ''),
-              trailing: _myCommentIds.contains(c['id'])
-                  ? OwnerMenuButton(
-                      iconSize: 18,
-                      tooltip: ps.commentOptions,
-                      onEdit: () => _editComment(c),
-                      onDelete: () => _deleteComment(c),
-                    )
-                  : ReportMenuButton(targetId: c['id'], type: 'comment', iconSize: 18),
-            );
-          },
-        ),
+        for (var i = 0; i < _comments.length; i++)
+          CommentTile(
+            key: ValueKey(_comments[i]['id']),
+            comment: _comments[i],
+            threadLine: i < _comments.length - 1,
+            onEdit: _myCommentIds.contains(_comments[i]['id'])
+                ? () => _editComment(_comments[i])
+                : null,
+            onDelete: _myCommentIds.contains(_comments[i]['id'])
+                ? () => _deleteComment(_comments[i])
+                : null,
+          ),
       ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final s = context.l10n;
-    final ps = context.postL10n;
-    final canSend = _hasText && !_isSending;
+    final fs = context.feedL10n;
+    final count = (_postData['comment_count'] as num?)?.toInt() ?? _comments.length;
+
     return Scaffold(
       appBar: appBarConstrained(
         context,
+        maxWidth: Responsive.detailMaxWidth,
         leading: IconButton(
           tooltip: s.back,
           icon: const BackButtonIcon(),
@@ -404,79 +358,213 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         ),
         title: Text(s.threadTitle),
       ),
-      body: PageBody(child: Column(
-        children: [
-          Expanded(
-            child: LinearRefresher(
-              onRefresh: _refreshData,
+      body: LinearRefresher(
+        onRefresh: _refreshData,
+        child: PostDetailLayout(
+          post: PostCard(
+            post: _postData,
+            onTap: null,
+            expanded: true,
+            onDeleted: _leave,
+            onCommentTap: _composerFocus.requestFocus,
+          ),
+          commentsHeader: Semantics(
+            header: true,
+            child: Text(
+              count > 0 ? fs.commentCount.fill([count]) : s.comments,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          comments: _buildComments(context),
+          composer: CommentComposer(
+            controller: _commentCtrl,
+            focusNode: _composerFocus,
+            anonymous: _isAnon,
+            sending: _isSending,
+            canSend: _hasText && !_isSending,
+            onToggleAnonymous: () => setState(() => _isAnon = !_isAnon),
+            onSend: _submitComment,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Thread layout on [AdaptiveScaffoldBody]: with ≥900 px of its own
+/// width, the post on the left and the comments on the right with the
+/// composer pinned under them; narrower, post then comments in one scroll
+/// with the composer pinned to the bottom of the screen.
+class PostDetailLayout extends StatelessWidget {
+  final Widget post;
+  final Widget commentsHeader;
+  final Widget comments;
+  final Widget composer;
+
+  const PostDetailLayout({
+    super.key,
+    required this.post,
+    required this.commentsHeader,
+    required this.comments,
+    required this.composer,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final header = Padding(
+      padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.l, KSpace.l, KSpace.xs),
+      child: commentsHeader,
+    );
+
+    final stacked = Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: Responsive.feedMaxWidth),
+        child: Column(
+          children: [
+            Expanded(
               child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(), // Ensures pull-to-refresh works even if list is short
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: KSpace.xl),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    PostCard(post: _postData, onTap: null, onDeleted: _leave),
-
-                    const Divider(thickness: 4),
-
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      color: scheme.surface,
-                      child: Semantics(
-                        header: true,
-                        child: Text(s.comments, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                          KSpace.m, KSpace.s, KSpace.m, 0),
+                      child: SelectionArea(child: post),
                     ),
-
-                    _buildComments(context),
-                    const SizedBox(height: 80),
+                    header,
+                    Padding(
+                      padding: const EdgeInsets.only(right: KSpace.xs),
+                      child: comments,
+                    ),
                   ],
                 ),
               ),
             ),
-          ),
+            composer,
+          ],
+        ),
+      ),
+    );
 
-          // INPUT BAR
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: theme.scaffoldBackgroundColor,
-              boxShadow: [BoxShadow(color: scheme.shadow.withValues(alpha: 0.05), blurRadius: 5, offset: const Offset(0, -2))],
+    return AdaptiveScaffoldBody(
+      compact: stacked,
+      primary: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(top: KSpace.s, bottom: KSpace.xxl),
+        child: SelectionArea(child: post),
+      ),
+      secondary: Column(
+        children: [
+          Align(alignment: Alignment.centerLeft, child: header),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(right: KSpace.s, bottom: KSpace.l),
+              child: comments,
             ),
-            child: SafeArea(
-              child: Row(
+          ),
+          composer,
+        ],
+      ),
+    );
+  }
+}
+
+/// Comment box: an anonymity toggle that says what it does in words, the
+/// text field, and send (disabled while empty, spinner while sending).
+class CommentComposer extends StatelessWidget {
+  final TextEditingController controller;
+  final FocusNode? focusNode;
+  final bool anonymous;
+  final bool sending;
+  final bool canSend;
+  final VoidCallback onToggleAnonymous;
+  final VoidCallback onSend;
+
+  const CommentComposer({
+    super.key,
+    required this.controller,
+    this.focusNode,
+    required this.anonymous,
+    required this.sending,
+    required this.canSend,
+    required this.onToggleAnonymous,
+    required this.onSend,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final s = context.l10n;
+    final ps = context.postL10n;
+    final fs = context.feedL10n;
+
+    return Material(
+      color: theme.scaffoldBackgroundColor,
+      elevation: 0,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: scheme.outlineVariant)),
+        ),
+        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              FilterChip(
+                avatar: Icon(
+                  anonymous ? Icons.visibility_off : Icons.visibility_outlined,
+                  size: 18,
+                ),
+                label: Text(anonymous ? fs.anonToggleOn : fs.anonToggle),
+                selected: anonymous,
+                showCheckmark: false,
+                tooltip: anonymous ? ps.commentAnonOn : ps.commentAnonOff,
+                onSelected: (_) => onToggleAnonymous(),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  IconButton(
-                    tooltip: _isAnon ? ps.commentAnonOn : ps.commentAnonOff,
-                    isSelected: _isAnon,
-                    icon: Icon(
-                      _isAnon ? Icons.visibility_off : Icons.visibility,
-                      color: _isAnon ? scheme.primary : scheme.onSurfaceVariant,
-                    ),
-                    onPressed: () => setState(() => _isAnon = !_isAnon),
-                  ),
                   Expanded(
-                    child: MentionInput(
-                      controller: _commentCtrl,
-                      hintText: s.commentHint,
-                      isMultiLine: true,
-                      reverseDirection: true,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: MentionInput(
+                        controller: controller,
+                        focusNode: focusNode,
+                        hintText: s.commentHint,
+                        isMultiLine: true,
+                        reverseDirection: true,
+                        maxLines: 5,
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 4),
                   IconButton(
                     tooltip: ps.sendComment,
-                    onPressed: canSend ? _submitComment : null,
-                    icon: _isSending
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    onPressed: canSend ? onSend : null,
+                    icon: sending
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2))
                         : Icon(Icons.send,
                             color: canSend ? scheme.primary : scheme.onSurfaceVariant),
                   ),
                 ],
               ),
-            ),
+            ],
           ),
-        ],
-      )),
+        ),
+      ),
     );
   }
 }

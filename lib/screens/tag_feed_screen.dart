@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../l10n/app_strings.dart';
+import '../l10n/feed_strings.dart';
 import '../l10n/post_strings.dart';
 import '../language_cubit.dart';
-import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
-import '../utils/responsive.dart';
+import '../widgets/brand/brand.dart';
 import '../utils/tags.dart';
 import '../widgets/error_state.dart';
 import '../widgets/linear_refresher.dart';
@@ -32,29 +32,34 @@ class TagFeedScreen extends StatefulWidget {
 class _TagFeedScreenState extends State<TagFeedScreen> {
   static const _pageSize = 20;
 
-  final _scroll = ScrollController();
   final List<Map<String, dynamic>> _posts = [];
   bool _loading = false;
   bool _hasMore = true;
+  int? _count;
   Object? _error; // error of the last page load
 
   late final String _tag = normalizeTag(widget.tag);
 
+  SupabaseQueryBuilder get _view =>
+      Supabase.instance.client.from('posts_public'); // anonymity-safe view
+
   @override
   void initState() {
     super.initState();
-    _scroll.addListener(_onScroll);
     _loadPage();
+    _loadCount();
   }
 
-  @override
-  void dispose() {
-    _scroll.dispose();
-    super.dispose();
-  }
-
-  void _onScroll() {
-    if (_scroll.position.extentAfter < 600) _loadPage();
+  Future<void> _loadCount() async {
+    try {
+      final res = await _view
+          .select('id')
+          .overlaps('tags', tagAliases(_tag))
+          .count(CountOption.exact);
+      if (mounted) setState(() => _count = res.count);
+    } catch (e) {
+      debugPrint("Tag count failed: $e"); // header just omits the count
+    }
   }
 
   Future<void> _loadPage({bool reset = false}) async {
@@ -65,8 +70,7 @@ class _TagFeedScreenState extends State<TagFeedScreen> {
     });
     final from = reset ? 0 : _posts.length;
     try {
-      final rows = await Supabase.instance.client
-          .from('posts_public') // anonymity-safe view
+      final rows = await _view
           .select('*')
           .overlaps('tags', tagAliases(_tag))
           .order('created_at', ascending: false)
@@ -84,87 +88,165 @@ class _TagFeedScreenState extends State<TagFeedScreen> {
     }
   }
 
-  Future<void> _refresh() => _loadPage(reset: true);
+  Future<void> _refresh() async {
+    await Future.wait([_loadPage(reset: true), _loadCount()]);
+  }
 
   @override
   Widget build(BuildContext context) {
+    return TagFeedView(
+      tag: _tag,
+      count: _count,
+      posts: _posts,
+      loading: _loading,
+      error: _error,
+      hasMore: _hasMore,
+      onRefresh: _refresh,
+      onLoadMore: _loadPage,
+    );
+  }
+}
+
+/// Tag feed layout from data: header (tag in the display face + post
+/// count), then the same cards as the home feed in one ≤680 px column.
+class TagFeedView extends StatelessWidget {
+  final String tag;
+  final int? count;
+  final List<Map<String, dynamic>> posts;
+  final bool loading;
+  final Object? error;
+  final bool hasMore;
+  final Future<void> Function() onRefresh;
+  final VoidCallback onLoadMore;
+
+  const TagFeedView({
+    super.key,
+    required this.tag,
+    required this.count,
+    required this.posts,
+    required this.loading,
+    required this.error,
+    required this.hasMore,
+    required this.onRefresh,
+    required this.onLoadMore,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final s = context.l10n;
     final ps = context.postL10n;
-    final title = displayTag(_tag);
+    final fs = context.feedL10n;
+    final title = displayTag(tag);
+
+    final header = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(
+            header: true,
+            label: ps.tagPostsLabel.fill([title]),
+            excludeSemantics: true,
+            child: Text(title, style: theme.textTheme.headlineSmall),
+          ),
+          if (count != null)
+            Text(
+              count == 1 ? fs.tagPostCountOne : fs.tagPostCount.fill([count]),
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+        ],
+      ),
+    );
 
     final Widget body;
-    if (_posts.isEmpty && _loading) {
-      body = ListView(children: [PostCardSkeleton.list(context)]);
-    } else if (_posts.isEmpty && _error != null) {
-      body = ErrorState(onRetry: _refresh);
-    } else if (_posts.isEmpty) {
+    if (posts.isEmpty && loading) {
+      body = ListView(children: [header, PostCardSkeleton.list(context)]);
+    } else if (posts.isEmpty && error != null) {
+      body = ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [header, ErrorState(onRetry: onRefresh)],
+      );
+    } else if (posts.isEmpty) {
       body = ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          Padding(
-            padding: const EdgeInsets.all(32),
-            child: Text(ps.noTaggedPosts,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          header,
+          BrandEmptyState(
+            icon: Icons.tag,
+            title: ps.noTaggedPosts,
+            compact: true,
           ),
         ],
       );
     } else {
-      body = ListView.builder(
-        controller: _scroll,
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: _posts.length + 1,
-        itemBuilder: (context, i) {
-          if (i < _posts.length) {
-            final post = _posts[i];
-            return PostCard(
-              post: post,
-              onTap: () => context.goPost(post),
-              onTagTap: (t) =>
-                  normalizeTag(t) == _tag ? null : openTagFeed(context, t),
-            );
-          }
-          // Footer: next page loading, failed (retry), or nothing more.
-          if (_error != null) {
+      body = NotificationListener<ScrollNotification>(
+        onNotification: (n) {
+          if (n.metrics.extentAfter < 600 && error == null) onLoadMore();
+          return false;
+        },
+        child: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: 24),
+          itemCount: posts.length + 2,
+          itemBuilder: (context, i) {
+            if (i == 0) return header;
+            if (i <= posts.length) {
+              final post = posts[i - 1];
+              return PostCard(
+                key: ValueKey(post['id']),
+                post: post,
+                onTap: () => context.goPost(post),
+                onTagTap: (t) =>
+                    normalizeTag(t) == tag ? null : openTagFeed(context, t),
+              );
+            }
+            // Footer: next page loading, failed (retry), or the end.
+            if (error != null) {
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Text(ps.loadMoreFailed),
+                    TextButton.icon(
+                      onPressed: onLoadMore,
+                      icon: const Icon(Icons.refresh),
+                      label: Text(s.tryAgain),
+                    ),
+                  ],
+                ),
+              );
+            }
+            if (hasMore) return const PostCardSkeleton();
             return Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Text(ps.loadMoreFailed),
-                  TextButton.icon(
-                    onPressed: _loadPage,
-                    icon: const Icon(Icons.refresh),
-                    label: Text(s.tryAgain),
-                  ),
-                ],
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: Text(fs.feedEnd,
+                    style: theme.textTheme.labelLarge
+                        ?.copyWith(color: scheme.onSurfaceVariant)),
               ),
             );
-          }
-          if (_hasMore) {
-            return const PostCardSkeleton();
-          }
-          return const SizedBox(height: 80);
-        },
+          },
+        ),
       );
     }
 
     return Scaffold(
-      appBar: appBarConstrained(
-        context,
+      appBar: AppBar(
         leading: IconButton(
           tooltip: s.back,
           icon: const BackButtonIcon(),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
-        title: Semantics(
-          label: ps.tagPostsLabel.fill([title]),
-          child: ExcludeSemantics(child: Text(title)),
-        ),
+        bottom: LatticeBand.preferred(),
       ),
-      body: PageBody(
-        child: LinearRefresher(onRefresh: _refresh, child: body),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: Responsive.feedMaxWidth),
+          child: LinearRefresher(onRefresh: onRefresh, child: body),
+        ),
       ),
     );
   }
