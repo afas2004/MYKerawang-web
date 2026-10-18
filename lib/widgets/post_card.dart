@@ -6,6 +6,7 @@ import 'package:mykerawang/utils/app_nav.dart';
 import 'package:mykerawang/utils/report_helper.dart';
 import 'package:mykerawang/widgets/embed_card.dart';
 import 'package:mykerawang/theme/app_themes.dart';
+import 'package:mykerawang/widgets/brand/brand.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/feed_strings.dart';
 import '../l10n/post_strings.dart';
@@ -177,7 +178,10 @@ class _PostCardState extends State<PostCard> {
               child: PinBadge(post: post),
             ),
           if (widget.showProfileHeader) ...[
-            _AuthorRow(post: post),
+            Padding(
+              padding: EdgeInsets.only(right: pinned ? 36 : 0),
+              child: _AuthorRow(post: post),
+            ),
             const SizedBox(height: 8),
           ],
           Padding(
@@ -253,21 +257,18 @@ class _PostCardState extends State<PostCard> {
       ),
     );
 
-    return Card(
-      margin: widget.expanded
+    // Pinned / official: kerawang cut + gold frame with corner lattice.
+    return Padding(
+      padding: widget.expanded
           ? EdgeInsets.zero
-          : const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      elevation: 0,
-      // Signature kerawang cut — DESIGN_SPEC §2. Pinned: gold frame.
-      shape: RoundedRectangleBorder(
-        borderRadius: kerawangCut,
-        side: pinned
-            ? BorderSide(color: scheme.tertiary, width: 1.5)
-            : BorderSide(color: scheme.outlineVariant),
+          : const EdgeInsets.symmetric(
+              horizontal: KSpace.gutter, vertical: KSpace.s - 2),
+      child: KCard(
+        official: pinned,
+        padding: EdgeInsets.zero,
+        onTap: widget.onTap,
+        child: content,
       ),
-      clipBehavior: Clip.antiAlias,
-      color: theme.cardColor,
-      child: InkWell(onTap: widget.onTap, child: content),
     );
   }
 }

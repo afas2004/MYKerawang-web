@@ -60,8 +60,10 @@ void main() {
       await pumpAt(tester, size, layout());
       expect(tester.takeException(), isNull);
       expect(find.byType(CommentTile), findsNWidgets(3));
-      expect(find.byType(VerticalDivider),
-          size.width >= 900 ? findsOneWidget : findsNothing);
+      // Split = the comments header sits to the right of the post.
+      final postX = tester.getTopLeft(find.byType(PostCard)).dx;
+      final headerX = tester.getTopLeft(find.text('3 comments')).dx;
+      expect(headerX > postX + 200, size.width >= 900);
     });
   }
 

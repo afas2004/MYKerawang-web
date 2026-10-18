@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mykerawang/l10n/app_strings.dart';
+import 'package:mykerawang/l10n/social_strings.dart';
 import 'package:mykerawang/screens/home_screen.dart';
+import 'package:mykerawang/widgets/brand/brand.dart';
 import 'package:mykerawang/widgets/embed_card.dart';
 import 'package:mykerawang/widgets/feed_composer.dart';
 import 'package:mykerawang/widgets/post_card.dart';
@@ -63,7 +66,9 @@ void main() {
     testWidgets('empty feed at $w px offers to post', (tester) async {
       await pumpAt(tester, size, feed(p: []));
       expect(tester.takeException(), isNull);
-      expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
+      expect(find.byType(BrandEmptyState), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, AppStrings.en.social.createFirstPost),
+          findsOneWidget);
     });
   }
 

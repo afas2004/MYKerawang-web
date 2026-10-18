@@ -13,7 +13,7 @@ import '../l10n/feed_strings.dart';
 import '../l10n/post_strings.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
-import '../utils/responsive.dart';
+import '../widgets/brand/brand.dart';
 import '../widgets/restriction_gate.dart';
 
 class PostDetailScreen extends StatefulWidget {
@@ -297,17 +297,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
 
     if (_comments.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 32),
-        child: Column(
-          children: [
-            Icon(Icons.chat_bubble_outline, size: 36, color: scheme.onSurfaceVariant),
-            const SizedBox(height: 8),
-            Text(s.beFirstToComment,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: scheme.onSurfaceVariant)),
-          ],
-        ),
+      return BrandEmptyState(
+        compact: true,
+        icon: Icons.chat_bubble_outline,
+        title: s.beFirstToComment,
       );
     }
 
@@ -357,7 +350,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     return Scaffold(
       appBar: appBarConstrained(
         context,
-        maxWidth: PostDetailLayout.maxWidth,
+        maxWidth: Responsive.detailMaxWidth,
         leading: IconButton(
           tooltip: s.back,
           icon: const BackButtonIcon(),
@@ -398,8 +391,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
 }
 
-/// Thread layout. ≥900 px: the post on the left, comments on the right
-/// with the composer pinned under them. Narrower: post, then comments,
+/// Thread layout on [AdaptiveScaffoldBody]: with ≥900 px of its own
+/// width, the post on the left and the comments on the right with the
+/// composer pinned under them; narrower, post then comments in one scroll
 /// with the composer pinned to the bottom of the screen.
 class PostDetailLayout extends StatelessWidget {
   final Widget post;
@@ -415,57 +409,14 @@ class PostDetailLayout extends StatelessWidget {
     required this.composer,
   });
 
-  static const double maxWidth = 1200;
-  static const double twoColumnBreakpoint = 900;
-
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final width = MediaQuery.sizeOf(context).width;
-
     final header = Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.l, KSpace.l, KSpace.xs),
       child: commentsHeader,
     );
 
-    if (width >= twoColumnBreakpoint) {
-      return Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: maxWidth),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 3,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                  child: SelectionArea(child: post),
-                ),
-              ),
-              VerticalDivider(width: 1, color: scheme.outlineVariant),
-              Expanded(
-                flex: 2,
-                child: Column(
-                  children: [
-                    header,
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.only(right: 8, bottom: 16),
-                        child: comments,
-                      ),
-                    ),
-                    composer,
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Center(
+    final stacked = Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: Responsive.feedMaxWidth),
         child: Column(
@@ -473,17 +424,18 @@ class PostDetailLayout extends StatelessWidget {
             Expanded(
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.only(bottom: 24),
+                padding: const EdgeInsets.only(bottom: KSpace.xl),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                      padding: const EdgeInsets.fromLTRB(
+                          KSpace.m, KSpace.s, KSpace.m, 0),
                       child: SelectionArea(child: post),
                     ),
                     header,
                     Padding(
-                      padding: const EdgeInsets.only(right: 4),
+                      padding: const EdgeInsets.only(right: KSpace.xs),
                       child: comments,
                     ),
                   ],
@@ -493,6 +445,27 @@ class PostDetailLayout extends StatelessWidget {
             composer,
           ],
         ),
+      ),
+    );
+
+    return AdaptiveScaffoldBody(
+      compact: stacked,
+      primary: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(top: KSpace.s, bottom: KSpace.xxl),
+        child: SelectionArea(child: post),
+      ),
+      secondary: Column(
+        children: [
+          Align(alignment: Alignment.centerLeft, child: header),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(right: KSpace.s, bottom: KSpace.l),
+              child: comments,
+            ),
+          ),
+          composer,
+        ],
       ),
     );
   }

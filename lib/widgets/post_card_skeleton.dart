@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/post_strings.dart';
-import '../theme/app_themes.dart';
+import 'brand/brand.dart';
 
 /// Placeholder with the shape of a [PostCard] while posts load, so the
-/// feed doesn't jump from a spinner to content. Pulses gently unless the
-/// platform asks for reduced motion.
+/// feed doesn't jump from a spinner to content. Built from [KSkeleton]
+/// (shimmer, static under reduced motion) inside a [KCard].
 ///
 /// Use [PostCardSkeleton.list] for a whole loading feed.
-class PostCardSkeleton extends StatefulWidget {
+class PostCardSkeleton extends StatelessWidget {
   /// Show a photo block (alternate in lists so it looks like a real feed).
   final bool withPhoto;
 
@@ -29,96 +29,51 @@ class PostCardSkeleton extends StatefulWidget {
       );
 
   @override
-  State<PostCardSkeleton> createState() => _PostCardSkeletonState();
-}
-
-class _PostCardSkeletonState extends State<PostCardSkeleton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pulse = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  );
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final reduce = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    if (reduce) {
-      _pulse.value = 0.5;
-      _pulse.stop();
-    } else if (!_pulse.isAnimating) {
-      _pulse.repeat(reverse: true);
-    }
-  }
-
-  @override
-  void dispose() {
-    _pulse.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-
-    Widget bar(double width, double height, {BorderRadius? radius}) =>
-        Container(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerHighest,
-            borderRadius: radius ?? BorderRadius.circular(4),
-          ),
-        );
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: kerawangCut,
-        side: BorderSide(color: scheme.outlineVariant),
-      ),
-      color: theme.cardColor,
-      child: FadeTransition(
-        opacity: Tween(begin: 0.45, end: 1.0).animate(_pulse),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  bar(32, 32, radius: BorderRadius.circular(16)),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      bar(120, 12),
-                      const SizedBox(height: 6),
-                      bar(60, 10),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              bar(220, 16),
-              const SizedBox(height: 10),
-              bar(double.infinity, 12),
-              const SizedBox(height: 6),
-              bar(180, 12),
-              if (widget.withPhoto) ...[
-                const SizedBox(height: 12),
-                AspectRatio(
-                  aspectRatio: 4 / 3,
-                  child: bar(double.infinity, double.infinity,
-                      radius: kerawangCut),
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+          horizontal: KSpace.gutter, vertical: KSpace.s - 2),
+      child: KCard(
+        padding: const EdgeInsets.all(KSpace.l),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                KSkeleton.circle(size: 40),
+                SizedBox(width: KSpace.m),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    KSkeleton(width: 140, height: 12),
+                    SizedBox(height: KSpace.s - 2),
+                    KSkeleton(width: 80, height: 10),
+                  ],
                 ),
               ],
-              const SizedBox(height: 16),
-              bar(90, 12),
+            ),
+            const SizedBox(height: KSpace.l),
+            const KSkeleton(width: 220, height: 18),
+            const SizedBox(height: KSpace.m),
+            KSkeleton.lines(2),
+            if (withPhoto) ...[
+              const SizedBox(height: KSpace.m),
+              const AspectRatio(
+                aspectRatio: 4 / 3,
+                child: KSkeleton(height: double.infinity, borderRadius: KRadius.cut),
+              ),
             ],
-          ),
+            const SizedBox(height: KSpace.l),
+            const Row(
+              children: [
+                KSkeleton(width: 56, height: 20),
+                SizedBox(width: KSpace.l),
+                KSkeleton(width: 24, height: 20),
+                SizedBox(width: KSpace.l),
+                KSkeleton(width: 24, height: 20),
+              ],
+            ),
+          ],
         ),
       ),
     );

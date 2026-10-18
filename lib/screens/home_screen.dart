@@ -12,7 +12,7 @@ import '../l10n/social_strings.dart';
 import '../services/unread_notifications.dart';
 import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
-import '../utils/responsive.dart';
+import '../widgets/brand/brand.dart';
 import '../widgets/embed_card.dart';
 import '../widgets/error_state.dart';
 import '../widgets/feed_composer.dart';
@@ -319,8 +319,9 @@ class FeedView extends StatelessWidget {
     final theme = Theme.of(context);
     final s = context.l10n;
     final width = MediaQuery.sizeOf(context).width;
-    final desktop = width >= Responsive.desktopBreakpoint;
-    final railVisible = width >= Responsive.railBreakpoint;
+    final size = Responsive.sizeFor(width);
+    final desktop = size.isExpanded;
+    final railVisible = size.isLarge; // MainScaffold shows the rail here
     final items = buildFeedItems(posts, injectables, inject: !railVisible);
     final topPadding = MediaQuery.paddingOf(context).top + kToolbarHeight;
 
@@ -351,6 +352,7 @@ class FeedView extends StatelessWidget {
                 ),
                 centerTitle: false,
                 actions: actions,
+                bottom: LatticeBand.preferred(),
               ),
 
               _column(SliverToBoxAdapter(child: FeedComposer(onPosted: onPosted))),
@@ -474,25 +476,15 @@ class _FeedSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(top: 12, bottom: 8),
+      padding: const EdgeInsets.only(top: KSpace.m, bottom: KSpace.s),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 8, 4),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Semantics(
-                    header: true,
-                    child: Text(title, style: theme.textTheme.titleLarge),
-                  ),
-                ),
-                TextButton(onPressed: onSeeAll, child: Text(context.l10n.seeAll)),
-              ],
-            ),
+          SectionHeader(
+            title: title,
+            onSeeAll: onSeeAll,
+            padding: const EdgeInsets.fromLTRB(KSpace.l, 0, KSpace.s, KSpace.xs),
           ),
           HoverCarousel(
             height: 250,
@@ -517,27 +509,14 @@ class _EmptyFeed extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = context.l10n;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
-      child: Column(
-        children: [
-          Icon(Icons.forum_outlined, size: 56, color: scheme.onSurfaceVariant),
-          const SizedBox(height: 12),
-          Text(s.social.feedEmptyTitle,
-              textAlign: TextAlign.center, style: theme.textTheme.titleLarge),
-          const SizedBox(height: 4),
-          Text(s.social.feedEmptyBody,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: scheme.onSurfaceVariant)),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: onCompose,
-            icon: const Icon(Icons.edit_outlined),
-            label: Text(s.social.createFirstPost),
-          ),
-        ],
+      padding: const EdgeInsets.symmetric(vertical: KSpace.xl),
+      child: BrandEmptyState(
+        icon: Icons.forum_outlined,
+        title: s.social.feedEmptyTitle,
+        message: s.social.feedEmptyBody,
+        actionLabel: s.social.createFirstPost,
+        onAction: onCompose,
       ),
     );
   }

@@ -6,7 +6,7 @@ import '../l10n/feed_strings.dart';
 import '../l10n/post_strings.dart';
 import '../language_cubit.dart';
 import '../utils/app_nav.dart';
-import '../utils/responsive.dart';
+import '../widgets/brand/brand.dart';
 import '../utils/tags.dart';
 import '../widgets/error_state.dart';
 import '../widgets/linear_refresher.dart';
@@ -174,17 +174,10 @@ class TagFeedView extends StatelessWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
           header,
-          Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              children: [
-                Icon(Icons.tag, size: 40, color: scheme.onSurfaceVariant),
-                const SizedBox(height: 8),
-                Text(ps.noTaggedPosts,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: scheme.onSurfaceVariant)),
-              ],
-            ),
+          BrandEmptyState(
+            icon: Icons.tag,
+            title: ps.noTaggedPosts,
+            compact: true,
           ),
         ],
       );
@@ -247,6 +240,7 @@ class TagFeedView extends StatelessWidget {
           icon: const BackButtonIcon(),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
+        bottom: LatticeBand.preferred(),
       ),
       body: Center(
         child: ConstrainedBox(

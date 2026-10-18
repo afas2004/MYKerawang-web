@@ -13,12 +13,13 @@ import '../services/post_service.dart';
 import '../theme/app_themes.dart';
 import '../utils/tags.dart';
 import '../widgets/media_picker_grid.dart';
+import '../widgets/brand/brand.dart';
 import '../widgets/restriction_gate.dart';
 import 'profile_cubit.dart';
 
 /// Width at or above which the editor opens as a dialog over the feed;
 /// below it is a full-screen page.
-const double kComposerDialogBreakpoint = 600;
+const double kComposerDialogBreakpoint = Responsive.mediumBreakpoint;
 
 /// Opens the post editor — new post, or [post] to edit. Dialog over the
 /// current page on ≥600 px, full screen below. Completes with true when

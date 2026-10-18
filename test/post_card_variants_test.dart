@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mykerawang/widgets/brand/brand.dart';
 import 'package:mykerawang/widgets/post_card.dart';
 
 import 'helpers/feed_fixtures.dart';
@@ -67,10 +68,11 @@ void main() {
       kCompact,
       Scaffold(body: PostCard(post: samplePost(pinned: true))),
     );
-    final card = tester.widget<Card>(find.byType(Card));
-    final side = (card.shape as RoundedRectangleBorder).side;
-    final gold = Theme.of(tester.element(find.byType(Card))).colorScheme.tertiary;
-    expect(side.color, gold);
+    expect(find.byType(OfficialFrame), findsOneWidget);
+
+    await pumpAt(tester, kCompact,
+        Scaffold(body: PostCard(post: samplePost(id: 'plain'))));
+    expect(find.byType(OfficialFrame), findsNothing);
   });
 
   testWidgets('verified author shows the badge', (tester) async {
