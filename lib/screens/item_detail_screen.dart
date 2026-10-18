@@ -3,11 +3,11 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:mykerawang/services/share_service.dart';
-import 'package:mykerawang/utils/report_helper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
  
 import 'create_listing_screen.dart';
 import 'create_post_screen.dart';
+import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../theme/app_themes.dart';
@@ -15,6 +15,7 @@ import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
 import '../utils/file_saver.dart';
 import '../utils/formatters.dart';
+import '../utils/guest_access.dart';
 import '../utils/roles.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/tap_card.dart';
@@ -53,10 +54,13 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           .eq('id', _itemData['id'])
           .single();
 
-      // 2. Fetch Seller Profile 
+      // 2. Seller profile. Contact details (phone, payment QR) only for
+      // logged-in buyers; guests read the column-safe view.
       final seller = await supabase
-          .from('profiles')
-          .select() 
+          .from(isLoggedIn ? 'profiles' : 'profiles_public')
+          .select(isLoggedIn
+              ? 'id, username, display_name, avatar_url, phone_number, payment_qr_url'
+              : 'id, username, display_name, avatar_url')
           .eq('id', freshItem['seller_id'])
           .maybeSingle();
 
@@ -119,8 +123,8 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       try {
         await Supabase.instance.client.from('listings').delete().eq('id', _itemData['id']);
         if (mounted) {
-          Navigator.pop(context, true); 
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.listingDeleted)));
+          popOrHome(context, true);
         }
       } catch (e) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
@@ -128,7 +132,11 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     }
   }
 
+  /// Contact sheet. Talking comes first: WhatsApp is the primary action,
+  /// and the seller's payment QR stays behind an explicit step with a
+  /// reminder to pay only once the deal is agreed.
   Future<void> _showPurchaseDialog() async {
+    if (!requireLogin(context)) return;
     if (_sellerProfile == null) return;
 
     final qrUrl = _sellerProfile!['payment_qr_url'];
@@ -136,6 +144,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     final sellerName = _sellerProfile!['username'] ?? context.l10nRead.seller;
 
     // Track state LOCALLY inside this function logic
+    bool showQr = false;
     bool isSaving = false;
     bool isSaved = false;
 
@@ -148,7 +157,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           final s = context.l10n;
           final theme = Theme.of(context);
           final scheme = theme.colorScheme;
-          return Padding(
+          return SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -156,73 +165,13 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                 Text(s.contactSeller, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Text(s.buyingFrom.fill([sellerName]), style: TextStyle(color: scheme.onSurfaceVariant)),
-                const SizedBox(height: 24),
+                const SizedBox(height: 4),
+                Text(s.chatFirstHint,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+                const SizedBox(height: 20),
 
-                if (qrUrl != null) ...[
-                  // Brand name of the payment scheme — not translated
-                  const Text("DuitNow QR", style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Container(
-                    height: 200, width: 200,
-                    decoration: BoxDecoration(border: Border.all(color: scheme.outlineVariant)),
-                    child: CachedNetworkImage(
-                      imageUrl: qrUrl,
-                      fit: BoxFit.contain,
-                      placeholder: (_,__) => const Center(child: CircularProgressIndicator()),
-                    ),
-                  ),
-                  
-                  // --- SAVE BUTTON (Fixed) ---
-                  TextButton.icon(
-                    onPressed: (isSaving || isSaved) 
-                      ? null // Disable if busy or done
-                      : () async {
-                          // 1. Update UI to "Saving..."
-                          setModalState(() => isSaving = true);
-
-                          try {
-                            // One button, right behaviour per platform:
-                            // browser download on web, gallery on mobile.
-                            final response = await http.get(Uri.parse(qrUrl));
-                            final ok = await saveImageBytes(
-                              response.bodyBytes,
-                              filename:
-                                  'duitnow-${_sellerProfile?['username'] ?? 'qr'}.jpg',
-                            );
-
-                            setModalState(() {
-                              isSaving = false;
-                              isSaved = ok;
-                            });
-                          } catch (e) {
-                            debugPrint("Save error: $e");
-                            setModalState(() => isSaving = false);
-                          }
-                        },
-                    // Dynamic Icon
-                    icon: isSaving 
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) 
-                      : Icon(isSaved ? Icons.check_circle : Icons.save_alt, color: isSaved ? scheme.primary : null),
-                    // Dynamic Text
-                    label: Text(
-                      isSaving
-                          ? s.saving
-                          : (isSaved
-                              ? s.saved
-                              : (kIsWeb ? s.downloadQr : s.saveToGallery)),
-                      style: TextStyle(
-                        color: isSaved ? scheme.primary : null,
-                        fontWeight: isSaved ? FontWeight.bold : null
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-                  Text(s.scanToPay, style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
-                  const SizedBox(height: 24),
-                ],
-
-                // 2. WHATSAPP BUTTON (Keep your existing one)
+                // 1. WHATSAPP — talk first
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
@@ -230,7 +179,6 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     label: Text(s.chatOnWhatsApp),
                     style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
                     onPressed: () {
-                      // Was a placeholder comment — the button did nothing.
                       final raw = (phone ?? '').toString().trim();
                       if (raw.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -246,7 +194,94 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     },
                   ),
                 ),
-                
+
+                // 2. PAYMENT QR — only on request
+                if (qrUrl != null) ...[
+                  const SizedBox(height: 12),
+                  if (!showQr)
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.qr_code_2),
+                        label: Text(s.showPaymentQr),
+                        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+                        onPressed: () => setModalState(() => showQr = true),
+                      ),
+                    )
+                  else ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: scheme.tertiaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, size: 18, color: scheme.onTertiaryContainer),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(s.paymentCaution,
+                                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onTertiaryContainer)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Brand name of the payment scheme — not translated
+                    const Text("DuitNow QR", style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 200, width: 200,
+                      decoration: BoxDecoration(border: Border.all(color: scheme.outlineVariant)),
+                      child: CachedNetworkImage(
+                        imageUrl: qrUrl,
+                        fit: BoxFit.contain,
+                        placeholder: (_,__) => const Center(child: CircularProgressIndicator()),
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: (isSaving || isSaved)
+                        ? null // Disable if busy or done
+                        : () async {
+                            setModalState(() => isSaving = true);
+                            try {
+                              // One button, right behaviour per platform:
+                              // browser download on web, gallery on mobile.
+                              final response = await http.get(Uri.parse(qrUrl));
+                              final ok = await saveImageBytes(
+                                response.bodyBytes,
+                                filename:
+                                    'duitnow-${_sellerProfile?['username'] ?? 'qr'}.jpg',
+                              );
+                              setModalState(() {
+                                isSaving = false;
+                                isSaved = ok;
+                              });
+                            } catch (e) {
+                              debugPrint("Save error: $e");
+                              setModalState(() => isSaving = false);
+                            }
+                          },
+                      icon: isSaving
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : Icon(isSaved ? Icons.check_circle : Icons.save_alt, color: isSaved ? scheme.primary : null),
+                      label: Text(
+                        isSaving
+                            ? s.saving
+                            : (isSaved
+                                ? s.saved
+                                : (kIsWeb ? s.downloadQr : s.saveToGallery)),
+                        style: TextStyle(
+                          color: isSaved ? scheme.primary : null,
+                          fontWeight: isSaved ? FontWeight.bold : null
+                        ),
+                      ),
+                    ),
+                    Text(s.scanToPay, style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+                  ],
+                ],
+
                 const SizedBox(height: 12),
                 TextButton(onPressed: () => Navigator.pop(ctx), child: Text(s.close)),
               ],
@@ -256,7 +291,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       ),
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final currentUser = Supabase.instance.client.auth.currentUser;
@@ -284,7 +319,9 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                 child: IconButton(
                   tooltip: MaterialLocalizations.of(context).backButtonTooltip,
                   icon: const Icon(Icons.arrow_back, color: kOnPhoto),
-                  onPressed: () => Navigator.pop(context),
+                  // A shared link opens this page cold, with nothing
+                  // underneath to pop back to.
+                  onPressed: () => popOrHome(context),
                 ),
               ),
             ),
@@ -371,10 +408,14 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                             _itemData['title'],
                             "${s.priceLine.fill([formatPrice(_itemData['price'])])}\n${_itemData['description'] ?? ''}",
                             allImages,
+                            // Deep link keeps the description intact — the
+                            // Web Share API drops text when files attach.
+                            link: '/item/${_itemData['id']}',
                           );
                         },
                       ),
-                      ReportMenuButton(targetId: _itemData['id'], type: 'listing'),
+                      if (!isOwner)
+                        GuardedReportButton(targetId: _itemData['id'], type: 'listing'),
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -410,6 +451,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                       Text(s.description, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                       TextButton.icon(
                         onPressed: () {
+                          if (!requireLogin(context)) return;
                           Navigator.push(context, MaterialPageRoute(builder: (_) => CreatePostScreen(sharedListing: _itemData)));
                         },
                         icon: const Icon(Icons.repeat, size: 16),
@@ -483,6 +525,9 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   ),
                 ],
               )
+            // GUEST VIEW
+            : !isLoggedIn && !isSold
+            ? GuestActionBar(label: s.loginToContact)
             // BUYER VIEW
             : ElevatedButton.icon(
                 onPressed: isSold ? null : _showPurchaseDialog, 
