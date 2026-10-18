@@ -48,6 +48,9 @@ class PostService {
   /// post (feed, profile, detail) can update without a refetch.
   static Stream<PostChange> get changes => _changes.stream;
 
+  @visibleForTesting
+  static void debugEmit(PostChange change) => _changes.add(change);
+
   // ---------------------------------------------------------- ownership
 
   static String? _cacheOwner;
