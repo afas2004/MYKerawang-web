@@ -18,6 +18,7 @@ import '../utils/roles.dart';
 import '../utils/tags.dart';
 import 'mention_text.dart';
 import 'owner_menu.dart';
+import 'pin_controls.dart';
 
 class PostCard extends StatefulWidget {
   final Map<String, dynamic> post;
@@ -225,6 +226,8 @@ class _PostCardState extends State<PostCard> {
               ),
               const SizedBox(height: 12),
 
+              PinBadge(post: post),
+
               // Tags — plain tappable text, no chips (DESIGN_SPEC)
               if (tags.isNotEmpty) ...[
                 Wrap(
@@ -301,6 +304,7 @@ class _PostCardState extends State<PostCard> {
                   }),
                   
                   const Spacer(),
+                  PinMenuButton(post: post),
                   _mine
                       ? OwnerMenuButton(
                           onEdit: () => openPostEditor(context, post),

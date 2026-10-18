@@ -17,6 +17,7 @@ import '../utils/formatters.dart';
 import '../utils/roles.dart';
 import '../utils/adaptive.dart';
 import '../utils/responsive.dart';
+import '../widgets/restriction_gate.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final Map<String, dynamic> post;
@@ -225,6 +226,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   Future<void> _submitComment() async {
     final text = _commentCtrl.text.trim();
     if (text.isEmpty || _isSending) return;
+    if (!await ensureCanWrite(context, ModScope.comment) || !mounted) return;
     final s = context.l10nRead;
     final ps = context.postL10nRead;
     final messenger = ScaffoldMessenger.of(context);

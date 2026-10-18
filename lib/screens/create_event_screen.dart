@@ -9,6 +9,7 @@ import '../utils/adaptive.dart';
 import '../utils/formatters.dart';
 import '../utils/responsive.dart';
 import '../widgets/media_picker_grid.dart';
+import '../widgets/restriction_gate.dart';
 
 class CreateEventScreen extends StatefulWidget {
   final Map<String, dynamic>? eventToEdit; 
@@ -88,6 +89,7 @@ if (event['tags'] != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.addPhotoRequired)));
       return;
     }
+    if (!await ensureCanWrite(context, ModScope.events) || !mounted) return;
 
     setState(() => _isLoading = true);
     final user = Supabase.instance.client.auth.currentUser;
@@ -151,7 +153,7 @@ if (event['tags'] != null) {
       if (mounted) Navigator.pop(context, true);
 
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeWriteError(context, e))));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

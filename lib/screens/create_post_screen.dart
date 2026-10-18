@@ -11,6 +11,7 @@ import '../utils/adaptive.dart';
 import '../utils/responsive.dart';
 import '../utils/tags.dart';
 import '../widgets/media_picker_grid.dart';
+import '../widgets/restriction_gate.dart';
 
 /// Opens the form to edit [post] — a dialog on desktop, a page on mobile,
 /// same as the feed composer. Completes with true when saved.
@@ -121,6 +122,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.postL10nRead.postEmpty)));
       return;
     }
+    if (!await ensureCanWrite(context, ModScope.post) || !mounted) return;
 
     final s = context.l10nRead;
     final ps = context.postL10nRead;
@@ -175,7 +177,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             content: Text(edit != null ? ps.postUpdated : s.postedSuccess)));
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeWriteError(context, e))));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

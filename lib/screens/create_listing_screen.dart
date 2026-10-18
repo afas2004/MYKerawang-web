@@ -10,6 +10,7 @@ import '../utils/adaptive.dart';
 import '../utils/formatters.dart';
 import '../utils/responsive.dart';
 import '../widgets/media_picker_grid.dart';
+import '../widgets/restriction_gate.dart';
 import 'edit_profile_screen.dart';
 
 class CreateListingScreen extends StatefulWidget {
@@ -127,6 +128,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
     final user = _supabase.auth.currentUser;
     if (user == null) return;
+    if (!await ensureCanWrite(context, ModScope.market) || !mounted) return;
 
     setState(() => _isLoading = true);
     try {
@@ -195,7 +197,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
       if (mounted) Navigator.pop(context, true); 
 
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeWriteError(context, e))));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

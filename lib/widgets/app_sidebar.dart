@@ -8,6 +8,7 @@ import '../services/unread_notifications.dart';
 import '../utils/app_nav.dart';
 import '../utils/responsive.dart';
 import 'kerawang_motif.dart';
+import 'admin_nav_entry.dart';
 
 /// Sidebar navigation, shared by the tab shell and by pushed pages
 /// (detail/profile/settings) so the chrome never disappears mid-session
@@ -90,6 +91,7 @@ class AppSidebar extends StatelessWidget {
               if (!onNotifications) context.goNotifications();
             },
           ),
+          const AdminNavEntry(),
           const SizedBox(height: 16),
           FilledButton.icon(
             onPressed: () => Navigator.push(

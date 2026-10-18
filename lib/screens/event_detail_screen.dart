@@ -23,6 +23,7 @@ import 'create_post_screen.dart';
 import 'create_event_screen.dart';
 import 'gallery_view_screen.dart';
 import '../utils/responsive.dart';
+import '../widgets/restriction_gate.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final Map<String, dynamic> event;
@@ -213,6 +214,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   Future<void> _postComment() async {
     if (!requireLogin(context)) return;
     if (_commentCtrl.text.trim().isEmpty || _postingComment) return;
+    if (!await ensureCanWrite(context, ModScope.comment) || !mounted) return;
     final user = Supabase.instance.client.auth.currentUser!;
     final s = context.l10nRead;
 
@@ -364,6 +366,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     final userId = supabase.auth.currentUser!.id;
     if (_isCancelled && !_isJoined) return;
     if (_joining) return;
+    if (!_isJoined && (!await ensureCanWrite(context, ModScope.events) || !mounted)) return;
     _joining = true;
 
     // 1. Instant UI Update (Makes it feel fast)
