@@ -8,6 +8,7 @@ import '../language_cubit.dart';
 import '../theme/app_themes.dart';
 import '../utils/app_nav.dart';
 import '../utils/formatters.dart';
+import 'brand/brand.dart';
 
 /// What the rail shows: upcoming (or, failing that, recent) events and
 /// fresh Market items.
@@ -22,7 +23,7 @@ typedef RightRailLoader = Future<RightRailData> Function();
 
 /// Desktop right rail (≥ 1200): discovery next to the feed.
 class RightRail extends StatefulWidget {
-  static const double width = 320;
+  static const double width = Responsive.rightRailWidth;
 
   /// Defaults to Supabase; tests inject a fake.
   final RightRailLoader? loader;
@@ -107,11 +108,13 @@ class _RightRailState extends State<RightRail> {
                 )
               else ...[
                 _RailCard(
-                  header: _RailHeader(
+                  header: SectionHeader(
                     title: data?.pastEvents == true
                         ? s.pastEvents
                         : s.eventsThisWeek,
+                    seeAllLabel: s.seeAll,
                     onSeeAll: () => context.go('/events'),
+                    padding: EdgeInsets.zero,
                   ),
                   child: loading
                       ? const _SkeletonList()
@@ -125,9 +128,11 @@ class _RightRailState extends State<RightRail> {
                 ),
                 const SizedBox(height: 16),
                 _RailCard(
-                  header: _RailHeader(
+                  header: SectionHeader(
                     title: s.newInMarket,
+                    seeAllLabel: s.seeAll,
                     onSeeAll: () => context.go('/market'),
+                    padding: EdgeInsets.zero,
                   ),
                   child: loading
                       ? const _SkeletonGrid()
@@ -156,39 +161,16 @@ class _RailCard extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
-        borderRadius: kerawangCut,
-        border: Border.all(color: scheme.outlineVariant),
+        borderRadius: KRadius.cut,
+        border: Border.all(color: KTokens.of(context).cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (header != null) ...[header!, const SizedBox(height: 8)],
+          if (header != null) ...[header!, const SizedBox(height: KSpace.s)],
           child,
         ],
       ),
-    );
-  }
-}
-
-/// Section title + See all. Swap for foundation's SectionHeader.
-class _RailHeader extends StatelessWidget {
-  final String title;
-  final VoidCallback onSeeAll;
-  const _RailHeader({required this.title, required this.onSeeAll});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      children: [
-        Expanded(
-          child: Semantics(
-            header: true,
-            child: Text(title, style: theme.textTheme.titleMedium),
-          ),
-        ),
-        TextButton(onPressed: onSeeAll, child: Text(context.l10n.seeAll)),
-      ],
     );
   }
 }
@@ -275,10 +257,10 @@ class _ItemGrid extends StatelessWidget {
             button: true,
             label: '${item['title'] ?? ''}, ${formatPrice(item['price'] as num?)}',
             child: InkWell(
-              borderRadius: kerawangCut,
+              borderRadius: KRadius.cut,
               onTap: () => context.goItem(item),
               child: ClipRRect(
-                borderRadius: kerawangCut,
+                borderRadius: KRadius.cut,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -315,23 +297,6 @@ class _ItemGrid extends StatelessWidget {
   }
 }
 
-/// Placeholder blocks; swap for foundation's KSkeleton.
-class _Bone extends StatelessWidget {
-  final double? width;
-  final double height;
-  const _Bone({this.width, required this.height});
-
-  @override
-  Widget build(BuildContext context) => Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(6),
-        ),
-      );
-}
-
 class _SkeletonList extends StatelessWidget {
   const _SkeletonList();
 
@@ -340,10 +305,10 @@ class _SkeletonList extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           for (int i = 0; i < 3; i++) ...const [
-            _Bone(width: 180, height: 14),
-            SizedBox(height: 6),
-            _Bone(width: 120, height: 10),
-            SizedBox(height: 14),
+            KSkeleton(width: 180, height: 14),
+            SizedBox(height: KSpace.s),
+            KSkeleton(width: 120, height: 10),
+            SizedBox(height: KSpace.m),
           ],
         ],
       );
@@ -357,10 +322,11 @@ class _SkeletonGrid extends StatelessWidget {
         crossAxisCount: 2,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
+        mainAxisSpacing: KSpace.s,
+        crossAxisSpacing: KSpace.s,
         children: [
-          for (int i = 0; i < 4; i++) const _Bone(height: 100),
+          for (int i = 0; i < 4; i++)
+            const KSkeleton(height: 100, borderRadius: KRadius.cut),
         ],
       );
 }

@@ -3,34 +3,18 @@ import 'package:go_router/go_router.dart';
 import '../l10n/shell_strings.dart';
 import '../language_cubit.dart';
 import '../services/unread_notifications.dart';
-import '../theme/app_themes.dart';
 import '../utils/app_nav.dart';
-import '../utils/responsive.dart';
+import '../widgets/brand/brand.dart';
 import '../widgets/app_sidebar.dart';
 import '../widgets/right_rail.dart';
 import '../widgets/shell_actions.dart';
 
-/// Layout size classes for the shell.
-///
-/// * compact  < 600   bottom bar (Home, Market, Create, Events, Profile);
-///                    Search lives in the tab app bars ([ShellSearchButton])
-/// * medium   600–899 navigation rail + one 680 column
-/// * expanded ≥ 900   240 sidebar + 680 feed, right rail from 1200
-enum ShellSize { compact, medium, expanded }
-
-class ShellLayout {
-  ShellLayout._();
-
-  static const double mediumMin = 600;
-  static const double expandedMin = Responsive.desktopBreakpoint; // 900
-  static const double rightRailMin = 1200;
-
-  static ShellSize sizeFor(double width) => width >= expandedMin
-      ? ShellSize.expanded
-      : width >= mediumMin
-          ? ShellSize.medium
-          : ShellSize.compact;
-}
+// Layout per Responsive size class (WindowSize):
+//  * compact  < 600   bottom bar (Home, Market, Create, Events, Profile);
+//                     Search lives in the tab app bars ([ShellSearchButton])
+//  * medium   600–899 navigation rail + one 680 column
+//  * expanded 900–1199 240 sidebar + 680 feed
+//  * large    ≥ 1200  sidebar + feed + right rail
 
 /// Branch order in the router's StatefulShellRoute.
 abstract final class ShellBranch {
@@ -84,12 +68,12 @@ class ShellFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, constraints) {
-      final width = constraints.maxWidth;
-      return switch (ShellLayout.sizeFor(width)) {
-        ShellSize.compact => _compact(context),
-        ShellSize.medium => _medium(context),
-        ShellSize.expanded =>
-          _expanded(context, showRail: width >= ShellLayout.rightRailMin),
+      final size = Responsive.sizeFor(constraints.maxWidth);
+      return switch (size) {
+        WindowSize.compact => _compact(context),
+        WindowSize.medium => _medium(context),
+        WindowSize.expanded || WindowSize.large =>
+          _expanded(context, showRail: size.isLarge),
       };
     });
   }
@@ -137,7 +121,7 @@ class ShellFrame extends StatelessWidget {
                   heroTag: 'shell-create',
                   tooltip: s.shell.create,
                   elevation: 0,
-                  shape: const RoundedRectangleBorder(borderRadius: kerawangCut),
+                  shape: const RoundedRectangleBorder(borderRadius: KRadius.cut),
                   backgroundColor: scheme.primary,
                   foregroundColor: scheme.onPrimary,
                   onPressed: () => showCreateSheet(context),
@@ -292,7 +276,6 @@ class _BarItem extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final fg = selected ? scheme.onSecondaryContainer : scheme.onSurfaceVariant;
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
     return Semantics(
       button: true,
@@ -305,10 +288,8 @@ class _BarItem extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             AnimatedContainer(
-              duration: reduceMotion
-                  ? Duration.zero
-                  : const Duration(milliseconds: 200),
-              curve: Curves.easeOut,
+              duration: KMotion.of(context).medium,
+              curve: KMotion.curve,
               width: 56,
               height: 32,
               decoration: BoxDecoration(
@@ -352,10 +333,10 @@ class _CreateBarButton extends StatelessWidget {
           child: Material(
             color: scheme.primary,
             elevation: 2,
-            shape: const RoundedRectangleBorder(borderRadius: kerawangCut),
+            shape: const RoundedRectangleBorder(borderRadius: KRadius.cut),
             child: InkWell(
               customBorder:
-                  const RoundedRectangleBorder(borderRadius: kerawangCut),
+                  const RoundedRectangleBorder(borderRadius: KRadius.cut),
               onTap: () => showCreateSheet(context),
               child: SizedBox(
                 width: 56,

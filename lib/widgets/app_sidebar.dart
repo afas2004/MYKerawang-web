@@ -3,10 +3,9 @@ import 'package:go_router/go_router.dart';
 import '../l10n/shell_strings.dart';
 import '../language_cubit.dart';
 import '../services/unread_notifications.dart';
-import '../theme/app_themes.dart';
 import '../utils/app_nav.dart';
-import '../utils/responsive.dart';
 import 'admin_nav_entry.dart';
+import 'brand/brand.dart';
 import 'kerawang_motif.dart';
 import 'shell_actions.dart';
 
@@ -17,7 +16,7 @@ import 'shell_actions.dart';
 /// Top to bottom: lattice band, wordmark, the five tabs, notifications
 /// (with unread badge), settings, admin (admins only), Create, motif.
 class AppSidebar extends StatelessWidget {
-  static const double width = 240;
+  static const double width = Responsive.sidebarWidth;
 
   /// Index of the highlighted tab, or -1 when a pushed page is showing.
   final int selectedIndex;
@@ -64,11 +63,11 @@ class AppSidebar extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Thin lattice band along the top edge (structure, not
-            // wallpaper). Swap for foundation's LatticeBand when merged.
-            const _SidebarBand(),
+            // wallpaper).
+            const LatticeBand(),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+                padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.l, KSpace.m, KSpace.s),
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(left: 4, bottom: 16),
@@ -127,7 +126,7 @@ class AppSidebar extends StatelessWidget {
                     style: FilledButton.styleFrom(
                       minimumSize: const Size.fromHeight(48),
                       shape: const RoundedRectangleBorder(
-                          borderRadius: kerawangCut),
+                          borderRadius: KRadius.cut),
                     ),
                   ),
                 ],
@@ -151,49 +150,6 @@ String _currentPath(BuildContext context) {
   } catch (_) {
     return '';
   }
-}
-
-/// Placeholder lattice edge: a hairline of diamonds in the motif colour.
-class _SidebarBand extends StatelessWidget {
-  const _SidebarBand();
-
-  @override
-  Widget build(BuildContext context) {
-    final c = Theme.of(context).colorScheme.tertiary;
-    return ExcludeSemantics(
-      child: SizedBox(
-        height: 10,
-        child: CustomPaint(painter: _DiamondRowPainter(c)),
-      ),
-    );
-  }
-}
-
-class _DiamondRowPainter extends CustomPainter {
-  final Color color;
-  _DiamondRowPainter(this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color.withValues(alpha: 0.5)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    final h = size.height;
-    final step = h * 1.2;
-    for (double x = 0; x < size.width; x += step) {
-      final path = Path()
-        ..moveTo(x + step / 2, 1)
-        ..lineTo(x + step - 1, h / 2)
-        ..lineTo(x + step / 2, h - 1)
-        ..lineTo(x + 1, h / 2)
-        ..close();
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_DiamondRowPainter old) => old.color != color;
 }
 
 /// One sidebar row: ≥ 48 px tall, hover and pressed states, and a visible
@@ -243,16 +199,14 @@ class _SideNavTileState extends State<SideNavTile> {
           borderRadius: radius,
           hoverColor: scheme.onSurface.withValues(alpha: 0.06),
           child: AnimatedContainer(
-            duration: MediaQuery.disableAnimationsOf(context)
-                ? Duration.zero
-                : const Duration(milliseconds: 150),
+            duration: KMotion.of(context).fast,
             constraints: const BoxConstraints(minHeight: 48),
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
               color: widget.selected ? scheme.secondaryContainer : null,
               borderRadius: radius,
               border: Border.all(
-                color: _focused ? scheme.primary : Colors.transparent,
+                color: _focused ? KTokens.of(context).focusRing : Colors.transparent,
                 width: 2,
               ),
             ),
@@ -284,11 +238,24 @@ class _SideNavTileState extends State<SideNavTile> {
 /// Wraps a pushed page so that on desktop it keeps the sidebar and stays
 /// inside the content column, instead of unmounting the chrome and
 /// sprawling across the window (H1.2). No-op below 900.
+///
+///   DesktopChrome(child: ...)                       // 680 reading column
+///   DesktopChrome(maxWidth: 1000, child: ...)        // custom
+///   DesktopChrome.detail(child: ...)                 // 1200, two-column details
 class DesktopChrome extends StatelessWidget {
   final Widget child;
   final double maxWidth;
 
-  const DesktopChrome({super.key, required this.child, this.maxWidth = 680});
+  const DesktopChrome({
+    super.key,
+    required this.child,
+    this.maxWidth = Responsive.feedMaxWidth,
+  });
+
+  /// Detail pages (item / event / post) that lay out media and details
+  /// side by side at ≥ 900: [Responsive.detailMaxWidth] wide.
+  const DesktopChrome.detail({super.key, required this.child})
+      : maxWidth = Responsive.detailMaxWidth;
 
   @override
   Widget build(BuildContext context) {

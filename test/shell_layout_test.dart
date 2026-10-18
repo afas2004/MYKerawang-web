@@ -1,19 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mykerawang/screens/main_scaffold.dart';
+import 'package:mykerawang/utils/responsive.dart';
 import 'package:mykerawang/widgets/app_sidebar.dart';
 import 'package:mykerawang/widgets/right_rail.dart';
 
 import 'helpers/pump_app.dart';
 
 void main() {
-  test('size classes', () {
-    expect(ShellLayout.sizeFor(375), ShellSize.compact);
-    expect(ShellLayout.sizeFor(599), ShellSize.compact);
-    expect(ShellLayout.sizeFor(600), ShellSize.medium);
-    expect(ShellLayout.sizeFor(899), ShellSize.medium);
-    expect(ShellLayout.sizeFor(900), ShellSize.expanded);
-  });
 
   Widget frame({int index = 0, ValueChanged<int>? onSelect}) => ShellFrame(
         currentIndex: index,
@@ -33,15 +27,16 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('tab body'), findsOneWidget);
-      switch (ShellLayout.sizeFor(width)) {
-        case ShellSize.compact:
+      switch (Responsive.sizeFor(width)) {
+        case WindowSize.compact:
           expect(find.byType(CompactNavBar), findsOneWidget);
           expect(find.byTooltip('Create'), findsOneWidget);
           expect(find.byType(AppSidebar), findsNothing);
-        case ShellSize.medium:
+        case WindowSize.medium:
           expect(find.byType(NavigationRail), findsOneWidget);
           expect(find.byTooltip('Create'), findsOneWidget);
-        case ShellSize.expanded:
+        case WindowSize.expanded:
+        case WindowSize.large:
           expect(find.byType(AppSidebar), findsOneWidget);
           expect(find.text('Create'), findsOneWidget);
           // 1280 ≥ 1200: the rail is there.

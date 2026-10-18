@@ -16,6 +16,7 @@ import 'services/saved_items.dart';
 import 'services/unread_notifications.dart';
 import 'services/update_service.dart';
 import 'widgets/update_banner.dart';
+import 'utils/responsive.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'screens/profile_cubit.dart';
@@ -80,10 +81,12 @@ class _MyAppState extends State<MyApp> {
             routerConfig: _router,
 
             // Session side effects (onboarding redirect, notification
-            // stream) above every route. No ResponsiveShell clamp any more:
-            // MainScaffold has a real medium (600–899) layout.
+            // stream) above every route. No mid-band clamp: MainScaffold
+            // has a real medium (600–899) layout.
             builder: (context, child) => SessionWatcher(
-              child: UpdateBanner(child: child!),
+              child: UpdateBanner(
+                child: ResponsiveShell(clampMidBand: false, child: child!),
+              ),
             ),
 
             // 3. Named theme (Kampus Bold / Istana Modern / Songket Noir)
