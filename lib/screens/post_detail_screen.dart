@@ -12,6 +12,7 @@ import '../utils/formatters.dart';
 import '../utils/roles.dart';
 import '../utils/adaptive.dart';
 import '../utils/responsive.dart';
+import '../widgets/restriction_gate.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final Map<String, dynamic> post;
@@ -117,6 +118,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (text.isEmpty) return;
     
     // ... (Your existing login check) ...
+    if (!await ensureCanWrite(context, ModScope.comment) || !mounted) return;
 
     setState(() => _isLoading = true);
 
@@ -142,7 +144,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       });
       
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.errorWithDetail.fill([e]))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeWriteError(context, e))));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

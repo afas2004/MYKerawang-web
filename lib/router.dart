@@ -19,6 +19,7 @@ import 'screens/profile_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
 import 'widgets/app_sidebar.dart';
+import 'screens/admin/moderation_routes.dart';
 
 /// Notifies the router whenever Supabase auth state changes, so the
 /// redirect below re-runs on login/logout.
@@ -183,6 +184,9 @@ GoRouter buildRouter() {
         builder: (context, state) =>
             const DesktopChrome(child: NotificationScreen()),
       ),
+
+      // --- MODERATION (/admin, /standing) ---
+      ...moderationRoutes(_rootKey),
     ],
 
     errorBuilder: (context, state) => Scaffold(

@@ -18,6 +18,7 @@ import 'create_post_screen.dart';
 import 'create_event_screen.dart';
 import 'gallery_view_screen.dart';
 import '../utils/responsive.dart';
+import '../widgets/restriction_gate.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final Map<String, dynamic> event;
@@ -124,6 +125,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     if (_commentCtrl.text.trim().isEmpty) return;
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
+    if (!await ensureCanWrite(context, ModScope.comment) || !mounted) return;
 
     try {
       await Supabase.instance.client.from('comments').insert({
@@ -135,7 +137,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       if (mounted) FocusScope.of(context).unfocus();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.errorWithDetail.fill([e]))));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeWriteError(context, e))));
     }
   }
 
@@ -213,6 +215,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.loginToJoin)));
       return;
     }
+    if (!_isJoined && (!await ensureCanWrite(context, ModScope.events) || !mounted)) return;
 
     // 1. Instant UI Update (Makes it feel fast)
     setState(() {
@@ -240,7 +243,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           _isJoined = !_isJoined;
           _participantCount += _isJoined ? 1 : -1;
         });
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.errorWithDetail.fill([e]))));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeWriteError(context, e))));
       }
     }
   }

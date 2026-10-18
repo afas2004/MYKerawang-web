@@ -9,6 +9,7 @@ import '../language_cubit.dart';
 import '../utils/formatters.dart';
 import '../utils/roles.dart';
 import 'mention_text.dart';
+import 'pin_controls.dart';
 
 class PostCard extends StatelessWidget {
   final Map<String, dynamic> post;
@@ -115,6 +116,8 @@ class PostCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
 
+              PinBadge(post: post),
+
               // Tag
                   if (post['tags'] != null && (post['tags'] as List).isNotEmpty)
                     Container(
@@ -180,6 +183,7 @@ class PostCard extends StatelessWidget {
                   }),
                   
                   const Spacer(),
+                  PinMenuButton(post: post),
                   ReportMenuButton(targetId: post['id'], type: 'post'),
                 ],
               ),

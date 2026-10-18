@@ -5,6 +5,7 @@ import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
 import '../utils/responsive.dart';
+import '../widgets/restriction_gate.dart';
 
 class CreatePostScreen extends StatefulWidget {
   final Map<String, dynamic>? sharedEvent;
@@ -57,6 +58,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       return;
     }
     
+    if (!await ensureCanWrite(context, ModScope.post) || !mounted) return;
     final s = context.l10nRead;
     setState(() => _isLoading = true);
     final user = Supabase.instance.client.auth.currentUser;
@@ -83,7 +85,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.postedSuccess)));
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeWriteError(context, e))));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

@@ -64,6 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
         //    anonymous rows. Joins are baked into the view.
         _supabase.from('posts_public')
             .select('*')
+            .order('is_pinned') // active pins first (20261019004500)
             .order('created_at', ascending: false)
             .limit(50), // Fetch enough posts
       ]);

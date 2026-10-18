@@ -3,12 +3,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/image_compressor.dart';
 import '../utils/local_image.dart';
 import '../utils/categories.dart';
-import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
 import '../utils/formatters.dart';
 import '../utils/responsive.dart';
 import '../widgets/media_picker_grid.dart';
+import '../widgets/restriction_gate.dart';
 
 class CreateListingScreen extends StatefulWidget {
   final Map<String, dynamic>? itemToEdit; 
@@ -86,6 +86,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
     final user = _supabase.auth.currentUser;
     if (user == null) return;
+    if (!await ensureCanWrite(context, ModScope.market) || !mounted) return;
 
     setState(() => _isLoading = true);
 
@@ -142,7 +143,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
       if (mounted) Navigator.pop(context, true); 
 
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeWriteError(context, e))));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
