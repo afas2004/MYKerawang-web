@@ -18,6 +18,11 @@ import '../widgets/saved_items_view.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/tap_card.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import '../utils/formatters.dart';
+import '../utils/guest_access.dart';
+import '../utils/responsive.dart';
+import '../widgets/kerawang_motif.dart';
+import '../widgets/shell_actions.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId; 
@@ -33,6 +38,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   late TabController _tabController; // Controls the 3 tabs
   
   bool _isLoading = true;
+  bool _loadError = false;
   bool _isMe = false;
   bool _isFollowing = false;
   int _followerCount = 0;   // <--- Add this
@@ -57,7 +63,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     final currentUid = _supabase.auth.currentUser?.id;
     final targetUid = widget.userId ?? currentUid;
 
-    if (targetUid == null) return; 
+    if (targetUid == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
 
     _isMe = (currentUid == targetUid);
 
@@ -116,16 +125,34 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       }
     } catch (e) {
       debugPrint("Error loading profile: $e");
+      if (!mounted) return;
+      if (_profile == null) {
+        setState(() => _loadError = true);
+      } else {
+        // Keep what's on screen; just say the refresh failed.
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(context.l10nRead.connectionError),
+          action: SnackBarAction(
+              label: context.l10nRead.tryAgain, onPressed: _fetchProfileData),
+        ));
+      }
     }
   }
 
   Future<void> _toggleFollow() async {
     final currentUid = _supabase.auth.currentUser?.id;
     final targetUid = widget.userId;
-    if (currentUid == null || targetUid == null) return;
+    if (targetUid == null) return;
+    if (currentUid == null) {
+      requireLogin(context);
+      return;
+    }
 
     // Optimistic UI Update
-    setState(() => _isFollowing = !_isFollowing); 
+    setState(() {
+      _isFollowing = !_isFollowing;
+      _followerCount += _isFollowing ? 1 : -1;
+    });
 
     try {
       if (_isFollowing) {
@@ -152,8 +179,15 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         await _supabase.from('followers').delete().match({'follower_id': currentUid, 'following_id': targetUid});
       }
     } catch (e) {
-      // Revert if error
-      if (mounted) setState(() => _isFollowing = !_isFollowing);
+      // Revert if error, and say so
+      if (mounted) {
+        setState(() {
+          _isFollowing = !_isFollowing;
+          _followerCount += _isFollowing ? 1 : -1;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(context.l10nRead.errorWithDetail.fill([e]))));
+      }
     }
   }
 
@@ -265,21 +299,34 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
   }
 
+  // ---------------------------------------------------------------- UI
+
   @override
   Widget build(BuildContext context) {
     final s = context.l10n;
-    if (_isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (_profile == null) return Scaffold(body: Center(child: Text(s.userNotFound)));
+    if (_isLoading && _profile == null) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: _loadError
+            ? _ErrorRetry(onRetry: _retry)
+            : const _ProfileSkeleton(),
+      );
+    }
+    if (_profile == null) {
+      return Scaffold(appBar: AppBar(), body: Center(child: Text(s.userNotFound)));
+    }
 
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final p = _profile!;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_profile!['username'] != null ? "@${_profile!['username']}" : s.profileTitle),
+        title: Text(p['username'] != null ? "@${p['username']}" : s.profileTitle),
         actions: [
+          if (_isMe && widget.userId == null) const ShellSearchButton(),
           IconButton(
-            tooltip: context.l10n.refresh,
+            tooltip: s.refresh,
             icon: const Icon(Icons.refresh),
             onPressed: _fetchProfileData,
           ),
@@ -290,8 +337,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           ),
           if (_isMe)
             IconButton(
-              tooltip: context.l10n.settings,
-              icon: const Icon(Icons.settings),
+              tooltip: s.settings,
+              icon: const Icon(Icons.settings_outlined),
               onPressed: () => context.goSettings(),
             )
           else
@@ -304,254 +351,588 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         ],
       ),
       body: LinearRefresher(
-      onRefresh: _fetchProfileData,
-      offset: 0.0,
-      child: NestedScrollView(
-        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-        headerSliverBuilder: (context, _) => [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  // Avatar
-                  InkWell(
+        onRefresh: _fetchProfileData,
+        offset: 0.0,
+        child: NestedScrollView(
+          physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics()),
+          headerSliverBuilder: (context, _) => [
+            SliverToBoxAdapter(child: _identityHeader(context, p)),
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _TabBarDelegate(
+                TabBar(
+                  controller: _tabController,
+                  labelColor: scheme.primary,
+                  unselectedLabelColor: scheme.onSurfaceVariant,
+                  indicatorColor: scheme.primary,
+                  tabs: [
+                    Tab(text: s.activity),
+                    Tab(text: s.navEvents),
+                    Tab(text: s.navMarket),
+                    if (_isMe) Tab(text: s.social.saved),
+                  ],
+                ),
+                background: theme.scaffoldBackgroundColor,
+                divider: scheme.outlineVariant,
+              ),
+            ),
+          ],
+          body: TabBarView(
+            controller: _tabController,
+            children: [
+              _postsTab(context),
+              _userEvents.isEmpty
+                  ? _TabEmpty(icon: Icons.event_outlined, text: s.noEventsYet)
+                  : _tileGrid(_userEvents, isEvent: true),
+              _userListings.isEmpty
+                  ? _TabEmpty(icon: Icons.storefront_outlined, text: s.nothingForSale)
+                  : _tileGrid(_userListings, isEvent: false),
+              if (_isMe) const SavedItemsView(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _retry() {
+    setState(() {
+      _loadError = false;
+      _isLoading = true;
+    });
+    _fetchProfileData();
+  }
+
+  /// Cover band with lattice, overlapping avatar, Fraunces name, gold
+  /// accent for verified/club accounts, stat chips and the main action.
+  Widget _identityHeader(BuildContext context, Map<String, dynamic> p) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final official = p['is_verified'] == true || p['role'] == 'club';
+    final avatarUrl = p['avatar_url'] as String?;
+    final name = displayNameFor(s, p);
+    const coverHeight = 96.0;
+    const avatarRadius = 44.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          height: coverHeight + avatarRadius,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
+                bottom: avatarRadius,
+                child: _CoverBand(color: scheme.primaryContainer, motif: scheme.tertiary),
+              ),
+              Positioned(
+                left: 16,
+                bottom: 0,
+                child: Semantics(
+                  button: avatarUrl != null,
+                  label: name,
+                  child: InkWell(
                     customBorder: const CircleBorder(),
-                    onTap: () {
-                      final url = _profile!['avatar_url'];
-                      if (url == null) return;
-                      // Full original image, uncropped (BoxFit.contain)
-                      showImagePreview(context, url: url);
-                    },
-                    child: CircleAvatar(
-                        radius: 40,
-                        backgroundImage: _profile!['avatar_url'] != null 
-                            ? NetworkImage(_profile!['avatar_url']) 
+                    onTap: avatarUrl == null
+                        ? null
+                        // Full original image, uncropped (BoxFit.contain)
+                        : () => showImagePreview(context, url: avatarUrl),
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        // Gold ring = official (verified or club).
+                        color: official ? scheme.tertiary : theme.scaffoldBackgroundColor,
+                      ),
+                      child: CircleAvatar(
+                        radius: avatarRadius,
+                        backgroundColor: scheme.primaryContainer,
+                        foregroundColor: scheme.onPrimaryContainer,
+                        backgroundImage:
+                            avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                        child: avatarUrl == null
+                            ? Text(name.characters.first.toUpperCase(),
+                                style: theme.textTheme.headlineMedium
+                                    ?.copyWith(color: scheme.onPrimaryContainer))
                             : null,
-                        backgroundColor: theme.colorScheme.primaryContainer,
-                        child: _profile!['avatar_url'] == null 
-                            ? Text(_profile!['display_name']?[0] ?? "U", style: const TextStyle(fontSize: 30)) 
-                            : null,
-                      ),
-                  ),
-                  const SizedBox(height: 12),
-                  
-                  // Name & Badge
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        displayNameFor(s, _profile),
-                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      // Gold marks officialness (DESIGN_SPEC §2)
-                      if (_profile!['is_verified'] == true) ...[
-                        const SizedBox(width: 4),
-                        Icon(Icons.verified, color: scheme.tertiary, size: 20),
-                      ]
-                    ],
-                  ),
-                  
-                  if (_profile!['bio'] != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8, bottom: 16),
-                      child: Text(_profile!['bio'], textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
-                    ),
-
-
-                  // Stats Row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _statItem(s.posts, "${_userPosts.length}"), // No tap for posts
-                      
-                      // Followers Tap
-                      _statItem(
-                        s.followers, 
-                        "$_followerCount", 
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FollowListScreen(userId: widget.userId ?? _supabase.auth.currentUser!.id, type: 'followers')))
-                      ),
-                      
-                      // Following Tap
-                      _statItem(
-                        s.following, 
-                        "$_followingCount",
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FollowListScreen(userId: widget.userId ?? _supabase.auth.currentUser!.id, type: 'following')))
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Follow / Edit Button
-                  if (!_isMe)
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: _toggleFollow,
-                        // Scheme roles so it reads on Songket Noir too
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _isFollowing ? scheme.surfaceContainerHighest : scheme.primary,
-                          foregroundColor: _isFollowing ? scheme.onSurface : scheme.onPrimary,
-                        ),
-                        child: Text(_isFollowing ? s.following : s.follow),
                       ),
                     ),
-                  if (_isMe)
-                    OutlinedButton(
-                      onPressed: () {
-                         Navigator.push(
-                          context, 
-                          MaterialPageRoute(builder: (_) => const EditProfileScreen())
-                        ).then((value) {
-                          if (value == true) _fetchProfileData(); // Refresh profile when back
-                        });
-                      },
-                      child: Text(s.editProfile),
-                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 16,
+                bottom: 4,
+                child: _primaryAction(context),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 6,
+                children: [
+                  Text(name, style: theme.textTheme.headlineSmall),
+                  if (p['is_verified'] == true)
+                    Icon(Icons.verified, color: scheme.tertiary, size: 22),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  if (p['username'] != null)
+                    Text('@${p['username']}',
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(color: scheme.onSurfaceVariant)),
+                  _RoleChip(label: roleLabel(s, p['role']), official: official),
+                ],
+              ),
+              if ((p['bio'] ?? '').toString().trim().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(p['bio'], style: theme.textTheme.bodyMedium),
+              ],
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _StatChip(
+                    count: _userPosts.length,
+                    label: s.posts,
+                    onTap: () => _tabController.animateTo(0),
+                  ),
+                  _StatChip(
+                    count: _followerCount,
+                    label: s.followers,
+                    onTap: () => _openFollows('followers'),
+                  ),
+                  _StatChip(
+                    count: _followingCount,
+                    label: s.following,
+                    onTap: () => _openFollows('following'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _openFollows(String type) {
+    final uid = widget.userId ?? _supabase.auth.currentUser?.id;
+    if (uid == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => FollowListScreen(userId: uid, type: type)),
+    );
+  }
+
+  Widget _primaryAction(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    const minSize = Size(112, 44);
+    if (_isMe) {
+      return OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+          minimumSize: minSize,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        ),
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+        ).then((value) {
+          if (value == true) _fetchProfileData();
+        }),
+        icon: const Icon(Icons.edit_outlined, size: 18),
+        label: Text(s.editProfile),
+      );
+    }
+    return FilledButton.icon(
+      onPressed: _toggleFollow,
+      // Scheme roles so it reads on Songket Noir too
+      style: FilledButton.styleFrom(
+        minimumSize: minSize,
+        shape: const RoundedRectangleBorder(borderRadius: kerawangCut),
+        backgroundColor:
+            _isFollowing ? scheme.surfaceContainerHighest : scheme.primary,
+        foregroundColor: _isFollowing ? scheme.onSurface : scheme.onPrimary,
+      ),
+      icon: Icon(_isFollowing ? Icons.check : Icons.person_add_alt, size: 18),
+      label: Text(_isFollowing ? s.following : s.follow),
+    );
+  }
+
+  /// Posts: one column, two side by side when the page is wide.
+  Widget _postsTab(BuildContext context) {
+    final s = context.l10n;
+    if (_userPosts.isEmpty) {
+      return _TabEmpty(icon: Icons.forum_outlined, text: s.noPostsYet);
+    }
+    Widget card(dynamic post) => PostCard(
+          post: post,
+          showProfileHeader: false,
+          onTap: () => context.goPost(post),
+        );
+
+    return LayoutBuilder(builder: (context, c) {
+      if (c.maxWidth < 900) {
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: _userPosts.length,
+          itemBuilder: (_, i) => card(_userPosts[i]),
+        );
+      }
+      final left = [for (var i = 0; i < _userPosts.length; i += 2) _userPosts[i]];
+      final right = [for (var i = 1; i < _userPosts.length; i += 2) _userPosts[i]];
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: Column(children: left.map(card).toList())),
+            const SizedBox(width: 16),
+            Expanded(child: Column(children: right.map(card).toList())),
+          ],
+        ),
+      );
+    });
+  }
+
+  /// Events / Market as captioned tiles; 2 columns on phones, more as the
+  /// page widens.
+  Widget _tileGrid(List<dynamic> items, {required bool isEvent}) {
+    return LayoutBuilder(builder: (context, c) {
+      final cols = Responsive.gridColumns(c.maxWidth - 32, minTileWidth: 180);
+      return GridView.builder(
+        padding: const EdgeInsets.all(16),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: cols,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 0.78,
+        ),
+        itemCount: items.length,
+        itemBuilder: (context, i) => _ProfileTile(item: items[i], isEvent: isEvent),
+      );
+    });
+  }
+}
+
+class _ProfileTile extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final bool isEvent;
+  const _ProfileTile({required this.item, required this.isEvent});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final start = parseLocal(item['start_datetime']);
+    final end = parseLocal(item['end_datetime']) ?? start;
+    final ended = isEvent && end != null && end.isBefore(DateTime.now());
+    final subtitle = isEvent
+        ? (start != null ? formatEventDate(start) : s.dateTba)
+        : formatPrice(item['price']);
+    final badge = isEvent
+        ? (ended ? s.ended : null)
+        : (item['is_sold'] == true ? s.sold : null);
+
+    return TapCard(
+      borderRadius: kerawangCut,
+      color: scheme.surfaceContainerLow,
+      onTap: () => isEvent ? context.goEvent(item) : context.goItem(item),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.network(
+                  item['image_url'] ?? '',
+                  cacheWidth: 400,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: scheme.surfaceContainerHighest,
+                    child: Icon(isEvent ? Icons.event : Icons.storefront,
+                        color: scheme.onSurfaceVariant),
+                  ),
+                ),
+                if (badge != null)
+                  Container(
+                    color: photoScrim(0.35),
+                    alignment: Alignment.center,
+                    child: StatusBadge(badge),
+                  ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(item['title'] ?? s.untitled,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall),
+                const SizedBox(height: 2),
+                Text(subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      // Prices are gold; dates stay neutral.
+                      color: isEvent ? scheme.onSurfaceVariant : scheme.tertiary,
+                      fontWeight: isEvent ? null : FontWeight.w600,
+                    )),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Tappable count, e.g. "128 Followers". ≥ 48 px tall.
+class _StatChip extends StatelessWidget {
+  final int count;
+  final String label;
+  final VoidCallback onTap;
+  const _StatChip({required this.count, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Semantics(
+      button: true,
+      label: '$count $label',
+      excludeSemantics: true,
+      child: Material(
+        color: scheme.surfaceContainer,
+        shape: StadiumBorder(side: BorderSide(color: scheme.outlineVariant)),
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('$count', style: theme.textTheme.titleMedium),
+                  const SizedBox(width: 6),
+                  Text(label,
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: scheme.onSurfaceVariant)),
                 ],
               ),
             ),
           ),
-        ],
-        body: Column(
-          children: [
-            TabBar(
-              controller: _tabController,
-              labelColor: scheme.primary,
-              unselectedLabelColor: scheme.onSurfaceVariant,
-              indicatorColor: scheme.primary,
-              tabs: [
-                Tab(text: s.activity),
-                Tab(text: s.navEvents),
-                Tab(text: s.navMarket),
-                if (_isMe) Tab(text: s.social.saved),
-              ],
-            ),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  // Tab 1: Posts
-                  _userPosts.isEmpty
-                    ? Center(child: Text(s.noPostsYet))
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _userPosts.length,
-                        itemBuilder: (context, index) {
-                          return PostCard(
-                            post: _userPosts[index],
-                            showProfileHeader: false, // remove profile header in post card
-                            onTap: () { 
-                              context.goPost(_userPosts[index]);
-                            },
-                          );
-                        },
-                      ),
-                  
-                  // Tab 2: Events - SWITCH TO GRID
-                  _userEvents.isEmpty 
-                    ? Center(child: Text(s.noEventsYet))
-                    : _buildPhotoGrid(_userEvents, true), // <--- USE YOUR FUNCTION HERE
-                    
-                  // Tab 3: Shop - SWITCH TO GRID
-                  _userListings.isEmpty
-                    ? Center(child: Text(s.nothingForSale))
-                    : _buildPhotoGrid(_userListings, false), // <--- AND HERE
-
-                  // Tab 4 (own profile only): bookmarks
-                  if (_isMe) const SavedItemsView(),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
-      )
     );
   }
+}
 
-  Widget _statItem(String label, String count, {VoidCallback? onTap}) {
+class _RoleChip extends StatelessWidget {
+  final String label;
+  final bool official;
+  const _RoleChip({required this.label, required this.official});
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return TapCard(
-      onTap: onTap,
+    final scheme = theme.colorScheme;
+    // Gold only for official accounts.
+    final c = official ? scheme.tertiary : scheme.onSurfaceVariant;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        borderRadius: kerawangCut,
+        border: Border.all(color: c),
+      ),
+      child: Text(label, style: theme.textTheme.labelMedium?.copyWith(color: c)),
+    );
+  }
+}
+
+/// Colour band with a faint lattice — the "carved panel" the profile sits
+/// in. Swap the painter for foundation's LatticeBand when it lands.
+class _CoverBand extends StatelessWidget {
+  final Color color;
+  final Color motif;
+  const _CoverBand({required this.color, required this.motif});
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeSemantics(
+      child: DecoratedBox(
+        decoration: BoxDecoration(color: color),
+        child: CustomPaint(painter: _LatticePainter(motif)),
+      ),
+    );
+  }
+}
+
+class _LatticePainter extends CustomPainter {
+  final Color color;
+  _LatticePainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color.withValues(alpha: 0.35)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    const cell = 24.0;
+    for (double y = 0; y < size.height + cell; y += cell) {
+      for (double x = 0; x < size.width + cell; x += cell) {
+        final path = Path()
+          ..moveTo(x, y - cell / 2)
+          ..lineTo(x + cell / 2, y)
+          ..lineTo(x, y + cell / 2)
+          ..lineTo(x - cell / 2, y)
+          ..close();
+        canvas.drawPath(path, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_LatticePainter old) => old.color != color;
+}
+
+class _TabBarDelegate extends SliverPersistentHeaderDelegate {
+  final TabBar tabBar;
+  final Color background;
+  final Color divider;
+  _TabBarDelegate(this.tabBar, {required this.background, required this.divider});
+
+  @override
+  double get minExtent => tabBar.preferredSize.height + 1;
+  @override
+  double get maxExtent => tabBar.preferredSize.height + 1;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      decoration: BoxDecoration(
+        color: background,
+        border: Border(bottom: BorderSide(color: divider)),
+      ),
+      child: tabBar,
+    );
+  }
+
+  @override
+  bool shouldRebuild(_TabBarDelegate old) =>
+      old.tabBar != tabBar || old.background != background;
+}
+
+class _TabEmpty extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _TabEmpty({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        padding: const EdgeInsets.all(24),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(count, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-            Text(label, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            Icon(icon, size: 48, color: scheme.onSurfaceVariant),
+            const SizedBox(height: 12),
+            Text(text,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: scheme.onSurfaceVariant)),
+            const SizedBox(height: 12),
+            const KerawangDivider(),
           ],
         ),
       ),
     );
   }
+}
 
-  // Helper Widget for Insta-Grid
-  Widget _buildPhotoGrid(List<dynamic> items, bool isEvent) {
-    return GridView.builder(
-      padding: const EdgeInsets.all(2),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3, // 3 across like Instagram
-        crossAxisSpacing: 2,
-        mainAxisSpacing: 2,
+class _ErrorRetry extends StatelessWidget {
+  final VoidCallback onRetry;
+  const _ErrorRetry({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.wifi_off, size: 48, color: Theme.of(context).colorScheme.onSurfaceVariant),
+          const SizedBox(height: 12),
+          Text(s.connectionError),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+            label: Text(s.tryAgain),
+          ),
+        ],
       ),
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
-        final s = context.l10n;
-        return TapCard(
-          borderRadius: BorderRadius.zero,
-          onTap: () {
-            // Navigate to details
-            if (isEvent) {
-              context.goEvent(item);
-            } else {
-              // Check type (Listing vs Post) if mixed, otherwise assume Listing
-              context.goItem(item);
-            }
-          },
-          onLongPress: () {
-            // Point 5: "Pop up details" - Simple implementation is a SnackBar or Dialog
-            showDialog(
-              context: context,
-              builder: (_) => Dialog(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Image.network(item['image_url'], height: 200, fit: BoxFit.cover),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text(item['title'] ?? s.untitled, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-          child: Stack(
-          fit: StackFit.expand,
-            children: [
-              // 1. The Image (Keep existing)
-              Image.network(
-                item['image_url'] ?? '',
-                cacheWidth: 400, // grid tile
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    child: Icon(Icons.image_not_supported, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-              ),
+    );
+  }
+}
 
-              // Same SOLD badge as the market grid
-              if (item['is_sold'] == true)
-                Container(
-                  color: photoScrim(0.35),
-                  alignment: Alignment.center,
-                  child: StatusBadge(s.sold),
-                ),
-            ],
-          )
+/// Loading placeholder shaped like the header. Swap for KSkeleton.
+class _ProfileSkeleton extends StatelessWidget {
+  const _ProfileSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).colorScheme.surfaceContainerHighest;
+    Widget bar(double w, double h) => Container(
+          width: w,
+          height: h,
+          decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(6)),
         );
-      },
+    return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      children: [
+        Container(height: 96, color: c.withValues(alpha: 0.6)),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(radius: 44, backgroundColor: c),
+              const SizedBox(height: 12),
+              bar(180, 22),
+              const SizedBox(height: 8),
+              bar(120, 14),
+              const SizedBox(height: 16),
+              Row(children: [bar(90, 40), const SizedBox(width: 8), bar(110, 40), const SizedBox(width: 8), bar(110, 40)]),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
