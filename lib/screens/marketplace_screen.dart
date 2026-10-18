@@ -10,12 +10,16 @@ import '../utils/categories.dart';
 import '../utils/formatters.dart';
 import '../utils/listing_status.dart';
 import '../widgets/status_badge.dart';
-import '../widgets/tap_card.dart';
+import '../widgets/brand/brand.dart';
 import 'marketplace_cubit.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
-import '../utils/responsive.dart';
 import '../widgets/error_state.dart';
+
+/// Filters become a side panel once the market is given this much width.
+const double _kSidePanelFrom = 900;
+const double _kSidePanelWidth = 280;
+
 
 class MarketplaceScreen extends StatelessWidget {
   const MarketplaceScreen({super.key});
@@ -54,163 +58,190 @@ class _MarketplaceViewState extends State<MarketplaceView> {
     }
   }
 
-  Future<void> _openFilters(BuildContext context, MarketFilters current) async {
+  Future<void> _openFilterSheet(BuildContext context, MarketFilters current) async {
     final cubit = context.read<MarketplaceCubit>();
     final next = await showAdaptiveSheet<MarketFilters>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _FilterSheet(initial: current),
+      builder: (sheetContext) => SafeArea(
+        child: MarketFilterForm(
+          initial: current,
+          onApply: (f) => Navigator.pop(sheetContext, f),
+        ),
+      ),
     );
     if (next != null) cubit.applyFilters(next);
   }
 
   @override
   Widget build(BuildContext context) {
-    // 2. Consume the State
     return BlocBuilder<MarketplaceCubit, MarketplaceState>(
       builder: (context, state) {
         final s = context.l10n;
-        final scheme = Theme.of(context).colorScheme;
-        final categories = <String?>[null, ...kListingCategories];
+        final cubit = context.read<MarketplaceCubit>();
         final active = state.filters.activeCount;
 
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(s.marketplaceTitle),
-            actions: [
-              IconButton(
-                tooltip: s.filters,
-                onPressed: () => _openFilters(context, state.filters),
-                icon: Badge(
-                  isLabelVisible: active > 0,
-                  label: Text('$active'),
-                  child: const Icon(Icons.tune),
-                ),
-              ),
-              // Desktop has no FAB, so creation lives here instead (H1.1).
-              if (isWide(context))
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: FilledButton.icon(
-                    onPressed: () => _openCreate(context),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: Text(s.sellItem),
-                  ),
-                ),
-            ],
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(50),
-              child: SizedBox(
-                height: 50,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: categories.length,
-                  itemBuilder: (context, index) {
-                    final category = categories[index];
-                    final isSelected = state.filters.category == category;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: FilterChip(
-                        label: Text(category ?? s.all),
-                        selected: isSelected,
-                        onSelected: (_) =>
-                            context.read<MarketplaceCubit>().updateCategory(category),
-                        backgroundColor: Theme.of(context).cardColor,
-                        selectedColor: scheme.surfaceContainerHighest,
-                        checkmarkColor: scheme.primary,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-          body: LinearRefresher(
-            offset: 0.0,
-            onRefresh: () => context.read<MarketplaceCubit>().loadData(),
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: TextField(
-                    controller: _searchCtrl,
-                    onChanged: (v) => context.read<MarketplaceCubit>().updateSearch(v),
-                    decoration: InputDecoration(
-                      hintText: s.searchItems,
-                      prefixIcon: Icon(Icons.search, color: scheme.onSurfaceVariant),
-                      filled: true,
-                      fillColor: scheme.surfaceContainerHighest,
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none),
+        return LayoutBuilder(builder: (context, constraints) {
+          final sidePanel = constraints.maxWidth >= _kSidePanelFrom;
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(s.marketplaceTitle),
+              actions: [
+                if (!sidePanel)
+                  IconButton(
+                    tooltip: s.filters,
+                    onPressed: () => _openFilterSheet(context, state.filters),
+                    icon: Badge(
+                      isLabelVisible: active > 0,
+                      label: Text('$active'),
+                      child: const Icon(Icons.tune),
                     ),
                   ),
-                ),
-                Expanded(child: _results(context, state)),
+                // Desktop has no FAB, so creation lives here instead (H1.1).
+                if (isWide(context))
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilledButton.icon(
+                      onPressed: () => _openCreate(context),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: Text(s.sellItem),
+                    ),
+                  ),
               ],
+              // Quick category chips; on wide layouts the side panel has them.
+              bottom: sidePanel
+                  ? LatticeBand.preferred()
+                  : PreferredSize(
+                      preferredSize: const Size.fromHeight(52 + 9),
+                      child: Column(
+                        children: [
+                          _CategoryChipRow(selected: state.filters.category),
+                          const LatticeBand(),
+                        ],
+                      ),
+                    ),
             ),
-          ),
-          // See G5 — no floating corner button on desktop.
-          floatingActionButton: isWide(context) ? null : FloatingActionButton(
-            heroTag: 'market_fab',
-            tooltip: s.sellItem,
-            onPressed: () => _openCreate(context),
-            backgroundColor: scheme.primary,
-            child: Icon(Icons.add, color: scheme.onPrimary),
-          ),
-        );
+            body: LinearRefresher(
+              offset: 0.0,
+              onRefresh: () => cubit.loadData(),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (sidePanel) ...[
+                    SizedBox(
+                      width: _kSidePanelWidth,
+                      // The form scrolls itself.
+                      child: MarketFilterForm(
+                        // Rebuilt whenever the applied filters change
+                        // (e.g. Reset from the empty state).
+                        key: ObjectKey(state.filters),
+                        initial: state.filters,
+                        onApply: cubit.applyFilters,
+                        panel: true,
+                      ),
+                    ),
+                    const VerticalDivider(width: 1),
+                  ],
+                  Expanded(
+                    child: Column(
+                      children: [
+                        // Outside the scroll view, so it stays put (sticky).
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                          child: _searchField(context),
+                        ),
+                        Expanded(child: _results(context, state)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // See G5 — no floating corner button on desktop.
+            floatingActionButton: isWide(context)
+                ? null
+                : FloatingActionButton(
+                    heroTag: 'market_fab',
+                    tooltip: s.sellItem,
+                    onPressed: () => _openCreate(context),
+                    child: const Icon(Icons.add),
+                  ),
+          );
+        });
       },
     );
   }
 
-  Widget _results(BuildContext context, MarketplaceState state) {
+  Widget _searchField(BuildContext context) {
     final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    return TextField(
+      controller: _searchCtrl,
+      textInputAction: TextInputAction.search,
+      onChanged: (v) {
+        context.read<MarketplaceCubit>().updateSearch(v);
+        setState(() {}); // show / hide the clear button
+      },
+      decoration: InputDecoration(
+        hintText: s.searchItems,
+        prefixIcon: Icon(Icons.search, color: scheme.onSurfaceVariant),
+        suffixIcon: _searchCtrl.text.isEmpty
+            ? null
+            : IconButton(
+                tooltip: s.clearSearch,
+                icon: const Icon(Icons.close),
+                onPressed: () {
+                  _searchCtrl.clear();
+                  context.read<MarketplaceCubit>().updateSearch('');
+                  setState(() {});
+                },
+              ),
+        filled: true,
+        fillColor: scheme.surfaceContainerHighest,
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      ),
+    );
+  }
+
+  Widget _results(BuildContext context, MarketplaceState state) {
     final cubit = context.read<MarketplaceCubit>();
 
-    if (state.isLoading && state.items.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (state.errorMessage != null && state.items.isEmpty) {
-      return ErrorState(onRetry: cubit.loadData);
-    }
-    if (state.items.isEmpty) {
-      final filtered = !state.filters.isDefault || state.searchQuery.isNotEmpty;
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(filtered ? s.noMatchingItems : s.noItemsFound, textAlign: TextAlign.center),
-              if (!state.filters.isDefault) ...[
-                const SizedBox(height: 12),
-                OutlinedButton(
-                  onPressed: () => cubit.applyFilters(const MarketFilters()),
-                  child: Text(s.resetFilters),
-                ),
-              ],
-            ],
-          ),
-        ),
-      );
-    }
-
     return LayoutBuilder(builder: (context, constraints) {
+      final columns = Responsive.gridColumnsFor(constraints.maxWidth);
+
+      if (state.isLoading && state.items.isEmpty) {
+        return _MarketGridSkeleton(columns: columns);
+      }
+      if (state.errorMessage != null && state.items.isEmpty) {
+        return ErrorState(onRetry: cubit.loadData);
+      }
+      if (state.items.isEmpty) {
+        return _EmptyMarket(
+          filtered: !state.filters.isDefault || state.searchQuery.isNotEmpty,
+          onReset: state.filters.isDefault
+              ? null
+              : () => cubit.applyFilters(const MarketFilters()),
+          onSell: () => _openCreate(context),
+        );
+      }
+
       return CustomScrollView(
         slivers: [
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             sliver: SliverGrid.builder(
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                // 2 columns on phones, 3-4 on wider screens
-                crossAxisCount: Responsive.gridColumns(constraints.maxWidth),
-                childAspectRatio: 0.7,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
+                crossAxisCount: columns,
+                childAspectRatio: MarketCard.aspectRatio,
+                crossAxisSpacing: KSpace.m,
+                mainAxisSpacing: KSpace.m,
               ),
               itemCount: state.items.length,
-              itemBuilder: (context, index) => _ListingTile(item: state.items[index]),
+              itemBuilder: (context, index) {
+                final item = state.items[index];
+                return MarketCard(item: item, onTap: () => context.goItem(item));
+              },
             ),
           ),
           SliverToBoxAdapter(
@@ -254,9 +285,20 @@ class _MarketplaceViewState extends State<MarketplaceView> {
   }
 }
 
-class _ListingTile extends StatelessWidget {
+// ---------------------------------------------------------------------------
+// Market card
+// ---------------------------------------------------------------------------
+
+/// Grid tile for a listing: square photo with the RESERVED / SOLD badge,
+/// title, and the price in gold. Lifts on hover / focus on web.
+class MarketCard extends StatelessWidget {
   final Map<String, dynamic> item;
-  const _ListingTile({required this.item});
+  final VoidCallback? onTap;
+
+  const MarketCard({super.key, required this.item, this.onTap});
+
+  /// Width / height of a tile (photo square + two text lines).
+  static const double aspectRatio = 0.68;
 
   @override
   Widget build(BuildContext context) {
@@ -266,92 +308,126 @@ class _ListingTile extends StatelessWidget {
     final status = ListingStatus.of(item);
     final isSold = status == ListingStatus.sold;
     final badge = status.badge(s);
+    final title = (item['title'] ?? '').toString();
+    final price = formatPrice(item['price'] as num?);
 
-    // TapCard (not GestureDetector) so desktop gets a pointer cursor +
-    // hover ripple (G6)
-    return TapCard(
-      onTap: () => context.goItem(item),
-      child: Opacity(
-        opacity: isSold ? 0.6 : 1,
-        child: Container(
-          decoration: BoxDecoration(
-            color: theme.cardColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: scheme.outlineVariant),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      CachedNetworkImage(
-                        imageUrl: item['image_url'] ?? '',
-                        fadeInDuration: Duration.zero,
-                        fadeOutDuration: Duration.zero,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        memCacheWidth: 500,
-                        placeholder: (context, url) => Container(
-                          color: scheme.surfaceContainerHighest,
-                          child: const Center(child: CircularProgressIndicator()),
-                        ),
-                        errorWidget: (context, url, error) => Container(
-                          color: scheme.surfaceContainerHighest,
-                          child: Center(
-                            child: Icon(Icons.store_mall_directory_outlined,
-                                color: scheme.onSurfaceVariant, size: 30),
-                          ),
-                        ),
+    return Opacity(
+      opacity: isSold ? 0.6 : 1,
+      child: KCard(
+        onTap: onTap,
+        padding: EdgeInsets.zero,
+        semanticLabel: '$title, $price${badge != null ? ', $badge' : ''}',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  CachedNetworkImage(
+                    imageUrl: item['image_url'] ?? '',
+                    fadeInDuration: Duration.zero,
+                    fadeOutDuration: Duration.zero,
+                    fit: BoxFit.cover,
+                    memCacheWidth: 500,
+                    // Sold photos are desaturated, not tinted.
+                    color: isSold ? scheme.outline : null,
+                    colorBlendMode: isSold ? BlendMode.saturation : null,
+                    placeholder: (_, __) => ColoredBox(color: scheme.surfaceContainerHighest),
+                    errorWidget: (_, __, ___) => ColoredBox(
+                      color: scheme.surfaceContainerHighest,
+                      child: Center(
+                        child: Icon(Icons.storefront_outlined,
+                            color: scheme.onSurfaceVariant, size: 30),
                       ),
-                      // RESERVED / SOLD badge (4.7)
-                      if (badge != null)
-                        Positioned(top: 8, left: 8, child: StatusBadge(badge)),
-                    ],
+                    ),
                   ),
-                ),
+                  if (badge != null) Positioned(top: 8, left: 8, child: StatusBadge(badge)),
+                ],
               ),
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(item['title'] ?? '',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleSmall
-                            ?.copyWith(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 4),
-                    Text(formatPrice(item['price'] as num?),
-                        style: theme.textTheme.titleMedium?.copyWith(
-                            color: isSold ? scheme.onSurfaceVariant : scheme.primary,
-                            decoration: isSold ? TextDecoration.lineThrough : null,
-                            fontWeight: FontWeight.bold)),
-                  ],
-                ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.s, KSpace.m, KSpace.m),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Text(price,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                          // Gold is for prices (design direction).
+                          color: isSold ? scheme.onSurfaceVariant : scheme.tertiary,
+                          decoration: isSold ? TextDecoration.lineThrough : null,
+                          fontWeight: FontWeight.w800)),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-/// Category, price range, status and sort. Returns the new filters, or
-/// null if dismissed.
-class _FilterSheet extends StatefulWidget {
-  final MarketFilters initial;
-  const _FilterSheet({required this.initial});
+// ---------------------------------------------------------------------------
+// Filters
+// ---------------------------------------------------------------------------
+
+class _CategoryChipRow extends StatelessWidget {
+  final String? selected;
+  const _CategoryChipRow({required this.selected});
 
   @override
-  State<_FilterSheet> createState() => _FilterSheetState();
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final categories = <String?>[null, ...kListingCategories];
+    return SizedBox(
+      height: 52,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        itemCount: categories.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final c = categories[i];
+          return FilterChip(
+            label: Text(c ?? s.all),
+            selected: selected == c,
+            onSelected: (_) => context.read<MarketplaceCubit>().updateCategory(c),
+            selectedColor: scheme.secondaryContainer,
+            checkmarkColor: scheme.onSecondaryContainer,
+          );
+        },
+      ),
+    );
+  }
 }
 
-class _FilterSheetState extends State<_FilterSheet> {
+/// Sort, category, price range and status. A bottom sheet / dialog on
+/// compact layouts, a side panel ([panel]) on wide ones.
+class MarketFilterForm extends StatefulWidget {
+  final MarketFilters initial;
+  final ValueChanged<MarketFilters> onApply;
+  final bool panel;
+
+  const MarketFilterForm({
+    super.key,
+    required this.initial,
+    required this.onApply,
+    this.panel = false,
+  });
+
+  @override
+  State<MarketFilterForm> createState() => _MarketFilterFormState();
+}
+
+class _MarketFilterFormState extends State<MarketFilterForm> {
   late String? _category = widget.initial.category;
   late Set<ListingStatus> _statuses = {...widget.initial.statuses};
   late MarketSort _sort = widget.initial.sort;
@@ -382,6 +458,12 @@ class _FilterSheetState extends State<_FilterSheet> {
     );
   }
 
+  /// The side panel applies chip changes straight away; the sheet waits
+  /// for "Show results".
+  void _changed() {
+    if (widget.panel) widget.onApply(_result());
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = context.l10n;
@@ -393,17 +475,25 @@ class _FilterSheetState extends State<_FilterSheet> {
         );
 
     final priceInput = [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))];
+    Widget priceField(TextEditingController c, String label) => TextField(
+          controller: c,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: priceInput,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _changed(),
+          decoration: InputDecoration(labelText: label, prefixText: 'RM '),
+        );
 
-    return SafeArea(
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          widget.panel ? 16 : 24, 16, widget.panel ? 16 : 24,
+          16 + (widget.panel ? 0 : MediaQuery.viewInsetsOf(context).bottom)),
       child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(
-            24, 16, 24, 16 + MediaQuery.viewInsetsOf(context).bottom),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(s.filters,
-                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            Text(s.filters, style: theme.textTheme.titleLarge),
 
             heading(s.sortBy),
             Wrap(
@@ -418,7 +508,10 @@ class _FilterSheetState extends State<_FilterSheet> {
                   ChoiceChip(
                     label: Text(label),
                     selected: _sort == sort,
-                    onSelected: (_) => setState(() => _sort = sort),
+                    onSelected: (_) {
+                      setState(() => _sort = sort);
+                      _changed();
+                    },
                   ),
               ],
             ),
@@ -432,7 +525,10 @@ class _FilterSheetState extends State<_FilterSheet> {
                   ChoiceChip(
                     label: Text(c ?? s.all),
                     selected: _category == c,
-                    onSelected: (_) => setState(() => _category = c),
+                    onSelected: (_) {
+                      setState(() => _category = c);
+                      _changed();
+                    },
                   ),
               ],
             ),
@@ -440,26 +536,12 @@ class _FilterSheetState extends State<_FilterSheet> {
             heading(s.priceRange),
             Row(
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _minCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: priceInput,
-                    decoration: InputDecoration(labelText: s.minPrice, prefixText: 'RM '),
-                  ),
-                ),
+                Expanded(child: priceField(_minCtrl, s.minPrice)),
                 const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  padding: EdgeInsets.symmetric(horizontal: 8),
                   child: Text('–'),
                 ),
-                Expanded(
-                  child: TextField(
-                    controller: _maxCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: priceInput,
-                    decoration: InputDecoration(labelText: s.maxPrice, prefixText: 'RM '),
-                  ),
-                ),
+                Expanded(child: priceField(_maxCtrl, s.maxPrice)),
               ],
             ),
 
@@ -472,28 +554,89 @@ class _FilterSheetState extends State<_FilterSheet> {
                   FilterChip(
                     label: Text(st.label(s)),
                     selected: _statuses.contains(st),
-                    onSelected: (on) => setState(() {
-                      _statuses = {..._statuses};
-                      on ? _statuses.add(st) : _statuses.remove(st);
-                    }),
+                    onSelected: (on) {
+                      setState(() {
+                        _statuses = {..._statuses};
+                        on ? _statuses.add(st) : _statuses.remove(st);
+                      });
+                      _changed();
+                    },
                   ),
               ],
             ),
 
             const SizedBox(height: 24),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.spaceBetween,
               children: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context, const MarketFilters()),
+                  onPressed: () => widget.onApply(const MarketFilters()),
                   child: Text(s.resetFilters),
                 ),
-                const Spacer(),
                 FilledButton(
-                  onPressed: () => Navigator.pop(context, _result()),
+                  onPressed: () => widget.onApply(_result()),
                   child: Text(s.showResults),
                 ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Empty and loading states
+// ---------------------------------------------------------------------------
+
+class _EmptyMarket extends StatelessWidget {
+  final bool filtered;
+  final VoidCallback? onReset;
+  final VoidCallback onSell;
+
+  const _EmptyMarket({required this.filtered, required this.onReset, required this.onSell});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    return BrandEmptyState(
+      icon: Icons.storefront_outlined,
+      title: filtered ? s.noMatchingItems : s.noItemsFound,
+      message: filtered ? null : s.noItemsYetHint,
+      actionLabel: onReset != null ? s.resetFilters : (filtered ? null : s.sellItem),
+      onAction: onReset ?? (filtered ? null : onSell),
+    );
+  }
+}
+
+class _MarketGridSkeleton extends StatelessWidget {
+  final int columns;
+  const _MarketGridSkeleton({required this.columns});
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeSemantics(
+      child: GridView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(KSpace.l, 0, KSpace.l, KSpace.l),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: columns,
+          childAspectRatio: MarketCard.aspectRatio,
+          crossAxisSpacing: KSpace.m,
+          mainAxisSpacing: KSpace.m,
+        ),
+        itemCount: columns * 2,
+        itemBuilder: (_, __) => const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: KSkeleton(height: double.infinity, borderRadius: KRadius.card)),
+            SizedBox(height: KSpace.s),
+            KSkeleton(height: 14),
+            SizedBox(height: KSpace.xs),
+            KSkeleton(width: 72, height: 16),
           ],
         ),
       ),

@@ -138,4 +138,50 @@ extension AccessStrings on AppStrings {
       "1 orang yang anda follow akan pergi", "フォロー中の1人が参加予定");
   String get followingGoingMany => _t("{0} people you follow are going",
       "{0} orang yang anda follow akan pergi", "フォロー中の{0}人が参加予定");
+
+  // ---- UI redesign: events / market / login ----
+  String get sectionThisWeek => _t("This week", "Minggu ni", "今週");
+  String get sectionLater => _t("Later", "Akan datang", "今後");
+  String get sectionEnded =>
+      _t("Ended & cancelled", "Dah tamat & dibatalkan", "終了・中止");
+  String get goingCount => _t("{0} going", "{0} pergi", "{0}人参加");
+  String get byOrganiser => _t("by {0}", "oleh {0}", "主催：{0}");
+  String get officialAccount => _t("Official", "Rasmi", "公式");
+  String get noEventsYetHint => _t(
+      "Nothing on yet. Clubs and friends post events here — check back soon, or create one.",
+      "Belum ada apa-apa lagi. Kelab dan kawan-kawan akan post acara di sini — jenguk lagi nanti, atau buat sendiri.",
+      "まだイベントはありません。");
+  String get noItemsYetHint => _t(
+      "No listings here yet. Got something to let go? Sell it to your college mates.",
+      "Belum ada barang lagi. Ada barang nak lepas? Jual kat member kolej.",
+      "まだ出品はありません。");
+  String get clearSearch => _t("Clear search", "Kosongkan carian", "検索をクリア");
+  String get openInMaps => _t("Open in Maps", "Buka dalam Maps", "地図で開く");
+  String get organiserBadge => _t("Organiser", "Penganjur", "主催者");
+  String get photoCount => _t("Photo {0} of {1}", "Gambar {0} daripada {1}", "{1}枚中{0}枚目");
+  String get closeGallery => _t("Close", "Tutup", "閉じる");
+  String get previousPhoto => _t("Previous photo", "Gambar sebelum", "前の写真");
+  String get nextPhoto => _t("Next photo", "Gambar seterusnya", "次の写真");
+  String get zoomIn => _t("Zoom in", "Zum masuk", "拡大");
+  String get zoomOut => _t("Zoom out", "Zum keluar", "縮小");
+  String get sectionDetails => _t("Details", "Butiran", "詳細");
+  String get sectionPhotos => _t("Photos", "Gambar", "写真");
+  String get sectionWhenWhere => _t("When & where", "Bila & di mana", "日時と場所");
+  String get sectionPricing => _t("Price & category", "Harga & kategori", "価格とカテゴリー");
+  String get loginValueTitle => _t("Your college, in one place",
+      "Kolej anda, semua dalam satu tempat", "あなたのカレッジをひとつに");
+  String get loginValueEvents => _t("See what's on — club events, talks and makan-makan.",
+      "Tengok apa yang berlangsung — acara kelab, ceramah dan makan-makan.", "クラブのイベントや講演をチェック");
+  String get loginValueMarket => _t("Buy and sell with people from your own college.",
+      "Jual beli dengan orang kolej sendiri.", "同じカレッジの仲間と売り買い");
+  String get loginValueCommunity => _t("Ask, share and stay in the loop with posts and comments.",
+      "Tanya, kongsi dan ikuti perkembangan melalui post dan komen.", "投稿とコメントで情報共有");
+  String get studentEmailHint => _t("New here? Sign up with your @student.uitm.edu.my email.",
+      "Baru di sini? Daftar dengan emel @student.uitm.edu.my anda.", "新規登録は@student.uitm.edu.myのメールで");
+  String get emailInvalid => _t("Enter a valid email address.",
+      "Masukkan alamat emel yang sah.", "有効なメールアドレスを入力してください。");
+  String get passwordTooShort => _t("At least 6 characters.",
+      "Sekurang-kurangnya 6 aksara.", "6文字以上");
+  String get priceInvalid => _t("Enter a price, e.g. 12.50",
+      "Masukkan harga, cth. 12.50", "価格を入力してください（例：12.50）");
 }

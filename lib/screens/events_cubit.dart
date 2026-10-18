@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database_helper.dart'; // Import your DB Helper
@@ -11,7 +12,15 @@ class EventsState {
   final bool isLoading;
   final String? errorMessage;
 
+  /// Going count per event id (public `event_participant_counts` view).
+  final Map<String, int> goingCounts;
+
+  /// Organiser public profile per user id (`profiles_public`).
+  final Map<String, Map<String, dynamic>> organisers;
+
   EventsState({
+    this.goingCounts = const {},
+    this.organisers = const {},
     this.allEvents = const [],
     this.displayedEvents = const [],
     this.selectedTag = 'All',
@@ -27,8 +36,12 @@ class EventsState {
     String? searchQuery,
     bool? isLoading,
     String? errorMessage,
+    Map<String, int>? goingCounts,
+    Map<String, Map<String, dynamic>>? organisers,
   }) {
     return EventsState(
+      goingCounts: goingCounts ?? this.goingCounts,
+      organisers: organisers ?? this.organisers,
       allEvents: allEvents ?? this.allEvents,
       displayedEvents: displayedEvents ?? this.displayedEvents,
       selectedTag: selectedTag ?? this.selectedTag,
@@ -102,6 +115,7 @@ class EventsCubit extends Cubit<EventsState> {
               displayedEvents: filtered,
               isLoading: false,
             ));
+            _loadCardExtras(items);
           }
         }, onError: (error) {
           // Must clear isLoading, otherwise the screen spins forever when
@@ -111,6 +125,39 @@ class EventsCubit extends Cubit<EventsState> {
                 isLoading: false, errorMessage: error.toString()));
           }
         });
+  }
+
+  /// Going counts and organiser names for the cards. Best-effort: on
+  /// failure the cards simply leave those lines out.
+  Future<void> _loadCardExtras(List<Map<String, dynamic>> events) async {
+    final ids = [for (final e in events) e['id'] as String];
+    final organiserIds = {
+      for (final e in events)
+        if (e['organizer_id'] != null) e['organizer_id'] as String
+    }.toList();
+    if (ids.isEmpty) return;
+    try {
+      final results = await Future.wait([
+        _supabase
+            .from('event_participant_counts')
+            .select('event_id, participant_count')
+            .inFilter('event_id', ids),
+        _supabase
+            .from('profiles_public')
+            .select('id, username, display_name, avatar_url, role, is_verified')
+            .inFilter('id', organiserIds),
+      ]);
+      if (isClosed) return;
+      emit(state.copyWith(
+        goingCounts: {
+          for (final r in results[0])
+            r['event_id'] as String: (r['participant_count'] as num).toInt()
+        },
+        organisers: {for (final p in results[1]) p['id'] as String: p},
+      ));
+    } catch (e) {
+      debugPrint('Event card extras failed: $e');
+    }
   }
 
   void updateTag(String tag) {

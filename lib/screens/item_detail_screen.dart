@@ -20,10 +20,9 @@ import '../utils/guest_access.dart';
 import '../utils/listing_status.dart';
 import '../utils/roles.dart';
 import '../widgets/status_badge.dart';
+import '../widgets/brand/brand.dart';
 import '../widgets/tap_card.dart';
 import 'gallery_view_screen.dart';
-import '../utils/responsive.dart';
-import '../services/saved_items.dart';
 import '../widgets/save_button.dart';
 
 class ItemDetailScreen extends StatefulWidget {
@@ -40,7 +39,14 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   Map<String, dynamic>? _sellerProfile;
   bool _loadingContact = false;
   bool _savingStatus = false;
-int _currentImageIndex = 0; 
+int _currentImageIndex = 0;
+  final _galleryController = PageController();
+
+  @override
+  void dispose() {
+    _galleryController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -336,24 +342,110 @@ int _currentImageIndex = 0;
     );
   }
 
+  // ---------------------------------------------------------------------
+  // Derived state
+  // ---------------------------------------------------------------------
+
+  bool get _isOwner {
+    final me = Supabase.instance.client.auth.currentUser;
+    return me != null && me.id == _itemData['seller_id'];
+  }
+
+  List<String> get _images => [
+        if (_itemData['image_url'] != null) _itemData['image_url'],
+        ...?(_itemData['gallery_urls'] as List?)?.whereType<String>(),
+      ];
+
+  /// Two columns (gallery left, summary card right) from this width.
+  static const double _wideFrom = Responsive.desktopBreakpoint;
+
   @override
   Widget build(BuildContext context) {
-    final currentUser = Supabase.instance.client.auth.currentUser;
-    final isOwner = currentUser != null && currentUser.id == _itemData['seller_id'];
-    final status = ListingStatus.of(_itemData);
-    final isSold = status == ListingStatus.sold;
-    final isReserved = status == ListingStatus.reserved;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final s = context.l10n;
+    return LayoutBuilder(builder: (context, constraints) {
+      final wide = constraints.maxWidth >= _wideFrom;
+      return Scaffold(
+        appBar: wide
+            ? AppBar(
+                leading: IconButton(
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                  icon: const Icon(Icons.arrow_back),
+                  // A shared link opens this page cold, with nothing
+                  // underneath to pop back to.
+                  onPressed: () => popOrHome(context),
+                ),
+                actions: [..._actions(context, onPhoto: false), const SizedBox(width: 8)],
+              )
+            : null,
+        body: AdaptiveScaffoldBody(
+          primaryFlex: 3,
+          secondaryFlex: 2,
+          compact: _compactBody(context),
+          // ---- left: gallery + thumbnails, description ----
+          primary: SelectionArea(
+            child: ListView(
+              padding: const EdgeInsets.only(top: KSpace.s, bottom: KSpace.xxl),
+              children: [
+                AspectRatio(
+                  aspectRatio: 1,
+                  child: ClipRRect(borderRadius: KRadius.cut, child: _gallery(context)),
+                ),
+                if (_images.length > 1) ...[
+                  const SizedBox(height: KSpace.m),
+                  _thumbnails(context),
+                ],
+                const SizedBox(height: KSpace.xxl),
+                _descriptionSection(context),
+              ],
+            ),
+          ),
+          // ---- right: price, status, seller, Contact ----
+          secondary: SingleChildScrollView(
+            padding: const EdgeInsets.only(top: KSpace.s, bottom: KSpace.xl),
+            child: KCard(
+              borderRadius: KRadius.cut,
+              padding: const EdgeInsets.all(KSpace.l + KSpace.xs),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _summary(context),
+                  const SizedBox(height: KSpace.l + KSpace.xs),
+                  _actionBar(context),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Compact: Contact (or owner controls) pinned to the bottom.
+        bottomSheet: wide
+            ? null
+            : bottomBarConstrained(
+                context,
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    boxShadow: [
+                      BoxShadow(
+                          color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, -2)),
+                    ],
+                  ),
+                  child: SafeArea(top: false, child: _actionBar(context)),
+                ),
+              ),
+      );
+    });
+  }
 
-    final List<String> allImages = [
-      if (_itemData['image_url'] != null) _itemData['image_url'],
-      ...?(_itemData['gallery_urls'] as List?)?.cast<String>(),
-    ];
+  // ---------------------------------------------------------------------
+  // Layouts
+  // ---------------------------------------------------------------------
 
-    return Scaffold(
-      body: PageBody(child: CustomScrollView(
+  Widget _compactBody(BuildContext context) {
+    return PageBody(
+      child: CustomScrollView(
         slivers: [
           SliverAppBar(
             expandedHeight: 400,
@@ -365,280 +457,448 @@ int _currentImageIndex = 0;
                 child: IconButton(
                   tooltip: MaterialLocalizations.of(context).backButtonTooltip,
                   icon: const Icon(Icons.arrow_back, color: kOnPhoto),
-                  // A shared link opens this page cold, with nothing
-                  // underneath to pop back to.
                   onPressed: () => popOrHome(context),
                 ),
               ),
             ),
+            actions: _actions(context, onPhoto: true),
             flexibleSpace: FlexibleSpaceBar(
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  PageView.builder(
-                    itemCount: allImages.length,
-                    onPageChanged: (index) => setState(() => _currentImageIndex = index),
-                    itemBuilder: (context, index) {
-                      return TapCard(
-                        borderRadius: BorderRadius.zero,
-                        onTap: () {
-                          showGallery(context, items: allImages, initialIndex: index);
-                        },
-                        child: Hero(
-                          tag: index == 0 ? _itemData['id'] : "gallery_$index", 
-                          child: CachedNetworkImage(
-                            imageUrl: allImages[index],
-                            fit: BoxFit.cover,
-                            // Desaturate sold photos (the colour is only a
-                            // saturation=0 mask, not a visible tint)
-                            color: isSold ? scheme.outline : null,
-                            colorBlendMode: isSold ? BlendMode.saturation : null,
-                            placeholder: (_,__) => const Center(child: CircularProgressIndicator()),
-                            errorWidget: (_,__,___) => Container(color: scheme.surfaceContainerHighest, child: Icon(Icons.broken_image, color: scheme.onSurfaceVariant)),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  if (status.badge(s) != null)
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: Container(
-                          color: photoScrim(isSold ? 0.4 : 0.25),
-                          child: Center(child: StatusBadge.stamp(status.badge(s)!)),
-                        ),
-                      ),
-                    ),
-                  if (allImages.length > 1)
-                    Positioned(
-                      bottom: 16, right: 16,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(color: photoScrim(), borderRadius: BorderRadius.circular(20)),
-                        child: Text("${_currentImageIndex + 1} / ${allImages.length}", style: theme.textTheme.labelMedium?.copyWith(color: kOnPhoto, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                ],
+              background: ClipRRect(
+                borderRadius: BorderRadius.only(
+                  bottomLeft: KRadius.cut.bottomLeft,
+                  bottomRight: KRadius.cut.bottomRight,
+                ),
+                child: _gallery(context),
               ),
             ),
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 112),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Chip(
-                        label: Text(_itemData['category'] ?? s.categoryGeneral),
-                        backgroundColor: scheme.secondaryContainer,
-                        labelStyle: TextStyle(color: scheme.onSecondaryContainer),
-                        side: BorderSide.none,
-                      ),
-                      Text(formatPrice(_itemData['price']), style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: scheme.primary)),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(child: Text(_itemData['title'], style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold))),
-                      SaveButton(type: SavedType.listing, id: _itemData['id'], color: scheme.onSurfaceVariant),
-                      IconButton(
-                        tooltip: s.share,
-                        icon: Icon(Icons.share, color: scheme.onSurfaceVariant),
-                        onPressed: () {
-                          // Pass cover + gallery so every photo can be shared
-                          ShareService.shareContent(
-                            context,
-                            _itemData['title'],
-                            "${s.priceLine.fill([formatPrice(_itemData['price'])])}\n${_itemData['description'] ?? ''}",
-                            allImages,
-                            // Deep link keeps the description intact — the
-                            // Web Share API drops text when files attach.
-                            link: '/item/${_itemData['id']}',
-                          );
-                        },
-                      ),
-                      if (!isOwner)
-                        GuardedReportButton(targetId: _itemData['id'], type: 'listing'),
-                    ],
-                  ),
-                  if (isReserved && !isOwner) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: scheme.secondaryContainer,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.handshake_outlined, color: scheme.onSecondaryContainer),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(s.reservedHint,
-                                style: TextStyle(color: scheme.onSecondaryContainer)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-
-                  if (_sellerProfile != null)
-                    TapCard(
-                      onTap: () => context.goUser(_sellerProfile!['id']),
-                      color: scheme.surfaceContainer,
-                      border: BorderSide(color: theme.dividerColor.withValues(alpha: 0.2)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          children: [
-                            CircleAvatar(backgroundImage: _sellerProfile!['avatar_url'] != null ? CachedNetworkImageProvider(_sellerProfile!['avatar_url']) : null, child: _sellerProfile!['avatar_url'] == null ? const Icon(Icons.person) : null),
-                            const SizedBox(width: 12),
-                            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(displayNameFor(s, _sellerProfile), style: const TextStyle(fontWeight: FontWeight.bold)),
-                              Text(s.viewProfile, style: theme.textTheme.bodySmall?.copyWith(color: scheme.primary)),
-                            ]),
-                            const Spacer(),
-                            Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
-                          ],
-                        ),
-                      ),
-                    ),
-
+                  _summary(context),
                   const SizedBox(height: 24),
-                  
-                  // --- NEW POST FUNCTION ---
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(s.description, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                      TextButton.icon(
-                        onPressed: () {
-                          if (!requireLogin(context)) return;
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => CreatePostScreen(sharedListing: _itemData)));
-                        },
-                        icon: const Icon(Icons.repeat, size: 16),
-                        label: Text(s.repost),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(_itemData['description'] ?? s.noDetails),
-                  const SizedBox(height: 80),
+                  _descriptionSection(context),
                 ],
               ),
             ),
-          )
+          ),
         ],
-      )),
-      
-      // --- OWNER CONTROLS ---
-      bottomSheet: bottomBarConstrained(context, Container(
-        padding: const EdgeInsets.all(16),
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
-          boxShadow: [BoxShadow(color: scheme.shadow.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -2))]
-        ),
-        child: isOwner
-            ? Row(
-                children: [
-                  // 1. STATUS: available / reserved / sold
-                  Expanded(
-                    child: PopupMenuButton<ListingStatus>(
-                      tooltip: s.listingStatus,
-                      enabled: !_savingStatus,
-                      initialValue: status,
-                      onSelected: _setStatus,
-                      itemBuilder: (_) => [
-                        for (final st in ListingStatus.values)
-                          CheckedPopupMenuItem(
-                            value: st,
-                            checked: st == status,
-                            child: Text(st.label(s)),
-                          ),
-                      ],
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: scheme.primary),
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            if (_savingStatus)
-                              const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                            else
-                              Icon(Icons.sell_outlined, size: 18, color: scheme.primary),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(status.label(s),
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w600)),
-                            ),
-                            Icon(Icons.arrow_drop_down, color: scheme.primary),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  
-                  // 2. EDIT BUTTON
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => CreateListingScreen(itemToEdit: _itemData)));
-                        if (result == true) _refreshData(); 
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: scheme.primary,
-                        foregroundColor: scheme.onPrimary,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: Text(s.edit),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
+      ),
+    );
+  }
 
-                  // 3. DELETE ICON (Small, beside edit)
-                  Container(
-                    decoration: BoxDecoration(
-                      color: scheme.errorContainer,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: IconButton(
-                      icon: Icon(Icons.delete_outline, color: scheme.onErrorContainer),
-                      tooltip: s.deletePermanently,
-                      onPressed: _deleteItem,
-                    ),
+  // ---------------------------------------------------------------------
+  // Pieces
+  // ---------------------------------------------------------------------
+
+  List<Widget> _actions(BuildContext context, {required bool onPhoto}) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final fg = onPhoto ? kOnPhoto : scheme.onSurfaceVariant;
+    Widget wrap(Widget child) => onPhoto
+        ? Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+            child: CircleAvatar(backgroundColor: photoScrim(0.5), child: child),
+          )
+        : child;
+    return [
+      wrap(SaveButton(type: SavedType.listing, id: _itemData['id'], color: fg)),
+      wrap(IconButton(tooltip: s.share, icon: Icon(Icons.share, color: fg), onPressed: _share)),
+      if (!_isOwner)
+        wrap(GuardedReportButton(
+          targetId: _itemData['id'],
+          type: 'listing',
+          icon: Icon(Icons.more_vert, color: fg),
+        )),
+      if (onPhoto) const SizedBox(width: 6),
+    ];
+  }
+
+  void _share() {
+    final s = context.l10nRead;
+    // Pass cover + gallery so every photo can be shared
+    ShareService.shareContent(
+      context,
+      _itemData['title'],
+      "${s.priceLine.fill([formatPrice(_itemData['price'])])}\n${_itemData['description'] ?? ''}",
+      _images,
+      // Deep link keeps the description intact — the Web Share API drops
+      // text when files attach.
+      link: '/item/${_itemData['id']}',
+    );
+  }
+
+  /// Photos with the RESERVED / SOLD stamp and a counter.
+  Widget _gallery(BuildContext context) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final status = ListingStatus.of(_itemData);
+    final isSold = status == ListingStatus.sold;
+    final images = _images;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (images.isEmpty)
+          ColoredBox(
+            color: scheme.surfaceContainerHighest,
+            child: Center(
+              child: Icon(Icons.storefront_outlined, size: 56, color: scheme.onSurfaceVariant),
+            ),
+          )
+        else
+          PageView.builder(
+            controller: _galleryController,
+            itemCount: images.length,
+            onPageChanged: (index) => setState(() => _currentImageIndex = index),
+            itemBuilder: (context, index) => TapCard(
+              borderRadius: BorderRadius.zero,
+              semanticLabel: s.photoCount.fill([index + 1, images.length]),
+              onTap: () => showGallery(context, items: images, initialIndex: index),
+              child: Hero(
+                tag: index == 0 ? _itemData['id'] : "gallery_$index",
+                child: CachedNetworkImage(
+                  imageUrl: images[index],
+                  fit: BoxFit.cover,
+                  // Desaturate sold photos (the colour is only a
+                  // saturation=0 mask, not a visible tint)
+                  color: isSold ? scheme.outline : null,
+                  colorBlendMode: isSold ? BlendMode.saturation : null,
+                  placeholder: (_, __) => ColoredBox(color: scheme.surfaceContainerHighest),
+                  errorWidget: (_, __, ___) => ColoredBox(
+                    color: scheme.surfaceContainerHighest,
+                    child: Icon(Icons.broken_image, color: scheme.onSurfaceVariant),
                   ),
-                ],
-              )
-            // GUEST VIEW
-            : !isLoggedIn && !isSold
-            ? GuestActionBar(label: s.loginToContact)
-            // BUYER VIEW
-            : ElevatedButton.icon(
-                onPressed: isSold ? null : _showPurchaseDialog, 
-                icon: _loadingContact
-                    ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onPrimary))
-                    : const Icon(Icons.chat),
-                label: Text(isSold ? s.sold : s.contactOrBuy),
-                // Sold = onPressed null, so the theme's disabled colours apply
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: scheme.primary,
-                  foregroundColor: scheme.onPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
-      )),
+            ),
+          ),
+        // Top scrim so the back / action buttons stay visible.
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 100,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [photoScrim(0.45), photoScrim(0)],
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (status.badge(s) != null)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ColoredBox(
+                color: photoScrim(isSold ? 0.4 : 0.25),
+                child: Center(child: StatusBadge.stamp(status.badge(s)!)),
+              ),
+            ),
+          ),
+        if (images.length > 1)
+          Positioned(
+            bottom: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration:
+                  BoxDecoration(color: photoScrim(), borderRadius: BorderRadius.circular(20)),
+              child: Text("${_currentImageIndex + 1} / ${images.length}",
+                  style: theme.textTheme.labelMedium
+                      ?.copyWith(color: kOnPhoto, fontWeight: FontWeight.bold)),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _thumbnails(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final s = context.l10n;
+    final images = _images;
+    return SizedBox(
+      height: 72,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: images.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final selected = i == _currentImageIndex;
+          return TapCard(
+            semanticLabel: s.photoCount.fill([i + 1, images.length]),
+            borderRadius: BorderRadius.circular(8),
+            border: BorderSide(
+              color: selected ? scheme.primary : scheme.outlineVariant,
+              width: selected ? 2 : 1,
+            ),
+            onTap: () {
+              setState(() => _currentImageIndex = i);
+              if (_galleryController.hasClients) {
+                _galleryController.animateToPage(i,
+                    duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
+              }
+            },
+            child: SizedBox(
+              width: 72,
+              child: CachedNetworkImage(imageUrl: images[i], fit: BoxFit.cover),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Category, price (gold), title, status, reserved note and seller.
+  Widget _summary(BuildContext context) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final status = ListingStatus.of(_itemData);
+    final isSold = status == ListingStatus.sold;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Chip(
+              label: Text(_itemData['category'] ?? s.categoryGeneral),
+              backgroundColor: scheme.secondaryContainer,
+              labelStyle: TextStyle(color: scheme.onSecondaryContainer),
+              side: BorderSide.none,
+            ),
+            Chip(
+              avatar: Icon(
+                switch (status) {
+                  ListingStatus.available => Icons.check_circle_outline,
+                  ListingStatus.reserved => Icons.handshake_outlined,
+                  ListingStatus.sold => Icons.block,
+                },
+                size: 16,
+              ),
+              label: Text(status.label(s)),
+              side: BorderSide(color: scheme.outlineVariant),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          formatPrice(_itemData['price']),
+          style: theme.textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+            // Gold is for prices (design direction).
+            color: isSold ? scheme.onSurfaceVariant : scheme.tertiary,
+            decoration: isSold ? TextDecoration.lineThrough : null,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(_itemData['title'] ?? '',
+            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+        if (status == ListingStatus.reserved && !_isOwner) ...[
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: scheme.secondaryContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.handshake_outlined, color: scheme.onSecondaryContainer),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(s.reservedHint,
+                      style: TextStyle(color: scheme.onSecondaryContainer)),
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (_sellerProfile != null) ...[
+          const SizedBox(height: 16),
+          TapCard(
+            onTap: () => context.goUser(_sellerProfile!['id']),
+            color: scheme.surfaceContainerHigh,
+            border: BorderSide(color: scheme.outlineVariant),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: scheme.primaryContainer,
+                    backgroundImage: _sellerProfile!['avatar_url'] != null
+                        ? CachedNetworkImageProvider(_sellerProfile!['avatar_url'])
+                        : null,
+                    child: _sellerProfile!['avatar_url'] == null
+                        ? Icon(Icons.person, color: scheme.onPrimaryContainer)
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(s.seller,
+                            style: theme.textTheme.labelSmall
+                                ?.copyWith(color: scheme.onSurfaceVariant)),
+                        Text(displayNameFor(s, _sellerProfile),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w700)),
+                        Text(s.viewProfile,
+                            style: theme.textTheme.bodySmall?.copyWith(color: scheme.primary)),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _descriptionSection(BuildContext context) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text(s.description, style: theme.textTheme.titleLarge)),
+            TextButton.icon(
+              onPressed: () {
+                if (!requireLogin(context)) return;
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => CreatePostScreen(sharedListing: _itemData)));
+              },
+              icon: const Icon(Icons.repeat, size: 16),
+              label: Text(s.repost),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          (_itemData['description'] ?? '').toString().trim().isEmpty
+              ? s.noDetails
+              : _itemData['description'],
+          style: theme.textTheme.bodyLarge?.copyWith(height: 1.5),
+        ),
+      ],
+    );
+  }
+
+  /// Owner: status, edit, delete. Guest: log in. Buyer: Contact.
+  Widget _actionBar(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final status = ListingStatus.of(_itemData);
+    final isSold = status == ListingStatus.sold;
+
+    if (_isOwner) {
+      return Row(
+        children: [
+          // 1. STATUS: available / reserved / sold
+          Expanded(
+            child: PopupMenuButton<ListingStatus>(
+              tooltip: s.listingStatus,
+              enabled: !_savingStatus,
+              initialValue: status,
+              onSelected: _setStatus,
+              itemBuilder: (_) => [
+                for (final st in ListingStatus.values)
+                  CheckedPopupMenuItem(
+                    value: st,
+                    checked: st == status,
+                    child: Text(st.label(s)),
+                  ),
+              ],
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 48),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: scheme.primary),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (_savingStatus)
+                      const SizedBox(
+                          width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    else
+                      Icon(Icons.sell_outlined, size: 18, color: scheme.primary),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(status.label(s),
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w600)),
+                    ),
+                    Icon(Icons.arrow_drop_down, color: scheme.primary),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // 2. EDIT
+          Expanded(
+            child: FilledButton(
+              onPressed: () async {
+                final result = await Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => CreateListingScreen(itemToEdit: _itemData)));
+                if (result == true) _refreshData();
+              },
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+              child: Text(s.edit),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // 3. DELETE
+          IconButton.filledTonal(
+            style: IconButton.styleFrom(
+              backgroundColor: scheme.errorContainer,
+              foregroundColor: scheme.onErrorContainer,
+              minimumSize: const Size(48, 48),
+            ),
+            icon: const Icon(Icons.delete_outline),
+            tooltip: s.deletePermanently,
+            onPressed: _deleteItem,
+          ),
+        ],
+      );
+    }
+
+    if (!isLoggedIn && !isSold) return GuestActionBar(label: s.loginToContact);
+
+    return FilledButton.icon(
+      onPressed: isSold ? null : _showPurchaseDialog,
+      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+      icon: _loadingContact
+          ? SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onPrimary))
+          : const Icon(Icons.chat),
+      // Sold = onPressed null, so the theme's disabled colours apply
+      label: Text(isSold ? s.sold : s.contactOrBuy),
     );
   }
 }

@@ -16,15 +16,15 @@ import '../utils/guest_access.dart';
 import '../utils/ics.dart';
 import '../utils/roles.dart';
 import '../widgets/comment_tile.dart';
+import 'events_screen.dart' show CountdownChip, DateBlock, eventCountdown, isOfficialProfile;
 import '../widgets/mention_text.dart';
 import '../widgets/status_badge.dart';
+import '../widgets/brand/brand.dart';
 import '../widgets/tap_card.dart';
 import 'create_post_screen.dart'; 
 import 'create_event_screen.dart';
 import 'gallery_view_screen.dart';
-import '../utils/responsive.dart';
 import '../widgets/restriction_gate.dart';
-import '../services/saved_items.dart';
 import '../widgets/save_button.dart';
 
 class EventDetailScreen extends StatefulWidget {
@@ -40,7 +40,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   late Map<String, dynamic> _event;
   Map<String, dynamic>? _organizer;
   bool _isLoading = true;
-  int _currentImageIndex = 0; 
+  int _currentImageIndex = 0;
+  final _heroController = PageController();
   final _commentCtrl = TextEditingController();
   bool _isJoined = false;       // <--- NEW: Did I join?
   bool _joining = false;
@@ -61,6 +62,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     't.me', 'telegram.org',
     'linkedin.com'
   ];
+
+  @override
+  void dispose() {
+    _heroController.dispose();
+    _commentCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -404,520 +412,837 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     }
   }
 
+  // ---------------------------------------------------------------------
+  // Derived state
+  // ---------------------------------------------------------------------
+
+  bool get _isOwner {
+    final me = Supabase.instance.client.auth.currentUser;
+    return me != null && me.id == _event['organizer_id'];
+  }
+
+  DateTime get _start => parseLocal(_event['start_datetime']) ?? DateTime.now();
+  DateTime? get _end => parseLocal(_event['end_datetime']);
+
+  bool get _isPast {
+    final end = _end;
+    return end != null
+        ? end.isBefore(DateTime.now())
+        : _start.add(const Duration(hours: 4)).isBefore(DateTime.now());
+  }
+
+  /// Joining / registering is closed once an event is over or cancelled.
+  bool get _isClosed => _isPast || _isCancelled;
+
+  List<String> get _images => [
+        if (_event['image_url'] != null) _event['image_url'],
+        ...?(_event['gallery_urls'] as List?)?.whereType<String>(),
+      ];
+
+  /// Two columns (media + content left, sticky info card right) once the
+  /// page is given this much width.
+  static const double _wideFrom = Responsive.desktopBreakpoint;
+
   @override
   Widget build(BuildContext context) {
-    final currentUser = Supabase.instance.client.auth.currentUser;
-    final isOwner = currentUser != null && currentUser.id == _event['organizer_id'];
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final s = context.l10n;
-
-    final startDate = parseLocal(_event['start_datetime'])!;
-    final DateTime? endDate = parseLocal(_event['end_datetime']);
-
-    // 1. PREPARE THE DATA (Handle Empty Strings correctly)
-    final String rawDesc = _event['description'] ?? '';
-    final String descriptionText = rawDesc.trim().isEmpty
-        ? s.noDetails
-        : rawDesc;
-
-    final List<String> allImages = [
-      if (_event['image_url'] != null) _event['image_url'],
-      ...?(_event['gallery_urls'] as List?)?.cast<String>(),
-    ];
-
-    final bool isPast = endDate != null
-        ? endDate.isBefore(DateTime.now())
-        : startDate.add(const Duration(hours: 4)).isBefore(DateTime.now());
-    final bool isCancelled = _isCancelled;
-    // Joining / registering is closed once an event is over or cancelled.
-    final bool isClosed = isPast || isCancelled;
-
-    return Scaffold(
-      body: PageBody(child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            // 1. App Bar (Keep your existing code)
-            SliverAppBar(
-              expandedHeight: 300,
-              pinned: true,
-              leading: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: CircleAvatar(
-                  backgroundColor: photoScrim(0.45),
-                  child: IconButton(
-                    tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                    icon: const Icon(Icons.arrow_back, color: kOnPhoto),
-                    // A shared link opens this page cold, with nothing
-                    // underneath to pop back to.
-                    onPressed: () => popOrHome(context),
-                  ),
+    return LayoutBuilder(builder: (context, constraints) {
+      final wide = constraints.maxWidth >= _wideFrom;
+      return Scaffold(
+        appBar: wide
+            ? AppBar(
+                leading: IconButton(
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                  icon: const Icon(Icons.arrow_back),
+                  // A shared link opens this page cold, with nothing
+                  // underneath to pop back to.
+                  onPressed: () => popOrHome(context),
                 ),
-              ),
-              // Owner controls live here so the bottom bar stays free for
-              // comments — organisers answer questions too.
-              actions: [
-                if (isOwner)
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: CircleAvatar(
-                      backgroundColor: photoScrim(0.45),
-                      child: PopupMenuButton<String>(
-                        tooltip: s.manageEvent,
-                        icon: const Icon(Icons.more_vert, color: kOnPhoto),
-                        onSelected: (v) => switch (v) {
-                          'edit' => _editEvent(),
-                          'cancel' => _cancelEvent(),
-                          'restore' => _restoreEvent(),
-                          'delete' => _deleteEvent(),
-                          _ => null,
-                        },
-                        itemBuilder: (_) => [
-                          PopupMenuItem(
-                            value: 'edit',
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: const Icon(Icons.edit_outlined),
-                              title: Text(s.edit),
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: isCancelled ? 'restore' : 'cancel',
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: Icon(isCancelled ? Icons.event_available : Icons.event_busy),
-                              title: Text(isCancelled ? s.restoreEvent : s.cancelEvent),
-                            ),
-                          ),
-                          const PopupMenuDivider(),
-                          PopupMenuItem(
-                            value: 'delete',
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: Icon(Icons.delete_forever, color: scheme.error),
-                              title: Text(s.deleteEvent, style: TextStyle(color: scheme.error)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-              backgroundColor: theme.scaffoldBackgroundColor,
-              flexibleSpace: FlexibleSpaceBar(
-                background: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // 1. THE CAROUSEL
-                    PageView.builder(
-                      itemCount: allImages.length,
-                      onPageChanged: (index) => setState(() => _currentImageIndex = index),
-                      itemBuilder: (context, index) {
-                        return TapCard(
-                          borderRadius: BorderRadius.zero,
-                          onTap: () => showGallery(context,
-                              items: allImages, initialIndex: index),
-                          child: Hero(
-                            tag: "gallery_$index", // Unique tag for smooth animation
-                            child: CachedNetworkImage(
-                              imageUrl: allImages[index],
-                              fit: BoxFit.cover,
-                              placeholder: (_,__) => const Center(child: CircularProgressIndicator()),
-                              errorWidget: (_,__,___) => Container(color: scheme.surfaceContainerHighest, child: Icon(Icons.event, color: scheme.onSurfaceVariant)),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+                actions: [..._actions(context, onPhoto: false), const SizedBox(width: 8)],
+              )
+            : null,
+        body: AdaptiveScaffoldBody(
+          primaryFlex: 3,
+          secondaryFlex: 2,
+          compact: _compactBody(context),
+          // ---- left: media, title, about, comments ----
+          primary: _primaryPane(context),
+          // ---- right: info card, scrolling on its own (stays in view) ----
+          secondary: SingleChildScrollView(
+            padding: const EdgeInsets.only(top: KSpace.s, bottom: KSpace.xl),
+            child: _infoCard(context),
+          ),
+        ),
+        // Compact: the comment box is pinned to the bottom. Wide: it sits
+        // under the comments instead.
+        bottomSheet: wide ? null : bottomBarConstrained(context, _composerBar(context)),
+      );
+    });
+  }
 
-                    if (isClosed)
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: Container(
-                          color: photoScrim(0.4),
-                          child: Center(child: StatusBadge.stamp(isCancelled ? s.cancelled : s.ended)),
-                        ),
-                      ),
-                    ),
+  // ---------------------------------------------------------------------
+  // Layouts
+  // ---------------------------------------------------------------------
 
-                    // 2. THE BADGE (e.g. "1/5")
-                    if (allImages.length > 1)
-                      Positioned(
-                        bottom: 16,
-                        right: 16,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: photoScrim(0.7),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.photo_library, color: kOnPhoto, size: 14),
-                              const SizedBox(width: 6),
-                              Text(
-                                "${_currentImageIndex + 1} / ${allImages.length}",
-                                style: theme.textTheme.labelMedium?.copyWith(color: kOnPhoto, fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      
-                    // 3. GRADIENT SHADOW (To make back button visible)
-                    Positioned(
-                      top: 0, left: 0, right: 0,
-                      height: 100,
-                      child: IgnorePointer(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [photoScrim(0.6), photoScrim(0)],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+  Widget _compactBody(BuildContext context) {
+    return PageBody(
+      child: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 320,
+            pinned: true,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            leading: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: CircleAvatar(
+                backgroundColor: photoScrim(0.45),
+                child: IconButton(
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                  icon: const Icon(Icons.arrow_back, color: kOnPhoto),
+                  onPressed: () => popOrHome(context),
                 ),
               ),
             ),
-
-            // 2. Body
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(child: Text(_event['title'], style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold))),
-                        // Body icons sit on the page, not on the photo, so
-                        // they take scheme colours (the old black circles
-                        // vanished on Songket Noir).
-                        SaveButton(type: SavedType.event, id: _event['id'], color: scheme.onSurfaceVariant),
-                        IconButton(
-                          tooltip: s.share,
-                          icon: Icon(Icons.share, color: scheme.onSurfaceVariant),
-                          onPressed: () {
-                            ShareService.shareContent(
-                              context,
-                              _event['title'],
-                              [
-                                if (_event['location'] != null) "📍 ${_event['location']}",
-                                "🗓 ${formatEventRange(startDate, endDate)}",
-                                if (_event['description'] != null) "\n${_event['description']}",
-                              ].join('\n'),
-                              allImages,
-                              // Deep link keeps the description intact — the
-                              // Web Share API drops text when files attach.
-                              link: '/event/${_event['id']}',
-                            );
-                          },
-                        ),
-                        if (!isOwner)
-                          GuardedReportButton(targetId: _event['id'], type: 'event'),
-                      ],
-                    ),
-                    if (isCancelled) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: scheme.errorContainer,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.event_busy, color: scheme.onErrorContainer),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(s.eventCancelledBanner,
-                                  style: TextStyle(color: scheme.onErrorContainer, fontWeight: FontWeight.w600)),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-
-                    // Date & Location Rows(Keep your existing logic)
-                    _infoRow(Icons.calendar_today, formatEventRange(startDate, endDate), theme),
-                    const SizedBox(height: 12),
-                    _infoRow(Icons.location_on, _event['location'] ?? s.locationTba, theme),
-                    if (!isClosed) ...[
-                      const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          onPressed: _savingCalendar ? null : _addToCalendar,
-                          icon: _savingCalendar
-                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                              : const Icon(Icons.event_available, size: 18),
-                          label: Text(s.addToCalendar),
-                        ),
-                      ),
-                    ],
-
-                    const SizedBox(height: 24),
-                    const Divider(),
-
-                                        
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: scheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.1)),
-                      ),
-                      child: Row(
-                        children: [
-                          // 1. The Count
-                          Icon(Icons.group, size: 20, color: scheme.primary),
-                          const SizedBox(width: 8),
-                          Text(s.attendingCount.fill([_participantCount]), style: const TextStyle(fontWeight: FontWeight.bold)),
-                          
-                          const Spacer(),
-
-                          // 2. The Button (Only show if not owner)
-                          if (!isOwner)
-                            SizedBox(
-                              height: 36,
-                              // Already-joined people can still leave a
-                              // cancelled event; nobody can newly join.
-                              child: _isJoined
-                                  ? OutlinedButton.icon(
-                                      onPressed: _toggleJoin,
-                                      icon: const Icon(Icons.check, size: 16),
-                                      label: Text(s.joined),
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: scheme.primary,
-                                        side: BorderSide(color: scheme.primary),
-                                      ),
-                                    )
-                                  : FilledButton.icon(
-                                      onPressed: isClosed ? null : _toggleJoin,
-                                      icon: Icon(isCancelled ? Icons.event_busy : Icons.add, size: 16),
-                                      label: Text(isCancelled ? s.cancelled : s.join),
-                                    ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    if (_followingGoing > 0) ...[
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 20.0 * _followingGoingFaces.length + 12,
-                            height: 32,
-                            child: Stack(
-                              children: [
-                                for (var i = 0; i < _followingGoingFaces.length; i++)
-                                  Positioned(
-                                    left: 20.0 * i,
-                                    child: CircleAvatar(
-                                      radius: 16,
-                                      backgroundColor: theme.scaffoldBackgroundColor,
-                                      child: CircleAvatar(
-                                        radius: 14,
-                                        backgroundColor: scheme.primaryContainer,
-                                        backgroundImage: _followingGoingFaces[i]['avatar_url'] != null
-                                            ? CachedNetworkImageProvider(_followingGoingFaces[i]['avatar_url'])
-                                            : null,
-                                        child: _followingGoingFaces[i]['avatar_url'] == null
-                                            ? Icon(Icons.person, size: 14, color: scheme.onPrimaryContainer)
-                                            : null,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _followingGoing == 1
-                                  ? s.followingGoingOne
-                                  : s.followingGoingMany.fill([_followingGoing]),
-                              style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-
-                    // Organizer Tile (Keep existing)
-                    if (_organizer != null)
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: CircleAvatar(
-                          backgroundImage: _organizer!['avatar_url'] != null ? NetworkImage(_organizer!['avatar_url']) : null,
-                          child: _organizer!['avatar_url'] == null ? const Icon(Icons.person) : null,
-                        ),
-                        title: Text(_organizer!['display_name'] ?? s.organizer, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(roleLabel(s, _organizer!['role'])),
-                        trailing: OutlinedButton(
-                          onPressed: () => context.goUser(_organizer!['id']),
-                          child: Text(s.viewProfile),
-                        ),
-                      ),
-
-                    const Divider(),
-                    const SizedBox(height: 16),
-
-                   
-                    // Description & Post Button (Keep existing)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(s.aboutEvent, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                        TextButton.icon(
-                          onPressed: () {
-                            if (!requireLogin(context)) return;
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => CreatePostScreen(sharedEvent: _event)));
-                          },
-                          icon: const Icon(Icons.repeat, size: 16),
-                          label: Text(s.repost),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-
-                    SizedBox(
-                      width: double.infinity,
-                      child: MentionText(
-                        descriptionText,
-                        style: theme.textTheme.bodyLarge?.copyWith(height: 1.5, color: scheme.onSurface),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    
-                    // --- REGISTER BUTTON (VISIBLE TO EVERYONE HERE) ---
-                    if (_event['registration_link'] != null)
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        icon: Icon(isClosed ? Icons.event_busy : Icons.link),
-                        label: Text(isClosed ? s.registrationClosed : s.registerOnline),
-                        // Past = onPressed null, so the theme's disabled colours apply
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        onPressed: isClosed
-                          ? null// DISABLE CLICK
-                          : () => _launchSafeUrl(_event['registration_link']), // USE SAFE LAUNCHER
-                      ),
-                    ),
-
-                    const SizedBox(height: 32),
-                    const Divider(thickness: 4),
-
-                    // Discussion Header (Keep existing)
-                    Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(s.comments, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                        
-                        // NEW REFRESH BUTTON HERE
-                        IconButton(
-                          icon: _isLoading 
-                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) 
-                            : const Icon(Icons.refresh, size: 20),
-                          onPressed: () {
-                            setState(() {
-                              _isLoading = true;
-                              _commentsStream = _fetchCommentsStream();
-                            });
-                            _fetchEventDetails();
-                          },
-                          tooltip: s.refreshComments,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                    // Comments List (Keep existing)
-                    StreamBuilder<List<Map<String, dynamic>>>(
-                      stream: _commentsStream,
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                          return Center(child: Padding(padding: const EdgeInsets.all(16), child: Text(s.noComments, style: TextStyle(color: scheme.onSurfaceVariant))));
-                        }
-                        return ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: snapshot.data!.length,
-                          itemBuilder: (context, index) =>
-                              CommentTile(comment: snapshot.data![index]),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 80),
-                  ],
+            actions: _actions(context, onPhoto: true),
+            flexibleSpace: FlexibleSpaceBar(
+              background: ClipRRect(
+                borderRadius: BorderRadius.only(
+                  bottomLeft: KRadius.cut.bottomLeft,
+                  bottomRight: KRadius.cut.bottomRight,
                 ),
+                child: _heroCarousel(context, withTitle: true),
               ),
             ),
-          ],
-        )),
-      
-      // 3. BOTTOM SHEET LOGIC (This is where the magic happens)
-      bottomSheet: bottomBarConstrained(context, Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
-          boxShadow: [BoxShadow(color: scheme.shadow.withValues(alpha: 0.05), blurRadius: 5, offset: const Offset(0, -2))],
-        ),
-        child: SafeArea(
-          // Everyone comments here, organisers included (owner controls
-          // are in the app bar menu). Guests get a login button instead.
-          child: !isLoggedIn
-              ? GuestActionBar(label: s.loginToComment)
-              : Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _commentCtrl,
-                        decoration: InputDecoration(
-                          hintText: s.askAboutEvent,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
-                          filled: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: s.post,
-                      onPressed: _postingComment ? null : _postComment,
-                      icon: _postingComment
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                          : Icon(Icons.send, color: scheme.primary),
-                    ),
-                  ],
-                ),
-        ),
-      )),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_isCancelled) ...[_cancelledBanner(context), const SizedBox(height: 16)],
+                  _infoCard(context),
+                  const SizedBox(height: 24),
+                  _aboutSection(context),
+                  const SizedBox(height: 24),
+                  _commentsSection(context),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _infoRow(IconData icon, String text, ThemeData theme) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: theme.colorScheme.primary),
-        const SizedBox(width: 12),
-        Expanded(child: Text(text, style: theme.textTheme.bodyLarge)),
+  Widget _primaryPane(BuildContext context) {
+    final theme = Theme.of(context);
+    return SelectionArea(
+      child: ListView(
+        padding: const EdgeInsets.only(top: KSpace.s, bottom: KSpace.xxl),
+        children: [
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: ClipRRect(
+              borderRadius: KRadius.cut,
+              child: _heroCarousel(context, withTitle: false),
+            ),
+          ),
+          if (_images.length > 1) ...[
+            const SizedBox(height: KSpace.m),
+            _thumbnails(context),
+          ],
+          const SizedBox(height: KSpace.xl),
+          Text(_event['title'] ?? '',
+              style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700)),
+          if (_isCancelled) ...[const SizedBox(height: KSpace.l), _cancelledBanner(context)],
+          const SizedBox(height: KSpace.xl),
+          _aboutSection(context),
+          const SizedBox(height: KSpace.xxl),
+          _commentsSection(context),
+          const SizedBox(height: KSpace.l),
+          _composerBar(context, inline: true),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // Pieces
+  // ---------------------------------------------------------------------
+
+  /// Save, share, report (visitors) or the manage menu (organiser).
+  /// [onPhoto]: drawn over the hero image, so they sit in scrim circles.
+  List<Widget> _actions(BuildContext context, {required bool onPhoto}) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final fg = onPhoto ? kOnPhoto : scheme.onSurfaceVariant;
+
+    Widget wrap(Widget child) => onPhoto
+        ? Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+            child: CircleAvatar(backgroundColor: photoScrim(0.45), child: child),
+          )
+        : child;
+
+    return [
+      wrap(SaveButton(type: SavedType.event, id: _event['id'], color: fg)),
+      wrap(IconButton(
+        tooltip: s.share,
+        icon: Icon(Icons.share, color: fg),
+        onPressed: _share,
+      )),
+      if (_isOwner)
+        wrap(_ownerMenu(context, fg))
+      else
+        wrap(GuardedReportButton(
+          targetId: _event['id'],
+          type: 'event',
+          icon: Icon(Icons.more_vert, color: fg),
+        )),
+      if (onPhoto) const SizedBox(width: 6),
+    ];
+  }
+
+  void _share() {
+    ShareService.shareContent(
+      context,
+      _event['title'],
+      [
+        if (_event['location'] != null) "📍 ${_event['location']}",
+        "🗓 ${formatEventRange(_start, _end)}",
+        if (_event['description'] != null) "\n${_event['description']}",
+      ].join('\n'),
+      _images,
+      // Deep link keeps the description intact — the Web Share API drops
+      // text when files attach.
+      link: '/event/${_event['id']}',
+    );
+  }
+
+  /// Owner controls live in a menu so the bottom bar stays free for
+  /// comments — organisers answer questions too.
+  Widget _ownerMenu(BuildContext context, Color fg) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    return PopupMenuButton<String>(
+      tooltip: s.manageEvent,
+      icon: Icon(Icons.more_vert, color: fg),
+      onSelected: (v) => switch (v) {
+        'edit' => _editEvent(),
+        'cancel' => _cancelEvent(),
+        'restore' => _restoreEvent(),
+        'delete' => _deleteEvent(),
+        _ => null,
+      },
+      itemBuilder: (_) => [
+        PopupMenuItem(
+          value: 'edit',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.edit_outlined),
+            title: Text(s.edit),
+          ),
+        ),
+        PopupMenuItem(
+          value: _isCancelled ? 'restore' : 'cancel',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(_isCancelled ? Icons.event_available : Icons.event_busy),
+            title: Text(_isCancelled ? s.restoreEvent : s.cancelEvent),
+          ),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: 'delete',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.delete_forever, color: scheme.error),
+            title: Text(s.deleteEvent, style: TextStyle(color: scheme.error)),
+          ),
+        ),
       ],
     );
   }
+
+  /// Photo carousel with the ENDED / CANCELLED stamp, a counter, and on
+  /// compact the title over a gradient.
+  Widget _heroCarousel(BuildContext context, {required bool withTitle}) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final images = _images;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (images.isEmpty)
+          ColoredBox(
+            color: scheme.primaryContainer,
+            child: Center(
+              child: Icon(Icons.event, size: 56, color: scheme.onPrimaryContainer),
+            ),
+          )
+        else
+          PageView.builder(
+            controller: _heroController,
+            itemCount: images.length,
+            onPageChanged: (index) => setState(() => _currentImageIndex = index),
+            itemBuilder: (context, index) => TapCard(
+              borderRadius: BorderRadius.zero,
+              semanticLabel: s.photoCount.fill([index + 1, images.length]),
+              onTap: () => showGallery(context, items: images, initialIndex: index),
+              child: Hero(
+                tag: "gallery_$index",
+                child: CachedNetworkImage(
+                  imageUrl: images[index],
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => ColoredBox(color: scheme.surfaceContainerHighest),
+                  errorWidget: (_, __, ___) => ColoredBox(
+                    color: scheme.surfaceContainerHighest,
+                    child: Icon(Icons.event, color: scheme.onSurfaceVariant),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+        // Top scrim so the back / action buttons stay visible.
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 100,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [photoScrim(0.5), photoScrim(0)],
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        if (_isClosed)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ColoredBox(
+                color: photoScrim(0.35),
+                child: Center(
+                  child: StatusBadge.stamp(_isCancelled ? s.cancelled : s.ended),
+                ),
+              ),
+            ),
+          ),
+
+        if (withTitle)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: IgnorePointer(
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(16, 48, 16, 16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [photoScrim(0), photoScrim(0.75)],
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _event['title'] ?? '',
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.headlineSmall
+                          ?.copyWith(color: kOnPhoto, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      formatEventRange(_start, _end),
+                      style: theme.textTheme.bodyMedium?.copyWith(color: kOnPhoto),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+        if (images.length > 1)
+          Positioned(
+            top: 12,
+            right: 12,
+            child: SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(top: withTitle ? 56 : 0),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: photoScrim(0.7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    "${_currentImageIndex + 1} / ${images.length}",
+                    style: theme.textTheme.labelMedium
+                        ?.copyWith(color: kOnPhoto, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Thumbnail strip under the hero on wide layouts.
+  Widget _thumbnails(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final s = context.l10n;
+    final images = _images;
+    return SizedBox(
+      height: 64,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: images.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final selected = i == _currentImageIndex;
+          return TapCard(
+            semanticLabel: s.photoCount.fill([i + 1, images.length]),
+            borderRadius: BorderRadius.circular(8),
+            border: BorderSide(
+              color: selected ? scheme.primary : scheme.outlineVariant,
+              width: selected ? 2 : 1,
+            ),
+            onTap: () {
+              setState(() => _currentImageIndex = i);
+              if (_heroController.hasClients) {
+                _heroController.animateToPage(i,
+                    duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
+              }
+            },
+            child: SizedBox(
+              width: 96,
+              child: CachedNetworkImage(imageUrl: images[i], fit: BoxFit.cover),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _cancelledBanner(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.errorContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.event_busy, color: scheme.onErrorContainer),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(s.eventCancelledBanner,
+                style: TextStyle(color: scheme.onErrorContainer, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Date, place, attendance + Join, calendar, registration, organiser and
+  /// friends going. Sticky on the right on wide layouts.
+  Widget _infoCard(BuildContext context) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final location = (_event['location'] ?? '').toString().trim();
+    final isOwner = _isOwner;
+
+    return KCard(
+      borderRadius: KRadius.cut,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ---- when ----
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DateBlock(date: _start, muted: _isClosed),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(formatEventRange(_start, _end),
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                    if (!_isClosed && eventCountdown(s, _event) != null) ...[
+                      const SizedBox(height: 6),
+                      CountdownChip(eventCountdown(s, _event)!),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // ---- where ----
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.location_on_outlined, color: scheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(location.isEmpty ? s.locationTba : location,
+                        style: theme.textTheme.bodyLarge),
+                    if (location.isNotEmpty)
+                      TextButton.icon(
+                        style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero, minimumSize: const Size(48, 40)),
+                        onPressed: () => launchUrl(
+                          Uri.https('www.google.com', '/maps/search/',
+                              {'api': '1', 'query': location}),
+                          mode: LaunchMode.externalApplication,
+                        ),
+                        icon: const Icon(Icons.map_outlined, size: 18),
+                        label: Text(s.openInMaps),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 24),
+
+          // ---- attendance + join ----
+          Row(
+            children: [
+              Icon(Icons.group_outlined, color: scheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(s.attendingCount.fill([_participantCount]),
+                    style: theme.textTheme.titleSmall),
+              ),
+            ],
+          ),
+          if (_followingGoing > 0) ...[
+            const SizedBox(height: 8),
+            _followingGoingRow(context),
+          ],
+          if (!isOwner) ...[
+            const SizedBox(height: 12),
+            // Already-joined people can still leave a cancelled event;
+            // nobody can newly join.
+            _isJoined
+                ? OutlinedButton.icon(
+                    onPressed: _toggleJoin,
+                    icon: const Icon(Icons.check, size: 18),
+                    label: Text(s.joined),
+                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                  )
+                : FilledButton.icon(
+                    onPressed: _isClosed ? null : _toggleJoin,
+                    icon: Icon(_isCancelled ? Icons.event_busy : Icons.add, size: 18),
+                    label: Text(_isCancelled
+                        ? s.cancelled
+                        : (_isPast ? s.ended : s.join)),
+                    style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                  ),
+          ],
+          if (!_isClosed) ...[
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _savingCalendar ? null : _addToCalendar,
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+              icon: _savingCalendar
+                  ? const SizedBox(
+                      width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.event_available, size: 18),
+              label: Text(s.addToCalendar),
+            ),
+          ],
+          if (_event['registration_link'] != null) ...[
+            const SizedBox(height: 8),
+            TextButton.icon(
+              style: TextButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+              icon: Icon(_isClosed ? Icons.event_busy : Icons.link),
+              label: Text(_isClosed ? s.registrationClosed : s.registerOnline),
+              onPressed: _isClosed ? null : () => _launchSafeUrl(_event['registration_link']),
+            ),
+          ],
+
+          // ---- organiser ----
+          if (_organizer != null) ...[
+            const Divider(height: 24),
+            _organiserRow(context),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _followingGoingRow(BuildContext context) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Row(
+      children: [
+        SizedBox(
+          width: 20.0 * _followingGoingFaces.length + 12,
+          height: 32,
+          child: Stack(
+            children: [
+              for (var i = 0; i < _followingGoingFaces.length; i++)
+                Positioned(
+                  left: 20.0 * i,
+                  child: CircleAvatar(
+                    radius: 16,
+                    backgroundColor: scheme.surfaceContainer,
+                    child: CircleAvatar(
+                      radius: 14,
+                      backgroundColor: scheme.primaryContainer,
+                      backgroundImage: _followingGoingFaces[i]['avatar_url'] != null
+                          ? CachedNetworkImageProvider(_followingGoingFaces[i]['avatar_url'])
+                          : null,
+                      child: _followingGoingFaces[i]['avatar_url'] == null
+                          ? Icon(Icons.person, size: 14, color: scheme.onPrimaryContainer)
+                          : null,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            _followingGoing == 1
+                ? s.followingGoingOne
+                : s.followingGoingMany.fill([_followingGoing]),
+            style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _organiserRow(BuildContext context) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final o = _organizer!;
+    final official = isOfficialProfile(o);
+    return KCard(
+      onTap: () => context.goUser(o['id']),
+      official: official,
+      semanticLabel: '${s.organizer}: ${o['display_name'] ?? ''}',
+      padding: const EdgeInsets.all(KSpace.m),
+      color: scheme.surfaceContainerHigh,
+      child: Padding(
+        padding: EdgeInsets.zero,
+        child: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: scheme.primaryContainer,
+              backgroundImage:
+                  o['avatar_url'] != null ? CachedNetworkImageProvider(o['avatar_url']) : null,
+              child: o['avatar_url'] == null
+                  ? Icon(Icons.person, color: scheme.onPrimaryContainer)
+                  : null,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(o['display_name'] ?? s.organizer,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w700)),
+                      ),
+                      if (official) ...[
+                        const SizedBox(width: 4),
+                        Tooltip(
+                          message: s.officialAccount,
+                          child: Icon(Icons.verified, size: 16, color: scheme.tertiary),
+                        ),
+                      ],
+                    ],
+                  ),
+                  Text('${s.organizer} · ${roleLabel(s, o['role'])}',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: scheme.onSurfaceVariant)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _aboutSection(BuildContext context) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final raw = (_event['description'] ?? '').toString();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text(s.aboutEvent, style: theme.textTheme.titleLarge)),
+            TextButton.icon(
+              onPressed: () {
+                if (!requireLogin(context)) return;
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => CreatePostScreen(sharedEvent: _event)));
+              },
+              icon: const Icon(Icons.repeat, size: 16),
+              label: Text(s.repost),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: MentionText(
+            raw.trim().isEmpty ? s.noDetails : raw,
+            style: theme.textTheme.bodyLarge?.copyWith(height: 1.5, color: scheme.onSurface),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _commentsSection(BuildContext context) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Semantics(
+                header: true,
+                child: Text(s.comments, style: theme.textTheme.titleLarge),
+              ),
+            ),
+            IconButton(
+              icon: _isLoading
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.refresh, size: 20),
+              onPressed: () {
+                setState(() {
+                  _isLoading = true;
+                  _commentsStream = _fetchCommentsStream();
+                });
+                _fetchEventDetails();
+              },
+              tooltip: s.refreshComments,
+            ),
+          ],
+        ),
+        const Divider(),
+        StreamBuilder<List<Map<String, dynamic>>>(
+          stream: _commentsStream,
+          builder: (context, snapshot) {
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text(s.noComments, style: TextStyle(color: scheme.onSurfaceVariant)),
+                ),
+              );
+            }
+            return Column(
+              children: [
+                for (final c in snapshot.data!)
+                  CommentTile(
+                    comment: c,
+                    highlightUserId: _event['organizer_id'],
+                    highlightLabel: s.organiserBadge,
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  /// Comment box. Everyone comments, organisers included; guests get a
+  /// login button. [inline] = inside the page (wide) instead of pinned.
+  Widget _composerBar(BuildContext context, {bool inline = false}) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final field = !isLoggedIn
+        ? GuestActionBar(label: s.loginToComment)
+        : Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _commentCtrl,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _postComment(),
+                  decoration: InputDecoration(
+                    hintText: s.askAboutEvent,
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+                    filled: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: s.post,
+                onPressed: _postingComment ? null : _postComment,
+                icon: _postingComment
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Icon(Icons.send, color: scheme.primary),
+              ),
+            ],
+          );
+    if (inline) return field;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor,
+        boxShadow: [
+          BoxShadow(
+              color: scheme.shadow.withValues(alpha: 0.05),
+              blurRadius: 5,
+              offset: const Offset(0, -2)),
+        ],
+      ),
+      child: SafeArea(child: field),
+    );
+  }
 }
+
 /// Destructive confirmation that only enables once [expected] is typed —
 /// harder to hit by accident than a Yes/No dialog.
 class _TypeToConfirmDialog extends StatefulWidget {

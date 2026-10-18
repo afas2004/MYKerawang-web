@@ -3,12 +3,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/image_compressor.dart';
 import '../utils/local_image.dart';
 import '../utils/categories.dart';
+import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/social_strings.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
 import '../utils/formatters.dart';
-import '../utils/responsive.dart';
+import '../widgets/form_layout.dart';
 import '../widgets/media_picker_grid.dart';
 import '../widgets/restriction_gate.dart';
 import 'edit_profile_screen.dart';
@@ -206,88 +207,94 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.itemToEdit != null;
-    final theme = Theme.of(context);
     final s = context.l10n;
 
     return Scaffold(
       appBar: appBarConstrained(context,
           title: Text(isEditing ? s.editListing : s.sellItem)),
-      body: PageBody(child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      body: FormPageBody(
         child: Form(
           key: _formKey,
+          // Errors show as soon as a field is touched, not only on submit.
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // --- MEDIA (shared with the event form) ---
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(s.photos, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-              ),
-              MediaPickerGrid(items: _mediaItems, onChanged: () => setState(() {})),
-              const SizedBox(height: 24),
-
-              // --- FORM FIELDS ---
-              TextFormField(
-                controller: _titleController,
-                decoration: InputDecoration(labelText: s.title, hintText: s.listingTitleHint),
-                validator: (v) => v!.isEmpty ? s.required : null,
-              ),
-              const SizedBox(height: 16),
-              
-              Row(
+              FormSection(
+                title: s.sectionPhotos,
+                icon: Icons.photo_library_outlined,
                 children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _priceController,
-                      decoration: InputDecoration(labelText: s.priceLabel, prefixText: kCurrencyPrefix),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (v) => (v == null || double.tryParse(v) == null) ? s.invalid : null,
-                    ),
+                  // Shared with the event form
+                  MediaPickerGrid(items: _mediaItems, onChanged: () => setState(() {})),
+                ],
+              ),
+              FormSection(
+                title: s.sectionDetails,
+                icon: Icons.edit_note,
+                children: [
+                  TextFormField(
+                    controller: _titleController,
+                    textInputAction: TextInputAction.next,
+                    decoration: InputDecoration(labelText: s.title, hintText: s.listingTitleHint),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? s.required : null,
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _category,
-                      decoration: InputDecoration(labelText: s.category),
-                      items: kListingCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                      onChanged: (v) => setState(() => _category = v!),
-                    ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _descriptionController,
+                    minLines: 3,
+                    maxLines: 6,
+                    decoration: InputDecoration(labelText: s.description, alignLabelWithHint: true),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? s.required : null,
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              
-              TextFormField(
-                controller: _descriptionController,
-                maxLines: 5,
-                decoration: InputDecoration(labelText: s.description, alignLabelWithHint: true),
-                validator: (v) => v!.isEmpty ? s.required : null,
+              FormSection(
+                title: s.sectionPricing,
+                icon: Icons.sell_outlined,
+                children: [
+                  LayoutBuilder(builder: (context, c) {
+                    final price = TextFormField(
+                      controller: _priceController,
+                      decoration: InputDecoration(
+                          labelText: s.priceLabel, prefixText: kCurrencyPrefix, hintText: '12.50'),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      validator: (v) {
+                        final n = double.tryParse((v ?? '').trim());
+                        return (n == null || n < 0) ? s.priceInvalid : null;
+                      },
+                    );
+                    final category = DropdownButtonFormField<String>(
+                      initialValue: _category,
+                      decoration: InputDecoration(labelText: s.category),
+                      items: kListingCategories
+                          .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                          .toList(),
+                      onChanged: (v) => setState(() => _category = v!),
+                    );
+                    if (c.maxWidth < 420) {
+                      return Column(children: [price, const SizedBox(height: 16), category]);
+                    }
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: price),
+                        const SizedBox(width: 16),
+                        Expanded(child: category),
+                      ],
+                    );
+                  }),
+                ],
               ),
-              const SizedBox(height: 80),
             ],
           ),
         ),
-      )),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor, 
-          border: Border(top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)))
-        ),
-        // Same submit bar as the event form
-        child: ElevatedButton.icon(
-          onPressed: _isLoading ? null : _submit,
-          icon: _isLoading
-              ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onPrimary))
-              : Icon(isEditing ? Icons.check : Icons.publish),
-          label: Text(_isLoading ? s.saving : (isEditing ? s.saveChanges : s.publish)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: theme.colorScheme.primary,
-            foregroundColor: theme.colorScheme.onPrimary,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-          ),
-        ),
+      ),
+      bottomNavigationBar: PublishBar(
+        busy: _isLoading,
+        editing: isEditing,
+        label: isEditing ? s.saveChanges : s.publish,
+        busyLabel: s.saving,
+        onPressed: _submit,
       ),
     );
   }
