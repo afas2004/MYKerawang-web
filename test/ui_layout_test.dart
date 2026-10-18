@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mykerawang/language_cubit.dart';
 import 'package:mykerawang/screens/events_screen.dart';
+import 'package:mykerawang/screens/marketplace_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Redesigned cards and pages render without overflow at phone (375),
@@ -92,5 +93,53 @@ void main() {
     );
     expect(find.text('CANCELLED'), findsOneWidget);
     expect(find.byType(CountdownChip), findsNothing);
+  });
+
+  // ---- market card ----
+  /// Width the market grid gives one tile at a screen width (side panel
+  /// from 900).
+  double marketTileWidth(double width) {
+    final grid = (width >= 900 ? width - 281 : width) - 32;
+    final cols = marketColumns(grid + 32);
+    return (grid - 12 * (cols - 1)) / cols;
+  }
+
+  final listing = {
+    'id': 'l1',
+    'title': 'Kalkulator saintifik Casio fx-570EX hampir baru, lengkap dengan kotak dan manual',
+    'price': 12345.5,
+    'status': 'reserved',
+    'image_url': null,
+  };
+
+  for (final width in widths) {
+    for (final scale in [1.0, 1.3]) {
+      testWidgets('MarketCard fits at ${width.toInt()}px, text x$scale', (tester) async {
+        final w = marketTileWidth(width);
+        await pumpAt(
+          tester,
+          width,
+          Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: w,
+              height: w / MarketCard.aspectRatio,
+              child: MarketCard(item: listing),
+            ),
+          ),
+          textScale: scale,
+        );
+        expect(tester.takeException(), isNull);
+        expect(find.text('RESERVED'), findsOneWidget);
+        expect(find.textContaining('12345.50'), findsOneWidget);
+      });
+    }
+  }
+
+  test('market columns step 2 / 3 / 4 / 5', () {
+    expect(marketColumns(375), 2);
+    expect(marketColumns(768), 3);
+    expect(marketColumns(1000), 4);
+    expect(marketColumns(1400), 5);
   });
 }
