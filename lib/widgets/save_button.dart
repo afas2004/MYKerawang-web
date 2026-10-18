@@ -71,7 +71,7 @@ class _SaveButtonState extends State<SaveButton> {
   Widget build(BuildContext context) {
     final s = context.l10n.social;
     final scheme = Theme.of(context).colorScheme;
-    if (Supabase.instance.client.auth.currentUser == null) {
+    if (!SavedItems.instance.signedIn) {
       return const SizedBox.shrink();
     }
     return ValueListenableBuilder<Set<String>>(

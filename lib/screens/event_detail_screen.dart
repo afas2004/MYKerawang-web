@@ -24,6 +24,8 @@ import 'create_event_screen.dart';
 import 'gallery_view_screen.dart';
 import '../utils/responsive.dart';
 import '../widgets/restriction_gate.dart';
+import '../services/saved_items.dart';
+import '../widgets/save_button.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final Map<String, dynamic> event;
@@ -597,6 +599,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                         // Body icons sit on the page, not on the photo, so
                         // they take scheme colours (the old black circles
                         // vanished on Songket Noir).
+                        SaveButton(type: SavedType.event, id: _event['id'], color: scheme.onSurfaceVariant),
                         IconButton(
                           tooltip: s.share,
                           icon: Icon(Icons.share, color: scheme.onSurfaceVariant),

@@ -19,6 +19,8 @@ import '../utils/tags.dart';
 import 'mention_text.dart';
 import 'owner_menu.dart';
 import 'pin_controls.dart';
+import '../services/saved_items.dart';
+import 'save_button.dart';
 
 class PostCard extends StatefulWidget {
   final Map<String, dynamic> post;
@@ -304,6 +306,7 @@ class _PostCardState extends State<PostCard> {
                   }),
                   
                   const Spacer(),
+                  SaveButton(type: SavedType.post, id: post['id'], iconSize: 20),
                   PinMenuButton(post: post),
                   _mine
                       ? OwnerMenuButton(

@@ -17,6 +17,7 @@ import '../widgets/hover_carousel.dart';
 import '../widgets/universal_card.dart';
 import '../widgets/post_card.dart';
 import 'create_post_screen.dart';
+import '../widgets/post_card_skeleton.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -326,7 +327,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // 4. SOCIAL FEED (Vertical Mixed)
             _isLoading 
-              ? const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+              ? SliverToBoxAdapter(child: PostCardSkeleton.list(context))
               : SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {

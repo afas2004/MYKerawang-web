@@ -13,7 +13,13 @@ class SavedItems {
   SavedItems._();
   static final instance = SavedItems._();
 
-  final _supabase = Supabase.instance.client;
+  SupabaseClient get _supabase => Supabase.instance.client;
+
+  /// Test hook: widget tests run without a Supabase instance.
+  static bool Function()? debugSignedIn;
+
+  bool get signedIn =>
+      debugSignedIn?.call() ?? _supabase.auth.currentUser != null;
 
   /// Keys are `"<type>:<id>"`; see [keyOf].
   final keys = ValueNotifier<Set<String>>({});

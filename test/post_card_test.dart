@@ -5,6 +5,7 @@ import 'package:mykerawang/l10n/app_strings.dart';
 import 'package:mykerawang/language_cubit.dart';
 import 'package:mykerawang/services/post_service.dart';
 import 'package:mykerawang/services/moderation_service.dart';
+import 'package:mykerawang/services/saved_items.dart';
 import 'package:mykerawang/widgets/post_card.dart';
 import 'package:mykerawang/widgets/post_card_skeleton.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,11 +19,13 @@ void main() {
     PostService.debugCurrentUserId = () => 'me';
     ModerationService.debugCurrentUserId = () => 'me';
     ModerationService.debugMyRole = () async => 'student';
+    SavedItems.debugSignedIn = () => false;
   });
   tearDown(() {
     PostService.debugCurrentUserId = null;
     ModerationService.debugCurrentUserId = null;
     ModerationService.debugMyRole = null;
+    SavedItems.debugSignedIn = null;
   });
 
   Map<String, dynamic> post({

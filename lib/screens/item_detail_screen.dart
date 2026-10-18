@@ -23,6 +23,8 @@ import '../widgets/status_badge.dart';
 import '../widgets/tap_card.dart';
 import 'gallery_view_screen.dart';
 import '../utils/responsive.dart';
+import '../services/saved_items.dart';
+import '../widgets/save_button.dart';
 
 class ItemDetailScreen extends StatefulWidget {
   final Map<String, dynamic> item;
@@ -442,6 +444,7 @@ int _currentImageIndex = 0;
                   Row(
                     children: [
                       Expanded(child: Text(_itemData['title'], style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold))),
+                      SaveButton(type: SavedType.listing, id: _itemData['id'], color: scheme.onSurfaceVariant),
                       IconButton(
                         tooltip: s.share,
                         icon: Icon(Icons.share, color: scheme.onSurfaceVariant),
