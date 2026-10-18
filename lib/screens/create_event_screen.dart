@@ -30,8 +30,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   DateTime? _startDate;
   DateTime? _endDate;
   bool _isLoading = false;
-  bool _isPublic = true;
-  
+
   // UNIFIED MEDIA LIST (Stores both Strings (URLs) and Files)
   // Index 0 is ALWAYS the Cover Photo.
   final List<dynamic> _mediaItems = [];
@@ -53,8 +52,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       _endDate = event['end_datetime'] != null 
           ? DateTime.parse(event['end_datetime']).toLocal() 
           : _startDate!.add(const Duration(hours: 2));
-      _isPublic = event['is_public'] ?? true;
-      if (event['tags'] != null) {
+if (event['tags'] != null) {
         _selectedTags = List<String>.from(event['tags']);
       }
 
@@ -136,8 +134,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         'end_datetime': _endDate!.toUtc().toIso8601String(),
         'image_url': finalCoverUrl,      // Index 0
         'gallery_urls': finalGalleryUrls, // Index 1+
-        'is_public': _isPublic,
-        'tags': _selectedTags,
+        // The Public switch was removed: new events are public, and an
+        // edit leaves whatever is_public an existing event already has.
+        if (widget.eventToEdit == null) 'is_public': true,
+'tags': _selectedTags,
         'organizer_id': user!.id,
       };
 
@@ -249,14 +249,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 ),
               ),
 
-              const SizedBox(height: 20),
-              _label(s.privacy),
-              SwitchListTile(
-                title: Text(s.publicEvent),
-                value: _isPublic,
-                activeThumbColor: theme.colorScheme.primary,
-                onChanged: (val) => setState(() => _isPublic = val),
-              ),
               const SizedBox(height: 80),
             ],
           ),

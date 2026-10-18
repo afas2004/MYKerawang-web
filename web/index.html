@@ -21,6 +21,23 @@
   <meta name="theme-color" content="#5B3E96">
   <meta name="description" content="MYKerawang — community marketplace and events platform.">
 
+  <!-- Link previews (WhatsApp, Telegram, X…). Crawlers don't run Flutter,
+       so every shared URL gets this same generic card; per-item previews
+       would need server-side rendering (e.g. a Cloud Function on /event/**).
+       og:image must be an absolute URL. -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="MYKerawang">
+  <meta property="og:title" content="MYKerawang">
+  <meta property="og:description" content="Events, marketplace and community posts for the UiTM Kerawang college community.">
+  <meta property="og:image" content="https://mykerawang-app.web.app/icons/Icon-512.png">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+  <meta property="og:image:alt" content="MYKerawang logo">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="MYKerawang">
+  <meta name="twitter:description" content="Events, marketplace and community posts for the UiTM Kerawang college community.">
+  <meta name="twitter:image" content="https://mykerawang-app.web.app/icons/Icon-512.png">
+
   <!-- Open connections early: engine (skwasm/canvaskit), fonts, backend -->
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

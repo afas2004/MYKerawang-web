@@ -1,6 +1,7 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show ValueNotifier, debugPrint, kIsWeb;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/guest_access.dart';
 
 /// Error codes put in [LoginState.errorMessage]. The cubit has no
 /// BuildContext, so the screen turns these into localized text
@@ -9,9 +10,41 @@ abstract final class LoginError {
   static const fillFields = 'login.fill_fields';
   static const checkEmail = 'login.check_email';
   static const generic = 'login.generic';
+  static const studentEmailOnly = 'login.student_email_only';
 
   /// Prefix; the underlying error follows it.
   static const googleFailed = 'login.google:';
+}
+
+/// New accounts must use a UiTM student address. Existing accounts with
+/// other addresses (e.g. the owner's) keep working — only sign-ups are
+/// checked, here and by the auth.users trigger in
+/// 20261019002400_student_email_signup.sql.
+const kStudentEmailDomain = '@student.uitm.edu.my';
+
+bool isStudentEmail(String? email) =>
+    (email ?? '').trim().toLowerCase().endsWith(kStudentEmailDomain);
+
+/// A [LoginError] code raised outside the login screen (after an OAuth
+/// redirect); the login screen shows it and clears it.
+final ValueNotifier<String?> pendingLoginError = ValueNotifier(null);
+
+/// Google sign-in can create an account without the student check the
+/// email form does. Call on every signedIn event: an account created by
+/// this sign-in whose address isn't a student one is signed out again.
+/// The server trigger normally rejects it first; this covers projects
+/// where that migration isn't applied yet.
+Future<void> enforceStudentEmailForNewAccount(User user) async {
+  if (isStudentEmail(user.email)) return;
+  final created = DateTime.tryParse(user.createdAt);
+  final lastSignIn = DateTime.tryParse(user.lastSignInAt ?? '');
+  // Brand-new account: first sign-in happens at creation time.
+  final isNew = created != null &&
+      (lastSignIn == null || lastSignIn.difference(created).inSeconds.abs() < 60);
+  if (!isNew) return; // grandfathered
+  debugPrint('Non-student sign-up rejected: ${user.email}');
+  pendingLoginError.value = LoginError.studentEmailOnly;
+  await Supabase.instance.client.auth.signOut();
 }
 
 // 1. Define the detailed States for your screen
@@ -62,6 +95,13 @@ class LoginCubit extends Cubit<LoginState> {
       return;
     }
 
+    // Only new accounts are restricted; logging in stays open so
+    // existing non-student accounts keep working.
+    if (!state.isLoginMode && !isStudentEmail(email)) {
+      emit(state.copyWith(errorMessage: LoginError.studentEmailOnly));
+      return;
+    }
+
     emit(state.copyWith(isLoading: true, errorMessage: null));
 
     try {
@@ -95,7 +135,10 @@ class LoginCubit extends Cubit<LoginState> {
     }
   }
 
-  Future<void> signInWithGoogle() async {
+  /// [from] is the page to return to; on web it rides along in the
+  /// redirect URL (`/login?from=…`), and the router forwards there once
+  /// the restored session arrives.
+  Future<void> signInWithGoogle({String? from}) async {
     emit(state.copyWith(isLoading: true, errorMessage: null));
     try {
       // 1. Trigger Supabase OAuth
@@ -105,7 +148,11 @@ class LoginCubit extends Cubit<LoginState> {
         // WEB: come back to this same page after Google login.
         // MOBILE: deep link back into the app (must match Supabase URL settings
         // and the AndroidManifest intent filter).
-        redirectTo: kIsWeb ? Uri.base.origin : 'mykerawang://login-callback',
+        // The full URL must be allowed in Supabase Auth → URL
+        // Configuration (e.g. https://mykerawang-app.web.app/**).
+        redirectTo: kIsWeb
+            ? '${Uri.base.origin}${loginPathFor(from)}'
+            : 'mykerawang://login-callback',
         // iOS WebKit blocks the storage access a popup needs to finish the
         // credential exchange (ITP), so the popup silently dies after account
         // selection. A same-tab, full-page redirect avoids popups entirely.

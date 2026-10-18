@@ -1,16 +1,21 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:mykerawang/services/share_service.dart';
-import 'package:mykerawang/utils/report_helper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../theme/app_themes.dart';
 import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
 import '../utils/formatters.dart';
+import '../utils/feedback.dart';
+import '../utils/guest_access.dart';
+import '../utils/ics.dart';
 import '../utils/roles.dart';
+import '../widgets/comment_tile.dart';
 import '../widgets/mention_text.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/tap_card.dart';
@@ -35,6 +40,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   int _currentImageIndex = 0; 
   final _commentCtrl = TextEditingController();
   bool _isJoined = false;       // <--- NEW: Did I join?
+  bool _joining = false;
+  bool _postingComment = false;
+  bool _savingCalendar = false;
+
+  /// People I follow who joined: total, plus up to 3 for avatars.
+  int _followingGoing = 0;
+  List<Map<String, dynamic>> _followingGoingFaces = const [];
   int _participantCount = 0;    // <--- NEW: Total count
   late Stream<List<Map<String, dynamic>>> _commentsStream;
 
@@ -59,14 +71,30 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     final supabase = Supabase.instance.client;
     try {
       final freshEvent = await supabase.from('events').select().eq('id', _event['id']).single();
-      final organizer = await supabase.from('profiles').select().eq('id', freshEvent['organizer_id']).maybeSingle();
+      // Only what the organiser tile shows. Guests can't read the profiles
+      // table (it holds phone numbers), so they go through the safe view.
+      final organizer = await supabase
+          .from(isLoggedIn ? 'profiles' : 'profiles_public')
+          .select('id, username, display_name, avatar_url, role, is_verified')
+          .eq('id', freshEvent['organizer_id'])
+          .maybeSingle();
 
-      // 2. NEW: Fetch Participant Count
-      final count = await supabase
-          .from('event_participants')
-          .count(CountOption.exact)
-          .eq('event_id', _event['id']);
-      
+      // 2. Participant count (guests see the number, not who)
+      final int count;
+      if (isLoggedIn) {
+        count = await supabase
+            .from('event_participants')
+            .count(CountOption.exact)
+            .eq('event_id', _event['id']);
+      } else {
+        final row = await supabase
+            .from('event_participant_counts')
+            .select('participant_count')
+            .eq('event_id', _event['id'])
+            .maybeSingle();
+        count = (row?['participant_count'] as num?)?.toInt() ?? 0;
+      }
+
       // 3. NEW: Check if *I* already joined
       bool amIJoined = false;
       final userId = supabase.auth.currentUser?.id;
@@ -89,12 +117,68 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           _isLoading = false;
         });
       }
+      if (userId != null) _fetchFollowingGoing(userId);
     } catch (e) {
       debugPrint("Error fetching details: $e");
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  /// Realtime can only subscribe to a real table, and a raw `comments`
+  /// "N people you follow are going". Best-effort: a failure just hides
+  /// the line.
+  Future<void> _fetchFollowingGoing(String myId) async {
+    final db = Supabase.instance.client;
+    try {
+      final follows = await db
+          .from('followers')
+          .select('following_id')
+          .eq('follower_id', myId);
+      final ids = [for (final f in follows) f['following_id'] as String];
+      if (ids.isEmpty) return;
+
+      final going = await db
+          .from('event_participants')
+          .select('user_id')
+          .eq('event_id', _event['id'])
+          .inFilter('user_id', ids);
+      final goingIds = [for (final g in going) g['user_id'] as String];
+      if (goingIds.isEmpty) {
+        if (mounted) setState(() => _followingGoing = 0);
+        return;
+      }
+
+      final faces = await db
+          .from('profiles')
+          .select('id, display_name, avatar_url')
+          .inFilter('id', goingIds.take(3).toList());
+      if (!mounted) return;
+      setState(() {
+        _followingGoing = goingIds.length;
+        _followingGoingFaces = List<Map<String, dynamic>>.from(faces);
+      });
+    } catch (e) {
+      debugPrint("Following-going lookup failed: $e");
+    }
+  }
+
+  Future<void> _addToCalendar() async {
+    if (_savingCalendar) return;
+    final s = context.l10nRead;
+    setState(() => _savingCalendar = true);
+    try {
+      final ics = buildEventIcs(_event,
+          url: ShareService.absoluteUrl('/event/${_event['id']}'));
+      await saveIcs(ics, icsFileName(_event['title']));
+      // Mobile shows the share sheet, which is its own confirmation.
+      if (mounted && kIsWeb) showSuccess(context, s.calendarFileSaved);
+    } catch (e) {
+      if (mounted) showErrorWithRetry(context, e, onRetry: _addToCalendar);
+    } finally {
+      if (mounted) setState(() => _savingCalendar = false);
+    }
+  }
+
+  /// Realtime can only subscribe to a real table,and a raw `comments`
   /// stream carries `user_id` even for anonymous comments. So the stream is
   /// used purely as a change signal; the rows actually rendered come from
   /// `comments_public`, which blanks the author.
@@ -106,8 +190,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         .stream(primaryKey: ['id'])
         .eq('event_id', _event['id']);
 
-    await for (final _ in signal) {
-      yield await _fetchEventComments();
+    // If realtime is unavailable (e.g. a guest's anon session), keep the
+    // comments already shown rather than surfacing a stream error.
+    try {
+      await for (final _ in signal) {
+        yield await _fetchEventComments();
+      }
+    } catch (e) {
+      debugPrint("Comment stream ended: $e");
     }
   }
 
@@ -121,38 +211,92 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 
   Future<void> _postComment() async {
-    if (_commentCtrl.text.trim().isEmpty) return;
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return;
+    if (!requireLogin(context)) return;
+    if (_commentCtrl.text.trim().isEmpty || _postingComment) return;
+    final user = Supabase.instance.client.auth.currentUser!;
+    final s = context.l10nRead;
 
+    setState(() => _postingComment = true);
     try {
       await Supabase.instance.client.from('comments').insert({
         'event_id': _event['id'],
         'user_id': user.id,
         'body': _commentCtrl.text.trim(),
       });
+      // Text is kept until the insert succeeds, so Retry resends it.
       _commentCtrl.clear();
-      if (mounted) FocusScope.of(context).unfocus();
-    } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.errorWithDetail.fill([e]))));
+      FocusScope.of(context).unfocus();
+      showSuccess(context, s.commentPosted);
+    } catch (e) {
+      if (mounted) showErrorWithRetry(context, e, onRetry: _postComment);
+    } finally {
+      if (mounted) setState(() => _postingComment = false);
     }
   }
 
-  // --- NEW: Delete Logic ---
-  Future<void> _deleteEvent() async {
+  bool get _isCancelled => _event['cancelled_at'] != null;
+
+  /// Soft cancel: the event stays visible, marked cancelled, and a
+  /// database trigger notifies everyone who joined.
+  Future<void> _cancelEvent() async {
     final s = context.l10nRead;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(s.cancelEvent),
-        content: Text(s.cancelEventConfirm),
+        content: Text(s.cancelEventSoftConfirm),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(s.keepEvent)),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(s.delete, style: TextStyle(color: Theme.of(ctx).colorScheme.error))),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
+            child: Text(s.cancelEvent),
+          ),
         ],
+      ),
+    );
+    if (confirm == true) {
+      await _setCancelled(DateTime.now().toUtc().toIso8601String(), s.eventCancelled);
+    }
+  }
+
+  Future<void> _restoreEvent() =>
+      _setCancelled(null, context.l10nRead.eventRestored);
+
+  Future<void> _setCancelled(String? cancelledAt, String doneMessage) async {
+    try {
+      await Supabase.instance.client
+          .from('events')
+          .update({'cancelled_at': cancelledAt})
+          .eq('id', _event['id']);
+      if (!mounted) return;
+      setState(() => _event = {..._event, 'cancelled_at': cancelledAt});
+      showSuccess(context, doneMessage);
+    } catch (e) {
+      if (mounted) {
+        showErrorWithRetry(context, e,
+            onRetry: () => _setCancelled(cancelledAt, doneMessage));
+      }
+    }
+  }
+
+  /// Permanent delete — comments and participants go with it, so the
+  /// owner has to type the title to confirm.
+  Future<void> _deleteEvent() async {
+    final s = context.l10nRead;
+    final title = (_event['title'] ?? '').toString().trim();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => _TypeToConfirmDialog(
+        title: s.deleteEvent,
+        message: s.deleteEventConfirm,
+        expected: title,
+        cancelLabel: s.cancel,
+        confirmLabel: s.deletePermanently,
       ),
     );
 
@@ -160,13 +304,21 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       try {
         await Supabase.instance.client.from('events').delete().eq('id', _event['id']);
         if (mounted) {
-          Navigator.pop(context, true); // Return true to refresh profile/home
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.eventCancelled)));
+          showSuccess(context, s.eventDeleted);
+          popOrHome(context, true); // true = refresh profile/home
         }
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+        if (mounted) showErrorWithRetry(context, e, onRetry: _deleteEvent);
       }
     }
+  }
+
+  Future<void> _editEvent() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => CreateEventScreen(eventToEdit: _event)),
+    );
+    if (result == true) _fetchEventDetails();
   }
 
   // --- 2. SAFETY: LINK CHECKER ---
@@ -208,11 +360,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
   Future<void> _toggleJoin() async {
     final supabase = Supabase.instance.client;
-    final userId = supabase.auth.currentUser?.id;
-    if (userId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.loginToJoin)));
-      return;
-    }
+    if (!requireLogin(context)) return;
+    final userId = supabase.auth.currentUser!.id;
+    if (_isCancelled && !_isJoined) return;
+    if (_joining) return;
+    _joining = true;
 
     // 1. Instant UI Update (Makes it feel fast)
     setState(() {
@@ -240,8 +392,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           _isJoined = !_isJoined;
           _participantCount += _isJoined ? 1 : -1;
         });
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.errorWithDetail.fill([e]))));
+        showErrorWithRetry(context, e, onRetry: _toggleJoin);
       }
+    } finally {
+      _joining = false;
     }
   }
 
@@ -267,9 +421,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       ...?(_event['gallery_urls'] as List?)?.cast<String>(),
     ];
 
-    final bool isPast = endDate != null 
-        ? endDate.isBefore(DateTime.now()) 
+    final bool isPast = endDate != null
+        ? endDate.isBefore(DateTime.now())
         : startDate.add(const Duration(hours: 4)).isBefore(DateTime.now());
+    final bool isCancelled = _isCancelled;
+    // Joining / registering is closed once an event is over or cancelled.
+    final bool isClosed = isPast || isCancelled;
 
     return Scaffold(
       body: PageBody(child: CustomScrollView(
@@ -286,10 +443,61 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   child: IconButton(
                     tooltip: MaterialLocalizations.of(context).backButtonTooltip,
                     icon: const Icon(Icons.arrow_back, color: kOnPhoto),
-                    onPressed: () => Navigator.pop(context),
+                    // A shared link opens this page cold, with nothing
+                    // underneath to pop back to.
+                    onPressed: () => popOrHome(context),
                   ),
                 ),
               ),
+              // Owner controls live here so the bottom bar stays free for
+              // comments — organisers answer questions too.
+              actions: [
+                if (isOwner)
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: CircleAvatar(
+                      backgroundColor: photoScrim(0.45),
+                      child: PopupMenuButton<String>(
+                        tooltip: s.manageEvent,
+                        icon: const Icon(Icons.more_vert, color: kOnPhoto),
+                        onSelected: (v) => switch (v) {
+                          'edit' => _editEvent(),
+                          'cancel' => _cancelEvent(),
+                          'restore' => _restoreEvent(),
+                          'delete' => _deleteEvent(),
+                          _ => null,
+                        },
+                        itemBuilder: (_) => [
+                          PopupMenuItem(
+                            value: 'edit',
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(Icons.edit_outlined),
+                              title: Text(s.edit),
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: isCancelled ? 'restore' : 'cancel',
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(isCancelled ? Icons.event_available : Icons.event_busy),
+                              title: Text(isCancelled ? s.restoreEvent : s.cancelEvent),
+                            ),
+                          ),
+                          const PopupMenuDivider(),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(Icons.delete_forever, color: scheme.error),
+                              title: Text(s.deleteEvent, style: TextStyle(color: scheme.error)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
               backgroundColor: theme.scaffoldBackgroundColor,
               flexibleSpace: FlexibleSpaceBar(
                 background: Stack(
@@ -317,12 +525,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       },
                     ),
 
-                    if (isPast)
+                    if (isClosed)
                     Positioned.fill(
                       child: IgnorePointer(
                         child: Container(
                           color: photoScrim(0.4),
-                          child: Center(child: StatusBadge.stamp(s.ended)),
+                          child: Center(child: StatusBadge.stamp(isCancelled ? s.cancelled : s.ended)),
                         ),
                       ),
                     ),
@@ -399,19 +607,57 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                 if (_event['description'] != null) "\n${_event['description']}",
                               ].join('\n'),
                               allImages,
+                              // Deep link keeps the description intact — the
+                              // Web Share API drops text when files attach.
+                              link: '/event/${_event['id']}',
                             );
                           },
                         ),
-                        ReportMenuButton(targetId: _event['id'], type: 'event'),
+                        if (!isOwner)
+                          GuardedReportButton(targetId: _event['id'], type: 'event'),
                       ],
                     ),
+                    if (isCancelled) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: scheme.errorContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.event_busy, color: scheme.onErrorContainer),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(s.eventCancelledBanner,
+                                  style: TextStyle(color: scheme.onErrorContainer, fontWeight: FontWeight.w600)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 16),
 
-                    // Date & Location Rows (Keep your existing logic)
+                    // Date & Location Rows(Keep your existing logic)
                     _infoRow(Icons.calendar_today, formatEventRange(startDate, endDate), theme),
                     const SizedBox(height: 12),
                     _infoRow(Icons.location_on, _event['location'] ?? s.locationTba, theme),
-                    
+                    if (!isClosed) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: _savingCalendar ? null : _addToCalendar,
+                          icon: _savingCalendar
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.event_available, size: 18),
+                          label: Text(s.addToCalendar),
+                        ),
+                      ),
+                    ],
+
                     const SizedBox(height: 24),
                     const Divider(),
 
@@ -433,9 +679,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                           const Spacer(),
 
                           // 2. The Button (Only show if not owner)
-                          if (Supabase.instance.client.auth.currentUser?.id != _event['organizer_id'])
+                          if (!isOwner)
                             SizedBox(
                               height: 36,
+                              // Already-joined people can still leave a
+                              // cancelled event; nobody can newly join.
                               child: _isJoined
                                   ? OutlinedButton.icon(
                                       onPressed: _toggleJoin,
@@ -447,14 +695,56 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                       ),
                                     )
                                   : FilledButton.icon(
-                                      onPressed: _toggleJoin,
-                                      icon: const Icon(Icons.add, size: 16),
-                                      label: Text(s.join),
+                                      onPressed: isClosed ? null : _toggleJoin,
+                                      icon: Icon(isCancelled ? Icons.event_busy : Icons.add, size: 16),
+                                      label: Text(isCancelled ? s.cancelled : s.join),
                                     ),
                             ),
                         ],
                       ),
                     ),
+                    if (_followingGoing > 0) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 20.0 * _followingGoingFaces.length + 12,
+                            height: 32,
+                            child: Stack(
+                              children: [
+                                for (var i = 0; i < _followingGoingFaces.length; i++)
+                                  Positioned(
+                                    left: 20.0 * i,
+                                    child: CircleAvatar(
+                                      radius: 16,
+                                      backgroundColor: theme.scaffoldBackgroundColor,
+                                      child: CircleAvatar(
+                                        radius: 14,
+                                        backgroundColor: scheme.primaryContainer,
+                                        backgroundImage: _followingGoingFaces[i]['avatar_url'] != null
+                                            ? CachedNetworkImageProvider(_followingGoingFaces[i]['avatar_url'])
+                                            : null,
+                                        child: _followingGoingFaces[i]['avatar_url'] == null
+                                            ? Icon(Icons.person, size: 14, color: scheme.onPrimaryContainer)
+                                            : null,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _followingGoing == 1
+                                  ? s.followingGoingOne
+                                  : s.followingGoingMany.fill([_followingGoing]),
+                              style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 24),
 
                     // Organizer Tile (Keep existing)
@@ -484,6 +774,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                         Text(s.aboutEvent, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                         TextButton.icon(
                           onPressed: () {
+                            if (!requireLogin(context)) return;
                             Navigator.push(context, MaterialPageRoute(builder: (_) => CreatePostScreen(sharedEvent: _event)));
                           },
                           icon: const Icon(Icons.repeat, size: 16),
@@ -507,14 +798,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
-                        icon: Icon(isPast ? Icons.event_busy : Icons.link),
-                        label: Text(isPast ? s.registrationClosed : s.registerOnline),
+                        icon: Icon(isClosed ? Icons.event_busy : Icons.link),
+                        label: Text(isClosed ? s.registrationClosed : s.registerOnline),
                         // Past = onPressed null, so the theme's disabled colours apply
                         style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        onPressed: isPast 
-                          ? null // DISABLE CLICK
+                        onPressed: isClosed
+                          ? null// DISABLE CLICK
                           : () => _launchSafeUrl(_event['registration_link']), // USE SAFE LAUNCHER
                       ),
                     ),
@@ -559,17 +850,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: snapshot.data!.length,
-                          itemBuilder: (context, index) {
-                            final c = snapshot.data![index];
-                            return ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: const CircleAvatar(radius: 14, child: Icon(Icons.person, size: 14)),
-                              title: MentionText(c['body'] ?? ''),
-                              subtitle: Text(formatRelative(context, DateTime.parse(c['created_at'])),
-                                  style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
-                              trailing: ReportMenuButton(targetId: c['id'], type: 'comment', iconSize: 18),
-                            );
-                          },
+                          itemBuilder: (context, index) =>
+                              CommentTile(comment: snapshot.data![index]),
                         );
                       },
                     ),
@@ -589,35 +871,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           boxShadow: [BoxShadow(color: scheme.shadow.withValues(alpha: 0.05), blurRadius: 5, offset: const Offset(0, -2))],
         ),
         child: SafeArea(
-          child: isOwner
-              // A: OWNER CONTROLS (Edit / Delete)
-              ? Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _deleteEvent,
-                        style: OutlinedButton.styleFrom(foregroundColor: scheme.error, side: BorderSide(color: scheme.error)),
-                        child: Text(s.cancelEvent),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          // Navigate to Edit Screen
-                          final result = await Navigator.push(
-                            context, 
-                            MaterialPageRoute(builder: (_) => CreateEventScreen(eventToEdit: _event))
-                          );
-                          if (result == true) _fetchEventDetails();
-                        },
-                        style: ElevatedButton.styleFrom(backgroundColor: scheme.primary, foregroundColor: scheme.onPrimary),
-                        child: Text(s.edit),
-                      ),
-                    ),
-                  ],
-                )
-              // B: VIEWER CONTROLS (Comment Input)
+          // Everyone comments here, organisers included (owner controls
+          // are in the app bar menu). Guests get a login button instead.
+          child: !isLoggedIn
+              ? GuestActionBar(label: s.loginToComment)
               : Row(
                   children: [
                     Expanded(
@@ -631,7 +888,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                         ),
                       ),
                     ),
-                    IconButton(tooltip: s.post, icon: Icon(Icons.send, color: scheme.primary), onPressed: _postComment),
+                    IconButton(
+                      tooltip: s.post,
+                      onPressed: _postingComment ? null : _postComment,
+                      icon: _postingComment
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                          : Icon(Icons.send, color: scheme.primary),
+                    ),
                   ],
                 ),
         ),
@@ -645,6 +908,78 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         Icon(icon, size: 20, color: theme.colorScheme.primary),
         const SizedBox(width: 12),
         Expanded(child: Text(text, style: theme.textTheme.bodyLarge)),
+      ],
+    );
+  }
+}
+/// Destructive confirmation that only enables once [expected] is typed —
+/// harder to hit by accident than a Yes/No dialog.
+class _TypeToConfirmDialog extends StatefulWidget {
+  final String title;
+  final String message;
+  final String expected;
+  final String cancelLabel;
+  final String confirmLabel;
+
+  const _TypeToConfirmDialog({
+    required this.title,
+    required this.message,
+    required this.expected,
+    required this.cancelLabel,
+    required this.confirmLabel,
+  });
+
+  @override
+  State<_TypeToConfirmDialog> createState() => _TypeToConfirmDialogState();
+}
+
+class _TypeToConfirmDialogState extends State<_TypeToConfirmDialog> {
+  final _ctrl = TextEditingController();
+
+  bool get _matches =>
+      _ctrl.text.trim().toLowerCase() == widget.expected.toLowerCase();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return AlertDialog(
+      icon: Icon(Icons.warning_amber, color: scheme.error),
+      title: Text(widget.title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(widget.message),
+          const SizedBox(height: 8),
+          Text(widget.expected, style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _ctrl,
+            autofocus: true,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(hintText: widget.expected),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(widget.cancelLabel),
+        ),
+        FilledButton(
+          onPressed: _matches ? () => Navigator.pop(context, true) : null,
+          style: FilledButton.styleFrom(
+            backgroundColor: scheme.error,
+            foregroundColor: scheme.onError,
+          ),
+          child: Text(widget.confirmLabel),
+        ),
       ],
     );
   }

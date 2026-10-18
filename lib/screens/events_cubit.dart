@@ -48,6 +48,14 @@ bool isEventEnded(Map<String, dynamic> event) {
   return end.toUtc().isBefore(DateTime.now().toUtc());
 }
 
+/// Cancelled by the organiser (events.cancelled_at, see
+/// 20261019002200_event_soft_cancel.sql).
+bool isEventCancelled(Map<String, dynamic> event) => event['cancelled_at'] != null;
+
+/// Ended or cancelled: either way it's history, greyed and sorted last.
+bool isEventClosed(Map<String, dynamic> event) =>
+    isEventEnded(event) || isEventCancelled(event);
+
 class EventsCubit extends Cubit<EventsState> {
   EventsCubit() : super(EventsState()) {
     loadData();
@@ -128,13 +136,14 @@ class EventsCubit extends Cubit<EventsState> {
       return matchesSearch && matchesTag;
     }).toList();
 
-    // Upcoming first (soonest first), then ended (most recent first).
+    // Upcoming first (soonest first), then ended or cancelled (most
+    // recent first).
     DateTime start(Map<String, dynamic> e) =>
         DateTime.tryParse(e['start_datetime'] ?? '') ?? DateTime(1970);
 
     filtered.sort((a, b) {
-      final aEnded = isEventEnded(a);
-      final bEnded = isEventEnded(b);
+      final aEnded = isEventClosed(a);
+      final bEnded = isEventClosed(b);
       if (aEnded != bEnded) return aEnded ? 1 : -1;
       return aEnded
           ? start(b).compareTo(start(a))

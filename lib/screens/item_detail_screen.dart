@@ -3,11 +3,11 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:mykerawang/services/share_service.dart';
-import 'package:mykerawang/utils/report_helper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
  
 import 'create_listing_screen.dart';
 import 'create_post_screen.dart';
+import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../theme/app_themes.dart';
@@ -15,6 +15,9 @@ import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
 import '../utils/file_saver.dart';
 import '../utils/formatters.dart';
+import '../utils/feedback.dart';
+import '../utils/guest_access.dart';
+import '../utils/listing_status.dart';
 import '../utils/roles.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/tap_card.dart';
@@ -33,7 +36,9 @@ class ItemDetailScreen extends StatefulWidget {
 class _ItemDetailScreenState extends State<ItemDetailScreen> {
   late Map<String, dynamic> _itemData;
   Map<String, dynamic>? _sellerProfile;
-  int _currentImageIndex = 0; 
+  bool _loadingContact = false;
+  bool _savingStatus = false;
+int _currentImageIndex = 0; 
 
   @override
   void initState() {
@@ -53,10 +58,11 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           .eq('id', _itemData['id'])
           .single();
 
-      // 2. Fetch Seller Profile 
+      // 2. Seller profile — public fields only. Phone and payment QR are
+      // fetched on demand by _showPurchaseDialog (get_listing_contact).
       final seller = await supabase
-          .from('profiles')
-          .select() 
+          .from(isLoggedIn ? 'profiles' : 'profiles_public')
+          .select('id, username, display_name, avatar_url')
           .eq('id', freshItem['seller_id'])
           .maybeSingle();
 
@@ -71,31 +77,41 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     }
   }
 
-  // --- TOGGLE SOLD STATUS ---
-  Future<void> _toggleSoldStatus() async {
-    final currentStatus = _itemData['is_sold'] ?? false;
-    final newStatus = !currentStatus;
-
+  // --- LISTING STATUS (available / reserved / sold) ---
+  Future<void> _setStatus(ListingStatus next) async {
+    final previous = ListingStatus.of(_itemData);
+    if (next == previous || _savingStatus) return;
     final s = context.l10nRead;
 
-    // Optimistic Update
-    setState(() => _itemData['is_sold'] = newStatus);
+    // Optimistic; reverted on failure.
+    setState(() {
+      _savingStatus = true;
+      _itemData = {..._itemData, 'status': next.dbValue, 'is_sold': next == ListingStatus.sold};
+    });
 
     try {
+      // Both columns are written; the database trigger keeps them in
+      // sync either way (20261019002500_listing_status.sql).
       await Supabase.instance.client
           .from('listings')
-          .update({'is_sold': newStatus})
+          .update({'status': next.dbValue, 'is_sold': next == ListingStatus.sold})
           .eq('id', _itemData['id']);
-
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(newStatus ? s.markedSold : s.markedAvailable))
-      );
+      showSuccess(context, switch (next) {
+        ListingStatus.sold => s.markedSold,
+        ListingStatus.available => s.markedAvailable,
+        ListingStatus.reserved => s.statusUpdated,
+      });
     } catch (e) {
       if (!mounted) return;
-      // Revert if error
-      setState(() => _itemData['is_sold'] = currentStatus);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+      setState(() => _itemData = {
+            ..._itemData,
+            'status': previous.dbValue,
+            'is_sold': previous == ListingStatus.sold,
+          });
+      showErrorWithRetry(context, e, onRetry: () => _setStatus(next));
+    } finally {
+      if (mounted) setState(() => _savingStatus = false);
     }
   }
 
@@ -119,23 +135,58 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       try {
         await Supabase.instance.client.from('listings').delete().eq('id', _itemData['id']);
         if (mounted) {
-          Navigator.pop(context, true); 
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.listingDeleted)));
+          popOrHome(context, true);
         }
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+        if (mounted) showErrorWithRetry(context, e, onRetry: _deleteItem);
       }
     }
   }
 
+  /// Contact sheet.Talking comes first: WhatsApp is the primary action,
+  /// and the seller's payment QR stays behind an explicit step with a
+  /// reminder to pay only once the deal is agreed.
   Future<void> _showPurchaseDialog() async {
-    if (_sellerProfile == null) return;
+    if (!requireLogin(context)) return;
+    if (_loadingContact) return;
 
-    final qrUrl = _sellerProfile!['payment_qr_url'];
-    final phone = _sellerProfile!['phone_number'];
-    final sellerName = _sellerProfile!['username'] ?? context.l10nRead.seller;
+    // Contact details are private (profile_contacts) and only revealed —
+    // and logged — when a buyer asks for them here.
+    final Map<String, dynamic> contact;
+    setState(() => _loadingContact = true);
+    try {
+      final rows = await Supabase.instance.client
+          .rpc('get_listing_contact', params: {'p_listing_id': _itemData['id']});
+      final list = rows is List ? rows : const [];
+      contact = list.isEmpty ? <String, dynamic>{} : Map<String, dynamic>.from(list.first);
+    } catch (e) {
+      if (!mounted) return;
+      // get_listing_contact's limits (20261019002600): no Retry, since
+      // retrying straight away can't succeed.
+      final text = e.toString();
+      if (text.contains('rate_limited')) {
+        showErrorWithRetry(context, e, message: context.l10nRead.tooManyContactRequests);
+      } else if (text.contains('listing_sold')) {
+        setState(() => _itemData = {..._itemData, 'status': 'sold', 'is_sold': true});
+        showErrorWithRetry(context, e, message: context.l10nRead.listingNowSold);
+      } else {
+        showErrorWithRetry(context, e, onRetry: _showPurchaseDialog);
+      }
+      return;
+    } finally {
+      if (mounted) setState(() => _loadingContact = false);
+    }
+    if (!mounted) return;
+
+    final qrUrl = contact['payment_qr_url'] as String?;
+    final phone = contact['phone_number'];
+    final sellerName = contact['username'] ??
+        _sellerProfile?['username'] ??
+        context.l10nRead.seller;
 
     // Track state LOCALLY inside this function logic
+    bool showQr = false;
     bool isSaving = false;
     bool isSaved = false;
 
@@ -148,7 +199,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           final s = context.l10n;
           final theme = Theme.of(context);
           final scheme = theme.colorScheme;
-          return Padding(
+          return SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -156,73 +207,13 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                 Text(s.contactSeller, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Text(s.buyingFrom.fill([sellerName]), style: TextStyle(color: scheme.onSurfaceVariant)),
-                const SizedBox(height: 24),
+                const SizedBox(height: 4),
+                Text(s.chatFirstHint,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+                const SizedBox(height: 20),
 
-                if (qrUrl != null) ...[
-                  // Brand name of the payment scheme — not translated
-                  const Text("DuitNow QR", style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Container(
-                    height: 200, width: 200,
-                    decoration: BoxDecoration(border: Border.all(color: scheme.outlineVariant)),
-                    child: CachedNetworkImage(
-                      imageUrl: qrUrl,
-                      fit: BoxFit.contain,
-                      placeholder: (_,__) => const Center(child: CircularProgressIndicator()),
-                    ),
-                  ),
-                  
-                  // --- SAVE BUTTON (Fixed) ---
-                  TextButton.icon(
-                    onPressed: (isSaving || isSaved) 
-                      ? null // Disable if busy or done
-                      : () async {
-                          // 1. Update UI to "Saving..."
-                          setModalState(() => isSaving = true);
-
-                          try {
-                            // One button, right behaviour per platform:
-                            // browser download on web, gallery on mobile.
-                            final response = await http.get(Uri.parse(qrUrl));
-                            final ok = await saveImageBytes(
-                              response.bodyBytes,
-                              filename:
-                                  'duitnow-${_sellerProfile?['username'] ?? 'qr'}.jpg',
-                            );
-
-                            setModalState(() {
-                              isSaving = false;
-                              isSaved = ok;
-                            });
-                          } catch (e) {
-                            debugPrint("Save error: $e");
-                            setModalState(() => isSaving = false);
-                          }
-                        },
-                    // Dynamic Icon
-                    icon: isSaving 
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) 
-                      : Icon(isSaved ? Icons.check_circle : Icons.save_alt, color: isSaved ? scheme.primary : null),
-                    // Dynamic Text
-                    label: Text(
-                      isSaving
-                          ? s.saving
-                          : (isSaved
-                              ? s.saved
-                              : (kIsWeb ? s.downloadQr : s.saveToGallery)),
-                      style: TextStyle(
-                        color: isSaved ? scheme.primary : null,
-                        fontWeight: isSaved ? FontWeight.bold : null
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-                  Text(s.scanToPay, style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
-                  const SizedBox(height: 24),
-                ],
-
-                // 2. WHATSAPP BUTTON (Keep your existing one)
+                // 1. WHATSAPP — talk first
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
@@ -230,7 +221,6 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     label: Text(s.chatOnWhatsApp),
                     style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
                     onPressed: () {
-                      // Was a placeholder comment — the button did nothing.
                       final raw = (phone ?? '').toString().trim();
                       if (raw.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -246,7 +236,94 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     },
                   ),
                 ),
-                
+
+                // 2. PAYMENT QR — only on request
+                if (qrUrl != null) ...[
+                  const SizedBox(height: 12),
+                  if (!showQr)
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.qr_code_2),
+                        label: Text(s.showPaymentQr),
+                        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+                        onPressed: () => setModalState(() => showQr = true),
+                      ),
+                    )
+                  else ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: scheme.tertiaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, size: 18, color: scheme.onTertiaryContainer),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(s.paymentCaution,
+                                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onTertiaryContainer)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Brand name of the payment scheme — not translated
+                    const Text("DuitNow QR", style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 200, width: 200,
+                      decoration: BoxDecoration(border: Border.all(color: scheme.outlineVariant)),
+                      child: CachedNetworkImage(
+                        imageUrl: qrUrl,
+                        fit: BoxFit.contain,
+                        placeholder: (_,__) => const Center(child: CircularProgressIndicator()),
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: (isSaving || isSaved)
+                        ? null // Disable if busy or done
+                        : () async {
+                            setModalState(() => isSaving = true);
+                            try {
+                              // One button, right behaviour per platform:
+                              // browser download on web, gallery on mobile.
+                              final response = await http.get(Uri.parse(qrUrl));
+                              final ok = await saveImageBytes(
+                                response.bodyBytes,
+                                filename:
+                                    'duitnow-${contact['username'] ?? 'qr'}.jpg',
+                              );
+                              setModalState(() {
+                                isSaving = false;
+                                isSaved = ok;
+                              });
+                            } catch (e) {
+                              debugPrint("Save error: $e");
+                              setModalState(() => isSaving = false);
+                            }
+                          },
+                      icon: isSaving
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : Icon(isSaved ? Icons.check_circle : Icons.save_alt, color: isSaved ? scheme.primary : null),
+                      label: Text(
+                        isSaving
+                            ? s.saving
+                            : (isSaved
+                                ? s.saved
+                                : (kIsWeb ? s.downloadQr : s.saveToGallery)),
+                        style: TextStyle(
+                          color: isSaved ? scheme.primary : null,
+                          fontWeight: isSaved ? FontWeight.bold : null
+                        ),
+                      ),
+                    ),
+                    Text(s.scanToPay, style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+                  ],
+                ],
+
                 const SizedBox(height: 12),
                 TextButton(onPressed: () => Navigator.pop(ctx), child: Text(s.close)),
               ],
@@ -256,12 +333,14 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       ),
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final currentUser = Supabase.instance.client.auth.currentUser;
     final isOwner = currentUser != null && currentUser.id == _itemData['seller_id'];
-    final isSold = _itemData['is_sold'] == true;
+    final status = ListingStatus.of(_itemData);
+    final isSold = status == ListingStatus.sold;
+    final isReserved = status == ListingStatus.reserved;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final s = context.l10n;
@@ -284,7 +363,9 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                 child: IconButton(
                   tooltip: MaterialLocalizations.of(context).backButtonTooltip,
                   icon: const Icon(Icons.arrow_back, color: kOnPhoto),
-                  onPressed: () => Navigator.pop(context),
+                  // A shared link opens this page cold, with nothing
+                  // underneath to pop back to.
+                  onPressed: () => popOrHome(context),
                 ),
               ),
             ),
@@ -317,12 +398,12 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                       );
                     },
                   ),
-                  if (isSold)
+                  if (status.badge(s) != null)
                     Positioned.fill(
                       child: IgnorePointer(
                         child: Container(
-                          color: photoScrim(0.4),
-                          child: Center(child: StatusBadge.stamp(s.sold)),
+                          color: photoScrim(isSold ? 0.4 : 0.25),
+                          child: Center(child: StatusBadge.stamp(status.badge(s)!)),
                         ),
                       ),
                     ),
@@ -371,12 +452,37 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                             _itemData['title'],
                             "${s.priceLine.fill([formatPrice(_itemData['price'])])}\n${_itemData['description'] ?? ''}",
                             allImages,
+                            // Deep link keeps the description intact — the
+                            // Web Share API drops text when files attach.
+                            link: '/item/${_itemData['id']}',
                           );
                         },
                       ),
-                      ReportMenuButton(targetId: _itemData['id'], type: 'listing'),
+                      if (!isOwner)
+                        GuardedReportButton(targetId: _itemData['id'], type: 'listing'),
                     ],
                   ),
+                  if (isReserved && !isOwner) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: scheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.handshake_outlined, color: scheme.onSecondaryContainer),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(s.reservedHint,
+                                style: TextStyle(color: scheme.onSecondaryContainer)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 20),
 
                   if (_sellerProfile != null)
@@ -410,6 +516,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                       Text(s.description, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                       TextButton.icon(
                         onPressed: () {
+                          if (!requireLogin(context)) return;
                           Navigator.push(context, MaterialPageRoute(builder: (_) => CreatePostScreen(sharedListing: _itemData)));
                         },
                         icon: const Icon(Icons.repeat, size: 16),
@@ -438,16 +545,44 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         child: isOwner
             ? Row(
                 children: [
-                  // 1. MARK SOLD BUTTON
+                  // 1. STATUS: available / reserved / sold
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: _toggleSoldStatus,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: scheme.primary,
-                        side: BorderSide(color: scheme.primary),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: PopupMenuButton<ListingStatus>(
+                      tooltip: s.listingStatus,
+                      enabled: !_savingStatus,
+                      initialValue: status,
+                      onSelected: _setStatus,
+                      itemBuilder: (_) => [
+                        for (final st in ListingStatus.values)
+                          CheckedPopupMenuItem(
+                            value: st,
+                            checked: st == status,
+                            child: Text(st.label(s)),
+                          ),
+                      ],
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: scheme.primary),
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (_savingStatus)
+                              const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                            else
+                              Icon(Icons.sell_outlined, size: 18, color: scheme.primary),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(status.label(s),
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w600)),
+                            ),
+                            Icon(Icons.arrow_drop_down, color: scheme.primary),
+                          ],
+                        ),
                       ),
-                      child: Text(isSold ? s.markAvailable : s.markAsSold),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -483,10 +618,15 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   ),
                 ],
               )
+            // GUEST VIEW
+            : !isLoggedIn && !isSold
+            ? GuestActionBar(label: s.loginToContact)
             // BUYER VIEW
             : ElevatedButton.icon(
                 onPressed: isSold ? null : _showPurchaseDialog, 
-                icon: const Icon(Icons.chat),
+                icon: _loadingContact
+                    ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onPrimary))
+                    : const Icon(Icons.chat),
                 label: Text(isSold ? s.sold : s.contactOrBuy),
                 // Sold = onPressed null, so the theme's disabled colours apply
                 style: ElevatedButton.styleFrom(
