@@ -1,9 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'create_event_screen.dart';
-import 'events_cubit.dart'; // Ensure this matches your file structure
+import 'events_cubit.dart';
 import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
@@ -12,7 +13,9 @@ import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
 import '../utils/categories.dart';
 import '../utils/formatters.dart';
+import '../utils/roles.dart';
 import '../widgets/error_state.dart';
+import '../widgets/kerawang_motif.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/tap_card.dart';
 
@@ -31,6 +34,22 @@ String? eventCountdown(AppStrings s, Map<String, dynamic> event, {DateTime? now}
   if (days < 7) return s.eventInDays.fill([days]);
   return null;
 }
+
+/// Which list section an event belongs to.
+enum EventSection { thisWeek, later, ended }
+
+EventSection eventSectionOf(Map<String, dynamic> event, {DateTime? now}) {
+  if (isEventClosed(event)) return EventSection.ended;
+  final start = parseLocal(event['start_datetime']);
+  final current = now ?? DateTime.now();
+  if (start == null) return EventSection.later;
+  final days = DateUtils.dateOnly(start).difference(DateUtils.dateOnly(current)).inDays;
+  return days < 7 ? EventSection.thisWeek : EventSection.later;
+}
+
+/// Layout widths (of the space this screen is given, not the window).
+const double _kFilterColumnFrom = 900;
+const double _kFilterColumnWidth = 240;
 
 class EventsScreen extends StatelessWidget {
   const EventsScreen({super.key});
@@ -62,246 +81,435 @@ class _EventsViewState extends State<EventsView> {
     super.dispose();
   }
 
+  Future<void> _openCreate(BuildContext context) async {
+    final result = await Navigator.push(
+        context, MaterialPageRoute(builder: (_) => const CreateEventScreen()));
+    if (result == true && context.mounted) {
+      context.read<EventsCubit>().loadData();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 2. Consume the State
     return BlocBuilder<EventsCubit, EventsState>(
       builder: (context, state) {
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(context.l10n.navEvents),
-            // Desktop has no FAB, so creation lives here instead (H1.1).
-            actions: [
-              if (isWide(context))
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: FilledButton.icon(
-                    onPressed: () async {
-                      final result = await Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const CreateEventScreen()));
-                      if (result == true && context.mounted) {
-                        context.read<EventsCubit>().loadData();
-                      }
-                    },
-                    icon: const Icon(Icons.add, size: 18),
-                    label: Text(context.l10n.createEvent),
+        final s = context.l10n;
+        return LayoutBuilder(builder: (context, constraints) {
+          final withFilterColumn = constraints.maxWidth >= _kFilterColumnFrom;
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(s.navEvents),
+              // Desktop has no FAB, so creation lives here instead (H1.1).
+              actions: [
+                if (isWide(context))
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilledButton.icon(
+                      onPressed: () => _openCreate(context),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: Text(s.createEvent),
+                    ),
                   ),
-                ),
-            ],
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(50),
-              child: SizedBox(
-                height: 50,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _tags.length,
-                  itemBuilder: (context, index) {
-                    final tag = _tags[index];
-                    // Read selection from State
-                    final isSelected = state.selectedTag == tag;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: FilterChip(
-                        label: Text(tag == 'All' ? context.l10n.all : tag),
-                        selected: isSelected,
-                        // Call Cubit
-                        onSelected: (v) => context.read<EventsCubit>().updateTag(tag),
-                        backgroundColor: Theme.of(context).colorScheme.surface,
-                        selectedColor: Theme.of(context).colorScheme.secondaryContainer,
-                        checkmarkColor: Theme.of(context).colorScheme.onSecondaryContainer,
-                        labelStyle: TextStyle(
-                        color: isSelected 
-                            ? Theme.of(context).colorScheme.onSecondaryContainer 
-                            : Theme.of(context).colorScheme.onSurface,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
-                      )
-                    );
-                  },
-                ),
-              ),
+              ],
+              bottom: withFilterColumn
+                  ? null
+                  : PreferredSize(
+                      preferredSize: const Size.fromHeight(52),
+                      child: _TagChipRow(tags: _tags, selected: state.selectedTag),
+                    ),
             ),
-          ),
-          body: LinearRefresher(
-            offset: 0.0,
-            onRefresh: () async {
-              // Now calling the PUBLIC method
-              await context.read<EventsCubit>().loadData();
-            },
-            child: state.isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : (state.errorMessage != null && state.allEvents.isEmpty)
-                ? ErrorState(
-                    onRetry: () => context.read<EventsCubit>().loadData())
-                : Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: TextField(
-                          controller: _searchCtrl,
-                          // Call Cubit
-                          onChanged: (v) => context.read<EventsCubit>().updateSearch(v),
-                          decoration: InputDecoration(
-                            hintText: context.l10n.searchEvents,
-                            prefixIcon: Icon(Icons.search, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                            filled: true,
-                            fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none),
+            body: LinearRefresher(
+              offset: 0.0,
+              onRefresh: () async => context.read<EventsCubit>().loadData(),
+              child: withFilterColumn
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: _kFilterColumnWidth,
+                          child: _FilterColumn(
+                            tags: _tags,
+                            selected: state.selectedTag,
+                            search: _searchField(context),
                           ),
                         ),
-                      ),
-                      Expanded(
-                        child: state.displayedEvents.isEmpty
-                            ? Center(child: Text(context.l10n.noEventsFound))
-                            : ListView.separated(
-                                padding: const EdgeInsets.all(16),
-                                itemCount: state.displayedEvents.length,
-                                separatorBuilder: (_, __) => const SizedBox(height: 16),
-                                itemBuilder: (context, index) {
-                                  final event = state.displayedEvents[index];
-                                  final date = parseLocal(event['start_datetime'])!;
-                                  final cancelled = isEventCancelled(event);
-                                  final ended = isEventClosed(event);
-                                  final countdown = eventCountdown(context.l10n, event);
+                        const VerticalDivider(width: 1),
+                        Expanded(child: _content(context, state, withSearch: false)),
+                      ],
+                    )
+                  : _content(context, state, withSearch: true),
+            ),
+            // Desktop creates from the header — a FAB floating in the
+            // far corner of a wide window is a phone pattern (G5).
+            floatingActionButton: isWide(context)
+                ? null
+                : FloatingActionButton(
+                    heroTag: 'events_fab',
+                    tooltip: s.createEvent,
+                    onPressed: () => _openCreate(context),
+                    child: const Icon(Icons.add),
+                  ),
+          );
+        });
+      },
+    );
+  }
 
-                                  return Opacity(
-                                    // Ended events stay visible but recede (spec §6)
-                                    opacity: ended ? 0.55 : 1,
-                                    child: TapCard(
-                                    onTap: () => context.goEvent(event),
-                                    borderRadius: kerawangCut,
-                                    color: Theme.of(context).colorScheme.surfaceContainer,
-                                    border: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-                                    child: SizedBox(
-                                      width: double.infinity,
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Stack(
-                                            children: [
-                                          CachedNetworkImage(
-                                              imageUrl: event['image_url'] ?? '',
-                                              memCacheWidth: 900, // decode at card size, not camera size
-                                              fadeInDuration: Duration.zero,
-                                              fadeOutDuration: Duration.zero,
-                                              height: 180,
-                                              width: double.infinity,
-                                              fit: BoxFit.cover,
-                                              placeholder: (context, url) => Container(
-                                                height: 180, 
-                                                color: Theme.of(context).colorScheme.surfaceContainerHighest, 
-                                                child: const Center(child: CircularProgressIndicator())
-                                              ),
-                                              errorWidget: (context, url, error) => Container(
-                                                height: 180,
-                                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                                child: Center(
-                                                  child: Icon(Icons.event_busy, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 40),
-                                                ),
-                                              ),
-                                            ),
-                                            if (ended)
-                                              Positioned(
-                                                top: 10,
-                                                left: 10,
-                                                child: StatusBadge(cancelled
-                                                    ? context.l10n.cancelled
-                                                    : context.l10n.ended),
-                                              )
-                                            else if (countdown != null)
-                                              Positioned(
-                                                top: 10,
-                                                left: 10,
-                                                child: _CountdownChip(countdown),
-                                              ),
-                                            ],
-                                          ),
-                                          Padding(
-                                            padding: const EdgeInsets.all(16),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                // Tags Row
-                                                Row(
-                                                  children: ((event['tags'] as List?) ?? [])
-                                                  .take(3)
-                                                  .map<Widget>((t) => Padding(
-                                                    padding: const EdgeInsets.only(right: 8),
-                                                    child: Text(
-                                                      "#$t",
-                                                      style: TextStyle(
-                                                        color: Theme.of(context).colorScheme.primary,
-                                                        fontSize: 12,
-                                                        fontWeight: FontWeight.bold,
-                                                      ),
-                                                    ),
-                                                  )).toList(),
-                                                ),
-                                                const SizedBox(height: 8),
-                                                // Title
-                                                Text(event['title'],
-                                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                                        fontWeight: FontWeight.bold)),
-                                                const SizedBox(height: 8),
-                                                // Date
-                                                Row(
-                                                  children: [
-                                                    Icon(Icons.calendar_today,
-                                                        size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                                    const SizedBox(width: 8),
-                                                    Text(
-                                                        formatEventRange(date, parseLocal(event['end_datetime'])),
-                                                        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 4),
-                                                // Location
-                                                Row(
-                                                  children: [
-                                                    Icon(Icons.location_on,
-                                                        size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                                    const SizedBox(width: 8),
-                                                    Text(event['location'] ?? context.l10n.locationTba,
-                                                        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                          )
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
+  Widget _searchField(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    return TextField(
+      controller: _searchCtrl,
+      onChanged: (v) {
+        context.read<EventsCubit>().updateSearch(v);
+        setState(() {}); // show / hide the clear button
+      },
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        hintText: s.searchEvents,
+        prefixIcon: Icon(Icons.search, color: scheme.onSurfaceVariant),
+        suffixIcon: _searchCtrl.text.isEmpty
+            ? null
+            : IconButton(
+                tooltip: s.clearSearch,
+                icon: const Icon(Icons.close),
+                onPressed: () {
+                  _searchCtrl.clear();
+                  context.read<EventsCubit>().updateSearch('');
+                  setState(() {});
+                },
+              ),
+        filled: true,
+        fillColor: scheme.surfaceContainerHighest,
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      ),
+    );
+  }
+
+  Widget _content(BuildContext context, EventsState state, {required bool withSearch}) {
+    final s = context.l10n;
+    final cubit = context.read<EventsCubit>();
+
+    if (state.isLoading && state.allEvents.isEmpty) {
+      return const _EventListSkeleton();
+    }
+    if (state.errorMessage != null && state.allEvents.isEmpty) {
+      return ErrorState(onRetry: cubit.loadData);
+    }
+
+    final now = DateTime.now();
+    final bySection = <EventSection, List<Map<String, dynamic>>>{
+      for (final sec in EventSection.values) sec: [],
+    };
+    for (final e in state.displayedEvents) {
+      bySection[eventSectionOf(e, now: now)]!.add(e);
+    }
+
+    return LayoutBuilder(builder: (context, constraints) {
+      final width = constraints.maxWidth;
+      final columns = width >= 1000 ? 3 : (width >= 600 ? 2 : 1);
+      const gap = 16.0;
+
+      List<Widget> section(EventSection sec, String title) {
+        final events = bySection[sec]!;
+        if (events.isEmpty) return const [];
+        Widget card(Map<String, dynamic> e) => EventCard(
+              event: e,
+              goingCount: state.goingCounts[e['id']],
+              organiser: state.organisers[e['organizer_id']],
+              onTap: () => context.goEvent(e),
+            );
+        return [
+          SliverToBoxAdapter(child: _SectionHeader(title: title, count: events.length)),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: columns == 1
+                ? SliverList.separated(
+                    itemCount: events.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: gap),
+                    itemBuilder: (_, i) => card(events[i]),
+                  )
+                : SliverGrid.builder(
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: columns,
+                      crossAxisSpacing: gap,
+                      mainAxisSpacing: gap,
+                      mainAxisExtent: EventCard.gridExtent,
+                    ),
+                    itemCount: events.length,
+                    itemBuilder: (_, i) => card(events[i]),
                   ),
           ),
-          // Desktop creates from the sidebar / header — a FAB floating in
-          // the far corner of a wide window is a phone pattern (G5).
-          floatingActionButton: isWide(context) ? null : FloatingActionButton(
-            heroTag: 'events_fab',
-            onPressed: () => Navigator.push(
-                context, MaterialPageRoute(builder: (_) => const CreateEventScreen())),
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            child: Icon(Icons.add, color: Theme.of(context).colorScheme.onPrimary),
-          ),
-        );
-      },
+        ];
+      }
+
+      return CustomScrollView(
+        slivers: [
+          if (withSearch)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: _searchField(context),
+              ),
+            ),
+          if (state.displayedEvents.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: _EmptyEvents(
+                filtered: state.searchQuery.isNotEmpty || state.selectedTag != 'All',
+              ),
+            ),
+          ...section(EventSection.thisWeek, s.sectionThisWeek),
+          ...section(EventSection.later, s.sectionLater),
+          ...section(EventSection.ended, s.sectionEnded),
+          const SliverToBoxAdapter(child: SizedBox(height: 96)),
+        ],
+      );
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Event card
+// ---------------------------------------------------------------------------
+
+/// Date-led event card: a calendar block (day number in the display face)
+/// beside the title, time, place, countdown, going count and organiser.
+/// Used in the events list; sized to [gridExtent] in multi-column grids.
+class EventCard extends StatelessWidget {
+  final Map<String, dynamic> event;
+  final int? goingCount;
+
+  /// `profiles_public` row of the organiser, if loaded.
+  final Map<String, dynamic>? organiser;
+  final VoidCallback? onTap;
+
+  const EventCard({
+    super.key,
+    required this.event,
+    this.goingCount,
+    this.organiser,
+    this.onTap,
+  });
+
+  /// Fixed tile height for grid layouts.
+  static const double gridExtent = 340;
+
+  static final _time = DateFormat('h:mm a');
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    final start = parseLocal(event['start_datetime']) ?? DateTime.now();
+    final end = parseLocal(event['end_datetime']);
+    final cancelled = isEventCancelled(event);
+    final closed = isEventClosed(event);
+    final countdown = eventCountdown(s, event);
+    final sameDay = end == null || DateUtils.isSameDay(start, end);
+    final timeText = sameDay
+        ? [_time.format(start), if (end != null) _time.format(end)].join(' – ')
+        : formatEventRange(start, end);
+    final meta = theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant);
+    final title = (event['title'] ?? '').toString();
+
+    return Opacity(
+      // Ended / cancelled stay visible but recede (spec §6)
+      opacity: closed ? 0.6 : 1,
+      child: TapCard(
+        onTap: onTap,
+        hoverLift: true,
+        semanticLabel: title,
+        borderRadius: kerawangCut,
+        color: scheme.surfaceContainer,
+        border: BorderSide(color: scheme.outlineVariant),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ---- cover ----
+            SizedBox(
+              height: 140,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  CachedNetworkImage(
+                    imageUrl: event['image_url'] ?? '',
+                    memCacheWidth: 900, // decode at card size, not camera size
+                    fadeInDuration: Duration.zero,
+                    fadeOutDuration: Duration.zero,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) => ColoredBox(color: scheme.surfaceContainerHighest),
+                    errorWidget: (_, __, ___) => ColoredBox(
+                      color: scheme.surfaceContainerHighest,
+                      child: Center(
+                        child: Icon(Icons.event, color: scheme.onSurfaceVariant, size: 36),
+                      ),
+                    ),
+                  ),
+                  if (closed)
+                    Positioned(
+                      top: 10,
+                      left: 10,
+                      child: StatusBadge(cancelled ? s.cancelled : s.ended),
+                    )
+                  else if (countdown != null)
+                    Positioned(top: 10, left: 10, child: CountdownChip(countdown)),
+                ],
+              ),
+            ),
+
+            // ---- date block + details ----
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  DateBlock(date: start, muted: closed),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 4),
+                        _iconLine(Icons.schedule, timeText, meta, scheme),
+                        const SizedBox(height: 2),
+                        _iconLine(Icons.location_on_outlined,
+                            (event['location'] ?? s.locationTba).toString(), meta, scheme),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            if (goingCount != null && goingCount! > 0)
+                              _iconLine(Icons.group_outlined,
+                                  s.goingCount.fill([goingCount]), meta, scheme,
+                                  shrink: true),
+                            if (organiser != null) _OrganiserLine(profile: organiser!),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _iconLine(IconData icon, String text, TextStyle? style, ColorScheme scheme,
+      {bool shrink = false}) {
+    final label = Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: style);
+    return Row(
+      mainAxisSize: shrink ? MainAxisSize.min : MainAxisSize.max,
+      children: [
+        Icon(icon, size: 14, color: scheme.onSurfaceVariant),
+        const SizedBox(width: 4),
+        shrink ? Flexible(child: label) : Expanded(child: label),
+      ],
     );
   }
 }
 
+/// Calendar block: weekday, big day number, month. Shared by the list
+/// card and the event page.
+class DateBlock extends StatelessWidget {
+  final DateTime date;
+  final bool muted;
+  final double size;
+
+  const DateBlock({super.key, required this.date, this.muted = false, this.size = 56});
+
+  static final _month = DateFormat('MMM');
+  static final _weekday = DateFormat('EEE');
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final bg = muted ? scheme.surfaceContainerHighest : scheme.primaryContainer;
+    final fg = muted ? scheme.onSurfaceVariant : scheme.onPrimaryContainer;
+    return Container(
+      width: size,
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(color: bg, borderRadius: kerawangCut),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(_weekday.format(date).toUpperCase(),
+              style: theme.textTheme.labelSmall
+                  ?.copyWith(color: fg, letterSpacing: 1, fontWeight: FontWeight.w600)),
+          Text('${date.day}',
+              style: theme.textTheme.headlineMedium
+                  ?.copyWith(color: fg, fontWeight: FontWeight.w700, height: 1.1)),
+          Text(_month.format(date).toUpperCase(),
+              style: theme.textTheme.labelSmall
+                  ?.copyWith(color: fg, letterSpacing: 1, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Organiser name with a gold "official" mark for clubs, staff and
+/// verified accounts.
+class _OrganiserLine extends StatelessWidget {
+  final Map<String, dynamic> profile;
+  const _OrganiserLine({required this.profile});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final official = isOfficialProfile(profile);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: Text(
+            s.byOrganiser.fill([displayNameFor(s, profile)]),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+                color: official ? scheme.onSurface : scheme.onSurfaceVariant,
+                fontWeight: official ? FontWeight.w600 : null),
+          ),
+        ),
+        if (official) ...[
+          const SizedBox(width: 4),
+          Tooltip(
+            message: s.officialAccount,
+            child: Icon(Icons.verified, size: 14, color: scheme.tertiary),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Clubs, admins, owners and verified accounts get the official accent.
+bool isOfficialProfile(Map<String, dynamic>? p) =>
+    p != null &&
+    (p['is_verified'] == true || const {'club', 'admin', 'owner'}.contains(p['role']));
+
 /// Upcoming-soon marker on an event cover. Primary container rather than
 /// the dark StatusBadge scrim, so "soon" never reads like "ended".
-class _CountdownChip extends StatelessWidget {
+class CountdownChip extends StatelessWidget {
   final String label;
-  const _CountdownChip(this.label);
+  const CountdownChip(this.label, {super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -321,6 +529,187 @@ class _CountdownChip extends StatelessWidget {
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
                   color: scheme.onPrimaryContainer, fontWeight: FontWeight.w700)),
         ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Filters, headers, empty and loading states
+// ---------------------------------------------------------------------------
+
+class _TagChipRow extends StatelessWidget {
+  final List<String> tags;
+  final String selected;
+  const _TagChipRow({required this.tags, required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 52,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        itemCount: tags.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) => _tagChip(context, tags[i], selected),
+      ),
+    );
+  }
+}
+
+Widget _tagChip(BuildContext context, String tag, String selected) {
+  final scheme = Theme.of(context).colorScheme;
+  final isSelected = selected == tag;
+  return FilterChip(
+    label: Text(tag == 'All' ? context.l10n.all : tag),
+    selected: isSelected,
+    onSelected: (_) => context.read<EventsCubit>().updateTag(tag),
+    selectedColor: scheme.secondaryContainer,
+    checkmarkColor: scheme.onSecondaryContainer,
+    labelStyle: TextStyle(
+      color: isSelected ? scheme.onSecondaryContainer : scheme.onSurface,
+      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+    ),
+  );
+}
+
+/// Left column on wide layouts: search plus the tag filters.
+class _FilterColumn extends StatelessWidget {
+  final List<String> tags;
+  final String selected;
+  final Widget search;
+  const _FilterColumn({required this.tags, required this.selected, required this.search});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        search,
+        const SizedBox(height: 24),
+        Text(s.filters, style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [for (final t in tags) _tagChip(context, t, selected)],
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final int count;
+  const _SectionHeader({required this.title, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+      child: Semantics(
+        header: true,
+        child: Row(
+          children: [
+            Text(title, style: theme.textTheme.titleLarge),
+            const SizedBox(width: 8),
+            Text('$count',
+                style: theme.textTheme.titleSmall?.copyWith(color: scheme.onSurfaceVariant)),
+            const SizedBox(width: 12),
+            Expanded(child: Divider(color: scheme.outlineVariant)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyEvents extends StatelessWidget {
+  final bool filtered;
+  const _EmptyEvents({required this.filtered});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const KerawangDivider(size: 12),
+            const SizedBox(height: 16),
+            Text(s.noEventsFound,
+                style: theme.textTheme.titleMedium, textAlign: TextAlign.center),
+            if (!filtered) ...[
+              const SizedBox(height: 8),
+              Text(s.noEventsYetHint,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Placeholder cards while the first load runs.
+class _EventListSkeleton extends StatelessWidget {
+  const _EventListSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    Widget bar(double w, double h) => Container(
+          width: w,
+          height: h,
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        );
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: 3,
+      separatorBuilder: (_, __) => const SizedBox(height: 16),
+      itemBuilder: (_, __) => ExcludeSemantics(
+        child: Container(
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainer,
+            borderRadius: kerawangCut,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(height: 140, color: scheme.surfaceContainerHighest),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    bar(56, 64),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [bar(180, 16), const SizedBox(height: 8), bar(120, 12)],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
