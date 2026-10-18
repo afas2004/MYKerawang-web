@@ -12,6 +12,7 @@ import 'language_cubit.dart';
 import 'router.dart';
 // --- IMPORT YOUR SERVICES ---
 import 'services/notification_service.dart';
+import 'services/saved_items.dart';
 import 'services/unread_notifications.dart';
 import 'services/update_service.dart';
 import 'widgets/update_banner.dart';
@@ -119,6 +120,7 @@ class _SessionWatcherState extends State<SessionWatcher> {
       _checkUserProfile(session.user.id);
       _startNotificationStream(session.user.id);
       UnreadNotifications.instance.start(session.user.id);
+      SavedItems.instance.start(session.user.id);
     }
 
     _authSubscription =
@@ -130,11 +132,13 @@ class _SessionWatcherState extends State<SessionWatcher> {
         _notificationSubscription?.cancel();
         _notificationSubscription = null;
         UnreadNotifications.instance.stop();
+        SavedItems.instance.stop();
         return;
       }
 
-      // No-op for the same user; swaps channels on an account switch.
+      // No-ops for the same user; swap state on an account switch.
       UnreadNotifications.instance.start(session.user.id);
+      SavedItems.instance.start(session.user.id);
 
       if (event == AuthChangeEvent.signedIn) {
         NotificationService.requestPermission();

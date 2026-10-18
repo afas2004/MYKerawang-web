@@ -12,7 +12,9 @@ import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../utils/roles.dart';
+import '../l10n/social_strings.dart';
 import '../widgets/post_card.dart';
+import '../widgets/saved_items_view.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/tap_card.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -44,7 +46,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this); // <--- CHANGED: 2 -> 3
+    // Own profile gets a fourth, private "Saved" tab.
+    final currentUid = _supabase.auth.currentUser?.id;
+    _isMe = currentUid != null && (widget.userId ?? currentUid) == currentUid;
+    _tabController = TabController(length: _isMe ? 4 : 3, vsync: this);
     _fetchProfileData();
   }
 
@@ -419,6 +424,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 Tab(text: s.activity),
                 Tab(text: s.navEvents),
                 Tab(text: s.navMarket),
+                if (_isMe) Tab(text: s.social.saved),
               ],
             ),
             Expanded(
@@ -451,6 +457,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   _userListings.isEmpty
                     ? Center(child: Text(s.nothingForSale))
                     : _buildPhotoGrid(_userListings, false), // <--- AND HERE
+
+                  // Tab 4 (own profile only): bookmarks
+                  if (_isMe) const SavedItemsView(),
                 ],
               ),
             ),
