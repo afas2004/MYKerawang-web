@@ -162,6 +162,8 @@ extension AccessStrings on AppStrings {
   String get closeGallery => _t("Close", "Tutup", "閉じる");
   String get previousPhoto => _t("Previous photo", "Gambar sebelum", "前の写真");
   String get nextPhoto => _t("Next photo", "Gambar seterusnya", "次の写真");
+  String get zoomIn => _t("Zoom in", "Zum masuk", "拡大");
+  String get zoomOut => _t("Zoom out", "Zum keluar", "縮小");
   String get sectionDetails => _t("Details", "Butiran", "詳細");
   String get sectionPhotos => _t("Photos", "Gambar", "写真");
   String get sectionWhenWhere => _t("When & where", "Bila & di mana", "日時と場所");
