@@ -11,17 +11,47 @@ create index if not exists notifications_unread_idx
   on public.notifications (user_id)
   where is_read = false;
 
--- ---------------------------------------------------------- mark as read
--- The recipient may update their own rows (is_read). Before this, the
--- per-row tap update was never actually sent by the client, so a missing
--- policy would have gone unnoticed.
+-- ---------------------------------------------------------- policies
+-- Self-sufficient: enabling RLS here must not lock out reads or the
+-- client-side follow/mention inserts if RLS was off before. Idempotent.
 alter table public.notifications enable row level security;
 
+-- Recipient reads their own (list, realtime stream, unread badge).
+drop policy if exists "notifications_select_own" on public.notifications;
+create policy "notifications_select_own" on public.notifications
+for select to authenticated
+using (user_id = auth.uid());
+
+-- Clients may only send notifications as themselves, so nobody can forge
+-- one that appears to come from someone else. Anonymous mentions go
+-- through the security-definer notify_mentions() RPC and system
+-- notifications through security-definer triggers; both bypass RLS.
+-- (A direct insert whose actor_id the trigger below strips to null is
+-- therefore rejected — anonymous mentions must use the RPC.)
+drop policy if exists "notifications_insert_as_self" on public.notifications;
+create policy "notifications_insert_as_self" on public.notifications
+for insert to authenticated
+with check (actor_id = auth.uid());
+
+-- Recipient marks their own rows read...
 drop policy if exists "notifications_update_own" on public.notifications;
 create policy "notifications_update_own" on public.notifications
 for update to authenticated
 using (user_id = auth.uid())
 with check (user_id = auth.uid());
+
+-- ...and can only change is_read, never rewrite title/body/data.
+revoke update on public.notifications from authenticated;
+grant update (is_read) on public.notifications to authenticated;
+
+-- Recipient may clear their own.
+drop policy if exists "notifications_delete_own" on public.notifications;
+create policy "notifications_delete_own" on public.notifications
+for delete to authenticated
+using (user_id = auth.uid());
+
+grant select, insert, delete on public.notifications to authenticated;
+revoke all on public.notifications from anon;
 
 -- ---------------------------------------------------------- anonymity
 -- Mention notifications store the author as actor_id. When the mention
