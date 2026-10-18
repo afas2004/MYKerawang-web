@@ -18,7 +18,11 @@ class MentionInput extends StatelessWidget {
     this.minLines,
     this.maxLines,
     this.autofocus = false,
+    this.focusNode,
   });
+
+  /// Lets callers focus the field (e.g. "Comment" on a post).
+  final FocusNode? focusNode;
 
   /// Optional look overrides for full editors (create post).
   final TextStyle? style;
@@ -31,7 +35,8 @@ class MentionInput extends StatelessWidget {
     return TypeAheadField<Map<String, dynamic>>(
       // CONNECT YOUR CONTROLLER HERE
       controller: controller,
-      
+      focusNode: focusNode,
+
       // Force direction UP if we are at the bottom of the screen
       direction: reverseDirection ? VerticalDirection.up : VerticalDirection.down,
       

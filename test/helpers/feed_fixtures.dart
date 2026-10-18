@@ -5,6 +5,7 @@ import 'package:mykerawang/language_cubit.dart';
 import 'package:mykerawang/services/moderation_service.dart';
 import 'package:mykerawang/services/post_service.dart';
 import 'package:mykerawang/services/saved_items.dart';
+import 'package:mykerawang/widgets/comment_tile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Supabase-free hooks for widgets that read the session (PostCard,
@@ -15,6 +16,7 @@ void installFeedHooks({String me = 'me', bool signedIn = false}) {
   ModerationService.debugCurrentUserId = () => me;
   ModerationService.debugMyRole = () async => 'student';
   SavedItems.debugSignedIn = () => signedIn;
+  CommentTile.debugLoggedIn = true;
 }
 
 void resetFeedHooks() {
@@ -22,6 +24,7 @@ void resetFeedHooks() {
   ModerationService.debugCurrentUserId = null;
   ModerationService.debugMyRole = null;
   SavedItems.debugSignedIn = null;
+  CommentTile.debugLoggedIn = null;
 }
 
 /// A posts_public-shaped row.
