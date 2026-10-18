@@ -9,6 +9,7 @@ import '../theme/app_themes.dart';
 import '../utils/adaptive.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
+import '../l10n/shell_strings.dart';
 import '../l10n/social_strings.dart';
 import '../services/account_data.dart';
 import 'privacy_policy_screen.dart';
@@ -156,142 +157,167 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final currentTheme = context.watch<ThemeCubit>().state.appTheme;
     final s = context.l10n;
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final email = _supabase.auth.currentUser?.email;
+
     return Scaffold(
       appBar: appBarConstrained(context, title: Text(s.settingsTitle)),
       body: PageBody(child: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
-              // --- THEME (three named moods, DESIGN_SPEC §2) ---
-              ListTile(
-                leading: const Icon(Icons.palette_outlined),
-                title: Text(s.theme),
-              ),
-              SizedBox(
-                height: 110,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: AppTheme.values
-                      .map((t) => _themeCard(context, t, t == currentTheme))
-                      .toList(),
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              // --- LANGUAGE (belongs with Appearance, not Event Alerts) ---
-              ListTile(
-                leading: const Icon(Icons.translate),
-                title: Text(s.language),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: SegmentedButton<AppLanguage>(
-                  segments: [
-                    for (final lang in kSupportedLanguages)
-                      ButtonSegment(value: lang, label: Text(lang.nativeName)),
-                  ],
-                  selected: {context.watch<LanguageCubit>().state.language},
-                  onSelectionChanged: (sel) =>
-                      context.read<LanguageCubit>().changeLanguage(sel.first),
-                ),
-              ),
-
-              // App-settings shortcut only makes sense on mobile
-              if (!kIsWeb) ...[
-                const Divider(height: 40),
-                _sectionHeader(s.notifications),
-                ListTile(
-                  leading: Icon(Icons.settings_applications, color: theme.colorScheme.primary),
-                  title: Text(s.fixNotifPermissions),
-                  subtitle: Text(s.openSystemSettings),
-                  onTap: () async {
-                    // This forces the phone's App Settings page to open
-                    await openAppSettings();
-                  },
-                ),
-              ],
-
-              const Divider(height: 40),
-              _sectionHeader(s.social.privacyData),
-              ListTile(
-                leading: Icon(Icons.policy_outlined, color: theme.colorScheme.primary),
-                title: Text(s.social.privacyPolicy),
-                subtitle: Text(s.social.privacyPolicySub),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen())),
-              ),
-              ListTile(
-                leading: _exporting
-                    ? const SizedBox(
-                        width: 24, height: 24,
-                        child: Padding(
-                          padding: EdgeInsets.all(2),
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ))
-                    : Icon(Icons.download_outlined, color: theme.colorScheme.primary),
-                title: Text(s.social.downloadMyData),
-                subtitle: Text(_exporting
-                    ? s.social.preparingExport
-                    : s.social.downloadMyDataSub),
-                enabled: !_exporting,
-                onTap: _exportData,
-              ),
-              ListTile(
-                leading: Icon(Icons.delete_forever_outlined,
-                    color: theme.colorScheme.error),
-                title: Text(s.social.deleteAccount,
-                    style: TextStyle(color: theme.colorScheme.error)),
-                subtitle: Text(s.social.deleteAccountSub),
-                onTap: _deleteAccount,
-              ),
-
-              const Divider(height: 40),
-              // Preview card removed — it didn't show anything the live
-              // theme cards don't already demonstrate (H4/14.7).
-              const SizedBox(height: 4),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: _signOut,
-                  // Theme error colour — the old red[50] fill was unreadable
-                  // on Songket Noir (verified in browser).
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
-                    side: BorderSide(color: Theme.of(context).colorScheme.error),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+              // --- APPEARANCE: three named moods (DESIGN_SPEC §2) ---
+              _SettingsGroup(
+                title: s.shell.appearance,
+                icon: Icons.palette_outlined,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                    child: SizedBox(
+                      height: 110,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: AppTheme.values
+                            .map((t) => _themeCard(context, t, t == currentTheme))
+                            .toList(),
+                      ),
+                    ),
                   ),
-                  child: Text(s.signOut, style: const TextStyle(fontWeight: FontWeight.bold)),
-                ),
+                ],
               ),
-              const SizedBox(height: 10),
-              Center(
-                child: Text(
-                    UpdateService.isSupported
+
+              // --- LANGUAGE ---
+              _SettingsGroup(
+                title: s.language,
+                icon: Icons.translate,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                    child: SegmentedButton<AppLanguage>(
+                      segments: [
+                        for (final lang in kSupportedLanguages)
+                          ButtonSegment(value: lang, label: Text(lang.nativeName)),
+                      ],
+                      selected: {context.watch<LanguageCubit>().state.language},
+                      onSelectionChanged: (sel) =>
+                          context.read<LanguageCubit>().changeLanguage(sel.first),
+                    ),
+                  ),
+                ],
+              ),
+
+              // --- NOTIFICATIONS ---
+              _SettingsGroup(
+                title: s.notifications,
+                icon: Icons.notifications_outlined,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.inbox_outlined),
+                    title: Text(s.notificationsTitle),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.push('/notifications'),
+                  ),
+                  // App-settings shortcut only makes sense on mobile
+                  if (!kIsWeb)
+                    ListTile(
+                      leading: const Icon(Icons.settings_applications_outlined),
+                      title: Text(s.fixNotifPermissions),
+                      subtitle: Text(s.openSystemSettings),
+                      trailing: const Icon(Icons.open_in_new, size: 18),
+                      // Opens the phone's App Settings page
+                      onTap: openAppSettings,
+                    ),
+                ],
+              ),
+
+              // --- PRIVACY & DATA ---
+              _SettingsGroup(
+                title: s.social.privacyData,
+                icon: Icons.shield_outlined,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.policy_outlined),
+                    title: Text(s.social.privacyPolicy),
+                    subtitle: Text(s.social.privacyPolicySub),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen())),
+                  ),
+                  ListTile(
+                    leading: _exporting
+                        ? const SizedBox(
+                            width: 24, height: 24,
+                            child: Padding(
+                              padding: EdgeInsets.all(2),
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ))
+                        : const Icon(Icons.download_outlined),
+                    title: Text(s.social.downloadMyData),
+                    subtitle: Text(_exporting
+                        ? s.social.preparingExport
+                        : s.social.downloadMyDataSub),
+                    enabled: !_exporting,
+                    onTap: _exportData,
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.delete_forever_outlined, color: scheme.error),
+                    title: Text(s.social.deleteAccount,
+                        style: TextStyle(color: scheme.error)),
+                    subtitle: Text(s.social.deleteAccountSub),
+                    onTap: _deleteAccount,
+                  ),
+                ],
+              ),
+
+              // --- ACCOUNT ---
+              _SettingsGroup(
+                title: s.shell.account,
+                icon: Icons.person_outline,
+                children: [
+                  if (email != null)
+                    ListTile(
+                      leading: const Icon(Icons.alternate_email),
+                      title: Text(email),
+                    ),
+                  ListTile(
+                    leading: const Icon(Icons.info_outline),
+                    title: Text(UpdateService.isSupported
                         ? s.versionBuildLabel.fill([UpdateService.appVersion, UpdateService.buildId])
-                        : s.versionLabel.fill([UpdateService.appVersion]),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant)),
-              ),
-              if (UpdateService.isSupported)
-                Center(
-                  child: ValueListenableBuilder<bool>(
-                    valueListenable: UpdateService.instance.updateAvailable,
-                    builder: (context, available, _) => available
-                        ? FilledButton.icon(
-                            onPressed: UpdateService.instance.applyUpdate,
-                            icon: const Icon(Icons.system_update),
-                            label: Text(s.updateNow),
-                          )
-                        : TextButton.icon(
-                            onPressed: _checkingUpdate ? null : _checkForUpdates,
-                            icon: _checkingUpdate
-                                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                                : const Icon(Icons.refresh),
-                            label: Text(s.checkForUpdates),
+                        : s.versionLabel.fill([UpdateService.appVersion])),
+                    trailing: !UpdateService.isSupported
+                        ? null
+                        : ValueListenableBuilder<bool>(
+                            valueListenable: UpdateService.instance.updateAvailable,
+                            builder: (context, available, _) => available
+                                ? FilledButton.icon(
+                                    onPressed: UpdateService.instance.applyUpdate,
+                                    icon: const Icon(Icons.system_update),
+                                    label: Text(s.updateNow),
+                                  )
+                                : TextButton.icon(
+                                    onPressed: _checkingUpdate ? null : _checkForUpdates,
+                                    icon: _checkingUpdate
+                                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                        : const Icon(Icons.refresh),
+                                    label: Text(s.checkForUpdates),
+                                  ),
                           ),
                   ),
-                ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    child: OutlinedButton.icon(
+                      onPressed: _signOut,
+                      // Theme error colour — readable on Songket Noir too.
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: scheme.error,
+                        side: BorderSide(color: scheme.error),
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                      icon: const Icon(Icons.logout),
+                      label: Text(s.signOut),
+                    ),
+                  ),
+                ],
+              ),
             ],
           )),
     );
@@ -365,17 +391,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
       AppTheme.noir => s.taglineNoir,
     };
   }
+}
 
-  Widget _sectionHeader(String title) {
+/// One titled card of settings rows.
+class _SettingsGroup extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final List<Widget> children;
+
+  const _SettingsGroup(
+      {required this.title, required this.icon, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0, left: 16),
-      child: Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant)),
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Semantics(
+              header: true,
+              child: Row(
+                children: [
+                  Icon(icon, size: 18, color: scheme.primary),
+                  const SizedBox(width: 8),
+                  Text(title, style: theme.textTheme.titleMedium),
+                ],
+              ),
+            ),
+          ),
+          Material(
+            color: scheme.surfaceContainerLow,
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              borderRadius: kerawangCut,
+              side: BorderSide(color: scheme.outlineVariant),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < children.length; i++) ...[
+                  if (i > 0) Divider(height: 1, color: scheme.outlineVariant),
+                  children[i],
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
-
-
 
 /// Strong confirmation: the user has to type their username.
 class _DeleteAccountDialog extends StatefulWidget {
