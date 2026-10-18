@@ -360,6 +360,9 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                               if (_itemData['image_url'] != null) _itemData['image_url'],
                               ...?(_itemData['gallery_urls'] as List?)?.cast<String>(),
                             ],
+                            // Deep link keeps the description intact — the
+                            // Web Share API drops text when files attach.
+                            link: '/item/${_itemData['id']}',
                           );
                         },
                       ),

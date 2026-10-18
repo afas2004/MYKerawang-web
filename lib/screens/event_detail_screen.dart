@@ -396,6 +396,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                 if (_event['image_url'] != null) _event['image_url'],
                                 ...?(_event['gallery_urls'] as List?)?.cast<String>(),
                               ],
+                              // Deep link keeps the description intact — the
+                              // Web Share API drops text when files attach.
+                              link: '/event/${_event['id']}',
                             );
                           },
                         ),
