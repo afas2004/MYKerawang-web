@@ -1,8 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../language_cubit.dart';
 import '../theme/app_themes.dart';
+import '../utils/formatters.dart';
 
 /// IG-style feed embed for injected marketplace items and events
 /// (DESIGN_SPEC.md §4). Same width as posts, visually louder:
@@ -31,20 +31,20 @@ class EmbedCard extends StatelessWidget {
     final scheme = theme.colorScheme;
     final s = context.l10n;
 
-    final label = (isEvent ? s.navEvents : s.navMarket).toUpperCase();
+    final label = (isEvent ? s.kindEvent : s.navMarket).toUpperCase();
     final title = data['title'] ?? '';
     final imageUrl = data['image_url'] as String?;
 
     // Context line: price for items, date + location for events
     String contextLine;
     if (isEvent) {
-      final start = DateTime.tryParse(data['start_datetime'] ?? '');
-      final date = start != null ? DateFormat('d MMM').format(start.toLocal()) : '';
+      final start = parseLocal(data['start_datetime']);
+      final date = start != null ? formatDate(start) : '';
       final location = data['location'] ?? '';
       contextLine = [date, location].where((e) => e.isNotEmpty).join(' · ');
     } else {
       final price = data['price'];
-      contextLine = price is num ? "RM ${price.toStringAsFixed(2)}" : '';
+      contextLine = price is num ? formatPrice(price) : '';
     }
 
     if (compact) {

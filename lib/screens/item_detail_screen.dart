@@ -33,7 +33,6 @@ class ItemDetailScreen extends StatefulWidget {
 class _ItemDetailScreenState extends State<ItemDetailScreen> {
   late Map<String, dynamic> _itemData;
   Map<String, dynamic>? _sellerProfile;
-  bool _isLoading = true;
   int _currentImageIndex = 0; 
 
   @override
@@ -65,7 +64,6 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         setState(() {
           _itemData = freshItem;
           _sellerProfile = seller;
-          _isLoading = false;
         });
       }
     } catch (e) {

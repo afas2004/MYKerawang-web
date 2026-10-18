@@ -5,6 +5,7 @@ import 'package:mykerawang/screens/create_event_screen.dart';
 import 'package:mykerawang/screens/create_listing_screen.dart';
 import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
@@ -143,7 +144,7 @@ class _HomeScreenState extends State<HomeScreen> {
               snap: true,
               // On desktop the sidebar already carries the wordmark (F2.7)
               title: Text(
-                isDesktop ? context.l10n.navHome : "MYKerawang",
+                isDesktop ? context.l10n.navHome : AppStrings.appName,
                 style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5),
               ),
               centerTitle: false,
@@ -290,14 +291,15 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          TextButton(onPressed: onSeeAll, child: const Text("See All")),
+          Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          TextButton(onPressed: onSeeAll, child: Text(context.l10n.seeAll)),
         ],
       ),
     );
   }
 
   void _showCreateOptions(BuildContext context) {
+    final s = context.l10nRead;
     showAdaptiveSheet(
       context: context,
       builder: (ctx) => SafeArea(
@@ -305,7 +307,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.chat_bubble_outline),
-              title: const Text('Create Post'),
+              title: Text(s.createPostTitle),
               onTap: () {
                 Navigator.pop(ctx);
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const CreatePostScreen()));
@@ -313,7 +315,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.calendar_today),
-              title: const Text('Host Event'),
+              title: Text(s.createEvent),
               onTap: () {
                 Navigator.pop(ctx);
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateEventScreen()));
@@ -321,7 +323,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.storefront),
-              title: const Text('Sell Item'),
+              title: Text(s.sellItem),
               onTap: () {
                 Navigator.pop(ctx);
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateListingScreen()));

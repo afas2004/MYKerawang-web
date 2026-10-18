@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../screens/create_post_screen.dart';
 import '../utils/responsive.dart';
@@ -51,7 +52,7 @@ class AppSidebar extends StatelessWidget {
             child: InkWell(
               onTap: () => context.go('/home'),
               child: Text(
-                "MYKerawang",
+                AppStrings.appName,
                 style: GoogleFonts.fraunces(
                   fontSize: 22,
                   fontWeight: FontWeight.w600,

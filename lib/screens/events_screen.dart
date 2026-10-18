@@ -1,7 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
 import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'create_event_screen.dart';
 import 'events_cubit.dart'; // Ensure this matches your file structure
@@ -10,7 +9,10 @@ import '../theme/app_themes.dart';
 import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
 import '../utils/categories.dart';
+import '../utils/formatters.dart';
 import '../widgets/error_state.dart';
+import '../widgets/status_badge.dart';
+import '../widgets/tap_card.dart';
 
 class EventsScreen extends StatelessWidget {
   const EventsScreen({super.key});
@@ -83,7 +85,7 @@ class _EventsViewState extends State<EventsView> {
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: FilterChip(
-                        label: Text(tag),
+                        label: Text(tag == 'All' ? context.l10n.all : tag),
                         selected: isSelected,
                         // Call Cubit
                         onSelected: (v) => context.read<EventsCubit>().updateTag(tag),
@@ -135,32 +137,26 @@ class _EventsViewState extends State<EventsView> {
                       ),
                       Expanded(
                         child: state.displayedEvents.isEmpty
-                            ? const Center(child: Text("No events found"))
+                            ? Center(child: Text(context.l10n.noEventsFound))
                             : ListView.separated(
                                 padding: const EdgeInsets.all(16),
                                 itemCount: state.displayedEvents.length,
                                 separatorBuilder: (_, __) => const SizedBox(height: 16),
                                 itemBuilder: (context, index) {
                                   final event = state.displayedEvents[index];
-                                  // Parse date exactly as before
-                                  final date = DateTime.parse(event['start_datetime']).toLocal();
+                                  final date = parseLocal(event['start_datetime'])!;
                                   final ended = isEventEnded(event);
 
                                   return Opacity(
                                     // Ended events stay visible but recede (spec §6)
                                     opacity: ended ? 0.55 : 1,
-                                    child: GestureDetector(
+                                    child: TapCard(
                                     onTap: () => context.goEvent(event),
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.surfaceContainer,
-                                        borderRadius: kerawangCut,
-                                        border: Border.all(
-                                          color: Theme.of(context).colorScheme.outlineVariant,
-                                          width: 1,
-                                        ),
-                                      ),
-                                      clipBehavior: Clip.antiAlias,
+                                    borderRadius: kerawangCut,
+                                    color: Theme.of(context).colorScheme.surfaceContainer,
+                                    border: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+                                    child: SizedBox(
+                                      width: double.infinity,
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
@@ -191,23 +187,7 @@ class _EventsViewState extends State<EventsView> {
                                               Positioned(
                                                 top: 10,
                                                 left: 10,
-                                                child: Container(
-                                                  padding: const EdgeInsets.symmetric(
-                                                      horizontal: 10, vertical: 4),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.black.withValues(alpha: 0.7),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                  ),
-                                                  child: const Text(
-                                                    "TAMAT",
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 11,
-                                                      fontWeight: FontWeight.w700,
-                                                      letterSpacing: 1,
-                                                    ),
-                                                  ),
-                                                ),
+                                                child: StatusBadge(context.l10n.ended),
                                               ),
                                             ],
                                           ),
@@ -235,8 +215,7 @@ class _EventsViewState extends State<EventsView> {
                                                 const SizedBox(height: 8),
                                                 // Title
                                                 Text(event['title'],
-                                                    style: const TextStyle(
-                                                        fontSize: 18,
+                                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                                         fontWeight: FontWeight.bold)),
                                                 const SizedBox(height: 8),
                                                 // Date
@@ -246,7 +225,7 @@ class _EventsViewState extends State<EventsView> {
                                                         size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
                                                     const SizedBox(width: 8),
                                                     Text(
-                                                        DateFormat('dd MMM, hh:mm a').format(date),
+                                                        formatEventRange(date, parseLocal(event['end_datetime'])),
                                                         style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                                                   ],
                                                 ),
@@ -257,7 +236,7 @@ class _EventsViewState extends State<EventsView> {
                                                     Icon(Icons.location_on,
                                                         size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
                                                     const SizedBox(width: 8),
-                                                    Text(event['location'] ?? 'TBA',
+                                                    Text(event['location'] ?? context.l10n.locationTba,
                                                         style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                                                   ],
                                                 ),

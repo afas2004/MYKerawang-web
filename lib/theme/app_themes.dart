@@ -25,8 +25,7 @@ Color photoScrim([double opacity = 0.55]) =>
     Colors.black.withValues(alpha: opacity);
 
 class AppThemeSpec {
-  final String displayName;
-  final String tagline;
+  final String displayName; // proper name, not translated (tagline: AppStrings)
   final Brightness brightness;
   final Color background;
   final Color surface; // cards
@@ -38,7 +37,6 @@ class AppThemeSpec {
 
   const AppThemeSpec({
     required this.displayName,
-    required this.tagline,
     required this.brightness,
     required this.background,
     required this.surface,
@@ -53,7 +51,6 @@ class AppThemeSpec {
 const Map<AppTheme, AppThemeSpec> kThemeSpecs = {
   AppTheme.kampus: AppThemeSpec(
     displayName: "Kampus Bold",
-    tagline: "Loud & young",
     brightness: Brightness.light,
     background: Color(0xFFFAF7FF),
     surface: Color(0xFFFFFFFF),
@@ -65,7 +62,6 @@ const Map<AppTheme, AppThemeSpec> kThemeSpecs = {
   ),
   AppTheme.istana: AppThemeSpec(
     displayName: "Istana Modern",
-    tagline: "Crafted & warm",
     brightness: Brightness.light,
     background: Color(0xFFF6F0E4),
     surface: Color(0xFFFFFDF7),
@@ -77,7 +73,6 @@ const Map<AppTheme, AppThemeSpec> kThemeSpecs = {
   ),
   AppTheme.noir: AppThemeSpec(
     displayName: "Songket Noir",
-    tagline: "Premium & dark",
     brightness: Brightness.dark,
     background: Color(0xFF171122),
     surface: Color(0xFF231A35),

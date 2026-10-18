@@ -4,6 +4,9 @@ import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:http/http.dart' as http;
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../l10n/app_strings.dart';
+import '../language_cubit.dart';
+import '../theme/app_themes.dart';
 
 class ShareService {
   
@@ -12,6 +15,7 @@ class ShareService {
     // 1. THE CLEANER: Remove everything that is NOT a number
     // "012-345 (Main)" -> "012345"
     // "http://scam.com" -> "" (Empty string)
+    final s = context.l10nRead;
     String phone = rawPhone.replaceAll(RegExp(r'\D'), '');
 
     // International prefixes: "+60..." and "0060..." both reduce to "60..."
@@ -20,7 +24,7 @@ class ShareService {
     // 2. Safety Check: If they typed nonsense/links, 'phone' is now empty.
     if (phone.length < 9) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Seller\'s phone number looks invalid: "$rawPhone"')),
+        SnackBar(content: Text(s.invalidPhone.fill([rawPhone]))),
       );
       return;
     }
@@ -48,7 +52,7 @@ class ShareService {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Could not open WhatsApp. Is it installed?")),
+          SnackBar(content: Text(s.whatsAppFailed)),
         );
       }
     }
@@ -71,13 +75,13 @@ class ShareService {
     ];
 
     final defaultText =
-        "$title\n\n$body\n\nCheck this out on MYKerawang!";
+        "$title\n\n$body\n\n${context.l10nRead.shareFooter}";
 
     final result = await showDialog<_ShareChoice>(
       context: context,
       builder: (_) => _ShareSheet(initialText: defaultText, imageUrls: urls),
     );
-    if (result == null) return;
+    if (result == null || !context.mounted) return;
 
     await _performShare(context, result.text, result.selectedUrls);
   }
@@ -158,9 +162,10 @@ class _ShareSheetState extends State<_ShareSheet> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final s = context.l10n;
 
     return AlertDialog(
-      title: const Text("Share"),
+      title: Text(s.share),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 460),
         child: SingleChildScrollView(
@@ -172,20 +177,20 @@ class _ShareSheetState extends State<_ShareSheet> {
                 controller: _ctrl,
                 maxLines: 6,
                 minLines: 3,
-                decoration: const InputDecoration(
-                  labelText: "Message",
+                decoration: InputDecoration(
+                  labelText: s.message,
                   alignLabelWithHint: true,
                 ),
               ),
               if (widget.imageUrls.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                Text("Photos (${_selected.length}/${widget.imageUrls.length})",
+                Text(s.photosCount.fill([_selected.length, widget.imageUrls.length]),
                     style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: scheme.onSurfaceVariant)),
                 if (_selected.length > 1)
                   Text(
-                    "Some apps drop the caption when sharing multiple photos",
+                    s.captionDropWarning,
                     style: TextStyle(
                         fontSize: 11, color: scheme.onSurfaceVariant),
                   ),
@@ -221,7 +226,7 @@ class _ShareSheetState extends State<_ShareSheet> {
                                     ? Icons.check_circle
                                     : Icons.radio_button_unchecked,
                                 size: 18,
-                                color: on ? scheme.primary : Colors.white,
+                                color: on ? scheme.primary : kOnPhoto,
                               ),
                             ),
                           ],
@@ -244,16 +249,16 @@ class _ShareSheetState extends State<_ShareSheet> {
             await Clipboard.setData(ClipboardData(text: _ctrl.text));
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Text copied")),
+                SnackBar(content: Text(s.textCopied)),
               );
             }
           },
           icon: const Icon(Icons.copy, size: 16),
-          label: const Text("Copy text"),
+          label: Text(s.copyText),
         ),
         TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel")),
+            child: Text(s.cancel)),
         FilledButton.icon(
           onPressed: () => Navigator.pop(
             context,
@@ -263,7 +268,7 @@ class _ShareSheetState extends State<_ShareSheet> {
             ),
           ),
           icon: const Icon(Icons.share, size: 18),
-          label: const Text("Share"),
+          label: Text(s.share),
         ),
       ],
     );

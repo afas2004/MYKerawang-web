@@ -18,8 +18,8 @@ class FeedComposer extends StatelessWidget {
   Future<void> _open(BuildContext context) async {
     final wide = isWide(context);
 
-    final bool? posted = wide
-        ? await showDialog<bool>(
+    final Future<bool?> route = wide
+        ? showDialog<bool>(
             context: context,
             builder: (_) => Dialog(
               clipBehavior: Clip.antiAlias,
@@ -32,10 +32,11 @@ class FeedComposer extends StatelessWidget {
               ),
             ),
           )
-        : await Navigator.push<bool>(
+        : Navigator.push<bool>(
             context,
             MaterialPageRoute(builder: (_) => const CreatePostScreen()),
           );
+    final posted = await route;
 
     if (posted == true) onPosted();
   }

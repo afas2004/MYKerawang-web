@@ -193,7 +193,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: _category,
+                      initialValue: _category,
                       decoration: InputDecoration(labelText: s.category),
                       items: kListingCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                       onChanged: (v) => setState(() => _category = v!),

@@ -183,7 +183,7 @@ class _SessionWatcherState extends State<SessionWatcher> {
           if (difference < 30) {
             NotificationService.showNotification(
               latest['title'],
-              latest['message'] ?? latest['body'] ?? 'New Notification',
+              latest['message'] ?? latest['body'] ?? context.l10nRead.notifications,
             );
           }
         });

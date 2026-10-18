@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../language_cubit.dart';
 import '../utils/adaptive.dart';
+import '../utils/roles.dart';
 import '../utils/app_nav.dart';
 import '../utils/responsive.dart';
 
@@ -64,15 +66,16 @@ class _FollowListScreenState extends State<FollowListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.l10n;
     return Scaffold(
       appBar: appBarConstrained(
         context,
-        title: Text(widget.type == 'followers' ? 'Followers' : 'Following'),
+        title: Text(widget.type == 'followers' ? s.followers : s.following),
       ),
       body: PageBody(child: _isLoading
         ? const Center(child: CircularProgressIndicator())
         : _users.isEmpty
-          ? const Center(child: Text("List is empty"))
+          ? Center(child: Text(s.listEmpty))
           : ListView.builder(
               itemCount: _users.length,
               itemBuilder: (context, index) {
@@ -86,7 +89,7 @@ class _FollowListScreenState extends State<FollowListScreen> {
                         ? const Icon(Icons.person) 
                         : null,
                   ),
-                  title: Text(user['display_name'] ?? 'User'),
+                  title: Text(displayNameFor(s, user)),
                   subtitle: Text("@${user['username'] ?? ''}"),
                   onTap: () => context.goUser(user['id']),
                 );

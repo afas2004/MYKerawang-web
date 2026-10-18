@@ -1,7 +1,18 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart' show LaunchMode;
+
+/// Error codes put in [LoginState.errorMessage]. The cubit has no
+/// BuildContext, so the screen turns these into localized text
+/// (see `login_screen.dart`). Anything else is a server message shown as-is.
+abstract final class LoginError {
+  static const fillFields = 'login.fill_fields';
+  static const checkEmail = 'login.check_email';
+  static const generic = 'login.generic';
+
+  /// Prefix; the underlying error follows it.
+  static const googleFailed = 'login.google:';
+}
 
 // 1. Define the detailed States for your screen
 class LoginState {
@@ -47,7 +58,7 @@ class LoginCubit extends Cubit<LoginState> {
   // Replaces: Future<void> _submit() async
   Future<void> submit(String email, String password) async {
     if (email.isEmpty || password.isEmpty) {
-      emit(state.copyWith(errorMessage: "Please fill in all fields"));
+      emit(state.copyWith(errorMessage: LoginError.fillFields));
       return;
     }
 
@@ -74,13 +85,13 @@ class LoginCubit extends Cubit<LoginState> {
         emit(state.copyWith(isLoading: false, isSuccess: true));
       } else {
         // Sometimes signup requires email confirmation, so session might be null
-        emit(state.copyWith(isLoading: false, errorMessage: "Check your email for confirmation link."));
+        emit(state.copyWith(isLoading: false, errorMessage: LoginError.checkEmail));
       }
 
     } on AuthException catch (e) {
       emit(state.copyWith(isLoading: false, errorMessage: e.message));
     } catch (e) {
-      emit(state.copyWith(isLoading: false, errorMessage: "An error occurred. Check connection."));
+      emit(state.copyWith(isLoading: false, errorMessage: LoginError.generic));
     }
   }
 
@@ -106,7 +117,7 @@ class LoginCubit extends Cubit<LoginState> {
       // router's auth redirect pick up the restored session — that's this
       // app's equivalent of Firebase's getRedirectResult().
     } catch (e) {
-      emit(state.copyWith(isLoading: false, errorMessage: "Google Sign-In failed: $e"));
+      emit(state.copyWith(isLoading: false, errorMessage: '${LoginError.googleFailed}$e'));
     }
   }
 }
