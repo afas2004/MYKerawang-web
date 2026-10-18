@@ -5,14 +5,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'create_listing_screen.dart';
 import '../l10n/access_strings.dart';
-import '../theme/app_themes.dart';
 import '../utils/app_nav.dart';
 import '../utils/categories.dart';
 import '../utils/formatters.dart';
 import '../utils/listing_status.dart';
-import '../widgets/kerawang_motif.dart';
 import '../widgets/status_badge.dart';
-import '../widgets/tap_card.dart';
+import '../widgets/brand/brand.dart';
 import 'marketplace_cubit.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
@@ -22,13 +20,6 @@ import '../widgets/error_state.dart';
 const double _kSidePanelFrom = 900;
 const double _kSidePanelWidth = 280;
 
-/// Grid columns for the width the grid itself has: 2 / 3 / 4 / 5.
-int marketColumns(double gridWidth) {
-  if (gridWidth >= 1200) return 5;
-  if (gridWidth >= 900) return 4;
-  if (gridWidth >= 560) return 3;
-  return 2;
-}
 
 class MarketplaceScreen extends StatelessWidget {
   const MarketplaceScreen({super.key});
@@ -119,10 +110,15 @@ class _MarketplaceViewState extends State<MarketplaceView> {
               ],
               // Quick category chips; on wide layouts the side panel has them.
               bottom: sidePanel
-                  ? null
+                  ? LatticeBand.preferred()
                   : PreferredSize(
-                      preferredSize: const Size.fromHeight(52),
-                      child: _CategoryChipRow(selected: state.filters.category),
+                      preferredSize: const Size.fromHeight(52 + 9),
+                      child: Column(
+                        children: [
+                          _CategoryChipRow(selected: state.filters.category),
+                          const LatticeBand(),
+                        ],
+                      ),
                     ),
             ),
             body: LinearRefresher(
@@ -212,7 +208,7 @@ class _MarketplaceViewState extends State<MarketplaceView> {
     final cubit = context.read<MarketplaceCubit>();
 
     return LayoutBuilder(builder: (context, constraints) {
-      final columns = marketColumns(constraints.maxWidth);
+      final columns = Responsive.gridColumnsFor(constraints.maxWidth);
 
       if (state.isLoading && state.items.isEmpty) {
         return _MarketGridSkeleton(columns: columns);
@@ -238,8 +234,8 @@ class _MarketplaceViewState extends State<MarketplaceView> {
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: columns,
                 childAspectRatio: MarketCard.aspectRatio,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
+                crossAxisSpacing: KSpace.m,
+                mainAxisSpacing: KSpace.m,
               ),
               itemCount: state.items.length,
               itemBuilder: (context, index) {
@@ -317,13 +313,10 @@ class MarketCard extends StatelessWidget {
 
     return Opacity(
       opacity: isSold ? 0.6 : 1,
-      child: TapCard(
+      child: KCard(
         onTap: onTap,
-        hoverLift: true,
+        padding: EdgeInsets.zero,
         semanticLabel: '$title, $price${badge != null ? ', $badge' : ''}',
-        borderRadius: kerawangCut,
-        color: scheme.surfaceContainer,
-        border: BorderSide(color: scheme.outlineVariant),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -354,7 +347,7 @@ class MarketCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.s, KSpace.m, KSpace.m),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -609,36 +602,12 @@ class _EmptyMarket extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = context.l10n;
-    final theme = Theme.of(context);
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const KerawangDivider(size: 12),
-            const SizedBox(height: 16),
-            Text(filtered ? s.noMatchingItems : s.noItemsFound,
-                textAlign: TextAlign.center, style: theme.textTheme.titleMedium),
-            if (!filtered) ...[
-              const SizedBox(height: 8),
-              Text(s.noItemsYetHint,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-            ],
-            const SizedBox(height: 16),
-            if (onReset != null)
-              OutlinedButton(onPressed: onReset, child: Text(s.resetFilters))
-            else if (!filtered)
-              FilledButton.icon(
-                onPressed: onSell,
-                icon: const Icon(Icons.add),
-                label: Text(s.sellItem),
-              ),
-          ],
-        ),
-      ),
+    return BrandEmptyState(
+      icon: Icons.storefront_outlined,
+      title: filtered ? s.noMatchingItems : s.noItemsFound,
+      message: filtered ? null : s.noItemsYetHint,
+      actionLabel: onReset != null ? s.resetFilters : (filtered ? null : s.sellItem),
+      onAction: onReset ?? (filtered ? null : onSell),
     );
   }
 }
@@ -649,23 +618,26 @@ class _MarketGridSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return ExcludeSemantics(
       child: GridView.builder(
         physics: const NeverScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        padding: const EdgeInsets.fromLTRB(KSpace.l, 0, KSpace.l, KSpace.l),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: columns,
           childAspectRatio: MarketCard.aspectRatio,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
+          crossAxisSpacing: KSpace.m,
+          mainAxisSpacing: KSpace.m,
         ),
         itemCount: columns * 2,
-        itemBuilder: (_, __) => Container(
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerHighest,
-            borderRadius: kerawangCut,
-          ),
+        itemBuilder: (_, __) => const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: KSkeleton(height: double.infinity, borderRadius: KRadius.card)),
+            SizedBox(height: KSpace.s),
+            KSkeleton(height: 14),
+            SizedBox(height: KSpace.xs),
+            KSkeleton(width: 72, height: 16),
+          ],
         ),
       ),
     );

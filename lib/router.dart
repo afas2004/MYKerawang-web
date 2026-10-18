@@ -21,6 +21,7 @@ import 'screens/profile_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
 import 'utils/guest_access.dart';
+import 'utils/responsive.dart';
 import 'widgets/app_sidebar.dart';
 import 'screens/admin/moderation_routes.dart';
 
@@ -157,6 +158,8 @@ GoRouter buildRouter() {
         // (inside a shell branch it would stay on the tab's URL).
         parentNavigatorKey: _rootKey,
         builder: (context, state) => DesktopChrome(
+          // Room for AdaptiveScaffoldBody's two columns on desktop.
+          maxWidth: Responsive.detailMaxWidth,
           child: _DetailLoader(
             table: 'listings',
             id: state.pathParameters['id']!,
@@ -169,6 +172,8 @@ GoRouter buildRouter() {
         path: '/event/:id',
         parentNavigatorKey: _rootKey,
         builder: (context, state) => DesktopChrome(
+          // Room for AdaptiveScaffoldBody's two columns on desktop.
+          maxWidth: Responsive.detailMaxWidth,
           child: _DetailLoader(
             table: 'events',
             id: state.pathParameters['id']!,
@@ -181,6 +186,8 @@ GoRouter buildRouter() {
         path: '/post/:id',
         parentNavigatorKey: _rootKey,
         builder: (context, state) => DesktopChrome(
+          // Room for AdaptiveScaffoldBody's two columns on desktop.
+          maxWidth: Responsive.detailMaxWidth,
           child: _DetailLoader(
             table: 'posts_public', // anonymity-safe view
             id: state.pathParameters['id']!,

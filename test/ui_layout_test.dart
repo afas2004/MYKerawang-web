@@ -5,6 +5,7 @@ import 'package:mykerawang/language_cubit.dart';
 import 'package:mykerawang/screens/events_screen.dart';
 import 'package:mykerawang/screens/login_screen.dart';
 import 'package:mykerawang/screens/marketplace_screen.dart';
+import 'package:mykerawang/widgets/brand/brand.dart';
 import 'package:mykerawang/l10n/access_strings.dart';
 import 'package:mykerawang/l10n/app_strings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -103,8 +104,8 @@ void main() {
   /// from 900).
   double marketTileWidth(double width) {
     final grid = (width >= 900 ? width - 281 : width) - 32;
-    final cols = marketColumns(grid + 32);
-    return (grid - 12 * (cols - 1)) / cols;
+    final cols = Responsive.gridColumnsFor(grid + 32);
+    return (grid - KSpace.m * (cols - 1)) / cols;
   }
 
   final listing = {
@@ -140,10 +141,10 @@ void main() {
   }
 
   test('market columns step 2 / 3 / 4 / 5', () {
-    expect(marketColumns(375), 2);
-    expect(marketColumns(768), 3);
-    expect(marketColumns(1000), 4);
-    expect(marketColumns(1400), 5);
+    expect(Responsive.gridColumnsFor(375), 2);
+    expect(Responsive.gridColumnsFor(768), 3);
+    expect(Responsive.gridColumnsFor(1000), 4);
+    expect(Responsive.gridColumnsFor(1400), 5);
   });
 
   // ---- login ----

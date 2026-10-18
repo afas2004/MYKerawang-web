@@ -8,16 +8,14 @@ import 'events_cubit.dart';
 import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
-import '../theme/app_themes.dart';
 import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
 import '../utils/categories.dart';
 import '../utils/formatters.dart';
 import '../utils/roles.dart';
 import '../widgets/error_state.dart';
-import '../widgets/kerawang_motif.dart';
 import '../widgets/status_badge.dart';
-import '../widgets/tap_card.dart';
+import '../widgets/brand/brand.dart';
 
 /// "Today" / "Tomorrow" / "In 3 days" for upcoming events less than a
 /// week away, "Happening now" while one runs; null otherwise. Counted in
@@ -112,10 +110,15 @@ class _EventsViewState extends State<EventsView> {
                   ),
               ],
               bottom: withFilterColumn
-                  ? null
+                  ? LatticeBand.preferred()
                   : PreferredSize(
-                      preferredSize: const Size.fromHeight(52),
-                      child: _TagChipRow(tags: _tags, selected: state.selectedTag),
+                      preferredSize: const Size.fromHeight(52 + 9),
+                      child: Column(
+                        children: [
+                          _TagChipRow(tags: _tags, selected: state.selectedTag),
+                          const LatticeBand(),
+                        ],
+                      ),
                     ),
             ),
             body: LinearRefresher(
@@ -187,6 +190,18 @@ class _EventsViewState extends State<EventsView> {
     );
   }
 
+  Widget _emptyState(BuildContext context, EventsState state) {
+    final s = context.l10n;
+    final filtered = state.searchQuery.isNotEmpty || state.selectedTag != 'All';
+    return BrandEmptyState(
+      icon: Icons.event_outlined,
+      title: s.noEventsFound,
+      message: filtered ? null : s.noEventsYetHint,
+      actionLabel: filtered ? null : s.createEvent,
+      onAction: filtered ? null : () => _openCreate(context),
+    );
+  }
+
   Widget _content(BuildContext context, EventsState state, {required bool withSearch}) {
     final s = context.l10n;
     final cubit = context.read<EventsCubit>();
@@ -208,8 +223,8 @@ class _EventsViewState extends State<EventsView> {
 
     return LayoutBuilder(builder: (context, constraints) {
       final width = constraints.maxWidth;
-      final columns = width >= 1000 ? 3 : (width >= 600 ? 2 : 1);
-      const gap = 16.0;
+      final columns = width >= 1000 ? 3 : (width >= Responsive.mediumBreakpoint ? 2 : 1);
+      const gap = KSpace.l;
 
       List<Widget> section(EventSection sec, String title) {
         final events = bySection[sec]!;
@@ -221,9 +236,17 @@ class _EventsViewState extends State<EventsView> {
               onTap: () => context.goEvent(e),
             );
         return [
-          SliverToBoxAdapter(child: _SectionHeader(title: title, count: events.length)),
+          SliverToBoxAdapter(
+            child: SectionHeader(
+              title: title,
+              padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.xl, KSpace.l, KSpace.m),
+              trailing: Text('${events.length}',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            ),
+          ),
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: KSpace.l),
             sliver: columns == 1
                 ? SliverList.separated(
                     itemCount: events.length,
@@ -256,9 +279,7 @@ class _EventsViewState extends State<EventsView> {
           if (state.displayedEvents.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
-              child: _EmptyEvents(
-                filtered: state.searchQuery.isNotEmpty || state.selectedTag != 'All',
-              ),
+              child: _emptyState(context, state),
             ),
           ...section(EventSection.thisWeek, s.sectionThisWeek),
           ...section(EventSection.later, s.sectionLater),
@@ -319,13 +340,13 @@ class EventCard extends StatelessWidget {
     return Opacity(
       // Ended / cancelled stay visible but recede (spec §6)
       opacity: closed ? 0.6 : 1,
-      child: TapCard(
+      child: KCard(
         onTap: onTap,
-        hoverLift: true,
+        padding: EdgeInsets.zero,
+        // Official organisers get the gold frame + corner lattice.
+        official: isOfficialProfile(organiser) && !closed,
+        borderRadius: KRadius.cut,
         semanticLabel: title,
-        borderRadius: kerawangCut,
-        color: scheme.surfaceContainer,
-        border: BorderSide(color: scheme.outlineVariant),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
@@ -364,12 +385,12 @@ class EventCard extends StatelessWidget {
 
             // ---- date block + details ----
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(KSpace.m),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   DateBlock(date: start, muted: closed),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: KSpace.m),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -444,7 +465,7 @@ class DateBlock extends StatelessWidget {
     return Container(
       width: size,
       padding: const EdgeInsets.symmetric(vertical: 6),
-      decoration: BoxDecoration(color: bg, borderRadius: kerawangCut),
+      decoration: BoxDecoration(color: bg, borderRadius: KRadius.cut),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -601,109 +622,32 @@ class _FilterColumn extends StatelessWidget {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final int count;
-  const _SectionHeader({required this.title, required this.count});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
-      child: Semantics(
-        header: true,
-        child: Row(
-          children: [
-            Text(title, style: theme.textTheme.titleLarge),
-            const SizedBox(width: 8),
-            Text('$count',
-                style: theme.textTheme.titleSmall?.copyWith(color: scheme.onSurfaceVariant)),
-            const SizedBox(width: 12),
-            Expanded(child: Divider(color: scheme.outlineVariant)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyEvents extends StatelessWidget {
-  final bool filtered;
-  const _EmptyEvents({required this.filtered});
-
-  @override
-  Widget build(BuildContext context) {
-    final s = context.l10n;
-    final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const KerawangDivider(size: 12),
-            const SizedBox(height: 16),
-            Text(s.noEventsFound,
-                style: theme.textTheme.titleMedium, textAlign: TextAlign.center),
-            if (!filtered) ...[
-              const SizedBox(height: 8),
-              Text(s.noEventsYetHint,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// Placeholder cards while the first load runs.
 class _EventListSkeleton extends StatelessWidget {
   const _EventListSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    Widget bar(double w, double h) => Container(
-          width: w,
-          height: h,
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(4),
-          ),
-        );
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: 3,
-      separatorBuilder: (_, __) => const SizedBox(height: 16),
-      itemBuilder: (_, __) => ExcludeSemantics(
-        child: Container(
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainer,
-            borderRadius: kerawangCut,
-          ),
-          clipBehavior: Clip.antiAlias,
+    return ExcludeSemantics(
+      child: ListView.separated(
+        padding: const EdgeInsets.all(KSpace.l),
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: 3,
+        separatorBuilder: (_, __) => const SizedBox(height: KSpace.l),
+        itemBuilder: (_, __) => KCard(
+          padding: EdgeInsets.zero,
+          borderRadius: KRadius.cut,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(height: 140, color: scheme.surfaceContainerHighest),
+              const KSkeleton(height: 140, borderRadius: BorderRadius.zero),
               Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(KSpace.m),
                 child: Row(
                   children: [
-                    bar(56, 64),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [bar(180, 16), const SizedBox(height: 8), bar(120, 12)],
-                      ),
-                    ),
+                    const KSkeleton(width: 56, height: 64),
+                    const SizedBox(width: KSpace.m),
+                    Expanded(child: KSkeleton.lines(2)),
                   ],
                 ),
               ),
