@@ -6,10 +6,15 @@ import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/kerawang_motif.dart';
+import '../utils/guest_access.dart';
 import 'login_cubit.dart'; // This looks in the SAME folder
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  /// Path to return to after signing in (`/login?from=…`), e.g. the
+  /// shared event a visitor opened before being asked to log in.
+  final String? from;
+
+  const LoginScreen({super.key, this.from});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -66,10 +71,10 @@ class _LoginScreenState extends State<LoginScreen> {
               );
             }
 
-            // Handle Navigation on Success — the router's redirect takes
-            // over from here (and drops any OAuth query string).
+            // Handle Navigation on Success — back to where the visitor
+            // came from; the router's redirect takes over from there.
             if (state.isSuccess) {
-              context.go('/home');
+              context.go(safeReturnPath(widget.from) ?? '/home');
             }
           },
           builder: (context, state) {
@@ -182,7 +187,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     OutlinedButton.icon(
                       onPressed: state.isLoading 
                           ? null 
-                          : () => context.read<LoginCubit>().signInWithGoogle(),
+                          : () => context.read<LoginCubit>().signInWithGoogle(from: widget.from),
                       icon: const _GoogleMark(),
                       label: Text(s.continueWithGoogle),
                       style: OutlinedButton.styleFrom(

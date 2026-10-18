@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/guest_access.dart';
 
 /// Error codes put in [LoginState.errorMessage]. The cubit has no
 /// BuildContext, so the screen turns these into localized text
@@ -95,7 +96,10 @@ class LoginCubit extends Cubit<LoginState> {
     }
   }
 
-  Future<void> signInWithGoogle() async {
+  /// [from] is the page to return to; on web it rides along in the
+  /// redirect URL (`/login?from=…`), and the router forwards there once
+  /// the restored session arrives.
+  Future<void> signInWithGoogle({String? from}) async {
     emit(state.copyWith(isLoading: true, errorMessage: null));
     try {
       // 1. Trigger Supabase OAuth
@@ -105,7 +109,11 @@ class LoginCubit extends Cubit<LoginState> {
         // WEB: come back to this same page after Google login.
         // MOBILE: deep link back into the app (must match Supabase URL settings
         // and the AndroidManifest intent filter).
-        redirectTo: kIsWeb ? Uri.base.origin : 'mykerawang://login-callback',
+        // The full URL must be allowed in Supabase Auth → URL
+        // Configuration (e.g. https://mykerawang-app.web.app/**).
+        redirectTo: kIsWeb
+            ? '${Uri.base.origin}${loginPathFor(from)}'
+            : 'mykerawang://login-callback',
         // iOS WebKit blocks the storage access a popup needs to finish the
         // credential exchange (ITP), so the popup silently dies after account
         // selection. A same-tab, full-page redirect avoids popups entirely.
