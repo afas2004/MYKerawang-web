@@ -1,13 +1,15 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_parsed_text/flutter_parsed_text.dart';
-import 'package:mykerawang/utils/app_nav.dart';
 import 'package:mykerawang/utils/report_helper.dart';
 import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:timeago/timeago.dart' as timeago;
+import '../widgets/linear_refresher.dart';
+import '../widgets/mention_text.dart';
 import '../widgets/post_card.dart';
+import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
+import '../utils/formatters.dart';
+import '../utils/roles.dart';
 import '../utils/adaptive.dart';
 import '../utils/responsive.dart';
 
@@ -88,6 +90,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (usernames.isEmpty) return;
 
     final myId = _supabase.auth.currentUser!.id;
+    // Read by the recipient, so written in the canonical language.
+    const n = AppStrings.en;
 
     final users = await _supabase
         .from('profiles')
@@ -101,8 +105,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         'user_id': user['id'],
         'actor_id': myId,
         'type': 'mention',
-        'title': 'You were mentioned in a comment', // Changed title slightly
-        'body': 'replied: $text',
+        'title': n.notifMentionCommentTitle,
+        'body': n.notifMentionCommentBody.fill([text]),
         'data': {'post_id': postId, 'comment_id': commentId},
       });
     }
@@ -130,14 +134,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
       // 3. Clear Input & Refresh
       _commentCtrl.clear();
-      FocusScope.of(context).unfocus(); 
+      if (mounted) FocusScope.of(context).unfocus();
       await _refreshData();
+      if (!mounted) return;
       setState(() {
         _commentsStream = _fetchCommentsStream(); 
       });
       
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.errorWithDetail.fill([e]))));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -145,14 +150,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final s = context.l10n;
     return Scaffold(
-      appBar: appBarConstrained(context, title: Text(context.l10n.threadTitle)),
+      appBar: appBarConstrained(context, title: Text(s.threadTitle)),
       body: PageBody(child: Column(
         children: [
           Expanded(
-            // 2. REFRESH INDICATOR WRAPPER
-            child: RefreshIndicator(
-              onRefresh: _refreshData, // Pulling triggers this
+            child: LinearRefresher(
+              onRefresh: _refreshData,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(), // Ensures pull-to-refresh works even if list is short
                 child: Column(
@@ -165,21 +172,21 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
-                      color: Theme.of(context).colorScheme.surface,
-                      child: const Text("Comments", style: TextStyle(fontWeight: FontWeight.bold)),
+                      color: scheme.surface,
+                      child: Text(s.comments, style: const TextStyle(fontWeight: FontWeight.bold)),
                     ),
 
                     StreamBuilder<List<Map<String, dynamic>>>(
                       stream: _commentsStream,
                       builder: (context, snapshot) {
-                        if (snapshot.hasError) return Padding(padding: const EdgeInsets.all(16), child: Text("Error: ${snapshot.error}"));
+                        if (snapshot.hasError) return Padding(padding: const EdgeInsets.all(16), child: Text(s.errorWithDetail.fill([snapshot.error])));
                         if (!snapshot.hasData) return const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()));
                         
                         final comments = snapshot.data!;
                         if (comments.isEmpty) {
-                           return const Padding(
-                             padding: EdgeInsets.all(32.0),
-                             child: Text("Be the first to reply!", style: TextStyle(color: Colors.grey)),
+                           return Padding(
+                             padding: const EdgeInsets.all(32.0),
+                             child: Text(s.beFirstToComment, style: TextStyle(color: scheme.onSurfaceVariant)),
                            );
                         }
 
@@ -193,7 +200,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                             final isAnon = c['is_anonymous'] ?? false;
                             
                             final profile = c['profiles'];
-                            final displayName = isAnon ? "Anonymous" : (profile?['display_name'] ?? "Student");
+                            final displayName = displayNameFor(s, profile, anonymous: isAnon);
                             final avatarUrl = isAnon ? null : profile?['avatar_url'];
                             final username = isAnon ? null : profile?['username'];
 
@@ -201,20 +208,20 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                               leading: Tooltip(
                                 // Explain what the crossed-eye icon means
                                 message: isAnon
-                                    ? context.l10n.postedAnonymously
+                                    ? s.postedAnonymously
                                     : displayName,
                                 child: CircleAvatar(
                                   radius: 16,
                                   backgroundColor: isAnon
-                                      ? Theme.of(context).colorScheme.surfaceContainerHighest
-                                      : Theme.of(context).colorScheme.primaryContainer,
+                                      ? scheme.surfaceContainerHighest
+                                      : scheme.primaryContainer,
                                   backgroundImage: avatarUrl != null ? CachedNetworkImageProvider(avatarUrl) : null,
                                   child: (avatarUrl == null)
                                       ? Icon(isAnon ? Icons.visibility_off : Icons.person,
                                           size: 16,
                                           color: isAnon
-                                              ? Theme.of(context).colorScheme.onSurfaceVariant
-                                              : Theme.of(context).colorScheme.onPrimaryContainer)
+                                              ? scheme.onSurfaceVariant
+                                              : scheme.onPrimaryContainer)
                                       : null,
                                 ),
                               ),
@@ -223,56 +230,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                   Text(displayName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                                   if (!isAnon && username != null) ...[
                                     const SizedBox(width: 4),
-                                    Text("@$username", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                    Text("@$username", style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
                                   ],
                                   const SizedBox(width: 8),
-                                  Text(timeago.format(DateTime.parse(c['created_at']), locale: 'en_short'), style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                  Text(formatRelative(context, DateTime.parse(c['created_at'])), style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
                                 ],
                               ),
 
-                              subtitle: ParsedText(
-                                text: c['body'] ?? '',
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface), // Default color
-                                parse: [
-                                  MatchText(
-                                    pattern: r"\@(\w+)", // Finds @username
-                                    style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
-                                    onTap: (username) async {
-                                      final cleanName = username.substring(1); // Remove @
-                                      
-                                      // 1. Find the User ID
-                                      final user = await Supabase.instance.client
-                                          .from('profiles')
-                                          .select('id')
-                                          .eq('username', cleanName)
-                                          .maybeSingle();
-
-                                      // 2. Navigate
-                                      if (user != null && context.mounted) {
-                                        context.goUser(user['id']);
-                                      } else if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User not found")));
-                                      }
-                                    },
-                                  ),
-                                ],
-                              ),
-                              
-                              trailing: PopupMenuButton<String>(
-                                icon: const Icon(Icons.more_vert, size: 18, color: Colors.grey),
-                                onSelected: (value) {
-                                  if (value == 'report') {
-                                    // Pass 'comment' as the type
-                                    showReportDialog(context, c['id'], 'comment');
-                                  }
-                                },
-                                itemBuilder: (context) => [
-                                  const PopupMenuItem(
-                                    value: 'report',
-                                    child: Text("Report Comment", style: TextStyle(color: Colors.red)),
-                                  ),
-                                ],
-                              ),
+                              subtitle: MentionText(c['body'] ?? ''),
+                              trailing: ReportMenuButton(targetId: c['id'], type: 'comment', iconSize: 18),
                             );
                           },
                         );
@@ -289,23 +255,24 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5, offset: const Offset(0, -2))],
+              color: theme.scaffoldBackgroundColor,
+              boxShadow: [BoxShadow(color: scheme.shadow.withValues(alpha: 0.05), blurRadius: 5, offset: const Offset(0, -2))],
             ),
             child: SafeArea(
               child: Row(
                 children: [
                   IconButton(
+                    tooltip: s.postAnonymously,
                     icon: Icon(
                       _isAnon ? Icons.visibility_off : Icons.visibility,
-                      color: _isAnon ? Theme.of(context).colorScheme.primary : Colors.grey,
+                      color: _isAnon ? scheme.primary : scheme.onSurfaceVariant,
                     ),
                     onPressed: () => setState(() => _isAnon = !_isAnon),
                   ),
                   Expanded(
                     child: MentionInput(
                       controller: _commentCtrl,
-                      hintText: "What's on your mind?",
+                      hintText: s.commentHint,
                       isMultiLine: true,
                       reverseDirection: true,
                     ),
@@ -315,7 +282,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     onPressed: _isLoading ? null : _submitComment,
                     icon: _isLoading 
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) 
-                      : Icon(Icons.send, color: Theme.of(context).colorScheme.primary),
+                      : Icon(Icons.send, color: scheme.primary),
                   ),
                 ],
               ),

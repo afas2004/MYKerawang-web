@@ -1,12 +1,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_parsed_text/flutter_parsed_text.dart';
 import 'package:mykerawang/utils/app_nav.dart';
 import 'package:mykerawang/utils/report_helper.dart';
 import 'package:mykerawang/widgets/embed_card.dart';
 import 'package:mykerawang/theme/app_themes.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:timeago/timeago.dart' as timeago;
+import '../l10n/app_strings.dart';
+import '../language_cubit.dart';
+import '../utils/formatters.dart';
+import '../utils/roles.dart';
+import 'mention_text.dart';
 
 class PostCard extends StatelessWidget {
   final Map<String, dynamic> post;
@@ -18,6 +20,8 @@ class PostCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final s = context.l10n;
     final isAnon = post['is_anonymous'] ?? false;
     
     // Safety check for date
@@ -30,9 +34,7 @@ class PostCard extends StatelessWidget {
         ? rawProfile.first 
         : (rawProfile is Map<String, dynamic> ? rawProfile : null);
 
-    final String displayName = isAnon 
-        ? "Anonymous Student" 
-        : (profile?['display_name'] ?? "UiTM Student");
+    final String displayName = displayNameFor(s, profile, anonymous: isAnon);
     final String? avatarUrl = isAnon ? null : profile?['avatar_url'];
     final String? username = isAnon ? null : profile?['username'];
 
@@ -58,17 +60,21 @@ class PostCard extends StatelessWidget {
               if (showProfileHeader)
                 Row(
                   children: [
-                    GestureDetector(
-                      onTap: (isAnon || profile == null) 
-                          ? null 
+                    InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: (isAnon || profile == null)
+                          ? null
                         : () => context.goUser(profile['id']),
-                    child: CircleAvatar(
-                      radius: 16, // Slightly larger for better visibility
-                      backgroundColor: isAnon ? Colors.grey : theme.colorScheme.primaryContainer,
-                      backgroundImage: avatarUrl != null ? CachedNetworkImageProvider(avatarUrl) : null,
-                      child: (avatarUrl == null) 
-                          ? Icon(isAnon ? Icons.visibility_off : Icons.person, size: 16, color: isAnon ? Colors.white : theme.colorScheme.onPrimaryContainer)
-                          : null,
+                    child: Tooltip(
+                      message: isAnon ? s.postedAnonymously : displayName,
+                      child: CircleAvatar(
+                        radius: 16, // Slightly larger for better visibility
+                        backgroundColor: isAnon ? scheme.surfaceContainerHighest : scheme.primaryContainer,
+                        backgroundImage: avatarUrl != null ? CachedNetworkImageProvider(avatarUrl) : null,
+                        child: (avatarUrl == null)
+                            ? Icon(isAnon ? Icons.visibility_off : Icons.person, size: 16, color: isAnon ? scheme.onSurfaceVariant : scheme.onPrimaryContainer)
+                            : null,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -97,7 +103,7 @@ class PostCard extends StatelessWidget {
                           ],
                         ),
                         Text(
-                          timeago.format(date, locale: 'en_short'),
+                          formatRelative(context, date),
                           style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11),
                         ),
                       ],
@@ -127,7 +133,7 @@ class PostCard extends StatelessWidget {
 
               // 2. TITLE
               Text(
-                post['title'] ?? 'No Title',
+                post['title'] ?? s.untitled,
                 style: theme.textTheme.titleMedium
                     ?.copyWith(fontWeight: FontWeight.w700, height: 1.3),
               ),
@@ -135,33 +141,7 @@ class PostCard extends StatelessWidget {
 
               // 3. BODY PREVIEW
               if (post['body'] != null)
-                ParsedText(
-                  text: post['body'] ?? '',
-                  style: TextStyle(color: theme.colorScheme.onSurface), // Your default style
-                  parse: [
-                    MatchText(
-                      pattern: r"\@(\w+)", // Regex to find @username
-                      style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
-                      onTap: (username) async {
-                        final cleanName = username.substring(1); // Remove '@'
-                        
-                        // Find the user ID based on the username
-                        final user = await Supabase.instance.client
-                            .from('profiles')
-                            .select('id')
-                            .eq('username', cleanName)
-                            .maybeSingle();
-
-                        if (user != null && context.mounted) {
-                          // Navigate to their profile
-                          context.goUser(user['id']);
-                        } else if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User not found")));
-                        }
-                      },
-                    ),
-                  ],
-                ),
+                MentionText(post['body'] ?? ''),
               
               // 4. SHARED CONTENT (Event OR Listing) — same embed language
               // as the feed, compact so it supports rather than dominates.
@@ -182,7 +162,7 @@ class PostCard extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // 5. FOOTER (Just Replies & Share)
+              // 5. FOOTER (comment count + report)
               Row(
                 children: [
                   // Comment Count
@@ -191,7 +171,7 @@ class PostCard extends StatelessWidget {
                   Builder(builder: (context) {
                     final count = post['comment_count'] ?? 0;
                     return Text(
-                      "$count ${count == 1 ? 'Reply' : 'Replies'}",
+                      (count == 1 ? s.commentCountOne : s.commentCountMany).fill([count]),
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w500,
@@ -200,28 +180,7 @@ class PostCard extends StatelessWidget {
                   }),
                   
                   const Spacer(),
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert, color: Colors.grey),
-                    onSelected: (value) {
-                      if (value == 'report') {
-                        // Call the helper we just made
-                        showReportDialog(context, post['id'], 'post');
-                      }
-                      // You can add 'delete' here later for the owner
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'report',
-                        child: Row(
-                          children: [
-                            Icon(Icons.flag, color: Colors.red, size: 20),
-                            SizedBox(width: 8),
-                            Text("Report", style: TextStyle(color: Colors.red)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                  ReportMenuButton(targetId: post['id'], type: 'post'),
                 ],
               ),
             ],
