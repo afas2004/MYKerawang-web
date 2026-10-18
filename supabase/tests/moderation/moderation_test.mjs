@@ -257,5 +257,16 @@ const spc = (await q(`select id from moderation_cases where target_id=$1`, [sp])
 e = await err(ids.admin, `select admin_bulk_resolve(array[$1::uuid], 'remove', 'spam wave')`, [spc]);
 ok(e === null, 'bulk remove spam ok');
 
+
+// case detail: reports with notes, history masked for anonymous cases
+await as(ids.erin, `insert into reports (reporter_id, target_id, target_type, reason, category, note) values ($1,$2,'post','Spam','spam','posted 5 times')`, [ids.erin, bobPosts[2]]);
+const dc = (await q(`select id from moderation_cases where target_id=$1 and status in ('open','hidden')`, [bobPosts[2]]))[0].id;
+const det = (await as(ids.admin, `select admin_case_detail($1) d`, [dc]))[0].d;
+ok(det.reports.some((r) => r.note === 'posted 5 times') && det.history.length >= 3, 'case detail has notes and author history');
+ok(!JSON.stringify(det).includes(ids.erin), 'case detail hides reporter ids');
+ok((await err(ids.bob, `select admin_case_detail($1)`, [dc]))?.includes('MOD:not_admin'), 'case detail admin-only');
+const anonDet = (await as(ids.admin, `select admin_case_detail($1) d`, [c2]))[0].d;
+ok(anonDet.history.length === 0 && anonDet.restrictions.length === 0, 'anonymous case detail has no author history');
+
 console.log(failures ? `\n${failures} FAILURES` : '\nALL PASSED');
 process.exit(failures ? 1 : 0);

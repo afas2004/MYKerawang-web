@@ -6,6 +6,7 @@ import '../../language_cubit.dart';
 import '../../services/moderation_service.dart';
 import '../../widgets/moderation_ui.dart';
 import 'admin_screen.dart';
+import '../../widgets/brand/brand.dart';
 
 /// club_pending accounts: approve (→ club + verified) or reject with a
 /// reason (→ student). Both notify the account.
@@ -18,7 +19,8 @@ class ClubApprovalsTab extends StatefulWidget {
 
 class _ClubApprovalsTabState extends State<ClubApprovalsTab>
     with AutomaticKeepAliveClientMixin {
-  late Future<List<Map<String, dynamic>>> _future = ModerationService.clubRequests();
+  late Future<List<Map<String, dynamic>>> _future =
+      ModerationService.clubRequests();
   final Set<String> _busy = {};
 
   @override
@@ -31,12 +33,20 @@ class _ClubApprovalsTabState extends State<ClubApprovalsTab>
     final name = '${p['display_name'] ?? p['username'] ?? ''}';
     String? reason;
     if (approve) {
-      final ok = await confirmModAction(context,
-          title: m.approveTitle.fill([name]), body: m.approveBody, confirmLabel: m.approve);
+      final ok = await confirmModAction(
+        context,
+        title: m.approveTitle.fill([name]),
+        body: m.approveBody,
+        confirmLabel: m.approve,
+      );
       if (!ok) return;
     } else {
-      reason = await askReason(context,
-          title: m.rejectClubTitle, confirmLabel: m.reject, destructive: true);
+      reason = await askReason(
+        context,
+        title: m.rejectClubTitle,
+        confirmLabel: m.reject,
+        destructive: true,
+      );
       if (reason == null) return;
     }
     final id = '${p['id']}';
@@ -60,19 +70,17 @@ class _ClubApprovalsTabState extends State<ClubApprovalsTab>
     return AdminAsyncList<Map<String, dynamic>>(
       future: _future,
       onRetry: _reload,
-      empty: ModEmptyState(icon: Icons.verified_outlined, title: m.noClubRequests),
+      empty: ModEmptyState(
+        icon: Icons.verified_outlined,
+        title: m.noClubRequests,
+      ),
       itemBuilder: (context, p) {
         final busy = _busy.contains('${p['id']}');
         final bio = p['bio'] as String?;
-        return Card(
-          elevation: 0,
-          margin: const EdgeInsets.symmetric(vertical: 6),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: KSpace.xs + 2),
+          child: KCard(
+            padding: const EdgeInsets.all(KSpace.l),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

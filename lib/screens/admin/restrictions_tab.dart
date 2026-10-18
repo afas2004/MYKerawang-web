@@ -9,6 +9,7 @@ import '../../utils/moderation_logic.dart';
 import '../../widgets/moderation_ui.dart';
 import 'admin_screen.dart';
 import 'restrict_dialog.dart';
+import '../../widgets/brand/brand.dart';
 
 /// Active (or all) restrictions; lift early with Undo; restrict a user
 /// by username.
@@ -22,28 +23,38 @@ class RestrictionsTab extends StatefulWidget {
 class _RestrictionsTabState extends State<RestrictionsTab>
     with AutomaticKeepAliveClientMixin {
   bool _activeOnly = true;
-  late Future<List<Map<String, dynamic>>> _future = ModerationService.restrictions();
+  late Future<List<Map<String, dynamic>>> _future =
+      ModerationService.restrictions();
   final Set<String> _busy = {};
 
   @override
   bool get wantKeepAlive => true;
 
   void _reload() => setState(
-      () => _future = ModerationService.restrictions(activeOnly: _activeOnly));
+    () => _future = ModerationService.restrictions(activeOnly: _activeOnly),
+  );
 
   Future<void> _lift(Map<String, dynamic> r) async {
     final m = modStrings(context);
-    final reason = await askReason(context, title: m.liftTitle, confirmLabel: m.lift);
+    final reason = await askReason(
+      context,
+      title: m.liftTitle,
+      confirmLabel: m.lift,
+    );
     if (reason == null || !mounted) return;
     final id = '${r['id']}';
     setState(() => _busy.add(id));
     try {
       await ModerationService.liftRestriction(id, reason);
       if (!mounted) return;
-      showModSnack(context, m.lifted, onUndo: () async {
-        await ModerationService.reinstateRestriction(id);
-        if (mounted) _reload();
-      });
+      showModSnack(
+        context,
+        m.lifted,
+        onUndo: () async {
+          await ModerationService.reinstateRestriction(id);
+          if (mounted) _reload();
+        },
+      );
       _reload();
     } catch (e) {
       if (mounted) showModError(context, e);
@@ -63,12 +74,21 @@ class _RestrictionsTabState extends State<RestrictionsTab>
           controller: ctrl,
           autofocus: true,
           decoration: InputDecoration(
-              labelText: m.usernameLabel, prefixText: '@', border: const OutlineInputBorder()),
+            labelText: m.usernameLabel,
+            prefixText: '@',
+            border: const OutlineInputBorder(),
+          ),
           onSubmitted: (v) => Navigator.pop(ctx, v),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(m.cancel)),
-          FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text), child: Text(m.confirm)),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(m.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text),
+            child: Text(m.confirm),
+          ),
         ],
       ),
     );
@@ -88,20 +108,28 @@ class _RestrictionsTabState extends State<RestrictionsTab>
       return;
     }
 
-    final choice = await showRestrictDialog(context,
-        who: '${user['display_name'] ?? user['username']}');
+    final choice = await showRestrictDialog(
+      context,
+      who: '${user['display_name'] ?? user['username']}',
+    );
     if (choice == null || !mounted) return;
     if (isSevereRestriction(choice.scopes, choice.duration)) {
-      final ok = await confirmModAction(context,
-          title: m.restrictTitle, body: m.severeWarning, confirmLabel: m.confirm, destructive: true);
+      final ok = await confirmModAction(
+        context,
+        title: m.restrictTitle,
+        body: m.severeWarning,
+        confirmLabel: m.confirm,
+        destructive: true,
+      );
       if (!ok || !mounted) return;
     }
     try {
       await ModerationService.restrict(
-          userId: '${user['id']}',
-          scopes: choice.scopes,
-          duration: choice.duration,
-          reason: choice.reason);
+        userId: '${user['id']}',
+        scopes: choice.scopes,
+        duration: choice.duration,
+        reason: choice.reason,
+      );
       if (!mounted) return;
       showModSnack(context, m.doneRestricted);
       _reload();
@@ -139,7 +167,10 @@ class _RestrictionsTabState extends State<RestrictionsTab>
           ],
         ),
       ),
-      empty: ModEmptyState(icon: Icons.verified_user_outlined, title: m.noRestrictions),
+      empty: ModEmptyState(
+        icon: Icons.verified_user_outlined,
+        title: m.noRestrictions,
+      ),
       itemBuilder: (context, r) {
         final busy = _busy.contains('${r['id']}');
         final active = r['active'] == true;
@@ -151,16 +182,10 @@ class _RestrictionsTabState extends State<RestrictionsTab>
             ? m.bySystem
             : m.byName.fill([r['created_by_name'] ?? '?']);
 
-        return Card(
-          elevation: 0,
-          margin: const EdgeInsets.symmetric(vertical: 6),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-                color: scope == 'account' && active ? scheme.error : scheme.outlineVariant),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: KSpace.xs + 2),
+          child: KCard(
+            padding: const EdgeInsets.all(KSpace.l),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -184,8 +209,8 @@ class _RestrictionsTabState extends State<RestrictionsTab>
                       label: !active
                           ? (lifted != null ? m.lift : m.ended)
                           : until == null
-                              ? m.permanent
-                              : m.untilDate.fill([formatUntil(until)]),
+                          ? m.permanent
+                          : m.untilDate.fill([formatUntil(until)]),
                       background: scheme.surfaceContainerHighest,
                       foreground: scheme.onSurface,
                     ),
@@ -202,11 +227,20 @@ class _RestrictionsTabState extends State<RestrictionsTab>
                 Text(m.restrictedReason.fill([r['reason'] ?? ''])),
                 Text(
                   [by, if (created != null) formatDate(created)].join(' · '),
-                  style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
-                if (lifted != null && (r['lift_reason'] as String?)?.isNotEmpty == true)
-                  Text('${r['lifted_by_name'] ?? ''}: ${r['lift_reason']}',
-                      style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+                if (lifted != null &&
+                    (r['lift_reason'] as String?)?.isNotEmpty == true)
+                  Text(
+                    '${r['lifted_by_name'] ?? ''}: ${r['lift_reason']}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
                 if (active)
                   Align(
                     alignment: Alignment.centerRight,

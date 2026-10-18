@@ -5,6 +5,7 @@ import '../l10n/app_strings.dart';
 import '../l10n/moderation_strings.dart';
 import '../language_cubit.dart';
 import '../utils/moderation_logic.dart';
+import 'brand/brand.dart';
 
 /// Shared moderation feedback: error text, snackbars, confirm and
 /// reason dialogs, empty states. Every moderation interaction goes
@@ -258,39 +259,35 @@ class _ReasonDialogState extends State<_ReasonDialog> {
   }
 }
 
-/// Centered icon + title + optional line, for empty lists.
+/// Empty lists across moderation: the brand medallion empty state.
 class ModEmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
   final String? body;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
-  const ModEmptyState({super.key, required this.icon, required this.title, this.body});
+  const ModEmptyState(
+      {super.key, required this.icon, required this.title, this.body, this.actionLabel, this.onAction});
 
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 48, color: scheme.primary),
-            const SizedBox(height: 12),
-            Text(title,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleMedium),
-            if (body != null) ...[
-              const SizedBox(height: 6),
-              Text(body!,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: scheme.onSurfaceVariant)),
-            ],
-          ],
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, box) => SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: box.maxHeight.isFinite ? box.maxHeight : 0),
+            child: Center(
+              child: BrandEmptyState(
+                icon: icon,
+                title: title,
+                message: body,
+                actionLabel: actionLabel,
+                onAction: onAction,
+                compact: box.maxHeight.isFinite && box.maxHeight < 360,
+              ),
+            ),
+          ),
         ),
-      ),
-    );
-  }
+      );
 }
 
 /// Small rounded label (status, category, priority).
@@ -310,21 +307,23 @@ class ModChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: KSpace.s, vertical: 3),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: KRadius.small,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
             Icon(icon, size: 12, color: foreground),
-            const SizedBox(width: 4),
+            const SizedBox(width: KSpace.xs),
           ],
           Text(label,
-              style: TextStyle(
-                  fontSize: 11, fontWeight: FontWeight.w600, color: foreground)),
+              style: Theme.of(context)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(fontWeight: FontWeight.w600, color: foreground)),
         ],
       ),
     );

@@ -7,6 +7,7 @@ import '../../services/moderation_service.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/moderation_ui.dart';
 import 'admin_screen.dart';
+import '../../widgets/brand/brand.dart';
 
 /// Appeals against a case decision or a restriction. Accepting reverses
 /// the decision; both outcomes notify the user with the admin's note.
@@ -17,7 +18,8 @@ class AppealsTab extends StatefulWidget {
   State<AppealsTab> createState() => _AppealsTabState();
 }
 
-class _AppealsTabState extends State<AppealsTab> with AutomaticKeepAliveClientMixin {
+class _AppealsTabState extends State<AppealsTab>
+    with AutomaticKeepAliveClientMixin {
   bool _pendingOnly = true;
   late Future<List<Map<String, dynamic>>> _future = ModerationService.appeals();
   final Set<String> _busy = {};
@@ -25,8 +27,9 @@ class _AppealsTabState extends State<AppealsTab> with AutomaticKeepAliveClientMi
   @override
   bool get wantKeepAlive => true;
 
-  void _reload() =>
-      setState(() => _future = ModerationService.appeals(pendingOnly: _pendingOnly));
+  void _reload() => setState(
+    () => _future = ModerationService.appeals(pendingOnly: _pendingOnly),
+  );
 
   Future<void> _handle(Map<String, dynamic> a, bool accept) async {
     final m = modStrings(context);
@@ -44,7 +47,10 @@ class _AppealsTabState extends State<AppealsTab> with AutomaticKeepAliveClientMi
     try {
       await ModerationService.handleAppeal(id, accept, note);
       if (!mounted) return;
-      showModSnack(context, accept ? m.appealAcceptedDone : m.appealRejectedDone);
+      showModSnack(
+        context,
+        accept ? m.appealAcceptedDone : m.appealRejectedDone,
+      );
       _reload();
     } catch (e) {
       if (mounted) showModError(context, e);
@@ -91,11 +97,13 @@ class _AppealsTabState extends State<AppealsTab> with AutomaticKeepAliveClientMi
           final decision = caseInfo['decision'] == null
               ? m.statusLabel(caseInfo['status'] as String?)
               : m.decisionLabel(caseInfo['decision'] as String?);
-          final snippet = '${preview?['title'] ?? preview?['body'] ?? ''}'.trim();
+          final snippet = '${preview?['title'] ?? preview?['body'] ?? ''}'
+              .trim();
           about = '$what · $decision${snippet.isEmpty ? '' : ' · “$snippet”'}';
         } else if (restriction != null) {
           final until = DateTime.tryParse('${restriction['until']}');
-          about = '${m.scopeLabel(restriction['scope'] as String?)} · '
+          about =
+              '${m.scopeLabel(restriction['scope'] as String?)} · '
               '${until == null ? m.permanent : m.untilDate.fill([formatUntil(until)])}';
         } else {
           about = m.contentGone;
@@ -103,15 +111,10 @@ class _AppealsTabState extends State<AppealsTab> with AutomaticKeepAliveClientMi
         final decisionReason =
             (caseInfo?['decision_reason'] ?? restriction?['reason']) as String?;
 
-        return Card(
-          elevation: 0,
-          margin: const EdgeInsets.symmetric(vertical: 6),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: scheme.outlineVariant),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: KSpace.xs + 2),
+          child: KCard(
+            padding: const EdgeInsets.all(KSpace.l),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -119,16 +122,28 @@ class _AppealsTabState extends State<AppealsTab> with AutomaticKeepAliveClientMi
                 AdminUserLine(
                   profile: a['profile'] as Map<String, dynamic>?,
                   anonymous: a['anonymous_source'] == true,
-                  trailing: created == null ? null : formatRelative(context, created),
+                  trailing: created == null
+                      ? null
+                      : formatRelative(context, created),
                 ),
                 const SizedBox(height: 8),
-                Text('${m.appealAbout}: $about',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+                Text(
+                  '${m.appealAbout}: $about',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
                 if (decisionReason != null && decisionReason.isNotEmpty)
-                  Text(m.restrictedReason.fill([decisionReason]),
-                      style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+                  Text(
+                    m.restrictedReason.fill([decisionReason]),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
                 const SizedBox(height: 8),
                 Container(
                   width: double.infinity,
@@ -159,7 +174,10 @@ class _AppealsTabState extends State<AppealsTab> with AutomaticKeepAliveClientMi
                   Text(
                     '${m.appealStatusLabel(a['status'] as String?)}'
                     '${(a['resolution_note'] as String?)?.isNotEmpty == true ? ' — ${a['resolution_note']}' : ''}',
-                    style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
               ],
             ),

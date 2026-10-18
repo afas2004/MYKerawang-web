@@ -5,12 +5,14 @@ import '../../l10n/moderation_strings.dart';
 import '../../language_cubit.dart';
 import '../../services/moderation_service.dart';
 import '../../widgets/moderation_ui.dart';
+import 'admin_overview.dart';
 import 'appeals_tab.dart';
 import 'cases_tab.dart';
 import 'club_approvals_tab.dart';
 import 'log_tab.dart';
 import 'restrictions_tab.dart';
 import 'settings_tab.dart';
+import '../../widgets/brand/brand.dart';
 
 /// /admin — moderation console. The route is reachable by URL, so the
 /// page checks the role itself; the database checks it again on every
@@ -77,20 +79,76 @@ class _AdminScreenState extends State<AdminScreen> {
           child: Scaffold(
             appBar: AppBar(
               title: Text(m.moderation),
-              bottom: TabBar(
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                tabs: [
-                  for (final t in tabs) Tab(icon: Icon(t.$2, size: 20), text: t.$1),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(72 + 9),
+                child: Column(
+                  children: [
+                    TabBar(
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      tabs: [
+                        for (final t in tabs) Tab(icon: Icon(t.$2, size: 20), text: t.$1),
+                      ],
+                    ),
+                    const LatticeBand(),
+                  ],
+                ),
+              ),
+            ),
+            body: Builder(
+              builder: (context) => Column(
+                children: [
+                  _OverviewLoader(
+                      onOpenTab: (i) => DefaultTabController.of(context).animateTo(i)),
+                  Expanded(child: TabBarView(children: [for (final t in tabs) t.$3])),
                 ],
               ),
             ),
-            body: TabBarView(children: [for (final t in tabs) t.$3]),
           ),
         );
       },
     );
   }
+}
+
+/// Fetches the queue summary for [AdminOverview]; refetches whenever a
+/// tab bumps [adminSummaryRefresh].
+class _OverviewLoader extends StatefulWidget {
+  final void Function(int) onOpenTab;
+  const _OverviewLoader({required this.onOpenTab});
+
+  @override
+  State<_OverviewLoader> createState() => _OverviewLoaderState();
+}
+
+class _OverviewLoaderState extends State<_OverviewLoader> {
+  Map<String, dynamic>? _summary;
+
+  @override
+  void initState() {
+    super.initState();
+    adminSummaryRefresh.addListener(_fetch);
+    _fetch();
+  }
+
+  @override
+  void dispose() {
+    adminSummaryRefresh.removeListener(_fetch);
+    super.dispose();
+  }
+
+  Future<void> _fetch() async {
+    try {
+      final s = await ModerationService.queueSummary();
+      if (mounted) setState(() => _summary = s);
+    } catch (_) {
+      // The tabs show their own errors; the cards keep their last values.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      AdminOverview(summary: _summary, onOpenTab: widget.onOpenTab);
 }
 
 /// Loading / error-with-retry / empty / list, the same way in every tab.

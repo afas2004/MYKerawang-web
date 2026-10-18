@@ -971,6 +971,10 @@ class ModerationStrings {
   /// Japanese is being dropped from the app; English stands in.
   static const ja = en;
 
+  /// Redesign copy (console, account status, report sheet).
+  ModerationUiStrings get ui =>
+      identical(this, ms) ? ModerationUiStrings.ms : ModerationUiStrings.en;
+
   String typeLabel(String? type) => switch (type) {
         'post' => typePost,
         'comment' => typeComment,
@@ -1043,6 +1047,286 @@ class ModerationStrings {
       : d.inDays == 1
           ? durationDay
           : durationDays.fill([d.inDays]);
+}
+
+/// Copy for the redesigned console, account status and report sheet.
+/// Reached through [ModerationStrings.ui]; ja reuses English.
+class ModerationUiStrings {
+  final String statOpen;
+  final String statOldest;
+  final String statHidden;
+  final String statClubs;
+  final String statAppeals;
+  final String statNone;
+  final String selectCase;
+  final String selectCaseBody;
+  final String contentHeading;
+  final String reportsHeading;
+  final String historyHeading;
+  final String noHistory;
+  final String historyAnon;
+  final String activeRestrictions;
+  final String notCounted;
+  final String openInApp;
+  final String detailError;
+  final String shortcutsHint;
+  final String shortcutsTitle;
+  final String scNext;
+  final String scPrev;
+  final String scDismiss;
+  final String scHide;
+  final String scRestore;
+  final String scHelp;
+  final String restoreNotHidden;
+  final String previewTitle;
+  final String previewCant;
+  final String previewUntil;
+  final String previewForever;
+  final String previewCan;
+  final String previewPick;
+  final String verbPost;
+  final String verbComment;
+  final String verbMarket;
+  final String verbEvents;
+  final String verbAccount;
+  final String listJoin;
+  final String standingIntro;
+  final String canStill;
+  final String historyTitle;
+  final String reportPickCategory;
+  final String reportNoteLabel;
+  final String reportNoteHint;
+  final String reportSubmit;
+  final String reportPrivacy;
+  final String reportDoneTitle;
+  final String reportDupTitle;
+  final String reportOwnTitle;
+  final String reportMissingTitle;
+  final String reportFailedTitle;
+  final String done;
+  final String descSpam;
+  final String descScam;
+  final String descHarassment;
+  final String descInappropriate;
+  final String descMinorSafety;
+  final String descMisinformation;
+  final String descOther;
+  final String back;
+  final String reportsShort;
+  final String reportsShortOne;
+
+  const ModerationUiStrings({
+    required this.statOpen,
+    required this.statOldest,
+    required this.statHidden,
+    required this.statClubs,
+    required this.statAppeals,
+    required this.statNone,
+    required this.selectCase,
+    required this.selectCaseBody,
+    required this.contentHeading,
+    required this.reportsHeading,
+    required this.historyHeading,
+    required this.noHistory,
+    required this.historyAnon,
+    required this.activeRestrictions,
+    required this.notCounted,
+    required this.openInApp,
+    required this.detailError,
+    required this.shortcutsHint,
+    required this.shortcutsTitle,
+    required this.scNext,
+    required this.scPrev,
+    required this.scDismiss,
+    required this.scHide,
+    required this.scRestore,
+    required this.scHelp,
+    required this.restoreNotHidden,
+    required this.previewTitle,
+    required this.previewCant,
+    required this.previewUntil,
+    required this.previewForever,
+    required this.previewCan,
+    required this.previewPick,
+    required this.verbPost,
+    required this.verbComment,
+    required this.verbMarket,
+    required this.verbEvents,
+    required this.verbAccount,
+    required this.listJoin,
+    required this.standingIntro,
+    required this.canStill,
+    required this.historyTitle,
+    required this.reportPickCategory,
+    required this.reportNoteLabel,
+    required this.reportNoteHint,
+    required this.reportSubmit,
+    required this.reportPrivacy,
+    required this.reportDoneTitle,
+    required this.reportDupTitle,
+    required this.reportOwnTitle,
+    required this.reportMissingTitle,
+    required this.reportFailedTitle,
+    required this.done,
+    required this.descSpam,
+    required this.descScam,
+    required this.descHarassment,
+    required this.descInappropriate,
+    required this.descMinorSafety,
+    required this.descMisinformation,
+    required this.descOther,
+    required this.back,
+    required this.reportsShort,
+    required this.reportsShortOne,
+  });
+
+  static const en = ModerationUiStrings(
+    statOpen: "Open cases",
+    statOldest: "Oldest waiting",
+    statHidden: "Auto-hidden, awaiting review",
+    statClubs: "Club requests",
+    statAppeals: "Appeals",
+    statNone: "—",
+    selectCase: "Select a case to review",
+    selectCaseBody: "Use j and k to move through the list.",
+    contentHeading: "Reported content",
+    reportsHeading: "Reports ({0})",
+    historyHeading: "Author history",
+    noHistory: "No earlier cases for this author.",
+    historyAnon: "History isn't shown for anonymous posts, to protect the author's identity.",
+    activeRestrictions: "Active restrictions",
+    notCounted: "Not counted toward auto-hide (this reporter's past reports were mostly dismissed)",
+    openInApp: "Open in app",
+    detailError: "Couldn't load the reports for this case.",
+    shortcutsHint: "Shortcuts: j/k move · d dismiss · h hide · r restore · ? help",
+    shortcutsTitle: "Keyboard shortcuts",
+    scNext: "Next case",
+    scPrev: "Previous case",
+    scDismiss: "Dismiss reports",
+    scHide: "Remove (keep hidden)",
+    scRestore: "Restore hidden content",
+    scHelp: "Show this help",
+    restoreNotHidden: "Restore only applies to hidden content.",
+    previewTitle: "What they'll experience",
+    previewCant: "They won't be able to {0}.",
+    previewUntil: "This lifts automatically on {0}.",
+    previewForever: "This has no end date. Only an admin can lift it.",
+    previewCan: "They can still browse and read. They'll get a notification with your reason and how to appeal.",
+    previewPick: "Pick what to restrict to see a preview.",
+    verbPost: "post",
+    verbComment: "comment",
+    verbMarket: "sell in the Market",
+    verbEvents: "create or join events",
+    verbAccount: "post, comment, sell, join events, follow or report",
+    listJoin: " or ",
+    standingIntro: "Here's where your account stands. If something here feels wrong, you can appeal — a person will read it.",
+    canStill: "You can still browse and read everything.",
+    historyTitle: "History",
+    reportPickCategory: "Choose the reason that fits best",
+    reportNoteLabel: "Add details (optional)",
+    reportNoteHint: "Anything that helps admins understand",
+    reportSubmit: "Send report",
+    reportPrivacy: "Reports are private. The person won't know it was you.",
+    reportDoneTitle: "Thanks for reporting",
+    reportDupTitle: "Already reported",
+    reportOwnTitle: "That's yours",
+    reportMissingTitle: "No longer available",
+    reportFailedTitle: "Report not sent",
+    done: "Done",
+    descSpam: "Repeated, misleading or unwanted promotion",
+    descScam: "Fake sales, phishing or asking for money",
+    descHarassment: "Attacks or insults a person or group",
+    descInappropriate: "Nudity, sexual or graphic content",
+    descMinorSafety: "Anything that puts a child at risk",
+    descMisinformation: "False information that could cause harm",
+    descOther: "Breaks the community rules another way",
+    back: "Back",
+    reportsShort: "{0} reports",
+    reportsShortOne: "1 report",
+  );
+
+  static const ms = ModerationUiStrings(
+    statOpen: "Kes terbuka",
+    statOldest: "Paling lama menunggu",
+    statHidden: "Disembunyi automatik, menunggu semakan",
+    statClubs: "Permohonan kelab",
+    statAppeals: "Rayuan",
+    statNone: "—",
+    selectCase: "Pilih kes untuk disemak",
+    selectCaseBody: "Guna j dan k untuk bergerak dalam senarai.",
+    contentHeading: "Kandungan dilaporkan",
+    reportsHeading: "Laporan ({0})",
+    historyHeading: "Sejarah penulis",
+    noHistory: "Tiada kes terdahulu bagi penulis ini.",
+    historyAnon: "Sejarah tidak dipaparkan untuk siaran tanpa nama, bagi melindungi identiti penulis.",
+    activeRestrictions: "Sekatan aktif",
+    notCounted: "Tidak dikira untuk sembunyi automatik (kebanyakan laporan lalu pelapor ini ditolak)",
+    openInApp: "Buka dalam aplikasi",
+    detailError: "Laporan untuk kes ini tidak dapat dimuatkan.",
+    shortcutsHint: "Pintasan: j/k gerak · d tolak · h sembunyi · r pulih · ? bantuan",
+    shortcutsTitle: "Pintasan papan kekunci",
+    scNext: "Kes seterusnya",
+    scPrev: "Kes sebelumnya",
+    scDismiss: "Tolak laporan",
+    scHide: "Buang (kekal tersembunyi)",
+    scRestore: "Pulihkan kandungan tersembunyi",
+    scHelp: "Tunjuk bantuan ini",
+    restoreNotHidden: "Pulihkan hanya untuk kandungan tersembunyi.",
+    previewTitle: "Apa yang mereka akan alami",
+    previewCant: "Mereka tidak boleh {0}.",
+    previewUntil: "Sekatan ini tamat sendiri pada {0}.",
+    previewForever: "Sekatan ini tiada tarikh tamat. Hanya admin boleh menariknya balik.",
+    previewCan: "Mereka masih boleh melayari dan membaca. Mereka akan menerima notifikasi dengan sebab anda dan cara merayu.",
+    previewPick: "Pilih apa yang hendak disekat untuk melihat pratonton.",
+    verbPost: "menyiarkan",
+    verbComment: "mengomen",
+    verbMarket: "menjual di Pasar",
+    verbEvents: "mencipta atau menyertai acara",
+    verbAccount: "menyiar, mengomen, menjual, menyertai acara, mengikuti atau melapor",
+    listJoin: " atau ",
+    standingIntro: "Ini status akaun anda. Jika ada yang tidak kena, anda boleh merayu — seorang admin akan membacanya.",
+    canStill: "Anda masih boleh melayari dan membaca semuanya.",
+    historyTitle: "Sejarah",
+    reportPickCategory: "Pilih sebab yang paling sesuai",
+    reportNoteLabel: "Tambah butiran (pilihan)",
+    reportNoteHint: "Apa-apa yang membantu admin memahami",
+    reportSubmit: "Hantar laporan",
+    reportPrivacy: "Laporan adalah sulit. Orang itu tidak akan tahu ia daripada anda.",
+    reportDoneTitle: "Terima kasih kerana melapor",
+    reportDupTitle: "Sudah dilaporkan",
+    reportOwnTitle: "Itu kandungan anda",
+    reportMissingTitle: "Tidak lagi tersedia",
+    reportFailedTitle: "Laporan tidak dihantar",
+    done: "Selesai",
+    descSpam: "Promosi berulang, mengelirukan atau tidak diingini",
+    descScam: "Jualan palsu, pancingan data atau meminta wang",
+    descHarassment: "Menyerang atau menghina seseorang atau kumpulan",
+    descInappropriate: "Kandungan bogel, seksual atau ganas",
+    descMinorSafety: "Apa-apa yang membahayakan kanak-kanak",
+    descMisinformation: "Maklumat palsu yang boleh membawa mudarat",
+    descOther: "Melanggar peraturan komuniti dengan cara lain",
+    back: "Kembali",
+    reportsShort: "{0} laporan",
+    reportsShortOne: "1 laporan",
+  );
+
+  String categoryDescription(String? c) => switch (c) {
+        'spam' => descSpam,
+        'scam' => descScam,
+        'harassment' => descHarassment,
+        'inappropriate' => descInappropriate,
+        'minor_safety' => descMinorSafety,
+        'misinformation' => descMisinformation,
+        _ => descOther,
+      };
+
+  String verb(String? scope) => switch (scope) {
+        'post' => verbPost,
+        'comment' => verbComment,
+        'market' => verbMarket,
+        'events' => verbEvents,
+        _ => verbAccount,
+      };
 }
 
 extension ModerationStringsOf on AppStrings {

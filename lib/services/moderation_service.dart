@@ -94,9 +94,11 @@ class ModerationService {
     required String targetType,
     required String category,
     required String reason,
+    String? note,
   }) async {
     final uid = _uid;
     if (uid == null) return const ReportOutcome(ReportResult.failed);
+    final trimmed = note?.trim();
     try {
       await _db.from('reports').insert({
         'reporter_id': uid,
@@ -104,6 +106,7 @@ class ModerationService {
         'target_type': targetType,
         'category': category,
         'reason': reason,
+        if (trimmed != null && trimmed.isNotEmpty) 'note': trimmed,
       });
       return const ReportOutcome(ReportResult.received);
     } catch (e) {
@@ -154,6 +157,12 @@ class ModerationService {
         : q.order('last_reported_at').limit(limit));
     return List<Map<String, dynamic>>.from(rows);
   }
+
+  /// Every report, the author's other cases and active restrictions
+  /// (history is empty for anonymous targets). See 20261019004600.
+  static Future<Map<String, dynamic>> caseDetail(String caseId) async =>
+      Map<String, dynamic>.from(
+          await _db.rpc('admin_case_detail', params: {'p_case_id': caseId}) as Map);
 
   static Future<Map<String, dynamic>> resolveCase(
       String caseId, String decision, String reason) async {
