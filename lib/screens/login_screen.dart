@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../widgets/app_logo.dart';
@@ -14,7 +15,11 @@ class LoginScreen extends StatefulWidget {
   /// shared event a visitor opened before being asked to log in.
   final String? from;
 
-  const LoginScreen({super.key, this.from});
+  /// `error_description` an OAuth provider sent back in the URL, e.g.
+  /// when the server refused to create a non-student account.
+  final String? oauthError;
+
+  const LoginScreen({super.key, this.from, this.oauthError});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -26,7 +31,40 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    pendingLoginError.addListener(_showPendingError);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final oauthError = widget.oauthError;
+      if (oauthError != null && oauthError.isNotEmpty) {
+        _showError(oauthError);
+      }
+      _showPendingError();
+    });
+  }
+
+  void _showPendingError() {
+    final code = pendingLoginError.value;
+    if (code == null || !mounted) return;
+    pendingLoginError.value = null;
+    _showError(code);
+  }
+
+  void _showError(String code) {
+    final scheme = Theme.of(context).colorScheme;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(_errorText(context.l10nRead, code),
+            style: TextStyle(color: scheme.onError)),
+        backgroundColor: scheme.error,
+      ),
+    );
+  }
+
+  @override
   void dispose() {
+    pendingLoginError.removeListener(_showPendingError);
     _emailCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
@@ -285,6 +323,12 @@ String _errorText(AppStrings s, String error) {
   if (error == LoginError.fillFields) return s.fillAllFields;
   if (error == LoginError.checkEmail) return s.checkEmailConfirm;
   if (error == LoginError.generic) return s.genericAuthError;
+  if (error == LoginError.studentEmailOnly) return s.studentEmailOnly;
+  // The auth.users trigger rejecting a sign-up surfaces as this.
+  if (error.contains('student.uitm.edu.my') ||
+      error.toLowerCase().contains('database error saving new user')) {
+    return s.studentEmailOnly;
+  }
   if (error.startsWith(LoginError.googleFailed)) {
     return s.googleSignInFailed.fill([error.substring(LoginError.googleFailed.length)]);
   }

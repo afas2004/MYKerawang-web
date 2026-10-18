@@ -10,6 +10,7 @@ import 'screens/guest_views.dart';
 import 'screens/events_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/item_detail_screen.dart';
+import 'screens/login_cubit.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_scaffold.dart';
 import 'screens/marketplace_screen.dart';
@@ -28,7 +29,11 @@ class AuthChangeNotifier extends ChangeNotifier {
   late final StreamSubscription<AuthState> _sub;
 
   AuthChangeNotifier() {
-    _sub = Supabase.instance.client.auth.onAuthStateChange.listen((_) {
+    _sub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final user = data.session?.user;
+      if (data.event == AuthChangeEvent.signedIn && user != null) {
+        enforceStudentEmailForNewAccount(user);
+      }
       notifyListeners();
     });
   }
@@ -91,7 +96,10 @@ GoRouter buildRouter() {
       GoRoute(
         path: '/login',
         builder: (context, state) =>
-            LoginScreen(from: state.uri.queryParameters['from']),
+            LoginScreen(
+              from: state.uri.queryParameters['from'],
+              oauthError: state.uri.queryParameters['error_description'],
+            ),
       ),
       GoRoute(
         path: '/onboarding',

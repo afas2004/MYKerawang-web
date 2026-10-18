@@ -29,6 +29,12 @@ extension AccessStrings on AppStrings {
   String get loginToContact => _t("Log in to contact the seller",
       "Log masuk untuk hubungi penjual", "出品者に連絡するにはログイン");
 
+  // ---- sign-up ----
+  String get studentEmailOnly => _t(
+      "New accounts need a UiTM student email (@student.uitm.edu.my).",
+      "Akaun baharu perlu guna emel pelajar UiTM (@student.uitm.edu.my).",
+      "新規登録にはUiTMの学生用メール（@student.uitm.edu.my）が必要です。");
+
   // ---- sharing ----
   String get copyLink => _t("Copy link", "Salin pautan", "リンクをコピー");
   String get linkCopied =>
