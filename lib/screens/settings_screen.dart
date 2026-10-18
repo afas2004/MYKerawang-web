@@ -23,7 +23,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // Toggle states
   bool _newEvents = true;
   bool _eventReminders = true;
-  bool _marketplaceUpdates = false;
   bool _isLoading = true;
   bool _checkingUpdate = false;
 
@@ -43,7 +42,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       final profile = await _supabase
           .from('profiles')
-          .select('notify_new_events, notify_reminders, notify_marketplace')
+          .select('notify_new_events, notify_reminders')
           .eq('id', user.id)
           .single();
 
@@ -51,7 +50,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         setState(() {
           _newEvents = profile['notify_new_events'] ?? true;
           _eventReminders = profile['notify_reminders'] ?? true;
-          _marketplaceUpdates = profile['notify_marketplace'] ?? false;
           _isLoading = false;
         });
       }
@@ -188,19 +186,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
               
-              const Divider(height: 40),
-              _sectionHeader(s.navMarket),
-              SwitchListTile(
-                title: Text(s.priceDrops),
-                subtitle: Text(s.priceDropsSub),
-                value: _marketplaceUpdates,
-                activeThumbColor: theme.colorScheme.primary,
-                onChanged: (v) {
-                  setState(() => _marketplaceUpdates = v);
-                  _updateSetting('notify_marketplace', v); // Save to DB
-                },
-              ),
-              
+              // No Market alerts: there's no saved-items feature for a
+              // "price drops" switch to act on.
+
               const Divider(height: 40),
               // Preview card removed — it didn't show anything the live
               // theme cards don't already demonstrate (H4/14.7).

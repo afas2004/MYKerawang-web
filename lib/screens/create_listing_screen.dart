@@ -4,11 +4,13 @@ import '../utils/image_compressor.dart';
 import '../utils/local_image.dart';
 import '../utils/categories.dart';
 import '../l10n/app_strings.dart';
+import '../l10n/social_strings.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
 import '../utils/formatters.dart';
 import '../utils/responsive.dart';
 import '../widgets/media_picker_grid.dart';
+import 'edit_profile_screen.dart';
 
 class CreateListingScreen extends StatefulWidget {
   final Map<String, dynamic>? itemToEdit; 
@@ -74,6 +76,45 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     super.dispose();
   }
 
+  Future<bool> _hasPhone(String userId) async {
+    final row = await _supabase
+        .from('profiles')
+        .select('phone_number')
+        .eq('id', userId)
+        .maybeSingle();
+    final phone = row?['phone_number'];
+    return phone is String && phone.trim().isNotEmpty;
+  }
+
+  /// Buyers reach sellers on WhatsApp, and onboarding no longer asks for
+  /// the number — so selling is where it becomes required. Offers Edit
+  /// profile and re-checks when they come back.
+  Future<bool> _ensurePhone(String userId) async {
+    if (await _hasPhone(userId)) return true;
+    if (!mounted) return false;
+    final s = context.l10nRead;
+    final goEdit = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.phone),
+        title: Text(s.social.whatsappNeededTitle),
+        content: Text(s.social.whatsappNeededBody),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(s.cancel)),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(s.editProfile)),
+        ],
+      ),
+    );
+    if (goEdit != true || !mounted) return false;
+    await Navigator.push(
+        context, MaterialPageRoute(builder: (_) => const EditProfileScreen()));
+    return _hasPhone(userId);
+  }
+
   // --- 2. UPLOAD LOGIC ---
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -88,6 +129,18 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     if (user == null) return;
 
     setState(() => _isLoading = true);
+    try {
+      if (!await _ensurePhone(user.id)) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+        setState(() => _isLoading = false);
+      }
+      return;
+    }
 
     try {
       String? finalCoverUrl;
