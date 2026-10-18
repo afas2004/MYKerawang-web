@@ -5,6 +5,7 @@ import 'package:mykerawang/l10n/app_strings.dart';
 import 'package:mykerawang/language_cubit.dart';
 import 'package:mykerawang/theme/app_themes.dart';
 import 'package:mykerawang/widgets/image_crop_dialog.dart';
+import 'package:mykerawang/utils/app_links.dart';
 import 'package:mykerawang/utils/app_nav.dart';
 import 'package:mykerawang/utils/report_helper.dart';
 import 'package:mykerawang/widgets/linear_refresher.dart';
@@ -180,7 +181,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: QrImageView(
-                              data: "mykerawang://user/${widget.userId ?? _supabase.auth.currentUser?.id}",
+                              // https so a phone camera can open it too
+                              data: profileUrl(_profile!['id']),
                               version: QrVersions.auto,
                               size: 200.0,
                               eyeStyle: QrEyeStyle(
@@ -231,9 +233,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                             final List<Barcode> barcodes = capture.barcodes;
                             for (final barcode in barcodes) {
                               if (barcode.rawValue != null) {
-                                final code = barcode.rawValue!;
-                                if (code.startsWith("mykerawang://user/")) {
-                                  final userId = code.split("/").last;
+                                final userId = userIdFromProfileCode(barcode.rawValue!);
+                                if (userId != null) {
                                   Navigator.pop(ctx);
                                   context.goUser(userId);
                                   break;
@@ -262,7 +263,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final isClub = _profile!['role'] == 'club';
 
     return Scaffold(
       appBar: AppBar(
@@ -386,7 +386,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                         child: Text(_isFollowing ? s.following : s.follow),
                       ),
                     ),
-                  if (_isMe && !isClub)
+                  if (_isMe)
                     OutlinedButton(
                       onPressed: () {
                          Navigator.push(
