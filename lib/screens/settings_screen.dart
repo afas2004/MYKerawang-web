@@ -9,6 +9,10 @@ import '../theme/app_themes.dart';
 import '../utils/adaptive.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
+import '../l10n/social_strings.dart';
+import '../services/account_data.dart';
+import 'privacy_policy_screen.dart';
+import 'profile_cubit.dart';
 import '../utils/responsive.dart';
 import '../services/update_service.dart';
 
@@ -20,58 +24,99 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // Toggle states
-  bool _newEvents = true;
-  bool _eventReminders = true;
-  bool _marketplaceUpdates = false;
-  bool _isLoading = true;
+  // Event-alert toggles (notify_new_events / notify_reminders) are hidden
+  // until something actually sends those notifications; the DB columns
+  // stay. Market "price drops" was removed — there's no saved-items feature.
   bool _checkingUpdate = false;
+  bool _exporting = false;
 
   final _supabase = Supabase.instance.client;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadSettings();
-  }
+  // ---- Privacy & data (PDPA) ------------------------------------------
 
-  // 1. Fetch current settings from Supabase
-  Future<void> _loadSettings() async {
+  Future<void> _exportData() async {
+    final s = context.l10nRead;
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _exporting = true);
     try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) return;
-
-      final profile = await _supabase
-          .from('profiles')
-          .select('notify_new_events, notify_reminders, notify_marketplace')
-          .eq('id', user.id)
-          .single();
-
-      if (mounted) {
-        setState(() {
-          _newEvents = profile['notify_new_events'] ?? true;
-          _eventReminders = profile['notify_reminders'] ?? true;
-          _marketplaceUpdates = profile['notify_marketplace'] ?? false;
-          _isLoading = false;
-        });
-      }
+      await AccountData.exportToFile();
+      messenger.showSnackBar(SnackBar(content: Text(s.social.exportReady)));
     } catch (e) {
-      debugPrint("Error loading settings: $e");
-      if (mounted) setState(() => _isLoading = false);
+      messenger.showSnackBar(SnackBar(
+        content: Text(s.social.exportFailed.fill([e])),
+        action: SnackBarAction(label: s.social.retry, onPressed: _exportData),
+      ));
+    } finally {
+      if (mounted) setState(() => _exporting = false);
     }
   }
 
-  // 2. Save changes to Supabase instantly
-  Future<void> _updateSetting(String column, bool value) async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return;
+  Future<String?> _myUsername() async {
+    final cached = context.read<ProfileCubit>().state.profile?['username'];
+    if (cached is String && cached.isNotEmpty) return cached;
+    final uid = _supabase.auth.currentUser?.id;
+    if (uid == null) return null;
+    final row = await _supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', uid)
+        .maybeSingle();
+    return row?['username'] as String?;
+  }
 
+  Future<void> _deleteAccount() async {
+    final s = context.l10nRead;
+    final messenger = ScaffoldMessenger.of(context);
+    final String? username;
     try {
-      await _supabase.from('profiles').update({column: value}).eq('id', user.id);
+      username = await _myUsername();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.errorWithDetail.fill([e]))));
-      }
+      messenger.showSnackBar(SnackBar(
+        content: Text(s.social.deleteAccountFailed.fill([e])),
+        action: SnackBarAction(label: s.social.retry, onPressed: _deleteAccount),
+      ));
+      return;
+    }
+    if (!mounted || username == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => _DeleteAccountDialog(username: username!),
+    );
+    if (confirmed != true || !mounted) return;
+
+    // Blocking progress: nothing else should happen mid-deletion.
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Row(children: [
+            const CircularProgressIndicator(),
+            const SizedBox(width: 20),
+            Expanded(child: Text(s.social.deletingAccount)),
+          ]),
+        ),
+      ),
+    );
+    try {
+      await AccountData.deleteAccount(username);
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      messenger.showSnackBar(SnackBar(content: Text(s.social.accountDeleted)));
+      context.go('/login');
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      final msg = '$e'.contains('owner_cannot_delete')
+          ? s.social.ownerCannotDelete
+          : s.social.deleteAccountFailed.fill(
+              [e is PostgrestException ? e.message : e]);
+      messenger.showSnackBar(SnackBar(
+        content: Text(msg),
+        action: SnackBarAction(label: s.social.retry, onPressed: _deleteAccount),
+      ));
     }
   }
 
@@ -113,9 +158,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: appBarConstrained(context, title: Text(s.settingsTitle)),
-      body: PageBody(child: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : ListView(
+      body: PageBody(child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
               // --- THEME (three named moods, DESIGN_SPEC §2) ---
@@ -144,7 +187,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: SegmentedButton<AppLanguage>(
                   segments: [
-                    for (final lang in AppLanguage.values)
+                    for (final lang in kSupportedLanguages)
                       ButtonSegment(value: lang, label: Text(lang.nativeName)),
                   ],
                   selected: {context.watch<LanguageCubit>().state.language},
@@ -153,31 +196,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
 
-              const Divider(height: 40),
-              _sectionHeader(s.eventAlerts),
-
-              SwitchListTile(
-                title: Text(s.newEventsSetting),
-                subtitle: Text(s.newEventsSettingSub),
-                value: _newEvents,
-                activeThumbColor: theme.colorScheme.primary,
-                onChanged: (v) {
-                  setState(() => _newEvents = v);
-                  _updateSetting('notify_new_events', v); // Save to DB
-                },
-              ),
-              SwitchListTile(
-                title: Text(s.reminders),
-                subtitle: Text(s.remindersSub),
-                value: _eventReminders,
-                activeThumbColor: theme.colorScheme.primary,
-                onChanged: (v) {
-                  setState(() => _eventReminders = v);
-                  _updateSetting('notify_reminders', v); // Save to DB
-                },
-              ),
               // App-settings shortcut only makes sense on mobile
-              if (!kIsWeb)
+              if (!kIsWeb) ...[
+                const Divider(height: 40),
+                _sectionHeader(s.notifications),
                 ListTile(
                   leading: Icon(Icons.settings_applications, color: theme.colorScheme.primary),
                   title: Text(s.fixNotifPermissions),
@@ -187,20 +209,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     await openAppSettings();
                   },
                 ),
-              
+              ],
+
               const Divider(height: 40),
-              _sectionHeader(s.navMarket),
-              SwitchListTile(
-                title: Text(s.priceDrops),
-                subtitle: Text(s.priceDropsSub),
-                value: _marketplaceUpdates,
-                activeThumbColor: theme.colorScheme.primary,
-                onChanged: (v) {
-                  setState(() => _marketplaceUpdates = v);
-                  _updateSetting('notify_marketplace', v); // Save to DB
-                },
+              _sectionHeader(s.social.privacyData),
+              ListTile(
+                leading: Icon(Icons.policy_outlined, color: theme.colorScheme.primary),
+                title: Text(s.social.privacyPolicy),
+                subtitle: Text(s.social.privacyPolicySub),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen())),
               ),
-              
+              ListTile(
+                leading: _exporting
+                    ? const SizedBox(
+                        width: 24, height: 24,
+                        child: Padding(
+                          padding: EdgeInsets.all(2),
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ))
+                    : Icon(Icons.download_outlined, color: theme.colorScheme.primary),
+                title: Text(s.social.downloadMyData),
+                subtitle: Text(_exporting
+                    ? s.social.preparingExport
+                    : s.social.downloadMyDataSub),
+                enabled: !_exporting,
+                onTap: _exportData,
+              ),
+              ListTile(
+                leading: Icon(Icons.delete_forever_outlined,
+                    color: theme.colorScheme.error),
+                title: Text(s.social.deleteAccount,
+                    style: TextStyle(color: theme.colorScheme.error)),
+                subtitle: Text(s.social.deleteAccountSub),
+                onTap: _deleteAccount,
+              ),
+
               const Divider(height: 40),
               // Preview card removed — it didn't show anything the live
               // theme cards don't already demonstrate (H4/14.7).
@@ -330,3 +375,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
+
+
+/// Strong confirmation: the user has to type their username.
+class _DeleteAccountDialog extends StatefulWidget {
+  final String username;
+  const _DeleteAccountDialog({required this.username});
+
+  @override
+  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
+  final _ctrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final ok = AccountData.confirms(_ctrl.text, widget.username);
+
+    return AlertDialog(
+      icon: Icon(Icons.warning_amber_rounded, color: scheme.error),
+      title: Text(s.social.deleteAccountTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(s.social.deleteAccountBody),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _ctrl,
+            autofocus: true,
+            autocorrect: false,
+            decoration: InputDecoration(
+              labelText: s.social.typeUsernameToConfirm.fill(['@${widget.username}']),
+              prefixText: '@',
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(s.cancel),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: scheme.error,
+            foregroundColor: scheme.onError,
+          ),
+          onPressed: ok ? () => Navigator.pop(context, true) : null,
+          child: Text(s.social.deleteForever),
+        ),
+      ],
+    );
+  }
+}

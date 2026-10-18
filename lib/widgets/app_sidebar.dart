@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../screens/create_post_screen.dart';
+import '../services/unread_notifications.dart';
+import '../utils/app_nav.dart';
 import '../utils/responsive.dart';
 import 'kerawang_motif.dart';
 
@@ -36,6 +38,7 @@ class AppSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final items = navItems(context);
+    final onNotifications = _currentPath(context).startsWith('/notifications');
 
     return Container(
       width: 220,
@@ -74,6 +77,19 @@ class AppSidebar extends StatelessWidget {
                 }
               },
             ),
+          // Not a tab: the bell lives in the home app bar on phones, but on
+          // desktop the badge needs to be visible from every page.
+          SideNavTile(
+            icon: onNotifications
+                ? Icons.notifications
+                : Icons.notifications_outlined,
+            label: context.l10n.notifications,
+            selected: onNotifications,
+            showUnread: true,
+            onTap: () {
+              if (!onNotifications) context.goNotifications();
+            },
+          ),
           const SizedBox(height: 16),
           FilledButton.icon(
             onPressed: () => Navigator.push(
@@ -95,11 +111,23 @@ class AppSidebar extends StatelessWidget {
   }
 }
 
+/// Path of the page this sidebar sits on; '' outside a go_router route.
+String _currentPath(BuildContext context) {
+  try {
+    return GoRouterState.of(context).uri.path;
+  } catch (_) {
+    return '';
+  }
+}
+
 class SideNavTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool selected;
   final VoidCallback onTap;
+
+  /// Overlay the live unread-notification count on the icon.
+  final bool showUnread;
 
   const SideNavTile({
     super.key,
@@ -107,7 +135,15 @@ class SideNavTile extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.showUnread = false,
   });
+
+  Widget _icon(ColorScheme scheme) {
+    final i = Icon(icon,
+        size: 20,
+        color: selected ? scheme.onSecondaryContainer : scheme.onSurfaceVariant);
+    return showUnread ? UnreadBadge(child: i) : i;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -125,11 +161,7 @@ class SideNavTile extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Icon(icon,
-                  size: 20,
-                  color: selected
-                      ? scheme.onSecondaryContainer
-                      : scheme.onSurfaceVariant),
+              _icon(scheme),
               const SizedBox(width: 12),
               Text(
                 label,

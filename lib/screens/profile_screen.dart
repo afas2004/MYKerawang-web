@@ -5,13 +5,16 @@ import 'package:mykerawang/l10n/app_strings.dart';
 import 'package:mykerawang/language_cubit.dart';
 import 'package:mykerawang/theme/app_themes.dart';
 import 'package:mykerawang/widgets/image_crop_dialog.dart';
+import 'package:mykerawang/utils/app_links.dart';
 import 'package:mykerawang/utils/app_nav.dart';
 import 'package:mykerawang/utils/report_helper.dart';
 import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../utils/roles.dart';
+import '../l10n/social_strings.dart';
 import '../widgets/post_card.dart';
+import '../widgets/saved_items_view.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/tap_card.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -43,7 +46,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this); // <--- CHANGED: 2 -> 3
+    // Own profile gets a fourth, private "Saved" tab.
+    final currentUid = _supabase.auth.currentUser?.id;
+    _isMe = currentUid != null && (widget.userId ?? currentUid) == currentUid;
+    _tabController = TabController(length: _isMe ? 4 : 3, vsync: this);
     _fetchProfileData();
   }
 
@@ -57,7 +63,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
     try {
       // 1. Fetch Profile
-      final profileData = await _supabase.from('profiles').select().eq('id', targetUid).single();
+      final profileData = await _supabase
+          .from('profiles')
+          // Explicit: never pull private columns for someone else's page.
+          .select('id, username, display_name, full_name, avatar_url, bio, is_verified, role')
+          .eq('id', targetUid)
+          .single();
       
       // 2. Fetch Content (Posts, Events, AND Listings)
       // posts_public nulls user_id on anonymous rows, so anonymous posts no
@@ -180,7 +191,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: QrImageView(
-                              data: "mykerawang://user/${widget.userId ?? _supabase.auth.currentUser?.id}",
+                              // https so a phone camera can open it too
+                              data: profileUrl(_profile!['id']),
                               version: QrVersions.auto,
                               size: 200.0,
                               eyeStyle: QrEyeStyle(
@@ -231,9 +243,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                             final List<Barcode> barcodes = capture.barcodes;
                             for (final barcode in barcodes) {
                               if (barcode.rawValue != null) {
-                                final code = barcode.rawValue!;
-                                if (code.startsWith("mykerawang://user/")) {
-                                  final userId = code.split("/").last;
+                                final userId = userIdFromProfileCode(barcode.rawValue!);
+                                if (userId != null) {
                                   Navigator.pop(ctx);
                                   context.goUser(userId);
                                   break;
@@ -262,7 +273,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final isClub = _profile!['role'] == 'club';
 
     return Scaffold(
       appBar: AppBar(
@@ -386,7 +396,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                         child: Text(_isFollowing ? s.following : s.follow),
                       ),
                     ),
-                  if (_isMe && !isClub)
+                  if (_isMe)
                     OutlinedButton(
                       onPressed: () {
                          Navigator.push(
@@ -414,6 +424,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 Tab(text: s.activity),
                 Tab(text: s.navEvents),
                 Tab(text: s.navMarket),
+                if (_isMe) Tab(text: s.social.saved),
               ],
             ),
             Expanded(
@@ -446,6 +457,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   _userListings.isEmpty
                     ? Center(child: Text(s.nothingForSale))
                     : _buildPhotoGrid(_userListings, false), // <--- AND HERE
+
+                  // Tab 4 (own profile only): bookmarks
+                  if (_isMe) const SavedItemsView(),
                 ],
               ),
             ),

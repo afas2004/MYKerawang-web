@@ -7,6 +7,8 @@ import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
+import '../l10n/social_strings.dart';
+import '../services/unread_notifications.dart';
 import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
 import '../widgets/embed_card.dart';
@@ -32,6 +34,15 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> _purePosts = []; // web: posts only (rail owns discovery)
   List<dynamic> _featuredEvents = [];
   List<dynamic> _freshMarketItems = [];
+
+  // Paging: posts arrive [_pageSize] at a time as the user nears the end.
+  static const _pageSize = 20;
+  final List<Map<String, dynamic>> _posts = [];
+  final Set<dynamic> _postIds = {};
+  List<dynamic> _injectables = [];
+  bool _hasMore = true;
+  bool _loadingMore = false;
+  bool _loadMoreError = false;
 
   @override
   void initState() {
@@ -60,19 +71,12 @@ class _HomeScreenState extends State<HomeScreen> {
             .order('created_at', ascending: false)
             .limit(20),
 
-        // 3. Posts — from the view, which blanks user_id/profiles on
-        //    anonymous rows. Joins are baked into the view.
-        _supabase.from('posts_public')
-            .select('*')
-            .order('created_at', ascending: false)
-            .limit(50), // Fetch enough posts
+        // 3. First page of posts
+        _postsPage(0),
       ]);
       final events = results[0];
       final listings = results[1];
       final posts = results[2];
-
-      // 4. PREPARE FEEDS (DESIGN_SPEC §4)
-      final purePosts = posts.map((p) => {...p, 'type': 'post'}).toList();
 
       // Injectables: alternate event/listing, in their natural order.
       // Deterministic — same data always produces the same feed.
@@ -84,22 +88,20 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
 
-      // Mobile feed: exactly one embed after every 6th post.
-      final List<dynamic> mixedFeed = [];
-      int injectIndex = 0;
-      for (int i = 0; i < purePosts.length; i++) {
-        mixedFeed.add(purePosts[i]);
-        if ((i + 1) % 6 == 0 && injectIndex < injectables.length) {
-          mixedFeed.add(injectables[injectIndex++]);
-        }
-      }
-
       if (mounted) {
         setState(() {
           _featuredEvents = events.take(8).toList(); // Keep top 8 for carousel
           _freshMarketItems = listings.take(8).toList();
-          _socialFeed = mixedFeed;
-          _purePosts = purePosts;
+          _injectables = injectables;
+          _posts
+            ..clear()
+            ..addAll(posts);
+          _postIds
+            ..clear()
+            ..addAll(posts.map((p) => p['id']));
+          _hasMore = posts.length == _pageSize;
+          _loadMoreError = false;
+          _rebuildFeeds();
           _isLoading = false;
         });
       }
@@ -112,6 +114,73 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     }
+  }
+
+  /// Posts from the view, which blanks user_id/profiles on anonymous
+  /// rows (joins are baked in), [_pageSize] at a time.
+  Future<List<Map<String, dynamic>>> _postsPage(int from) => _supabase
+      .from('posts_public')
+      .select('*')
+      .order('created_at', ascending: false)
+      .range(from, from + _pageSize - 1);
+
+  /// Next page, appended. Rows already shown (new posts shift the
+  /// offsets) are skipped.
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore || _isLoading) return;
+    setState(() {
+      _loadingMore = true;
+      _loadMoreError = false;
+    });
+    try {
+      final page = await _postsPage(_posts.length);
+      if (!mounted) return;
+      setState(() {
+        for (final p in page) {
+          if (_postIds.add(p['id'])) _posts.add(p);
+        }
+        _hasMore = page.length == _pageSize;
+        _rebuildFeeds();
+      });
+    } catch (e) {
+      debugPrint("Error loading more posts: $e");
+      if (mounted) setState(() => _loadMoreError = true);
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  /// Derives both feeds from [_posts] (DESIGN_SPEC §4).
+  void _rebuildFeeds() {
+    final purePosts = _posts.map((p) => {...p, 'type': 'post'}).toList();
+
+    // Mobile feed: exactly one embed after every 6th post.
+    final List<dynamic> mixedFeed = [];
+    int injectIndex = 0;
+    for (int i = 0; i < purePosts.length; i++) {
+      mixedFeed.add(purePosts[i]);
+      if ((i + 1) % 6 == 0 && injectIndex < _injectables.length) {
+        mixedFeed.add(_injectables[injectIndex++]);
+      }
+    }
+    _socialFeed = mixedFeed;
+    _purePosts = purePosts;
+  }
+
+  /// Fetch the next page when within ~a screen of the end.
+  bool _onScroll(ScrollNotification n) {
+    if (n.metrics.axis == Axis.vertical &&
+        n.metrics.extentAfter < 800 &&
+        !_loadMoreError) {
+      _loadMore();
+    }
+    return false;
+  }
+
+  Future<void> _openComposer() async {
+    await Navigator.push(
+        context, MaterialPageRoute(builder: (_) => const CreatePostScreen()));
+    if (mounted) _fetchFeedData();
   }
 
   @override
@@ -135,7 +204,9 @@ class _HomeScreenState extends State<HomeScreen> {
       body: LinearRefresher(
         onRefresh: _fetchFeedData,
         offset: topPadding,
-        child: CustomScrollView(
+        child: NotificationListener<ScrollNotification>(
+          onNotification: _onScroll,
+          child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             // 1. APP BAR
@@ -158,7 +229,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 IconButton(
                   tooltip: context.l10n.notifications,
-                  icon: const Icon(Icons.notifications_outlined),
+                  icon: const UnreadBadge(
+                      child: Icon(Icons.notifications_outlined)),
                   onPressed: () => context.goNotifications(),
                 ),
                 IconButton(
@@ -279,10 +351,81 @@ class _HomeScreenState extends State<HomeScreen> {
                     childCount: feed.length,
                   ),
                 ),
+
+            // EMPTY STATE: loaded fine, but nobody has posted yet
+            if (!_isLoading && !_hasError && _posts.isEmpty)
+              SliverToBoxAdapter(child: _emptyFeed(context)),
+
+            // PAGING FOOTER: spinner / retry / end
+            if (!_isLoading && _posts.isNotEmpty)
+              SliverToBoxAdapter(child: _pagingFooter(context)),
           ],
+        ),
         ),
       )
     );
+  }
+
+  Widget _emptyFeed(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+      child: Column(
+        children: [
+          Icon(Icons.forum_outlined, size: 56, color: scheme.onSurfaceVariant),
+          const SizedBox(height: 12),
+          Text(s.social.feedEmptyTitle,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(s.social.feedEmptyBody,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: scheme.onSurfaceVariant)),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: _openComposer,
+            icon: const Icon(Icons.edit_outlined),
+            label: Text(s.social.createFirstPost),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _pagingFooter(BuildContext context) {
+    final s = context.l10n;
+    if (_loadMoreError) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          children: [
+            Text(s.social.loadMoreFailed),
+            TextButton.icon(
+              onPressed: _loadMore,
+              icon: const Icon(Icons.refresh),
+              label: Text(s.social.retry),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_hasMore) {
+      // Slivers build lazily, so the footer being built means it is near
+      // the viewport — covers tall screens where nothing scrolls.
+      if (!_loadingMore) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _loadMore();
+        });
+      }
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return const SizedBox(height: 32);
   }
 
   Widget _sectionHeader(String title, VoidCallback onSeeAll) {
