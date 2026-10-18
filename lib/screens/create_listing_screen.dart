@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:image_picker/image_picker.dart';
-// Ensure you have this utility (or copy it from previous steps)
 import '../utils/image_compressor.dart';
 import '../utils/local_image.dart';
 import '../utils/categories.dart';
-import 'gallery_view_screen.dart';
+import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
+import '../utils/formatters.dart';
 import '../utils/responsive.dart';
+import '../widgets/media_picker_grid.dart';
 
 class CreateListingScreen extends StatefulWidget {
   final Map<String, dynamic>? itemToEdit; 
@@ -74,60 +74,13 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     super.dispose();
   }
 
-  // --- 1. UNIFIED PICKER LOGIC ---
-  Future<void> _pickImage(ImageSource source) async {
-    final picker = ImagePicker();
-    try {
-      if (source == ImageSource.camera) {
-        final XFile? picked = await picker.pickImage(source: ImageSource.camera, maxWidth: kPhotoMaxDimension, maxHeight: kPhotoMaxDimension, imageQuality: kPhotoQuality);
-        if (picked != null) {
-          final img = await LocalImage.fromXFile(picked);
-          setState(() => _mediaItems.add(img));
-        }
-      } else {
-        final List<XFile> pickedList = await picker.pickMultiImage(maxWidth: kPhotoMaxDimension, maxHeight: kPhotoMaxDimension, imageQuality: kPhotoQuality);
-        if (pickedList.isNotEmpty) {
-          final imgs = await Future.wait(pickedList.map(LocalImage.fromXFile));
-          setState(() {
-            _mediaItems.addAll(imgs);
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint("Error picking image: $e");
-    }
-  }
-
-  void _showAddOptions() {
-    showAdaptiveSheet(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Wrap(
-          children: [
-            // Desktop browsers can't capture; phone PWAs can (see canUseCamera)
-            if (canUseCamera(context))
-              ListTile(
-                leading: const Icon(Icons.photo_camera),
-                title: Text(context.l10n.takePhoto),
-                onTap: () { Navigator.pop(context); _pickImage(ImageSource.camera); },
-              ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: Text(context.l10n.chooseFromGallery),
-              onTap: () { Navigator.pop(context); _pickImage(ImageSource.gallery); },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // --- 2. UPLOAD LOGIC ---
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    
+    final s = context.l10nRead;
+
     if (_mediaItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please add at least 1 photo.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.addPhotoRequired)));
       return;
     }
 
@@ -180,70 +133,30 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
       if (widget.itemToEdit != null) {
         await _supabase.from('listings').update(data).eq('id', widget.itemToEdit!['id']);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Listing Updated!')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.listingUpdated)));
       } else {
         await _supabase.from('listings').insert(data);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Listing Published!')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.listingPublished)));
       }
 
       if (mounted) Navigator.pop(context, true); 
 
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  // --- 3. UI HELPER: IMAGE MENU ---
-  void _showImageMenu(int index) {
-    showAdaptiveSheet(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Wrap(
-          children: [
-            if (index != 0)
-              ListTile(
-                leading: const Icon(Icons.star_border),
-                title: Text(context.l10n.setAsCover),
-                onTap: () {
-                  Navigator.pop(context);
-                  setState(() {
-                    final item = _mediaItems.removeAt(index);
-                    _mediaItems.insert(0, item);
-                  });
-                },
-              ),
-            ListTile(
-              leading: const Icon(Icons.fullscreen),
-              title: Text(context.l10n.viewFullscreen),
-              onTap: () {
-                Navigator.pop(context);
-                showGallery(context, items: _mediaItems, initialIndex: index);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Remove Photo', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(context);
-                setState(() => _mediaItems.removeAt(index));
-              },
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.itemToEdit != null;
     final theme = Theme.of(context);
+    final s = context.l10n;
 
     return Scaffold(
       appBar: appBarConstrained(context,
-          title: Text(isEditing ? 'Edit Listing' : 'Sell Item')),
+          title: Text(isEditing ? s.editListing : s.sellItem)),
       body: PageBody(child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -251,109 +164,19 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- UNIFIED MEDIA GRID ---
-              const Padding(
-                padding: EdgeInsets.only(bottom: 8),
-                child: Text("Photos", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              // --- MEDIA (shared with the event form) ---
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(s.photos, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
               ),
-              if (_mediaItems.isEmpty)
-                GestureDetector(
-                  onTap: _showAddOptions,
-                  child: Container(
-                    height: 150,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainer,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.add_a_photo, size: 40, color: theme.colorScheme.primary),
-                        const SizedBox(height: 8),
-                        Text("Add Photos", style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
-                )
-              else
-                SizedBox(
-                  height: 140,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _mediaItems.length + 1,
-                    itemBuilder: (context, index) {
-                      // "Add More" Button at the end
-                      if (index == _mediaItems.length) {
-                        return GestureDetector(
-                          onTap: _showAddOptions,
-                          child: Container(
-                            width: 100,
-                            margin: const EdgeInsets.only(right: 8),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surfaceContainer,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
-                            ),
-                            child: const Icon(Icons.add, size: 30),
-                          ),
-                        );
-                      }
-
-                      final item = _mediaItems[index];
-                      final isCover = index == 0;
-
-                      return GestureDetector(
-                        onTap: () => _showImageMenu(index),
-                        child: Container(
-                          width: 140,
-                          margin: const EdgeInsets.only(right: 8),
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: item is LocalImage
-                                    ? Image.memory(item.bytes, fit: BoxFit.cover)
-                                    : Image.network(item as String, fit: BoxFit.cover),
-                              ),
-                              if (isCover)
-                                Positioned(
-                                  bottom: 0, left: 0, right: 0,
-                                  child: Container(
-                                    color: Colors.black54,
-                                    padding: const EdgeInsets.symmetric(vertical: 4),
-                                    child: const Text("COVER", textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                                  ),
-                                ),
-                              Positioned(
-                                top: 4, right: 4,
-                                child: GestureDetector(
-                                  onTap: () => setState(() => _mediaItems.removeAt(index)),
-                                  child: const CircleAvatar(radius: 10, backgroundColor: Colors.red, child: Icon(Icons.close, size: 12, color: Colors.white)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                
-              if (_mediaItems.isNotEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(top: 8, bottom: 20),
-                  child: Text("Tip: Tap a photo to set it as Cover.", style: TextStyle(fontSize: 12, color: Colors.grey)),
-                ),
-              SizedBox(height: 12),
+              MediaPickerGrid(items: _mediaItems, onChanged: () => setState(() {})),
+              const SizedBox(height: 24),
 
               // --- FORM FIELDS ---
               TextFormField(
                 controller: _titleController,
-                decoration: const InputDecoration(labelText: 'Title', hintText: 'e.g. Pre-loved Textbook', border: OutlineInputBorder()),
-                validator: (v) => v!.isEmpty ? 'Required' : null,
+                decoration: InputDecoration(labelText: s.title, hintText: s.listingTitleHint),
+                validator: (v) => v!.isEmpty ? s.required : null,
               ),
               const SizedBox(height: 16),
               
@@ -362,16 +185,16 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                   Expanded(
                     child: TextFormField(
                       controller: _priceController,
-                      decoration: const InputDecoration(labelText: 'Price (RM)', prefixText: 'RM ', border: OutlineInputBorder()),
+                      decoration: InputDecoration(labelText: s.priceLabel, prefixText: kCurrencyPrefix),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (v) => (v == null || double.tryParse(v) == null) ? 'Invalid' : null,
+                      validator: (v) => (v == null || double.tryParse(v) == null) ? s.invalid : null,
                     ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: _category,
-                      decoration: const InputDecoration(labelText: 'Category', border: OutlineInputBorder()),
+                      initialValue: _category,
+                      decoration: InputDecoration(labelText: s.category),
                       items: kListingCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                       onChanged: (v) => setState(() => _category = v!),
                     ),
@@ -383,8 +206,8 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
               TextFormField(
                 controller: _descriptionController,
                 maxLines: 5,
-                decoration: const InputDecoration(labelText: 'Description', alignLabelWithHint: true, border: OutlineInputBorder()),
-                validator: (v) => v!.isEmpty ? 'Required' : null,
+                decoration: InputDecoration(labelText: s.description, alignLabelWithHint: true),
+                validator: (v) => v!.isEmpty ? s.required : null,
               ),
               const SizedBox(height: 80),
             ],
@@ -395,19 +218,20 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: theme.scaffoldBackgroundColor, 
-          border: Border(top: BorderSide(color: theme.dividerColor.withOpacity(0.1)))
+          border: Border(top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)))
         ),
-        child: ElevatedButton(
+        // Same submit bar as the event form
+        child: ElevatedButton.icon(
           onPressed: _isLoading ? null : _submit,
+          icon: _isLoading
+              ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onPrimary))
+              : Icon(isEditing ? Icons.check : Icons.publish),
+          label: Text(_isLoading ? s.saving : (isEditing ? s.saveChanges : s.publish)),
           style: ElevatedButton.styleFrom(
             backgroundColor: theme.colorScheme.primary,
-            foregroundColor: Colors.white,
+            foregroundColor: theme.colorScheme.onPrimary,
             padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
           ),
-          child: _isLoading 
-            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
-            : Text(isEditing ? "Save Changes" : "Publish Listing"),
         ),
       ),
     );

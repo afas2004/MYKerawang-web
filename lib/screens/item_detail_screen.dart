@@ -6,12 +6,18 @@ import 'package:mykerawang/services/share_service.dart';
 import 'package:mykerawang/utils/report_helper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
  
-import 'create_listing_screen.dart'; 
-import 'create_post_screen.dart'; // Ensure this exists
+import 'create_listing_screen.dart';
+import 'create_post_screen.dart';
+import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
+import '../theme/app_themes.dart';
 import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
 import '../utils/file_saver.dart';
+import '../utils/formatters.dart';
+import '../utils/roles.dart';
+import '../widgets/status_badge.dart';
+import '../widgets/tap_card.dart';
 import 'gallery_view_screen.dart';
 import '../utils/responsive.dart';
 
@@ -27,7 +33,6 @@ class ItemDetailScreen extends StatefulWidget {
 class _ItemDetailScreenState extends State<ItemDetailScreen> {
   late Map<String, dynamic> _itemData;
   Map<String, dynamic>? _sellerProfile;
-  bool _isLoading = true;
   int _currentImageIndex = 0; 
 
   @override
@@ -59,7 +64,6 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         setState(() {
           _itemData = freshItem;
           _sellerProfile = seller;
-          _isLoading = false;
         });
       }
     } catch (e) {
@@ -72,6 +76,8 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     final currentStatus = _itemData['is_sold'] ?? false;
     final newStatus = !currentStatus;
 
+    final s = context.l10nRead;
+
     // Optimistic Update
     setState(() => _itemData['is_sold'] = newStatus);
 
@@ -80,28 +86,31 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           .from('listings')
           .update({'is_sold': newStatus})
           .eq('id', _itemData['id']);
-      
+
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(newStatus ? "Marked as Sold" : "Marked as Available"))
+        SnackBar(content: Text(newStatus ? s.markedSold : s.markedAvailable))
       );
     } catch (e) {
+      if (!mounted) return;
       // Revert if error
       setState(() => _itemData['is_sold'] = currentStatus);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
     }
   }
 
   Future<void> _deleteItem() async {
+    final s = context.l10nRead;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Delete Item"),
-        content: const Text("Are you sure you want to delete this listing permanently?"),
+        title: Text(s.deleteListing),
+        content: Text(s.deleteListingConfirm),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(s.cancel)),
           TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text("Delete", style: TextStyle(color: Colors.red))),
+              child: Text(s.delete, style: TextStyle(color: Theme.of(ctx).colorScheme.error))),
         ],
       ),
     );
@@ -111,10 +120,10 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         await Supabase.instance.client.from('listings').delete().eq('id', _itemData['id']);
         if (mounted) {
           Navigator.pop(context, true); 
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Listing deleted")));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.listingDeleted)));
         }
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
       }
     }
   }
@@ -124,7 +133,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 
     final qrUrl = _sellerProfile!['payment_qr_url'];
     final phone = _sellerProfile!['phone_number'];
-    final sellerName = _sellerProfile!['username'] ?? "Seller";
+    final sellerName = _sellerProfile!['username'] ?? context.l10nRead.seller;
 
     // Track state LOCALLY inside this function logic
     bool isSaving = false;
@@ -136,22 +145,26 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       builder: (ctx) => StatefulBuilder(
         // 'setModalState' allows us to rebuild ONLY this bottom sheet
         builder: (BuildContext context, StateSetter setModalState) {
+          final s = context.l10n;
+          final theme = Theme.of(context);
+          final scheme = theme.colorScheme;
           return Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text("Contact Seller", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                Text(s.contactSeller, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                Text("Buying from @$sellerName", style: const TextStyle(color: Colors.grey)),
+                Text(s.buyingFrom.fill([sellerName]), style: TextStyle(color: scheme.onSurfaceVariant)),
                 const SizedBox(height: 24),
 
                 if (qrUrl != null) ...[
+                  // Brand name of the payment scheme — not translated
                   const Text("DuitNow QR", style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Container(
                     height: 200, width: 200,
-                    decoration: BoxDecoration(border: Border.all(color: Colors.grey[300]!)),
+                    decoration: BoxDecoration(border: Border.all(color: scheme.outlineVariant)),
                     child: CachedNetworkImage(
                       imageUrl: qrUrl,
                       fit: BoxFit.contain,
@@ -189,23 +202,23 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     // Dynamic Icon
                     icon: isSaving 
                       ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) 
-                      : Icon(isSaved ? Icons.check_circle : Icons.save_alt, color: isSaved ? Colors.green : null),
+                      : Icon(isSaved ? Icons.check_circle : Icons.save_alt, color: isSaved ? scheme.primary : null),
                     // Dynamic Text
                     label: Text(
                       isSaving
-                          ? context.l10n.saving
+                          ? s.saving
                           : (isSaved
-                              ? context.l10n.saved
-                              : (kIsWeb ? "Download QR" : "Save to Gallery")),
+                              ? s.saved
+                              : (kIsWeb ? s.downloadQr : s.saveToGallery)),
                       style: TextStyle(
-                        color: isSaved ? Colors.green : null, 
+                        color: isSaved ? scheme.primary : null,
                         fontWeight: isSaved ? FontWeight.bold : null
                       ),
                     ),
                   ),
 
                   const SizedBox(height: 8),
-                  const Text("Screenshot & Scan to Pay", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text(s.scanToPay, style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
                   const SizedBox(height: 24),
                 ],
 
@@ -214,31 +227,28 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   width: double.infinity,
                   child: FilledButton.icon(
                     icon: const Icon(Icons.chat),
-                    label: const Text("Chat on WhatsApp"),
-                    style: FilledButton.styleFrom(backgroundColor: Colors.green, padding: const EdgeInsets.symmetric(vertical: 12)),
+                    label: Text(s.chatOnWhatsApp),
+                    style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
                     onPressed: () {
                       // Was a placeholder comment — the button did nothing.
                       final raw = (phone ?? '').toString().trim();
                       if (raw.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text(
-                                  "This seller hasn't added a phone number yet")),
+                          SnackBar(content: Text(s.sellerNoPhone)),
                         );
                         return;
                       }
                       ShareService.openWhatsApp(
                         context,
                         raw,
-                        "Hi! I'm interested in your listing "
-                        "\"${_itemData['title']}\" (RM ${_itemData['price']}) on MYKerawang.",
+                        s.whatsAppInterest.fill([_itemData['title'], formatPrice(_itemData['price'])]),
                       );
                     },
                   ),
                 ),
                 
                 const SizedBox(height: 12),
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Close")),
+                TextButton(onPressed: () => Navigator.pop(ctx), child: Text(s.close)),
               ],
             ),
           );
@@ -252,6 +262,9 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     final currentUser = Supabase.instance.client.auth.currentUser;
     final isOwner = currentUser != null && currentUser.id == _itemData['seller_id'];
     final isSold = _itemData['is_sold'] == true;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final s = context.l10n;
 
     final List<String> allImages = [
       if (_itemData['image_url'] != null) _itemData['image_url'],
@@ -267,9 +280,10 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
             leading: Padding(
               padding: const EdgeInsets.all(8.0),
               child: CircleAvatar(
-                backgroundColor: Colors.black.withOpacity(0.5),
+                backgroundColor: photoScrim(0.5),
                 child: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                  icon: const Icon(Icons.arrow_back, color: kOnPhoto),
                   onPressed: () => Navigator.pop(context),
                 ),
               ),
@@ -282,7 +296,8 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     itemCount: allImages.length,
                     onPageChanged: (index) => setState(() => _currentImageIndex = index),
                     itemBuilder: (context, index) {
-                      return GestureDetector(
+                      return TapCard(
+                        borderRadius: BorderRadius.zero,
                         onTap: () {
                           showGallery(context, items: allImages, initialIndex: index);
                         },
@@ -291,10 +306,12 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                           child: CachedNetworkImage(
                             imageUrl: allImages[index],
                             fit: BoxFit.cover,
-                            color: isSold ? Colors.grey : null,
+                            // Desaturate sold photos (the colour is only a
+                            // saturation=0 mask, not a visible tint)
+                            color: isSold ? scheme.outline : null,
                             colorBlendMode: isSold ? BlendMode.saturation : null,
                             placeholder: (_,__) => const Center(child: CircularProgressIndicator()),
-                            errorWidget: (_,__,___) => Container(color: Colors.grey, child: const Icon(Icons.broken_image, color: Colors.white)),
+                            errorWidget: (_,__,___) => Container(color: scheme.surfaceContainerHighest, child: Icon(Icons.broken_image, color: scheme.onSurfaceVariant)),
                           ),
                         ),
                       );
@@ -302,14 +319,10 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   ),
                   if (isSold)
                     Positioned.fill(
-                      child: Container(
-                        color: Colors.black38,
-                        child: Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                            decoration: BoxDecoration(border: Border.all(color: Colors.white, width: 3), color: Colors.red.withOpacity(0.8)),
-                            child: const Text("SOLD", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 4)),
-                          ),
+                      child: IgnorePointer(
+                        child: Container(
+                          color: photoScrim(0.4),
+                          child: Center(child: StatusBadge.stamp(s.sold)),
                         ),
                       ),
                     ),
@@ -318,8 +331,8 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                       bottom: 16, right: 16,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
-                        child: Text("${_currentImageIndex + 1} / ${allImages.length}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        decoration: BoxDecoration(color: photoScrim(), borderRadius: BorderRadius.circular(20)),
+                        child: Text("${_currentImageIndex + 1} / ${allImages.length}", style: theme.textTheme.labelMedium?.copyWith(color: kOnPhoto, fontWeight: FontWeight.bold)),
                       ),
                     ),
                 ],
@@ -336,69 +349,53 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Chip(
-                        label: Text(_itemData['category'] ?? 'General'),
-                        backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-                        labelStyle: TextStyle(color: Theme.of(context).colorScheme.onSecondaryContainer),
+                        label: Text(_itemData['category'] ?? s.categoryGeneral),
+                        backgroundColor: scheme.secondaryContainer,
+                        labelStyle: TextStyle(color: scheme.onSecondaryContainer),
                         side: BorderSide.none,
                       ),
-                      Text("RM ${(_itemData['price'] ?? 0).toStringAsFixed(2)}", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
+                      Text(formatPrice(_itemData['price']), style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: scheme.primary)),
                     ],
                   ),
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      Expanded(child: Text(_itemData['title'], style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
+                      Expanded(child: Text(_itemData['title'], style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold))),
                       IconButton(
-                        icon: const CircleAvatar(backgroundColor: Colors.black45, child: Icon(Icons.share, color: Colors.white, size: 20)),
+                        tooltip: s.share,
+                        icon: Icon(Icons.share, color: scheme.onSurfaceVariant),
                         onPressed: () {
                           // Pass cover + gallery so every photo can be shared
                           ShareService.shareContent(
                             context,
                             _itemData['title'],
-                            "Price: RM ${_itemData['price']}\n${_itemData['description'] ?? ''}",
-                            [
-                              if (_itemData['image_url'] != null) _itemData['image_url'],
-                              ...?(_itemData['gallery_urls'] as List?)?.cast<String>(),
-                            ],
+                            "${s.priceLine.fill([formatPrice(_itemData['price'])])}\n${_itemData['description'] ?? ''}",
+                            allImages,
                           );
                         },
                       ),
-                      PopupMenuButton<String>(
-                        icon: const CircleAvatar(
-                          backgroundColor: Colors.black45, 
-                          child: Icon(Icons.more_vert, color: Colors.white)
-                        ),
-                        onSelected: (val) {
-                          // Change 'listing' to 'event' depending on the screen
-                          showReportDialog(context, _itemData['id'], 'listing'); 
-                        },
-                        itemBuilder: (ctx) => [
-                          const PopupMenuItem(
-                            value: 'report',
-                            child: Text("Report this content", style: TextStyle(color: Colors.red)),
-                          ),
-                        ],
-                      ),
+                      ReportMenuButton(targetId: _itemData['id'], type: 'listing'),
                     ],
                   ),
                   const SizedBox(height: 20),
 
                   if (_sellerProfile != null)
-                    InkWell(
+                    TapCard(
                       onTap: () => context.goUser(_sellerProfile!['id']),
-                      child: Container(
+                      color: scheme.surfaceContainer,
+                      border: BorderSide(color: theme.dividerColor.withValues(alpha: 0.2)),
+                      child: Padding(
                         padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.2)), borderRadius: BorderRadius.circular(12), color: Theme.of(context).colorScheme.surfaceContainer),
                         child: Row(
                           children: [
                             CircleAvatar(backgroundImage: _sellerProfile!['avatar_url'] != null ? CachedNetworkImageProvider(_sellerProfile!['avatar_url']) : null, child: _sellerProfile!['avatar_url'] == null ? const Icon(Icons.person) : null),
                             const SizedBox(width: 12),
                             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(_sellerProfile!['display_name'] ?? 'Student', style: const TextStyle(fontWeight: FontWeight.bold)),
-                              Text("View Profile", style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 12)),
+                              Text(displayNameFor(s, _sellerProfile), style: const TextStyle(fontWeight: FontWeight.bold)),
+                              Text(s.viewProfile, style: theme.textTheme.bodySmall?.copyWith(color: scheme.primary)),
                             ]),
                             const Spacer(),
-                            const Icon(Icons.chevron_right, color: Colors.grey),
+                            Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
                           ],
                         ),
                       ),
@@ -410,24 +407,18 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text("Description", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                      Text(s.description, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                       TextButton.icon(
                         onPressed: () {
-                          // Requires updating CreatePostScreen to accept 'sharedListing'
-                          // Use a Try-Catch or ensure CreatePostScreen is updated
-                          try {
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => CreatePostScreen(sharedListing: _itemData))); 
-                          } catch (e) {
-                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please update CreatePostScreen first!")));
-                          }
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => CreatePostScreen(sharedListing: _itemData)));
                         },
                         icon: const Icon(Icons.repeat, size: 16),
-                        label: const Text("Repost"),
+                        label: Text(s.repost),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(_itemData['description'] ?? 'No description provided.'),
+                  Text(_itemData['description'] ?? s.noDetails),
                   const SizedBox(height: 80),
                 ],
               ),
@@ -441,8 +432,8 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         padding: const EdgeInsets.all(16),
         width: double.infinity,
         decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -2))]
+          color: theme.scaffoldBackgroundColor,
+          boxShadow: [BoxShadow(color: scheme.shadow.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -2))]
         ),
         child: isOwner
             ? Row(
@@ -452,12 +443,11 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     child: OutlinedButton(
                       onPressed: _toggleSoldStatus,
                       style: OutlinedButton.styleFrom(
-                        // If sold: Green text (to make available), If available: Orange text (to mark sold)
-                        foregroundColor: isSold ? Colors.green : Colors.orange, 
-                        side: BorderSide(color: isSold ? Colors.green : Colors.orange),
+                        foregroundColor: scheme.primary,
+                        side: BorderSide(color: scheme.primary),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      child: Text(isSold ? "Mark Available" : "Mark as Sold"),
+                      child: Text(isSold ? s.markAvailable : s.markAsSold),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -470,11 +460,11 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         if (result == true) _refreshData(); 
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                        backgroundColor: scheme.primary,
+                        foregroundColor: scheme.onPrimary,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      child: const Text("Edit"),
+                      child: Text(s.edit),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -482,12 +472,12 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   // 3. DELETE ICON (Small, beside edit)
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
+                      color: scheme.errorContainer,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.red),
-                      tooltip: "Delete Permanently",
+                      icon: Icon(Icons.delete_outline, color: scheme.onErrorContainer),
+                      tooltip: s.deletePermanently,
                       onPressed: _deleteItem,
                     ),
                   ),
@@ -497,10 +487,11 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
             : ElevatedButton.icon(
                 onPressed: isSold ? null : _showPurchaseDialog, 
                 icon: const Icon(Icons.chat),
-                label: Text(isSold ? "Item Sold" : "Contact / Buy"),
+                label: Text(isSold ? s.sold : s.contactOrBuy),
+                // Sold = onPressed null, so the theme's disabled colours apply
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isSold ? Colors.grey : Theme.of(context).colorScheme.primary,
-                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  backgroundColor: scheme.primary,
+                  foregroundColor: scheme.onPrimary,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),

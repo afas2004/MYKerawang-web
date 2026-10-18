@@ -2,8 +2,12 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:intl/intl.dart';
+import '../l10n/app_strings.dart';
+import '../language_cubit.dart';
 import '../utils/app_nav.dart';
+import '../utils/formatters.dart';
+import '../utils/roles.dart';
+import '../widgets/tap_card.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -24,7 +28,6 @@ class _SearchScreenState extends State<SearchScreen> {
   
   // Pagination State
   int _searchLimit = 10;
-  bool _hasMore = true; // Simple check to see if we hit the limit
 
   @override
   void dispose() {
@@ -43,7 +46,6 @@ class _SearchScreenState extends State<SearchScreen> {
         setState(() {
           _query = query;
           _searchLimit = 10; // Reset limit on new search
-          _hasMore = true;
         });
         _performSearch();
       } else {
@@ -64,6 +66,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _performSearch() async {
     if (_query.isEmpty) return;
+    final s = context.l10nRead;
     setState(() => _isLoading = true);
     
     List<Map<String, dynamic>> tempResults = [];
@@ -139,10 +142,13 @@ class _SearchScreenState extends State<SearchScreen> {
 
         for (var p in posts) {
           // Smart Title Generation
-          String displayTitle = p['title'] ?? "Post";
+          String displayTitle = p['title'] ?? s.kindPost;
           if ((p['title'] == null || p['title'].toString().trim().isEmpty)) {
-            if (p['events'] != null) displayTitle = "Re: ${p['events']['title']}";
-            else if (p['listings'] != null) displayTitle = "Re: ${p['listings']['title']}";
+            if (p['events'] != null) {
+              displayTitle = s.replyTo.fill([p['events']['title']]);
+            } else if (p['listings'] != null) {
+              displayTitle = s.replyTo.fill([p['listings']['title']]);
+            }
           }
 
           tempResults.add({
@@ -159,9 +165,7 @@ class _SearchScreenState extends State<SearchScreen> {
       if (mounted) {
         setState(() {
           _results = tempResults;
-          _isLoading = false;
-          // If we got fewer results than we asked for, we probably hit the end
-          _hasMore = tempResults.length >= _searchLimit; 
+          _isLoading = false; 
         });
       }
     } catch (e) {
@@ -172,14 +176,26 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.l10n;
+    // Filter keys stay stable (they drive the queries); labels are localized
+    final filters = {
+      'All': s.all,
+      'Posts': s.posts,
+      'People': s.people,
+      'Events': s.navEvents,
+      'Market': s.navMarket,
+    };
     return Scaffold(
       appBar: AppBar(
         title: TextField(
           controller: _searchCtrl,
           autofocus: true,
           decoration: InputDecoration(
-            hintText: 'Search posts, people, items...',
+            hintText: s.searchHint,
             border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            filled: false,
             hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
             suffixIcon: _query.isNotEmpty 
               ? IconButton(
@@ -201,12 +217,12 @@ class _SearchScreenState extends State<SearchScreen> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
-              children: ['All', 'Posts', 'People', 'Events', 'Market'].map((filter) {
+              children: filters.keys.map((filter) {
                 final isSelected = _activeFilter == filter;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: FilterChip(
-                    label: Text(filter),
+                    label: Text(filters[filter]!),
                     selected: isSelected,
                     onSelected: (val) {
                       setState(() {
@@ -246,7 +262,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           Icon(Icons.search, size: 64, color: Theme.of(context).dividerColor),
                           const SizedBox(height: 16),
                           Text(
-                            _query.isEmpty ? "Start typing to search" : "No results found",
+                            _query.isEmpty ? s.startTyping : s.noResults,
                             style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                           ),
                         ],
@@ -265,7 +281,7 @@ class _SearchScreenState extends State<SearchScreen> {
                               ? const Center(child: CircularProgressIndicator())
                               : TextButton(
                                   onPressed: _loadMore,
-                                  child: const Text("Show More Results"),
+                                  child: Text(s.showMore),
                                 ),
                           );
                         }
@@ -285,6 +301,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   // --- WIDGET: Person Card ---
   Widget _buildPersonCard(Map<String, dynamic> item) {
+    final s = context.l10n;
     return ListTile(
       leading: CircleAvatar(
         radius: 24,
@@ -293,8 +310,8 @@ class _SearchScreenState extends State<SearchScreen> {
             : null,
         child: item['avatar_url'] == null ? const Icon(Icons.person) : null,
       ),
-      title: Text(item['display_name'] ?? item['full_name'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.bold)),
-      subtitle: Text(item['role'] == 'student' ? 'Student' : 'Club/Admin'),
+      title: Text(displayNameFor(s, item), style: const TextStyle(fontWeight: FontWeight.bold)),
+      subtitle: Text(roleLabel(s, item['role'])),
       trailing: const Icon(Icons.chevron_right),
       onTap: () => context.goUser(item['id']),
     );
@@ -304,8 +321,11 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildContentCard(Map<String, dynamic> item, String type) {
     final isEvent = type == 'event';
     final isPost = type == 'post';
-    
-    final title = item['title'] ?? 'No Content';
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final s = context.l10n;
+
+    final title = item['title'] ?? s.untitled;
     final image = item['image_url'];
     
     String subtitle;
@@ -314,28 +334,29 @@ class _SearchScreenState extends State<SearchScreen> {
     IconData placeholderIcon;
 
     if (isEvent) {
-      subtitle = item['start_datetime'] != null 
-          ? DateFormat('d MMM, h:mm a').format(DateTime.parse(item['start_datetime']).toLocal()) 
-          : 'Date TBA';
-      badgeLabel = 'EVENT';
-      badgeColor = Theme.of(context).colorScheme.primary;
+      final start = parseLocal(item['start_datetime']);
+      subtitle = start != null ? formatEventDate(start) : s.dateTba;
+      badgeLabel = s.kindEvent;
+      badgeColor = scheme.primary;
       placeholderIcon = Icons.event;
     } else if (isPost) {
       // For posts, show who posted it
-      final author = item['profiles']?['display_name'] ?? 'Anonymous';
-      subtitle = "Posted by $author"; 
-      badgeLabel = 'POST';
-      badgeColor = Colors.blueGrey;
+      final author = item['profiles']?['display_name'] ?? s.anonymous;
+      subtitle = s.postedBy.fill([author]);
+      badgeLabel = s.kindPost;
+      badgeColor = scheme.secondary;
       placeholderIcon = Icons.article;
     } else {
-      // Market
-      subtitle = "RM ${(item['price'] ?? 0).toStringAsFixed(2)}";
-      badgeLabel = 'MARKET';
-      badgeColor = Colors.orange;
+      // Market — gold label, same as the feed embed's "◆ MARKET".
+      subtitle = formatPrice(item['price']);
+      badgeLabel = s.navMarket;
+      badgeColor = scheme.tertiary;
       placeholderIcon = Icons.store;
     }
 
-    return GestureDetector(
+    return TapCard(
+      color: theme.cardColor,
+      border: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
       onTap: () {
         if (isEvent) {
           context.goEvent(item);
@@ -345,14 +366,8 @@ class _SearchScreenState extends State<SearchScreen> {
           context.goItem(item);
         }
       },
-      child: Container(
+      child: SizedBox(
         height: 100,
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.1)),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)],
-        ),
         child: Row(
           children: [
             // Image Section
@@ -366,12 +381,12 @@ class _SearchScreenState extends State<SearchScreen> {
                         imageUrl: image, 
                         memCacheWidth: 300,
                         fit: BoxFit.cover,
-                        placeholder: (_,__) => Container(color: Theme.of(context).colorScheme.surfaceContainerHighest),
-                        errorWidget: (_,__,___) => const Icon(Icons.broken_image),
+                        placeholder: (_,__) => Container(color: scheme.surfaceContainerHighest),
+                        errorWidget: (_,__,___) => Icon(Icons.broken_image, color: scheme.onSurfaceVariant),
                       )
                     : Container(
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                        child: Icon(placeholderIcon, color: Colors.grey),
+                        color: scheme.surfaceContainerHighest,
+                        child: Icon(placeholderIcon, color: scheme.onSurfaceVariant),
                       ),
               ),
             ),
@@ -387,22 +402,21 @@ class _SearchScreenState extends State<SearchScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: badgeColor.withOpacity(0.1),
+                        color: badgeColor.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        badgeLabel,
-                        style: TextStyle(
-                          fontSize: 10, 
+                        badgeLabel.toUpperCase(),
+                        style: theme.textTheme.labelSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: badgeColor,
                         ),
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    Text(subtitle, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
+                    Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
                   ],
                 ),
               ),

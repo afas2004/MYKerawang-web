@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/kerawang_motif.dart';
@@ -58,7 +59,7 @@ class _LoginScreenState extends State<LoginScreen> {
               final scheme = Theme.of(context).colorScheme;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(state.errorMessage!,
+                  content: Text(_errorText(context.l10nRead, state.errorMessage!),
                       style: TextStyle(color: scheme.onError)),
                   backgroundColor: scheme.error,
                 ),
@@ -272,4 +273,15 @@ class _GooglePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Localizes a [LoginError] code; server messages pass through.
+String _errorText(AppStrings s, String error) {
+  if (error == LoginError.fillFields) return s.fillAllFields;
+  if (error == LoginError.checkEmail) return s.checkEmailConfirm;
+  if (error == LoginError.generic) return s.genericAuthError;
+  if (error.startsWith(LoginError.googleFailed)) {
+    return s.googleSignInFailed.fill([error.substring(LoginError.googleFailed.length)]);
+  }
+  return error;
 }

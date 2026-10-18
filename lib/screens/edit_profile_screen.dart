@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../utils/image_compressor.dart'; // Ensure you have this file from previous steps
 import '../utils/local_image.dart';
 import '../widgets/image_crop_dialog.dart';
+import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
 import '../utils/responsive.dart';
@@ -116,15 +117,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   String? _validateUsername(String? value) {
-    if (value == null || value.isEmpty) return "Username is required";
-    if (value.length < 3) return "Min 3 chars";
+    final s = context.l10nRead;
+    if (value == null || value.isEmpty) return s.usernameRequired;
+    if (value.length < 3) return s.usernameMin;
     // Regex: Only letters, numbers, underscore
-    if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value)) return "Only letters, numbers, '_'";
+    if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value)) return s.usernameChars;
     return null;
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    final s = context.l10nRead;
+    final scheme = Theme.of(context).colorScheme;
 
     setState(() => _isSaving = true);
     final user = Supabase.instance.client.auth.currentUser;
@@ -137,7 +141,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (await _isUsernameTaken(newUsername)) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Username @$newUsername is already taken."), backgroundColor: Colors.red),
+            SnackBar(content: Text(s.usernameTaken.fill([newUsername]), style: TextStyle(color: scheme.onError)), backgroundColor: scheme.error),
           );
           setState(() => _isSaving = false);
         }
@@ -185,10 +189,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       if (mounted) {
         Navigator.pop(context, true); 
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile Updated!")));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.profileUpdated)));
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]), style: TextStyle(color: scheme.onError)), backgroundColor: scheme.error));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -256,18 +260,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<bool> _confirmDiscard() async {
     if (!_isDirty) return true;
+    final s = context.l10nRead;
     final leave = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Discard changes?"),
-        content: const Text("You have unsaved changes on this page."),
+        title: Text(s.discardChangesTitle),
+        content: Text(s.unsavedChanges),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text("Keep editing")),
+              child: Text(s.keepEditing)),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text("Discard",
+            child: Text(s.discard,
                 style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
         ],
@@ -279,12 +284,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final s = context.l10n;
 
     return PopScope(
       canPop: !_isDirty,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
-        if (await _confirmDiscard() && mounted) {
+        if (await _confirmDiscard() && context.mounted) {
           Navigator.of(context).pop();
         }
       },
@@ -336,7 +342,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             // --- USERNAME & NAME ---
             TextFormField(
               controller: _usernameCtrl,
-              decoration: _inputDeco("Username (Unique ID)").copyWith(
+              decoration: _inputDeco(s.username).copyWith(
+                helperText: s.usernameHelper,
                 prefixText: "@ ",
                 suffixIcon: _statusIcon('username'),
               ),
@@ -346,9 +353,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 16),
             TextFormField(
               controller: _nameCtrl,
-              decoration: _inputDeco("Display Name")
+              decoration: _inputDeco(s.displayName)
                   .copyWith(suffixIcon: _statusIcon('display_name')),
-              validator: (v) => v!.isEmpty ? "Name required" : null,
+              validator: (v) => v!.isEmpty ? s.required : null,
               onChanged: (v) => _autoSave('display_name', v),
             ),
             const SizedBox(height: 16),
@@ -358,7 +365,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               controller: _bioCtrl,
               maxLines: 3,
               decoration:
-                  _inputDeco("Bio").copyWith(suffixIcon: _statusIcon('bio')),
+                  _inputDeco(s.bio).copyWith(suffixIcon: _statusIcon('bio')),
               maxLength: 150,
               onChanged: (v) => _autoSave('bio', v),
             ),
@@ -368,14 +375,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             // --- CONTACT INFO ---
             const Divider(),
             const SizedBox(height: 16),
-            const Text("Contact Details", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(s.contactDetails, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             
             TextFormField(
               controller: _phoneCtrl,
               decoration: InputDecoration(
-                labelText: 'Phone Number',
-                hintText: 'e.g. 0123456789',
+                labelText: s.phoneNumber,
+                hintText: s.phoneHint,
                 prefixText: '+60 ', // Visual cue
                 suffixIcon: _statusIcon('phone_number'),
               ),
@@ -388,7 +395,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 LengthLimitingTextInputFormatter(11),   // Limit length (optional)
               ],
               validator: (val) {
-                if (val == null || val.length < 9) return "Please enter a valid number";
+                if (val == null || val.length < 9) return s.phoneInvalid;
                 return null;
               },
               onChanged: (v) {
@@ -398,16 +405,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: _websiteCtrl,
-              decoration: _inputDeco("Website / Link")
+              decoration: _inputDeco(s.website)
                   .copyWith(suffixIcon: _statusIcon('website')),
               onChanged: (v) => _autoSave('website', v),
             ),
             const SizedBox(height: 24),
 
             // --- DUITNOW QR ---
-            const Text("DuitNow QR (For Selling)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            Text("Buyers scan this to pay you",
-                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
+            Text(s.duitnowForSelling, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+            Text(s.duitnowHelp,
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
             const SizedBox(height: 8),
             // Square, centred — a QR isn't a banner (H4/10.2)
             Center(
@@ -431,7 +438,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           children: [
                             Icon(Icons.qr_code_2, size: 44, color: theme.colorScheme.onSurfaceVariant),
                             const SizedBox(height: 6),
-                            Text("Tap to upload QR",
+                            Text(s.tapToUploadQr,
                                 style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
                           ],
                         )
@@ -445,7 +452,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 child: TextButton.icon(
                   onPressed: () => _pickImage(false),
                   icon: const Icon(Icons.edit, size: 16),
-                  label: const Text("Change QR"),
+                  label: Text(s.changeQr),
                 ),
               ),
             const SizedBox(height: 32),
@@ -461,9 +468,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         width: 16, height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.check),
-                label: Text(_isSaving
-                    ? context.l10n.saving
-                    : context.l10n.saveChanges),
+                label: Text(_isSaving ? s.saving : s.saveChanges),
               ),
             ),
             const SizedBox(height: 40),

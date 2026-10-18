@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../language_cubit.dart';
+import '../theme/app_themes.dart';
 import '../utils/local_image.dart';
 
 /// Opens the gallery as an overlay popup rather than a pushed page.
@@ -19,7 +21,7 @@ Future<void> showGallery(
 }) {
   return showDialog(
     context: context,
-    barrierColor: Colors.black.withValues(alpha: 0.92),
+    barrierColor: photoScrim(0.92),
     barrierDismissible: true,
     useSafeArea: false,
     builder: (_) => GalleryViewScreen(
@@ -119,19 +121,19 @@ class _GalleryViewScreenState extends State<GalleryViewScreen> {
     final multiple = widget.galleryItems.length > 1;
 
     return Scaffold(
-      backgroundColor: widget.asDialog ? Colors.transparent : Colors.black,
+      backgroundColor: widget.asDialog ? Colors.transparent : photoScrim(1),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: kOnPhoto),
         elevation: 0,
         title: Text(
           "${_index + 1} / ${widget.galleryItems.length}",
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: kOnPhoto),
         ),
         actions: [
           IconButton(
-            tooltip: "Close",
-            icon: const Icon(Icons.close, color: Colors.white),
+            tooltip: context.l10n.close,
+            icon: const Icon(Icons.close, color: kOnPhoto),
             onPressed: () => Navigator.of(context).maybePop(),
           ),
         ],
@@ -178,7 +180,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen> {
                     );
                   },
                   loadingBuilder: (context, event) => const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
+                    child: CircularProgressIndicator(color: kOnPhoto),
                   ),
                 ),
 
@@ -206,8 +208,8 @@ class _GalleryViewScreenState extends State<GalleryViewScreen> {
                           margin: const EdgeInsets.symmetric(horizontal: 3),
                           decoration: BoxDecoration(
                             color: i == _index
-                                ? Colors.white
-                                : Colors.white.withValues(alpha: 0.4),
+                                ? kOnPhoto
+                                : kOnPhoto.withValues(alpha: 0.4),
                             borderRadius: BorderRadius.circular(99),
                           ),
                         ),
@@ -230,7 +232,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen> {
       bottom: 0,
       child: Center(
         child: Material(
-          color: Colors.black.withValues(alpha: 0.45),
+          color: photoScrim(0.45),
           shape: const CircleBorder(),
           child: InkWell(
             customBorder: const CircleBorder(),
@@ -239,7 +241,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen> {
               padding: const EdgeInsets.all(12),
               child: Icon(
                 alignLeft ? Icons.chevron_left : Icons.chevron_right,
-                color: Colors.white,
+                color: kOnPhoto,
                 size: 30,
               ),
             ),

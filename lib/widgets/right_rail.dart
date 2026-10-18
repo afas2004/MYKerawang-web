@@ -2,7 +2,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../language_cubit.dart';
+import '../theme/app_themes.dart';
 import '../utils/app_nav.dart';
+import '../utils/formatters.dart';
 
 /// Desktop-only right rail (Instagram/Facebook style): upcoming events
 /// and fresh marketplace items, using the space next to the feed.
@@ -154,14 +156,13 @@ class _RightRailState extends State<RightRail> {
                             right: 0,
                             bottom: 0,
                             child: Container(
-                              color: Colors.black54,
+                              color: photoScrim(),
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 6, vertical: 3),
                               child: Text(
-                                "RM ${(item['price'] as num?)?.toStringAsFixed(0) ?? '?'}",
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
+                                formatPrice(item['price'] as num?),
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                    color: kOnPhoto,
                                     fontWeight: FontWeight.bold),
                               ),
                             ),

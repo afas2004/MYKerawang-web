@@ -70,7 +70,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await _supabase.from('profiles').update({column: value}).eq('id', user.id);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error saving setting: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.errorWithDetail.fill([e]))));
       }
     }
   }
@@ -82,7 +82,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _checkingUpdate = false);
     // When newer, the button itself turns into "Update"; only confirm the no-op case.
     if (!newer) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<LanguageCubit>().state.strings.upToDate)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.upToDate)));
     }
   }
 
@@ -94,8 +94,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) context.go('/login');
     } catch (e) {
       if (mounted) {
+        final scheme = Theme.of(context).colorScheme;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error signing out: $e"), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(context.l10nRead.errorWithDetail.fill([e]),
+                style: TextStyle(color: scheme.onError)),
+            backgroundColor: scheme.error,
+          ),
         );
       }
     }
@@ -104,17 +109,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final currentTheme = context.watch<ThemeCubit>().state.appTheme;
+    final s = context.l10n;
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: appBarConstrained(context, title: Text(context.l10n.settingsTitle)),
+      appBar: appBarConstrained(context, title: Text(s.settingsTitle)),
       body: PageBody(child: _isLoading 
         ? const Center(child: CircularProgressIndicator())
         : ListView(
             padding: const EdgeInsets.all(16),
             children: [
               // --- THEME (three named moods, DESIGN_SPEC §2) ---
-              const ListTile(
-                leading: Icon(Icons.palette_outlined),
-                title: Text("Theme"),
+              ListTile(
+                leading: const Icon(Icons.palette_outlined),
+                title: Text(s.theme),
               ),
               SizedBox(
                 height: 110,
@@ -131,15 +138,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // --- LANGUAGE (belongs with Appearance, not Event Alerts) ---
               ListTile(
                 leading: const Icon(Icons.translate),
-                title: Text(context.l10n.language),
+                title: Text(s.language),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: SegmentedButton<AppLanguage>(
-                  segments: const [
-                    ButtonSegment(value: AppLanguage.en, label: Text("English")),
-                    ButtonSegment(value: AppLanguage.ms, label: Text("B. Melayu")),
-                    ButtonSegment(value: AppLanguage.ja, label: Text("日本語")),
+                  segments: [
+                    for (final lang in AppLanguage.values)
+                      ButtonSegment(value: lang, label: Text(lang.nativeName)),
                   ],
                   selected: {context.watch<LanguageCubit>().state.language},
                   onSelectionChanged: (sel) =>
@@ -148,23 +154,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
 
               const Divider(height: 40),
-              _sectionHeader("Event Alerts"),
+              _sectionHeader(s.eventAlerts),
 
               SwitchListTile(
-                title: const Text("New Events"),
-                subtitle: const Text("Get notified when new events are posted"),
+                title: Text(s.newEventsSetting),
+                subtitle: Text(s.newEventsSettingSub),
                 value: _newEvents,
-                activeThumbColor: Theme.of(context).colorScheme.primary,
+                activeThumbColor: theme.colorScheme.primary,
                 onChanged: (v) {
                   setState(() => _newEvents = v);
                   _updateSetting('notify_new_events', v); // Save to DB
                 },
               ),
               SwitchListTile(
-                title: const Text("Reminders"),
-                subtitle: const Text("1 hour before events you joined"),
+                title: Text(s.reminders),
+                subtitle: Text(s.remindersSub),
                 value: _eventReminders,
-                activeThumbColor: Theme.of(context).colorScheme.primary,
+                activeThumbColor: theme.colorScheme.primary,
                 onChanged: (v) {
                   setState(() => _eventReminders = v);
                   _updateSetting('notify_reminders', v); // Save to DB
@@ -173,9 +179,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // App-settings shortcut only makes sense on mobile
               if (!kIsWeb)
                 ListTile(
-                  leading: const Icon(Icons.settings_applications, color: Colors.orange),
-                  title: const Text("Fix Notification Permissions"),
-                  subtitle: const Text("Open system settings to enable"),
+                  leading: Icon(Icons.settings_applications, color: theme.colorScheme.primary),
+                  title: Text(s.fixNotifPermissions),
+                  subtitle: Text(s.openSystemSettings),
                   onTap: () async {
                     // This forces the phone's App Settings page to open
                     await openAppSettings();
@@ -183,12 +189,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               
               const Divider(height: 40),
-              _sectionHeader("Marketplace"),
+              _sectionHeader(s.navMarket),
               SwitchListTile(
-                title: const Text("Price Drops"),
-                subtitle: const Text("Notify when saved items drop in price"),
+                title: Text(s.priceDrops),
+                subtitle: Text(s.priceDropsSub),
                 value: _marketplaceUpdates,
-                activeThumbColor: Theme.of(context).colorScheme.primary,
+                activeThumbColor: theme.colorScheme.primary,
                 onChanged: (v) {
                   setState(() => _marketplaceUpdates = v);
                   _updateSetting('notify_marketplace', v); // Save to DB
@@ -210,15 +216,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     side: BorderSide(color: Theme.of(context).colorScheme.error),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: const Text("Sign Out", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  child: Text(s.signOut, style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
               const SizedBox(height: 10),
               Center(
                 child: Text(
                     UpdateService.isSupported
-                        ? "Version ${UpdateService.appVersion} · build ${UpdateService.buildId}"
-                        : "Version ${UpdateService.appVersion}",
+                        ? s.versionBuildLabel.fill([UpdateService.appVersion, UpdateService.buildId])
+                        : s.versionLabel.fill([UpdateService.appVersion]),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant)),
               ),
@@ -230,14 +236,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ? FilledButton.icon(
                             onPressed: UpdateService.instance.applyUpdate,
                             icon: const Icon(Icons.system_update),
-                            label: Text(context.l10n.updateNow),
+                            label: Text(s.updateNow),
                           )
                         : TextButton.icon(
                             onPressed: _checkingUpdate ? null : _checkForUpdates,
                             icon: _checkingUpdate
                                 ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                                 : const Icon(Icons.refresh),
-                            label: Text(context.l10n.checkForUpdates),
+                            label: Text(s.checkForUpdates),
                           ),
                   ),
                 ),
@@ -284,7 +290,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       fontWeight: FontWeight.w700,
                       fontSize: 13,
                       color: spec.text)),
-              Text(spec.tagline,
+              Text(_tagline(context, theme),
                   style: TextStyle(
                       fontSize: 11,
                       color: spec.text.withValues(alpha: 0.6))),
@@ -302,14 +308,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
         decoration: BoxDecoration(
           color: c,
           shape: BoxShape.circle,
-          border: Border.all(color: Colors.black12),
+          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
         ),
       );
 
+  String _tagline(BuildContext context, AppTheme theme) {
+    final s = context.l10n;
+    return switch (theme) {
+      AppTheme.kampus => s.taglineKampus,
+      AppTheme.istana => s.taglineIstana,
+      AppTheme.noir => s.taglineNoir,
+    };
+  }
+
   Widget _sectionHeader(String title) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0, left: 16),
-      child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey)),
+      child: Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant)),
     );
   }
 }

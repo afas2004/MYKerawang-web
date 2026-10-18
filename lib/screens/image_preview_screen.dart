@@ -2,6 +2,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:photo_view/photo_view.dart'; // Ensure you have this package
 import 'package:cached_network_image/cached_network_image.dart';
+import '../language_cubit.dart';
+import '../theme/app_themes.dart';
 
 class ImagePreviewScreen extends StatelessWidget {
   final Uint8List? imageBytes;
@@ -18,15 +20,15 @@ class ImagePreviewScreen extends StatelessWidget {
         : (imageUrl != null ? CachedNetworkImageProvider(imageUrl!) : null);
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: photoScrim(1),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: kOnPhoto),
         elevation: 0,
       ),
       body: Center(
         child: provider == null
-            ? const Text("No Image Found", style: TextStyle(color: Colors.white))
+            ? Text(context.l10n.imageUnavailable, style: const TextStyle(color: kOnPhoto))
             : PhotoView(
                 // 2. Pass the dynamic provider here
                 imageProvider: provider,
@@ -37,19 +39,19 @@ class ImagePreviewScreen extends StatelessWidget {
                 
                 // 4. Error Handling (Works for both File and Network failures)
                 errorBuilder: (context, error, stackTrace) {
-                  return const Column(
+                  return Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.broken_image, color: Colors.white, size: 50),
-                      SizedBox(height: 10),
-                      Text("Image unavailable", style: TextStyle(color: Colors.white)),
+                      const Icon(Icons.broken_image, color: kOnPhoto, size: 50),
+                      const SizedBox(height: 10),
+                      Text(context.l10n.imageUnavailable, style: const TextStyle(color: kOnPhoto)),
                     ],
                   );
                 },
                 
                 // 5. Loading Indicator
                 loadingBuilder: (context, event) => const Center(
-                  child: CircularProgressIndicator(color: Colors.white),
+                  child: CircularProgressIndicator(color: kOnPhoto),
                 ),
               ),
       ),

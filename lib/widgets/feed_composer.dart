@@ -4,6 +4,7 @@ import '../language_cubit.dart';
 import '../screens/create_post_screen.dart';
 import '../screens/profile_cubit.dart';
 import '../theme/app_themes.dart';
+import '../utils/adaptive.dart';
 
 /// Threads-style composer at the top of the web feed (DESIGN_SPEC.md §4).
 /// Acts as a launcher: on wide screens the create-post flow opens as a
@@ -15,10 +16,10 @@ class FeedComposer extends StatelessWidget {
   const FeedComposer({super.key, required this.onPosted});
 
   Future<void> _open(BuildContext context) async {
-    final wide = MediaQuery.sizeOf(context).width >= 900;
+    final wide = isWide(context);
 
-    final bool? posted = wide
-        ? await showDialog<bool>(
+    final Future<bool?> route = wide
+        ? showDialog<bool>(
             context: context,
             builder: (_) => Dialog(
               clipBehavior: Clip.antiAlias,
@@ -31,10 +32,11 @@ class FeedComposer extends StatelessWidget {
               ),
             ),
           )
-        : await Navigator.push<bool>(
+        : Navigator.push<bool>(
             context,
             MaterialPageRoute(builder: (_) => const CreatePostScreen()),
           );
+    final posted = await route;
 
     if (posted == true) onPosted();
   }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'language_cubit.dart';
 import 'screens/event_detail_screen.dart';
 import 'screens/events_screen.dart';
 import 'screens/home_screen.dart';
@@ -191,11 +192,11 @@ GoRouter buildRouter() {
           children: [
             const Icon(Icons.explore_off_outlined, size: 48),
             const SizedBox(height: 12),
-            const Text("Page not found"),
+            Text(context.l10n.pageNotFound),
             const SizedBox(height: 12),
             FilledButton(
               onPressed: () => context.go('/home'),
-              child: const Text("Go home"),
+              child: Text(context.l10n.goHome),
             ),
           ],
         ),
@@ -267,11 +268,11 @@ class _DetailLoaderState extends State<_DetailLoader> {
                 children: [
                   const Icon(Icons.search_off, size: 48),
                   const SizedBox(height: 12),
-                  const Text("This content is no longer available"),
+                  Text(context.l10n.contentUnavailable),
                   const SizedBox(height: 12),
                   FilledButton(
                     onPressed: () => context.go('/home'),
-                    child: const Text("Go home"),
+                    child: Text(context.l10n.goHome),
                   ),
                 ],
               )

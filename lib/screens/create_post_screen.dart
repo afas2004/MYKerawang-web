@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
 import '../utils/responsive.dart';
@@ -52,10 +53,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   Future<void> _submit() async {
     if (_titleCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please enter a title")));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.titleRequired)));
       return;
     }
     
+    final s = context.l10nRead;
     setState(() => _isLoading = true);
     final user = Supabase.instance.client.auth.currentUser;
 
@@ -78,10 +80,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
       if (mounted) {
         Navigator.pop(context, true); 
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Posted successfully!")));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.postedSuccess)));
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -104,7 +106,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         .select('id, username')
         .inFilter('username', usernames);
 
-    // 3. Send Notifications
+    // 3. Send Notifications (read by the recipient → canonical language)
+    const n = AppStrings.en;
     for (var user in users) {
       if (user['id'] == myId) continue; // Don't notify yourself
 
@@ -112,8 +115,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         'user_id': user['id'],
         'actor_id': myId,
         'type': 'mention',
-        'title': 'You were mentioned',
-        'body': 'mentioned you in a post',
+        'title': n.notifMentionTitle,
+        'body': n.notifMentionPostBody,
         'data': {'post_id': postId, 'comment_id': commentId},
       });
     }
@@ -123,12 +126,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   Widget build(BuildContext context) {
     final bool isEvent = widget.sharedEvent != null;
     final bool isListing = widget.sharedListing != null;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final s = context.l10n;
     return Scaffold(
       appBar: appBarConstrained(
         context,
         // In a dialog on desktop a ✕ reads better than a back arrow (H4/2.1)
         leading: IconButton(
-          tooltip: "Close",
+          tooltip: s.close,
           icon: Icon(isWide(context) ? Icons.close : Icons.arrow_back),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
@@ -149,7 +155,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             // Optional: Add a little border/color to make it pop (like in the event screen)
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.grey.withOpacity(0.1),
+              color: scheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -158,7 +164,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 Icon(
                   isEvent ? Icons.event : Icons.shopping_bag, 
                   size: 20,
-                  color: isEvent ? Theme.of(context).primaryColor : Colors.orange,
+                  color: scheme.primary,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -167,8 +173,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     children: [
                       // DYNAMIC LABEL
                       Text(
-                        isEvent ? "Referencing Event:" : "Referencing Item:", 
-                        style: const TextStyle(fontSize: 10, color: Colors.grey)
+                        isEvent ? s.referencingEvent : s.referencingItem,
+                        style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)
                       ),
                       // DYNAMIC TITLE
                       Text(
@@ -185,12 +191,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           ),
           TextField(
             controller: _titleCtrl,
-            decoration: const InputDecoration(
-              hintText: "Title (e.g. Lost Wallet)",
+            decoration: InputDecoration(
+              hintText: s.postTitleHint,
               border: InputBorder.none,
-              hintStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              filled: false,
+              hintStyle: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: scheme.onSurfaceVariant),
             ),
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
           const Divider(),
           MentionInput(
@@ -202,8 +211,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           
           // Options
           SwitchListTile(
-            title: const Text("Post Anonymously"),
-            subtitle: const Text("Hide your name from everyone"),
+            title: Text(s.postAnonymously),
+            subtitle: Text(s.postAnonymouslySub),
             value: _isAnon,
             onChanged: (val) => setState(() => _isAnon = val),
           ),

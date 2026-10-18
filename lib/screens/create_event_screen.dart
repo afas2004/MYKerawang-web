@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:image_picker/image_picker.dart';
-import '../utils/image_compressor.dart'; // Ensure this exists from previous step
+import '../utils/image_compressor.dart';
 import '../utils/local_image.dart';
-import 'gallery_view_screen.dart'; // Ensure this exists
+import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
+import '../utils/formatters.dart';
 import '../utils/responsive.dart';
+import '../widgets/media_picker_grid.dart';
 
 class CreateEventScreen extends StatefulWidget {
   final Map<String, dynamic>? eventToEdit; 
@@ -81,60 +82,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     super.dispose();
   }
 
-  // --- NEW: UNIFIED PICKER LOGIC ---
-  Future<void> _pickImage(ImageSource source) async {
-    final picker = ImagePicker();
-    try {
-      if (source == ImageSource.camera) {
-        final XFile? picked = await picker.pickImage(source: ImageSource.camera, maxWidth: kPhotoMaxDimension, maxHeight: kPhotoMaxDimension, imageQuality: kPhotoQuality);
-        if (picked != null) {
-          final img = await LocalImage.fromXFile(picked);
-          setState(() => _mediaItems.add(img));
-        }
-      } else {
-        // Multi-picker for Gallery
-        final List<XFile> pickedList = await picker.pickMultiImage(maxWidth: kPhotoMaxDimension, maxHeight: kPhotoMaxDimension, imageQuality: kPhotoQuality);
-        if (pickedList.isNotEmpty) {
-          final imgs = await Future.wait(pickedList.map(LocalImage.fromXFile));
-          setState(() {
-            _mediaItems.addAll(imgs);
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint("Error picking image: $e");
-    }
-  }
-
-  void _showAddOptions() {
-    showAdaptiveSheet(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Wrap(
-          children: [
-            // Desktop browsers can't capture; phone PWAs can (see canUseCamera)
-            if (canUseCamera(context))
-              ListTile(
-                leading: const Icon(Icons.photo_camera),
-                title: Text(context.l10n.takePhoto),
-                onTap: () { Navigator.pop(context); _pickImage(ImageSource.camera); },
-              ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: Text(context.l10n.chooseFromGallery),
-              onTap: () { Navigator.pop(context); _pickImage(ImageSource.gallery); },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // --- SUBMIT LOGIC (SMART SORTING) ---
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    final s = context.l10nRead;
     if (_mediaItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please add at least one photo (Cover)")));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.addPhotoRequired)));
       return;
     }
 
@@ -198,7 +151,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       if (mounted) Navigator.pop(context, true);
 
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -220,6 +173,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         .select('id, username')
         .inFilter('username', usernames);
 
+    // Read by the recipient, so written in the canonical language.
+    const n = AppStrings.en;
     for (var user in users) {
       if (user['id'] == myId) continue;
 
@@ -227,8 +182,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         'user_id': user['id'],
         'actor_id': myId,
         'type': 'mention', // We use the same type
-        'title': 'Tagged in an Event',
-        'body': 'mentioned you in an event description',
+        'title': n.notifMentionEventTitle,
+        'body': n.notifMentionEventBody,
         'data': {'event_id': eventId}, // Link to the Event ID
       });
     }
@@ -238,10 +193,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isEditing = widget.eventToEdit != null;
+    final s = context.l10n;
 
     return Scaffold(
       appBar: appBarConstrained(context,
-          title: Text(isEditing ? 'Edit Event' : 'Create Event')),
+          title: Text(isEditing ? s.editEvent : s.createEvent)),
       body: PageBody(child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -249,110 +205,16 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _label("Event Media", topPad: 0),
+              _label(s.photos, topPad: 0),
               
-              // --- UNIFIED MEDIA GRID ---
-              if (_mediaItems.isEmpty)
-                GestureDetector(
-                  onTap: _showAddOptions,
-                  child: Container(
-                    height: 150,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainer,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.add_a_photo, size: 40, color: theme.colorScheme.primary),
-                        const SizedBox(height: 8),
-                        Text("Add Photos", style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
-                )
-              else
-                SizedBox(
-                  height: 140, // Height of the horizontal strip
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _mediaItems.length + 1, // +1 for "Add More" button
-                    itemBuilder: (context, index) {
-                      // "Add More" Button at the end
-                      if (index == _mediaItems.length) {
-                        return GestureDetector(
-                          onTap: _showAddOptions,
-                          child: Container(
-                            width: 100,
-                            margin: const EdgeInsets.only(right: 8),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surfaceContainer,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
-                            ),
-                            child: const Icon(Icons.add, size: 30),
-                          ),
-                        );
-                      }
+              // --- MEDIA (shared with the listing form) ---
+              MediaPickerGrid(items: _mediaItems, onChanged: () => setState(() {})),
 
-                      final item = _mediaItems[index];
-                      final isCover = index == 0;
-
-                      return GestureDetector(
-                        onTap: () => _showImageMenu(index),
-                        child: Container(
-                          width: 140, // Slightly wider to show detail
-                          margin: const EdgeInsets.only(right: 8),
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              // Image
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: item is LocalImage
-                                    ? Image.memory(item.bytes, fit: BoxFit.cover)
-                                    : Image.network(item as String, fit: BoxFit.cover),
-                              ),
-                              
-                              // "Cover" Badge
-                              if (isCover)
-                                Positioned(
-                                  bottom: 0, left: 0, right: 0,
-                                  child: Container(
-                                    color: Colors.black54,
-                                    padding: const EdgeInsets.symmetric(vertical: 4),
-                                    child: const Text("COVER", textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                                  ),
-                                ),
-
-                              // Delete Button (Small X)
-                              Positioned(
-                                top: 4, right: 4,
-                                child: GestureDetector(
-                                  onTap: () => setState(() => _mediaItems.removeAt(index)),
-                                  child: const CircleAvatar(radius: 10, backgroundColor: Colors.red, child: Icon(Icons.close, size: 12, color: Colors.white)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              if (_mediaItems.isNotEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: Text("Tip: Tap a photo to set it as Cover or View.", style: TextStyle(fontSize: 12, color: Colors.grey)),
-                ),
-
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
               // ... REST OF THE FORM (Title, Date, etc.) ...
-              _label("Event Title"),
-              _input(_titleController, "Enter a catchy title", validator: _required("Title")),
+              _label(s.eventTitle),
+              _input(_titleController, s.eventTitleHint, validator: _required(s.title)),
               
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -365,14 +227,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 ),
               ),
 
-              _label("Location", topPad: 0),
-              _input(_locationController, "e.g. Dewan Aspirasi", validator: _required("Location")),
+              _label(s.location, topPad: 0),
+              _input(_locationController, s.locationHint, validator: _required(s.location)),
 
-              _label("Registration Link (Optional)"),
+              _label(s.registrationLinkOptional),
               _input(_linkController, "https://forms.gle/...", icon: Icons.link),
 
-              const Text("Description", style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
+              _label(s.description),
 
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -383,15 +244,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 // REPLACE TextField WITH THIS:
                 child: MentionInput(
                   controller: _descController, // Your existing controller
-                  hintText: "Event details... (Use @ to tag speakers/organizers)",
+                  hintText: s.eventDescHint,
                   isMultiLine: true,
                 ),
               ),
 
               const SizedBox(height: 20),
-              _label("Privacy"),
+              _label(s.privacy),
               SwitchListTile(
-                title: const Text("Public Event"),
+                title: Text(s.publicEvent),
                 value: _isPublic,
                 activeThumbColor: theme.colorScheme.primary,
                 onChanged: (val) => setState(() => _isPublic = val),
@@ -405,14 +266,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: theme.scaffoldBackgroundColor, 
-          border: Border(top: BorderSide(color: theme.dividerColor.withOpacity(0.1)))
+          border: Border(top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)))
         ),
         child: ElevatedButton.icon(
           onPressed: _isLoading ? null : _submit,
           icon: _isLoading 
               ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onPrimary))
-              : const Icon(Icons.publish),
-          label: Text(_isLoading ? "Processing..." : "Publish Event"),
+              : Icon(isEditing ? Icons.check : Icons.publish),
+          label: Text(_isLoading ? s.saving : (isEditing ? s.saveChanges : s.publish)),
           style: ElevatedButton.styleFrom(
             backgroundColor: theme.colorScheme.primary,
             foregroundColor: theme.colorScheme.onPrimary,
@@ -423,63 +284,24 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     );
   }
 
-  // --- HELPER: Image Menu ---
-  void _showImageMenu(int index) {
-    showAdaptiveSheet(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Wrap(
-          children: [
-            if (index != 0) // Only show "Make Cover" if it's not already cover
-              ListTile(
-                leading: const Icon(Icons.star_border),
-                title: Text(context.l10n.setAsCover),
-                onTap: () {
-                  Navigator.pop(context);
-                  setState(() {
-                    final item = _mediaItems.removeAt(index);
-                    _mediaItems.insert(0, item); // Move to front
-                  });
-                },
-              ),
-            ListTile(
-              leading: const Icon(Icons.fullscreen),
-              title: Text(context.l10n.viewFullscreen),
-              onTap: () {
-                Navigator.pop(context);
-                showGallery(context, items: _mediaItems, initialIndex: index);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Remove Photo', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(context);
-                setState(() => _mediaItems.removeAt(index));
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // --- FORM HELPERS (Date, Input) ---
   Widget _dateSelector(bool isStart) {
+    final s = context.l10n;
     final date = isStart ? _startDate : _endDate;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _label(isStart ? "Starts" : "Ends", topPad: 0),
-        GestureDetector(
+        _label(isStart ? s.starts : s.ends, topPad: 0),
+        InkWell(
           onTap: () => _pickDateTime(isStart),
+          borderRadius: BorderRadius.circular(12),
           child: AbsorbPointer(
             child: _input(
-              TextEditingController(text: _formatDate(date)), "Select",
+              TextEditingController(text: date == null ? '' : formatEventDate(date)), s.select,
               icon: Icons.calendar_today,
               readOnly: true,
               validator: isStart ? null : (_) => (_startDate != null && _endDate != null && !_endDate!.isAfter(_startDate!))
-                  ? "Must be after start"
+                  ? s.mustBeAfterStart
                   : null,
             ),
           ),
@@ -516,15 +338,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     }
   }
 
-  String _formatDate(DateTime? d) => d == null ? '' : "${d.day}/${d.month} ${d.hour}:${d.minute.toString().padLeft(2,'0')}";
-  
   Widget _label(String text, {double topPad = 16}) => Padding(
-    padding: EdgeInsets.only(bottom: 8, top: topPad), 
-    child: Text(text, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))
+    padding: EdgeInsets.only(bottom: 8, top: topPad),
+    child: Text(text, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600))
   );
 
-  String? Function(String?) _required(String field) =>
-      (v) => (v == null || v.trim().isEmpty) ? "$field is required" : null;
+  String? Function(String?) _required(String field) {
+    final message = context.l10n.fieldRequired.fill([field]);
+    return (v) => (v == null || v.trim().isEmpty) ? message : null;
+  }
 
   Widget _input(TextEditingController c, String h, {IconData? icon, bool readOnly = false, String? Function(String?)? validator}) => TextFormField(
     controller: c, 

@@ -1,6 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import '../language_cubit.dart';
+import '../utils/formatters.dart';
+import 'tap_card.dart';
 
 class UniversalCard extends StatelessWidget {
   final Map<String, dynamic> data;
@@ -11,7 +13,9 @@ class UniversalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final title = data['title'] ?? 'No Title';
+    final scheme = theme.colorScheme;
+    final s = context.l10n;
+    final title = data['title'] ?? s.untitled;
     final image = data['image_url'];
     
     // Determine subtitle based on type (Event date vs Price)
@@ -19,31 +23,18 @@ class UniversalCard extends StatelessWidget {
     bool isEvent = data.containsKey('start_datetime');
     
     if (isEvent) {
-      final date = DateTime.parse(data['start_datetime']).toLocal();
-      subtitle = DateFormat('d MMM, h:mm a').format(date);
+      subtitle = formatEventRange(parseLocal(data['start_datetime'])!,
+          parseLocal(data['end_datetime']));
     } else {
       // Marketplace item
-      double price = (data['price'] ?? 0).toDouble();
-      subtitle = "RM ${price.toStringAsFixed(2)}";
+      subtitle = formatPrice(data['price']);
     }
 
-    return GestureDetector(
+    return TapCard(
       onTap: onTap,
-      child: Container(
-        // REMOVED: height property (Let content decide height)
-        decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: theme.dividerColor.withOpacity(0.1)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            )
-          ],
-        ),
-        child: Column(
+      color: theme.cardColor,
+      border: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min, // <--- CRITICAL: Shrink-wraps the card
           children: [
@@ -62,7 +53,7 @@ class UniversalCard extends StatelessWidget {
                         placeholder: (context, url) => Container(color: theme.colorScheme.surfaceContainerHighest),
                         errorWidget: (context, url, error) => Container(
                           color: theme.colorScheme.surfaceContainerHighest,
-                          child: const Icon(Icons.broken_image, color: Colors.grey),
+                          child: Icon(Icons.broken_image, color: scheme.onSurfaceVariant),
                         ),
                       )
                     : Container(
@@ -86,19 +77,18 @@ class UniversalCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: isEvent 
-                          ? theme.colorScheme.primaryContainer 
-                          : Colors.orange.withOpacity(0.1),
+                      color: isEvent
+                          ? scheme.primaryContainer
+                          : scheme.tertiary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      isEvent ? 'EVENT' : 'MARKET',
-                      style: TextStyle(
-                        fontSize: 10, 
+                      (isEvent ? s.kindEvent : s.navMarket).toUpperCase(),
+                      style: theme.textTheme.labelSmall?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: isEvent 
-                            ? theme.colorScheme.onPrimaryContainer 
-                            : Colors.orange,
+                        color: isEvent
+                            ? scheme.onPrimaryContainer
+                            : scheme.tertiary,
                       ),
                     ),
                   ),
@@ -108,15 +98,16 @@ class UniversalCard extends StatelessWidget {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
-                  
+
                   Text(
                     subtitle,
-                    style: TextStyle(
-                      color: theme.colorScheme.onSurfaceVariant, 
-                      fontSize: 14,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
                       fontWeight: FontWeight.w500
                     ),
                   ),
@@ -125,7 +116,6 @@ class UniversalCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
     );
   }
 }

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:timeago/timeago.dart' as timeago;
+import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
+import '../utils/formatters.dart';
 import '../utils/adaptive.dart';
 import '../utils/responsive.dart';
 
@@ -49,7 +50,7 @@ class NotificationScreen extends StatelessWidget {
       appBar: appBarConstrained(context,
           title: Text(context.l10n.notificationsTitle)),
       body: PageBody(child: userId == null 
-        ? const Center(child: Text("Please login to see notifications"))
+        ? Center(child: Text(context.l10n.loginToSeeNotifications))
         : StreamBuilder(
             stream: Supabase.instance.client
                 .from('notifications')
@@ -58,7 +59,7 @@ class NotificationScreen extends StatelessWidget {
                 .order('created_at', ascending: false)
                 .limit(100),
             builder: (context, snapshot) {
-              if (snapshot.hasError) return Center(child: Text("Error: ${snapshot.error}"));
+              if (snapshot.hasError) return Center(child: Text(context.l10n.errorWithDetail.fill([snapshot.error])));
               if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
               
               final notifications = snapshot.data!;
@@ -103,8 +104,9 @@ class NotificationScreen extends StatelessWidget {
                     title: Text(notif['title'], style: TextStyle(fontWeight: isRead ? FontWeight.normal : FontWeight.bold)),
                     subtitle: Text(notif['body'] ?? notif['message'] ?? ''),
                     trailing: Text(
-                      timeago.format(DateTime.parse(notif['created_at']), locale: 'en_short'),
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      formatRelative(context, DateTime.parse(notif['created_at'])),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                     onTap: () {
                       // Mark as read, then open what it refers to (12.1)

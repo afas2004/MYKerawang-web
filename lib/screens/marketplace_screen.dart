@@ -1,10 +1,13 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:mykerawang/widgets/linear_refresher';
+import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'create_listing_screen.dart';
 import '../utils/app_nav.dart';
 import '../utils/categories.dart';
+import '../utils/formatters.dart';
+import '../widgets/status_badge.dart';
+import '../widgets/tap_card.dart';
 import 'marketplace_cubit.dart'; // Ensure this matches your file name
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
@@ -82,7 +85,7 @@ class _MarketplaceViewState extends State<MarketplaceView> {
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: FilterChip(
-                        label: Text(filter),
+                        label: Text(filter == 'All' ? context.l10n.all : filter),
                         selected: isSelected,
                         // Call Cubit
                         onSelected: (v) => context.read<MarketplaceCubit>().updateFilter(filter),
@@ -144,11 +147,10 @@ class _MarketplaceViewState extends State<MarketplaceView> {
                                 itemBuilder: (context, index) {
                                   final item = state.displayedItems[index];
                                   final isSold = item['is_sold'] == true;
-                                  // InkWell (not GestureDetector) so desktop
+                                  // TapCard (not GestureDetector) so desktop
                                   // gets a pointer cursor + hover ripple (G6)
-                                  return InkWell(
+                                  return TapCard(
                                     onTap: () => context.goItem(item),
-                                    borderRadius: BorderRadius.circular(12),
                                     child: Opacity(
                                       opacity: isSold ? 0.6 : 1,
                                       child: Container(
@@ -175,12 +177,12 @@ class _MarketplaceViewState extends State<MarketplaceView> {
                                                 memCacheWidth: 500,
                                                 placeholder: (context, url) => Container(
                                                   color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                                  child: const Center(child: CircularProgressIndicator())
+                                                  child: Center(child: CircularProgressIndicator())
                                                 ),
                                                 errorWidget: (context, url, error) => Container(
                                                   color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                                  child: const Center(
-                                                    child: Icon(Icons.store_mall_directory_outlined, color: Colors.grey, size: 30)
+                                                  child: Center(
+                                                    child: Icon(Icons.store_mall_directory_outlined, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 30)
                                                   ),
                                                 ),
                                               ),
@@ -189,20 +191,7 @@ class _MarketplaceViewState extends State<MarketplaceView> {
                                                 Positioned(
                                                   top: 8,
                                                   left: 8,
-                                                  child: Container(
-                                                    padding: const EdgeInsets.symmetric(
-                                                        horizontal: 10, vertical: 4),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.black.withValues(alpha: 0.75),
-                                                      borderRadius: BorderRadius.circular(6),
-                                                    ),
-                                                    child: const Text("SOLD",
-                                                        style: TextStyle(
-                                                            color: Colors.white,
-                                                            fontSize: 11,
-                                                            fontWeight: FontWeight.w700,
-                                                            letterSpacing: 1)),
-                                                  ),
+                                                  child: StatusBadge(context.l10n.sold),
                                                 ),
                                                 ],
                                               ),
@@ -220,16 +209,15 @@ class _MarketplaceViewState extends State<MarketplaceView> {
                                                         ?.copyWith(fontWeight: FontWeight.w600)),
                                                 const SizedBox(height: 4),
                                                 Text(
-                                                    "RM ${(item['price'] as num).toStringAsFixed(2)}",
-                                                    style: TextStyle(
+                                                    formatPrice(item['price'] as num?),
+                                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                                         color: isSold
                                                             ? Theme.of(context).colorScheme.onSurfaceVariant
                                                             : Theme.of(context).colorScheme.primary,
                                                         decoration: isSold
                                                             ? TextDecoration.lineThrough
                                                             : null,
-                                                        fontWeight: FontWeight.bold,
-                                                        fontSize: 16)),
+                                                        fontWeight: FontWeight.bold)),
                                               ],
                                             ),
                                           )
