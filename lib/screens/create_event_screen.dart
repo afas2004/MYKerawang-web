@@ -3,11 +3,12 @@ import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/image_compressor.dart';
 import '../utils/local_image.dart';
+import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
 import '../utils/formatters.dart';
-import '../utils/responsive.dart';
+import '../widgets/form_layout.dart';
 import '../widgets/media_picker_grid.dart';
 import '../widgets/restriction_gate.dart';
 
@@ -200,80 +201,81 @@ if (event['tags'] != null) {
     return Scaffold(
       appBar: appBarConstrained(context,
           title: Text(isEditing ? s.editEvent : s.createEvent)),
-      body: PageBody(child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      body: FormPageBody(
         child: Form(
           key: _formKey,
+          // Errors show as soon as a field is touched, not only on submit.
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _label(s.photos, topPad: 0),
-              
-              // --- MEDIA (shared with the listing form) ---
-              MediaPickerGrid(items: _mediaItems, onChanged: () => setState(() {})),
-
-              const SizedBox(height: 24),
-
-              // ... REST OF THE FORM (Title, Date, etc.) ...
-              _label(s.eventTitle),
-              _input(_titleController, s.eventTitleHint, validator: _required(s.title)),
-              
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Row(
-                  children: [
-                    Expanded(child: _dateSelector(true)), // Helper below
-                    const SizedBox(width: 12),
-                    Expanded(child: _dateSelector(false)), // Helper below
-                  ],
-                ),
+              FormSection(
+                title: s.sectionPhotos,
+                icon: Icons.photo_library_outlined,
+                children: [
+                  // Shared with the listing form
+                  MediaPickerGrid(items: _mediaItems, onChanged: () => setState(() {})),
+                ],
               ),
-
-              _label(s.location, topPad: 0),
-              _input(_locationController, s.locationHint, validator: _required(s.location)),
-
-              _label(s.registrationLinkOptional),
-              _input(_linkController, "https://forms.gle/...", icon: Icons.link),
-
-              _label(s.description),
-
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                // REPLACE TextField WITH THIS:
-                child: MentionInput(
-                  controller: _descController, // Your existing controller
-                  hintText: s.eventDescHint,
-                  isMultiLine: true,
-                ),
+              FormSection(
+                title: s.sectionDetails,
+                icon: Icons.edit_note,
+                children: [
+                  _label(s.eventTitle, topPad: 0),
+                  _input(_titleController, s.eventTitleHint, validator: _required(s.title)),
+                  _label(s.description),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: MentionInput(
+                      controller: _descController,
+                      hintText: s.eventDescHint,
+                      isMultiLine: true,
+                    ),
+                  ),
+                ],
               ),
-
-              const SizedBox(height: 80),
+              FormSection(
+                title: s.sectionWhenWhere,
+                icon: Icons.event_outlined,
+                children: [
+                  LayoutBuilder(builder: (context, c) {
+                    // Side by side when there's room, stacked on small phones.
+                    if (c.maxWidth < 420) {
+                      return Column(children: [
+                        _dateSelector(true),
+                        const SizedBox(height: 12),
+                        _dateSelector(false),
+                      ]);
+                    }
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: _dateSelector(true)),
+                        const SizedBox(width: 12),
+                        Expanded(child: _dateSelector(false)),
+                      ],
+                    );
+                  }),
+                  _label(s.location),
+                  _input(_locationController, s.locationHint, validator: _required(s.location)),
+                  _label(s.registrationLinkOptional),
+                  _input(_linkController, "https://forms.gle/...", icon: Icons.link),
+                ],
+              ),
             ],
           ),
         ),
-      )),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor, 
-          border: Border(top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)))
-        ),
-        child: ElevatedButton.icon(
-          onPressed: _isLoading ? null : _submit,
-          icon: _isLoading 
-              ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onPrimary))
-              : Icon(isEditing ? Icons.check : Icons.publish),
-          label: Text(_isLoading ? s.saving : (isEditing ? s.saveChanges : s.publish)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: theme.colorScheme.primary,
-            foregroundColor: theme.colorScheme.onPrimary,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-          ),
-        ),
+      ),
+      bottomNavigationBar: PublishBar(
+        busy: _isLoading,
+        editing: isEditing,
+        label: isEditing ? s.saveChanges : s.publish,
+        busyLabel: s.saving,
+        onPressed: _submit,
       ),
     );
   }
@@ -294,9 +296,11 @@ if (event['tags'] != null) {
               TextEditingController(text: date == null ? '' : formatEventDate(date)), s.select,
               icon: Icons.calendar_today,
               readOnly: true,
-              validator: isStart ? null : (_) => (_startDate != null && _endDate != null && !_endDate!.isAfter(_startDate!))
-                  ? s.mustBeAfterStart
-                  : null,
+              validator: isStart
+                  ? (_) => _startDate == null ? s.fieldRequired.fill([s.starts]) : null
+                  : (_) => (_startDate != null && _endDate != null && !_endDate!.isAfter(_startDate!))
+                      ? s.mustBeAfterStart
+                      : null,
             ),
           ),
         ),
@@ -350,10 +354,14 @@ if (event['tags'] != null) {
   );
 
   InputDecoration _inputDeco(String h, ThemeData t, {IconData? icon}) => InputDecoration(
-    hintText: h, 
-    suffixIcon: icon != null ? Icon(icon) : null, 
-    filled: true, 
-    fillColor: t.colorScheme.surfaceContainer, 
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)
+    hintText: h,
+    suffixIcon: icon != null ? Icon(icon) : null,
+    filled: true,
+    fillColor: t.colorScheme.surfaceContainer,
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+    // Visible focus ring for keyboard users on web.
+    focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: t.colorScheme.primary, width: 2)),
   );
 }

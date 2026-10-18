@@ -180,7 +180,6 @@ extension AccessStrings on AppStrings {
       "Masukkan alamat emel yang sah.", "有効なメールアドレスを入力してください。");
   String get passwordTooShort => _t("At least 6 characters.",
       "Sekurang-kurangnya 6 aksara.", "6文字以上");
-  String get fieldRequired => _t("Required", "Wajib diisi", "必須");
   String get priceInvalid => _t("Enter a price, e.g. 12.50",
       "Masukkan harga, cth. 12.50", "価格を入力してください（例：12.50）");
 }
