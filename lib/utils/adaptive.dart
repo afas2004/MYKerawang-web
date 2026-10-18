@@ -4,7 +4,7 @@ import '../theme/app_themes.dart';
 import 'responsive.dart';
 
 /// Desktop breakpoint used for interaction patterns (not just layout).
-bool isWide(BuildContext context) => MediaQuery.sizeOf(context).width >= 900;
+bool isWide(BuildContext context) => Responsive.isDesktop(context);
 
 /// Can this device realistically take a photo?
 ///
@@ -15,7 +15,8 @@ bool isWide(BuildContext context) => MediaQuery.sizeOf(context).width >= 900;
 bool canUseCamera(BuildContext context) {
   if (!kIsWeb) return true; // native Android/iOS
   final size = MediaQuery.sizeOf(context);
-  final touch = size.shortestSide < 900; // phone/tablet-sized viewport
+  // phone/tablet-sized viewport
+  final touch = size.shortestSide < Responsive.desktopBreakpoint;
   return touch;
 }
 

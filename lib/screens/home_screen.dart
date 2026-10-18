@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mykerawang/screens/create_event_screen.dart';
 import 'package:mykerawang/screens/create_listing_screen.dart';
-import 'package:mykerawang/widgets/linear_refresher';
+import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
@@ -118,7 +118,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final double topPadding = MediaQuery.of(context).padding.top + kToolbarHeight;
     // Desktop: composer + pure posts; discovery lives in the right rail.
     // Mobile: carousels + deterministic embeds (DESIGN_SPEC §4).
-    final bool isDesktop = MediaQuery.sizeOf(context).width >= 900;
+    final bool isDesktop = isWide(context);
     final List<dynamic> feed = isDesktop ? _purePosts : _socialFeed;
 
     return Scaffold(

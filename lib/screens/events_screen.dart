@@ -2,7 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import 'package:mykerawang/widgets/linear_refresher';
+import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'create_event_screen.dart';
 import 'events_cubit.dart'; // Ensure this matches your file structure
 import '../language_cubit.dart';
@@ -64,7 +64,7 @@ class _EventsViewState extends State<EventsView> {
                       }
                     },
                     icon: const Icon(Icons.add, size: 18),
-                    label: Text(context.l10n.newEvent),
+                    label: Text(context.l10n.createEvent),
                   ),
                 ),
             ],

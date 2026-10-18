@@ -5,7 +5,7 @@ import 'package:mykerawang/language_cubit.dart';
 import 'package:mykerawang/widgets/image_crop_dialog.dart';
 import 'package:mykerawang/utils/app_nav.dart';
 import 'package:mykerawang/utils/report_helper.dart';
-import 'package:mykerawang/widgets/linear_refresher';
+import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../widgets/post_card.dart';

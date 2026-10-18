@@ -4,6 +4,7 @@ import '../language_cubit.dart';
 import '../screens/create_post_screen.dart';
 import '../screens/profile_cubit.dart';
 import '../theme/app_themes.dart';
+import '../utils/adaptive.dart';
 
 /// Threads-style composer at the top of the web feed (DESIGN_SPEC.md §4).
 /// Acts as a launcher: on wide screens the create-post flow opens as a
@@ -15,7 +16,7 @@ class FeedComposer extends StatelessWidget {
   const FeedComposer({super.key, required this.onPosted});
 
   Future<void> _open(BuildContext context) async {
-    final wide = MediaQuery.sizeOf(context).width >= 900;
+    final wide = isWide(context);
 
     final bool? posted = wide
         ? await showDialog<bool>(

@@ -35,8 +35,8 @@ class _MainScaffoldState extends State<MainScaffold> {
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, constraints) {
       final width = constraints.maxWidth;
-      final isDesktop = width >= 900;
-      final showRail = width >= 1150;
+      final isDesktop = width >= Responsive.desktopBreakpoint;
+      final showRail = width >= Responsive.railBreakpoint;
 
       if (!isDesktop) return _buildMobile(context);
       return _buildDesktop(context, showRail);

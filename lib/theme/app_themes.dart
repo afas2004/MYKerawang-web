@@ -15,6 +15,15 @@ const BorderRadius kerawangCut = BorderRadius.only(
   bottomLeft: Radius.circular(14),
 );
 
+/// Chrome that sits directly on photos — status badges, carousel counters,
+/// the fullscreen viewer. Theme-independent on purpose (a photo looks the
+/// same in every theme). Everything else takes colours from ColorScheme.
+const Color kOnPhoto = Colors.white;
+
+/// Dark wash behind [kOnPhoto] content on top of an image.
+Color photoScrim([double opacity = 0.55]) =>
+    Colors.black.withValues(alpha: opacity);
+
 class AppThemeSpec {
   final String displayName;
   final String tagline;

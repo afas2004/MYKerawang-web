@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../language_cubit.dart';
 import '../screens/create_post_screen.dart';
+import '../utils/responsive.dart';
 import 'kerawang_motif.dart';
 
 /// Sidebar navigation, shared by the tab shell and by pushed pages
@@ -157,7 +158,7 @@ class DesktopChrome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.sizeOf(context).width < 900) return child;
+    if (!Responsive.isDesktop(context)) return child;
 
     return Scaffold(
       body: Row(

@@ -11,12 +11,23 @@ class Responsive {
   /// Max width of the center feed column on desktop.
   static const double feedMaxWidth = 680;
 
+  // --- Breakpoints: the only place layout widths are decided. ---
+
+  /// At or above: sidebar + feed layout, dialogs instead of sheets, no FAB.
+  static const double desktopBreakpoint = 900;
+
+  /// At or above: the right rail (events / market) appears next to the feed.
+  static const double railBreakpoint = 1150;
+
+  /// Between this and [desktopBreakpoint] the phone layout is clamped to
+  /// this width so it doesn't stretch.
+  static const double clampedMobileWidth = 840;
+
   static double screenWidth(BuildContext context) =>
       MediaQuery.sizeOf(context).width;
 
-  static bool isMobile(BuildContext context) => screenWidth(context) < 600;
-
-  static bool isDesktop(BuildContext context) => screenWidth(context) >= 1024;
+  static bool isDesktop(BuildContext context) =>
+      screenWidth(context) >= desktopBreakpoint;
 
   /// Column count for card grids based on the available width.
   /// e.g. 2 columns on phones, 3-4 on wider screens.
@@ -59,20 +70,25 @@ class ResponsiveShell extends StatelessWidget {
     final media = MediaQuery.of(context);
     final width = media.size.width;
 
-    // Desktop (>=900): MainScaffold lays out sidebar/feed/rail itself and
+    // Desktop: MainScaffold lays out sidebar/feed/rail itself and
     // should span edge-to-edge like a real web app. Phones: no-op.
-    if (width >= 900 || width <= 840) return child;
+    if (width >= Responsive.desktopBreakpoint ||
+        width <= Responsive.clampedMobileWidth) {
+      return child;
+    }
 
-    // Awkward mid-band (840-900): clamp the mobile layout so it doesn't
-    // stretch, since the desktop layout hasn't kicked in yet.
+    // Awkward mid-band: clamp the mobile layout so it doesn't stretch,
+    // since the desktop layout hasn't kicked in yet.
     final theme = Theme.of(context);
     return ColoredBox(
       color: theme.colorScheme.surfaceContainerHighest,
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 840),
+          constraints:
+              const BoxConstraints(maxWidth: Responsive.clampedMobileWidth),
           child: MediaQuery(
-            data: media.copyWith(size: Size(840, media.size.height)),
+            data: media.copyWith(
+                size: Size(Responsive.clampedMobileWidth, media.size.height)),
             child: child,
           ),
         ),

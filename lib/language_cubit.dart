@@ -39,3 +39,10 @@ class LanguageCubit extends Cubit<LanguageState> {
 extension L10nContext on BuildContext {
   AppStrings get l10n => watch<LanguageCubit>().state.strings;
 }
+
+/// Non-listening variant for callbacks, validators and code after an
+/// `await` — `watch` is only legal during build.
+extension L10nReadContext on BuildContext {
+  AppStrings get l10nRead => read<LanguageCubit>().state.strings;
+  AppLanguage get appLanguage => watch<LanguageCubit>().state.language;
+}
