@@ -9,6 +9,10 @@ import '../theme/app_themes.dart';
 import '../utils/adaptive.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
+import '../l10n/social_strings.dart';
+import '../services/account_data.dart';
+import 'privacy_policy_screen.dart';
+import 'profile_cubit.dart';
 import '../utils/responsive.dart';
 import '../services/update_service.dart';
 
@@ -24,8 +28,97 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // until something actually sends those notifications; the DB columns
   // stay. Market "price drops" was removed — there's no saved-items feature.
   bool _checkingUpdate = false;
+  bool _exporting = false;
 
   final _supabase = Supabase.instance.client;
+
+  // ---- Privacy & data (PDPA) ------------------------------------------
+
+  Future<void> _exportData() async {
+    final s = context.l10nRead;
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _exporting = true);
+    try {
+      await AccountData.exportToFile();
+      messenger.showSnackBar(SnackBar(content: Text(s.social.exportReady)));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(s.social.exportFailed.fill([e])),
+        action: SnackBarAction(label: s.social.retry, onPressed: _exportData),
+      ));
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  Future<String?> _myUsername() async {
+    final cached = context.read<ProfileCubit>().state.profile?['username'];
+    if (cached is String && cached.isNotEmpty) return cached;
+    final uid = _supabase.auth.currentUser?.id;
+    if (uid == null) return null;
+    final row = await _supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', uid)
+        .maybeSingle();
+    return row?['username'] as String?;
+  }
+
+  Future<void> _deleteAccount() async {
+    final s = context.l10nRead;
+    final messenger = ScaffoldMessenger.of(context);
+    final String? username;
+    try {
+      username = await _myUsername();
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(s.social.deleteAccountFailed.fill([e])),
+        action: SnackBarAction(label: s.social.retry, onPressed: _deleteAccount),
+      ));
+      return;
+    }
+    if (!mounted || username == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => _DeleteAccountDialog(username: username!),
+    );
+    if (confirmed != true || !mounted) return;
+
+    // Blocking progress: nothing else should happen mid-deletion.
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Row(children: [
+            const CircularProgressIndicator(),
+            const SizedBox(width: 20),
+            Expanded(child: Text(s.social.deletingAccount)),
+          ]),
+        ),
+      ),
+    );
+    try {
+      await AccountData.deleteAccount(username);
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      messenger.showSnackBar(SnackBar(content: Text(s.social.accountDeleted)));
+      context.go('/login');
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      final msg = '$e'.contains('owner_cannot_delete')
+          ? s.social.ownerCannotDelete
+          : s.social.deleteAccountFailed.fill(
+              [e is PostgrestException ? e.message : e]);
+      messenger.showSnackBar(SnackBar(
+        content: Text(msg),
+        action: SnackBarAction(label: s.social.retry, onPressed: _deleteAccount),
+      ));
+    }
+  }
 
   Future<void> _checkForUpdates() async {
     setState(() => _checkingUpdate = true);
@@ -117,6 +210,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
               ],
+
+              const Divider(height: 40),
+              _sectionHeader(s.social.privacyData),
+              ListTile(
+                leading: Icon(Icons.policy_outlined, color: theme.colorScheme.primary),
+                title: Text(s.social.privacyPolicy),
+                subtitle: Text(s.social.privacyPolicySub),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen())),
+              ),
+              ListTile(
+                leading: _exporting
+                    ? const SizedBox(
+                        width: 24, height: 24,
+                        child: Padding(
+                          padding: EdgeInsets.all(2),
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ))
+                    : Icon(Icons.download_outlined, color: theme.colorScheme.primary),
+                title: Text(s.social.downloadMyData),
+                subtitle: Text(_exporting
+                    ? s.social.preparingExport
+                    : s.social.downloadMyDataSub),
+                enabled: !_exporting,
+                onTap: _exportData,
+              ),
+              ListTile(
+                leading: Icon(Icons.delete_forever_outlined,
+                    color: theme.colorScheme.error),
+                title: Text(s.social.deleteAccount,
+                    style: TextStyle(color: theme.colorScheme.error)),
+                subtitle: Text(s.social.deleteAccountSub),
+                onTap: _deleteAccount,
+              ),
 
               const Divider(height: 40),
               // Preview card removed — it didn't show anything the live
@@ -247,3 +375,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
+
+
+/// Strong confirmation: the user has to type their username.
+class _DeleteAccountDialog extends StatefulWidget {
+  final String username;
+  const _DeleteAccountDialog({required this.username});
+
+  @override
+  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
+  final _ctrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final ok = AccountData.confirms(_ctrl.text, widget.username);
+
+    return AlertDialog(
+      icon: Icon(Icons.warning_amber_rounded, color: scheme.error),
+      title: Text(s.social.deleteAccountTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(s.social.deleteAccountBody),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _ctrl,
+            autofocus: true,
+            autocorrect: false,
+            decoration: InputDecoration(
+              labelText: s.social.typeUsernameToConfirm.fill(['@${widget.username}']),
+              prefixText: '@',
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(s.cancel),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: scheme.error,
+            foregroundColor: scheme.onError,
+          ),
+          onPressed: ok ? () => Navigator.pop(context, true) : null,
+          child: Text(s.social.deleteForever),
+        ),
+      ],
+    );
+  }
+}
