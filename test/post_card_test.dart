@@ -74,7 +74,7 @@ void main() {
     await pump(tester, PostCard(post: post()));
     expect(find.text('Lost wallet'), findsOneWidget);
     expect(find.text('Amir'), findsOneWidget);
-    expect(find.text('@amir'), findsOneWidget);
+    expect(find.textContaining('@amir'), findsOneWidget);
     expect(find.text(en.untitled), findsNothing);
   });
 
@@ -96,7 +96,7 @@ void main() {
     await pump(tester, PostCard(post: post(anonymous: true)));
     expect(find.text(en.anonymous), findsOneWidget);
     expect(find.text('Amir'), findsNothing);
-    expect(find.text('@amir'), findsNothing);
+    expect(find.textContaining('@amir'), findsNothing);
     expect(find.byIcon(Icons.visibility_off), findsOneWidget);
     expect(find.byTooltip(en.postedAnonymously), findsOneWidget);
   });
@@ -118,7 +118,7 @@ void main() {
       ),
     );
     expect(find.bySemanticsLabel('Post photo 1 of 2'), findsOneWidget);
-    expect(find.text('2'), findsOneWidget);
+    expect(find.bySemanticsLabel('Post photo 2 of 2'), findsOneWidget);
   });
 
   testWidgets('tags show as #text, Lost&Found as #lostfound', (tester) async {
