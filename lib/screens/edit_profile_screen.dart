@@ -80,7 +80,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _pickImage(bool isAvatar) async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery);
+    final picked = await picker.pickImage(source: ImageSource.gallery, maxWidth: kPhotoMaxDimension, maxHeight: kPhotoMaxDimension, imageQuality: kPhotoQuality);
     if (picked == null) return;
 
     var img = await LocalImage.fromXFile(picked);
@@ -155,7 +155,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         await supabase.storage.from('images').uploadBinary(
               path,
               bytesToUpload,
-              fileOptions: const FileOptions(contentType: 'image/jpeg'),
+              fileOptions: FileOptions(contentType: imageContentType(bytesToUpload)),
             );
         newAvatarUrl = supabase.storage.from('images').getPublicUrl(path);
       }
@@ -166,7 +166,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         await supabase.storage.from('images').uploadBinary(
               uniquePath,
               bytesToUpload,
-              fileOptions: const FileOptions(contentType: 'image/jpeg'),
+              fileOptions: FileOptions(contentType: imageContentType(bytesToUpload)),
             );
         newQrUrl = supabase.storage.from('images').getPublicUrl(uniquePath);
       }

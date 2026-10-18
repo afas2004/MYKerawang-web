@@ -10,6 +10,7 @@ import '../utils/adaptive.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../utils/responsive.dart';
+import '../services/update_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -24,6 +25,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _eventReminders = true;
   bool _marketplaceUpdates = false;
   bool _isLoading = true;
+  bool _checkingUpdate = false;
 
   final _supabase = Supabase.instance.client;
 
@@ -70,6 +72,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error saving setting: $e")));
       }
+    }
+  }
+
+  Future<void> _checkForUpdates() async {
+    setState(() => _checkingUpdate = true);
+    final newer = await UpdateService.instance.check();
+    if (!mounted) return;
+    setState(() => _checkingUpdate = false);
+    // When newer, the button itself turns into "Update"; only confirm the no-op case.
+    if (!newer) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<LanguageCubit>().state.strings.upToDate)));
     }
   }
 
@@ -202,10 +215,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 10),
               Center(
-                child: Text("Version 1.0.1", // keep in sync with pubspec.yaml
+                child: Text(
+                    UpdateService.isSupported
+                        ? "Version ${UpdateService.appVersion} · build ${UpdateService.buildId}"
+                        : "Version ${UpdateService.appVersion}",
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant)),
               ),
+              if (UpdateService.isSupported)
+                Center(
+                  child: ValueListenableBuilder<bool>(
+                    valueListenable: UpdateService.instance.updateAvailable,
+                    builder: (context, available, _) => available
+                        ? FilledButton.icon(
+                            onPressed: UpdateService.instance.applyUpdate,
+                            icon: const Icon(Icons.system_update),
+                            label: Text(context.l10n.updateNow),
+                          )
+                        : TextButton.icon(
+                            onPressed: _checkingUpdate ? null : _checkForUpdates,
+                            icon: _checkingUpdate
+                                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                : const Icon(Icons.refresh),
+                            label: Text(context.l10n.checkForUpdates),
+                          ),
+                  ),
+                ),
             ],
           )),
     );

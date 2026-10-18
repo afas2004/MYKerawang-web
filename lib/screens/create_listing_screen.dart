@@ -79,13 +79,13 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     final picker = ImagePicker();
     try {
       if (source == ImageSource.camera) {
-        final XFile? picked = await picker.pickImage(source: ImageSource.camera);
+        final XFile? picked = await picker.pickImage(source: ImageSource.camera, maxWidth: kPhotoMaxDimension, maxHeight: kPhotoMaxDimension, imageQuality: kPhotoQuality);
         if (picked != null) {
           final img = await LocalImage.fromXFile(picked);
           setState(() => _mediaItems.add(img));
         }
       } else {
-        final List<XFile> pickedList = await picker.pickMultiImage();
+        final List<XFile> pickedList = await picker.pickMultiImage(maxWidth: kPhotoMaxDimension, maxHeight: kPhotoMaxDimension, imageQuality: kPhotoQuality);
         if (pickedList.isNotEmpty) {
           final imgs = await Future.wait(pickedList.map(LocalImage.fromXFile));
           setState(() {
@@ -152,7 +152,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
           await _supabase.storage.from('images').uploadBinary(
                 path,
                 compressed,
-                fileOptions: const FileOptions(contentType: 'image/jpeg'),
+                fileOptions: FileOptions(contentType: imageContentType(compressed)),
               );
           url = _supabase.storage.from('images').getPublicUrl(path);
         } else {

@@ -57,6 +57,7 @@ class UniversalCard extends StatelessWidget {
                 child: image != null
                     ? CachedNetworkImage(
                         imageUrl: image,
+                        memCacheWidth: 600,
                         fit: BoxFit.cover,
                         placeholder: (context, url) => Container(color: theme.colorScheme.surfaceContainerHighest),
                         errorWidget: (context, url, error) => Container(

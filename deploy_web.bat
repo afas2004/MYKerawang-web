@@ -6,12 +6,20 @@ echo  MYKerawang - Build and deploy to Firebase
 echo ============================================
 echo.
 
-echo [1/2] Building release web bundle (wasm)...
+REM Unique stamp per deploy. Compiled into the app (BUILD_ID) and written to
+REM build\web\build.json; the app polls that file and offers "Update" when
+REM they differ (lib/services/update_service.dart).
+for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMddHHmm"') do set BUILD_ID=%%i
+
+echo [1/2] Building release web bundle (wasm), build %BUILD_ID%...
 REM --wasm adds the skwasm renderer with an automatic canvaskit fallback.
 REM Required for iOS: plain "flutter build web" leaves iOS WebKit on a white
 REM screen. (--web-renderer html no longer exists in current Flutter.)
-call flutter build web --release --wasm
+REM --pwa-strategy=none replaces Flutter's offline-first service worker, which
+REM served cached (stale) app code to returning phones after every deploy.
+call flutter build web --release --wasm --pwa-strategy=none --dart-define=BUILD_ID=%BUILD_ID%
 if errorlevel 1 goto :error
+> build\web\build.json echo {"build_id":"%BUILD_ID%"}
 
 echo.
 echo [2/2] Deploying to Firebase Hosting...
@@ -26,8 +34,8 @@ echo.
 echo  Reminders:
 echo   * Add that URL to Supabase Auth - Redirect URLs
 echo     (and Site URL) or Google login will fail.
-echo   * Hard-refresh (Ctrl+Shift+R) to bypass the
-echo     old service worker after each deploy.
+echo   * Open users get an "Update" prompt within
+echo     15 minutes (or Settings - Check for updates).
 echo ============================================
 goto :eof
 

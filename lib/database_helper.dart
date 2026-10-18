@@ -1,10 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
-// NOTE: sqflite does not support web. On web the cache is simply skipped —
-// the app falls back to fetching directly from Supabase, which is fine
-// because this DB is only an offline cache.
+// NOTE: sqflite does not support web. On web the lists are cached as JSON in
+// shared_preferences (localStorage) instead, so a returning phone paints the
+// Events/Market tabs instantly while the realtime stream catches up.
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -55,7 +58,7 @@ class DatabaseHelper {
 
   // UPSERT METHODS (Save Supabase data to local phone)
   Future<void> cacheListings(List<Map<String, dynamic>> items) async {
-    if (kIsWeb) return; // No local cache on web
+    if (kIsWeb) return _webWrite(_webListingsKey, items);
     final db = await instance.database;
     await db.transaction((txn) async {
       await txn.delete('listings'); // Clear old cache
@@ -75,7 +78,7 @@ class DatabaseHelper {
   }
 
   Future<void> cacheEvents(List<Map<String, dynamic>> items) async {
-    if (kIsWeb) return; // No local cache on web
+    if (kIsWeb) return _webWrite(_webEventsKey, items);
     final db = await instance.database;
     await db.transaction((txn) async {
       await txn.delete('events');
@@ -93,14 +96,38 @@ class DatabaseHelper {
   }
 
   Future<List<Map<String, dynamic>>> getCachedListings() async {
-    if (kIsWeb) return []; // No local cache on web
+    if (kIsWeb) return _webRead(_webListingsKey);
     final db = await instance.database;
     return await db.query('listings');
   }
 
   Future<List<Map<String, dynamic>>> getCachedEvents() async {
-    if (kIsWeb) return []; // No local cache on web
+    if (kIsWeb) return _webRead(_webEventsKey);
     final db = await instance.database;
     return await db.query('events');
+  }
+
+  // --- WEB (shared_preferences / localStorage) ---
+  static const _webListingsKey = 'cache_listings_v1';
+  static const _webEventsKey = 'cache_events_v1';
+
+  Future<void> _webWrite(String key, List<Map<String, dynamic>> items) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(key, jsonEncode(items));
+    } catch (_) {
+      // Quota exceeded / storage blocked (private mode) — cache is optional.
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _webRead(String key) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(key);
+      if (raw == null) return [];
+      return List<Map<String, dynamic>>.from(jsonDecode(raw) as List);
+    } catch (_) {
+      return [];
+    }
   }
 }

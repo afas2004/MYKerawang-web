@@ -168,6 +168,7 @@ class _EventsViewState extends State<EventsView> {
                                             children: [
                                           CachedNetworkImage(
                                               imageUrl: event['image_url'] ?? '',
+                                              memCacheWidth: 900, // decode at card size, not camera size
                                               fadeInDuration: Duration.zero,
                                               fadeOutDuration: Duration.zero,
                                               height: 180,

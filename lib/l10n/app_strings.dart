@@ -79,6 +79,10 @@ class AppStrings {
   final String threadTitle;
   final String notificationsTitle;
   final String settingsTitle;
+  final String updateAvailable;
+  final String updateNow;
+  final String checkForUpdates;
+  final String upToDate;
   final String noNotifications;
   final String comments;
   final String whatsOnYourMind;
@@ -161,6 +165,10 @@ class AppStrings {
     required this.threadTitle,
     required this.notificationsTitle,
     required this.settingsTitle,
+    required this.updateAvailable,
+    required this.updateNow,
+    required this.checkForUpdates,
+    required this.upToDate,
     required this.noNotifications,
     required this.comments,
     required this.whatsOnYourMind,
@@ -242,6 +250,10 @@ class AppStrings {
     threadTitle: "Thread",
     notificationsTitle: "Notifications",
     settingsTitle: "Settings",
+    updateAvailable: "A new version of MYKerawang is available",
+    updateNow: "Update",
+    checkForUpdates: "Check for updates",
+    upToDate: "You're on the latest version",
     noNotifications: "No new notifications",
     comments: "Comments",
     whatsOnYourMind: "What's on your mind?",
@@ -323,6 +335,10 @@ class AppStrings {
     threadTitle: "Bicara",
     notificationsTitle: "Notifikasi",
     settingsTitle: "Tetapan",
+    updateAvailable: "Versi baharu MYKerawang tersedia",
+    updateNow: "Kemas kini",
+    checkForUpdates: "Semak kemas kini",
+    upToDate: "Anda menggunakan versi terkini",
     noNotifications: "Tiada notifikasi baru",
     comments: "Komen",
     whatsOnYourMind: "Apa dalam fikiran anda?",
@@ -404,6 +420,10 @@ class AppStrings {
     threadTitle: "スレッド",
     notificationsTitle: "通知",
     settingsTitle: "設定",
+    updateAvailable: "MYKerawangの新しいバージョンがあります",
+    updateNow: "更新",
+    checkForUpdates: "アップデートを確認",
+    upToDate: "最新バージョンです",
     noNotifications: "新しい通知はありません",
     comments: "コメント",
     whatsOnYourMind: "いま何してる？",

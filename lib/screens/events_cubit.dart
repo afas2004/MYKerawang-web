@@ -78,6 +78,7 @@ class EventsCubit extends Cubit<EventsState> {
         .from('events')
         .stream(primaryKey: ['id'])
         .order('created_at', ascending: false)
+        .limit(200) // newest 200 — not the whole table over mobile data
         .listen((data) async {
           final items = List<Map<String, dynamic>>.from(data);
           

@@ -82,7 +82,7 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/MyKerawang.png
+    - assets/logo_mark.jpg # 600px centre crop of MyKerawang.png (kept as source art)
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
