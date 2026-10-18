@@ -22,6 +22,7 @@ import '../utils/formatters.dart';
 import '../utils/guest_access.dart';
 import '../utils/responsive.dart';
 import '../widgets/kerawang_motif.dart';
+import '../widgets/lattice_placeholder.dart';
 import '../widgets/shell_actions.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -786,38 +787,10 @@ class _CoverBand extends StatelessWidget {
     return ExcludeSemantics(
       child: DecoratedBox(
         decoration: BoxDecoration(color: color),
-        child: CustomPaint(painter: _LatticePainter(motif)),
+        child: LatticePlaceholder(color: motif),
       ),
     );
   }
-}
-
-class _LatticePainter extends CustomPainter {
-  final Color color;
-  _LatticePainter(this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color.withValues(alpha: 0.35)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    const cell = 24.0;
-    for (double y = 0; y < size.height + cell; y += cell) {
-      for (double x = 0; x < size.width + cell; x += cell) {
-        final path = Path()
-          ..moveTo(x, y - cell / 2)
-          ..lineTo(x + cell / 2, y)
-          ..lineTo(x, y + cell / 2)
-          ..lineTo(x - cell / 2, y)
-          ..close();
-        canvas.drawPath(path, paint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_LatticePainter old) => old.color != color;
 }
 
 class _TabBarDelegate extends SliverPersistentHeaderDelegate {

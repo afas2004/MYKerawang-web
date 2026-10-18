@@ -3,7 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../l10n/app_strings.dart';
+import '../l10n/shell_strings.dart';
 import '../l10n/social_strings.dart';
+import '../theme/app_themes.dart';
+import '../widgets/kerawang_motif.dart';
+import '../widgets/lattice_placeholder.dart';
+import '../widgets/shell_actions.dart';
 import '../language_cubit.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -173,18 +178,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final scheme = theme.colorScheme;
     final s = context.l10n;
 
-    return Scaffold(
-      appBar: AppBar(title: Text(s.welcomeTitle), automaticallyImplyLeading: false),
-      body: Form(
+    final form = Form(
         key: _formKey,
         child: Column(
           children: [
-            // PROGRESS BAR
-            LinearProgressIndicator(
-              value: _step == 0 ? 0.5 : 1.0, 
-              backgroundColor: theme.colorScheme.surfaceContainer,
-            ),
-            
+            _StepHeader(step: _step, total: 2),
+
             Expanded(
               child: PageView(
                 physics: const NeverScrollableScrollPhysics(), // Disable swipe
@@ -324,6 +323,99 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ],
         ),
+      );
+
+    // Phone: full screen. ≥ 600: a centred card on a lattice backdrop.
+    return Scaffold(
+      body: LayoutBuilder(builder: (context, c) {
+        if (c.maxWidth < 600) return SafeArea(child: form);
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            ExcludeSemantics(
+              child: ColoredBox(
+                color: scheme.surfaceContainerLow,
+                child: LatticePlaceholder(color: scheme.tertiary, cell: 32, opacity: 0.18),
+              ),
+            ),
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520, maxHeight: 760),
+                  child: Material(
+                    color: theme.scaffoldBackgroundColor,
+                    elevation: 1,
+                    clipBehavior: Clip.antiAlias,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: kerawangCut,
+                      side: BorderSide(color: scheme.outlineVariant),
+                    ),
+                    child: form,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      }),
+    );
+  }
+}
+
+/// Wordmark, motif and a two-segment progress bar with "Step n of m".
+class _StepHeader extends StatelessWidget {
+  final int step;
+  final int total;
+  const _StepHeader({required this.step, required this.total});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final s = context.l10n;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Flexible(child: Wordmark(fontSize: 22)),
+              const SizedBox(width: 12),
+              const KerawangDivider(size: 6),
+              const Spacer(),
+              const SizedBox(width: 12),
+              Text(s.shell.stepOf.fill([step + 1, total]),
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(color: scheme.onSurfaceVariant)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Semantics(
+            label: s.shell.stepOf.fill([step + 1, total]),
+            child: Row(
+              children: [
+                for (var i = 0; i < total; i++) ...[
+                  if (i > 0) const SizedBox(width: 6),
+                  Expanded(
+                    child: AnimatedContainer(
+                      duration: reduceMotion
+                          ? Duration.zero
+                          : const Duration(milliseconds: 250),
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: i <= step ? scheme.primary : scheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

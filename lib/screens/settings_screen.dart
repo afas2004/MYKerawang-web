@@ -173,7 +173,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                     child: SizedBox(
-                      height: 110,
+                      height: 120,
                       child: ListView(
                         scrollDirection: Axis.horizontal,
                         children: AppTheme.values
@@ -356,15 +356,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
               const Spacer(),
+              // Flexible + ellipsis: long taglines or large text sizes
+              // must not overflow the fixed-height card.
               Text(spec.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 13,
                       color: spec.text)),
-              Text(_tagline(context, theme),
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: spec.text.withValues(alpha: 0.6))),
+              Flexible(
+                child: Text(_tagline(context, theme),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: spec.text.withValues(alpha: 0.6))),
+              ),
             ],
           ),
         ),

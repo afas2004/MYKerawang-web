@@ -131,6 +131,9 @@ class Wordmark extends StatelessWidget {
     final theme = Theme.of(context);
     return Text(
       AppStrings.appName,
+      maxLines: 1,
+      softWrap: false,
+      overflow: TextOverflow.fade,
       style: theme.textTheme.headlineSmall?.copyWith(
         fontSize: fontSize,
         fontWeight: FontWeight.w600,
