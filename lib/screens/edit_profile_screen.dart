@@ -11,10 +11,9 @@ import '../widgets/image_crop_dialog.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/shell_strings.dart';
 import '../l10n/social_strings.dart';
-import '../theme/app_themes.dart';
+import '../widgets/brand/brand.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
-import '../utils/responsive.dart';
 import 'profile_cubit.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -516,13 +515,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 Center(
                   child: InkWell(
                     onTap: () => _pickImage(false),
-                    borderRadius: kerawangCut,
+                    borderRadius: KRadius.cut,
                     child: Container(
                       height: 200,
                       width: 200,
                       decoration: BoxDecoration(
                         border: Border.all(color: theme.colorScheme.outlineVariant),
-                        borderRadius: kerawangCut,
+                        borderRadius: KRadius.cut,
                         color: theme.colorScheme.surfaceContainerHighest,
                         image: _qrFile != null
                             ? DecorationImage(image: MemoryImage(_qrFile!.bytes), fit: BoxFit.contain)
@@ -571,7 +570,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(48),
-                  shape: const RoundedRectangleBorder(borderRadius: kerawangCut),
+                  shape: const RoundedRectangleBorder(borderRadius: KRadius.cut),
                 ),
                 onPressed: _isSaving ? null : _save,
                 icon: _isSaving
@@ -623,7 +622,7 @@ class _FormSection extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
-        borderRadius: kerawangCut,
+        borderRadius: KRadius.cut,
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(

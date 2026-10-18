@@ -16,13 +16,10 @@ import '../l10n/social_strings.dart';
 import '../widgets/post_card.dart';
 import '../widgets/saved_items_view.dart';
 import '../widgets/status_badge.dart';
-import '../widgets/tap_card.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../utils/formatters.dart';
 import '../utils/guest_access.dart';
-import '../utils/responsive.dart';
-import '../widgets/kerawang_motif.dart';
-import '../widgets/lattice_placeholder.dart';
+import '../widgets/brand/brand.dart';
 import '../widgets/shell_actions.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -417,7 +414,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     const coverHeight = 96.0;
     const avatarRadius = 44.0;
 
-    return Column(
+    return OfficialFrame(
+      enabled: official,
+      borderRadius: BorderRadius.zero,
+      semanticLabel: roleLabel(s, p['role']),
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(
@@ -427,7 +428,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             children: [
               Positioned.fill(
                 bottom: avatarRadius,
-                child: _CoverBand(color: scheme.primaryContainer, motif: scheme.tertiary),
+                child: _CoverBand(
+                    color: scheme.primaryContainer,
+                    motif: KTokens.of(context).motif),
               ),
               Positioned(
                 left: 16,
@@ -445,8 +448,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                       padding: const EdgeInsets.all(3),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        // Gold ring = official (verified or club).
-                        color: official ? scheme.tertiary : theme.scaffoldBackgroundColor,
+                        // Gold ring = official (verified or club). Decorative
+                        // gold, so the token, not tertiary.
+                        color: official
+                            ? KTokens.of(context).gold
+                            : theme.scaffoldBackgroundColor,
                       ),
                       child: CircleAvatar(
                         radius: avatarRadius,
@@ -525,11 +531,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: KSpace.l),
             ],
           ),
         ),
       ],
+      ),
     );
   }
 
@@ -567,7 +574,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       // Scheme roles so it reads on Songket Noir too
       style: FilledButton.styleFrom(
         minimumSize: minSize,
-        shape: const RoundedRectangleBorder(borderRadius: kerawangCut),
+        shape: const RoundedRectangleBorder(borderRadius: KRadius.cut),
         backgroundColor:
             _isFollowing ? scheme.surfaceContainerHighest : scheme.primary,
         foregroundColor: _isFollowing ? scheme.onSurface : scheme.onPrimary,
@@ -617,7 +624,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   /// page widens.
   Widget _tileGrid(List<dynamic> items, {required bool isEvent}) {
     return LayoutBuilder(builder: (context, c) {
-      final cols = Responsive.gridColumns(c.maxWidth - 32, minTileWidth: 180);
+      final cols = Responsive.gridColumnsFor(c.maxWidth - 2 * KSpace.l);
       return GridView.builder(
         padding: const EdgeInsets.all(16),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -653,9 +660,11 @@ class _ProfileTile extends StatelessWidget {
         ? (ended ? s.ended : null)
         : (item['is_sold'] == true ? s.sold : null);
 
-    return TapCard(
-      borderRadius: kerawangCut,
+    return KCard(
+      padding: EdgeInsets.zero,
+      borderRadius: KRadius.cut,
       color: scheme.surfaceContainerLow,
+      semanticLabel: '${item['title'] ?? s.untitled}, $subtitle',
       onTap: () => isEvent ? context.goEvent(item) : context.goItem(item),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -767,7 +776,7 @@ class _RoleChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        borderRadius: kerawangCut,
+        borderRadius: KRadius.cut,
         border: Border.all(color: c),
       ),
       child: Text(label, style: theme.textTheme.labelMedium?.copyWith(color: c)),
@@ -776,7 +785,7 @@ class _RoleChip extends StatelessWidget {
 }
 
 /// Colour band with a faint lattice — the "carved panel" the profile sits
-/// in. Swap the painter for foundation's LatticeBand when it lands.
+/// in.
 class _CoverBand extends StatelessWidget {
   final Color color;
   final Color motif;
@@ -787,7 +796,9 @@ class _CoverBand extends StatelessWidget {
     return ExcludeSemantics(
       child: DecoratedBox(
         decoration: BoxDecoration(color: color),
-        child: LatticePlaceholder(color: motif),
+        // No text sits on the band, so the field can be a little stronger
+        // than the default background opacity.
+        child: KerawangLattice(color: motif, tileSize: 22, opacity: 0.22),
       ),
     );
   }
@@ -826,26 +837,8 @@ class _TabEmpty extends StatelessWidget {
   const _TabEmpty({required this.icon, required this.text});
 
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 48, color: scheme.onSurfaceVariant),
-            const SizedBox(height: 12),
-            Text(text,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: scheme.onSurfaceVariant)),
-            const SizedBox(height: 12),
-            const KerawangDivider(),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      BrandEmptyState(icon: icon, title: text, compact: true);
 }
 
 class _ErrorRetry extends StatelessWidget {
@@ -855,53 +848,43 @@ class _ErrorRetry extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = context.l10n;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.wifi_off, size: 48, color: Theme.of(context).colorScheme.onSurfaceVariant),
-          const SizedBox(height: 12),
-          Text(s.connectionError),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh),
-            label: Text(s.tryAgain),
-          ),
-        ],
-      ),
+    return BrandEmptyState(
+      icon: Icons.wifi_off,
+      title: s.connectionError,
+      actionLabel: s.tryAgain,
+      onAction: onRetry,
     );
   }
 }
 
-/// Loading placeholder shaped like the header. Swap for KSkeleton.
+/// Loading placeholder shaped like the header.
 class _ProfileSkeleton extends StatelessWidget {
   const _ProfileSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    final c = Theme.of(context).colorScheme.surfaceContainerHighest;
-    Widget bar(double w, double h) => Container(
-          width: w,
-          height: h,
-          decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(6)),
-        );
     return ListView(
       physics: const NeverScrollableScrollPhysics(),
-      children: [
-        Container(height: 96, color: c.withValues(alpha: 0.6)),
+      children: const [
+        KSkeleton(height: 96, borderRadius: BorderRadius.zero),
         Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(KSpace.l),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(radius: 44, backgroundColor: c),
-              const SizedBox(height: 12),
-              bar(180, 22),
-              const SizedBox(height: 8),
-              bar(120, 14),
-              const SizedBox(height: 16),
-              Row(children: [bar(90, 40), const SizedBox(width: 8), bar(110, 40), const SizedBox(width: 8), bar(110, 40)]),
+              KSkeleton.circle(size: 88),
+              SizedBox(height: KSpace.m),
+              KSkeleton(width: 180, height: 22),
+              SizedBox(height: KSpace.s),
+              KSkeleton(width: 120, height: 14),
+              SizedBox(height: KSpace.l),
+              Row(children: [
+                KSkeleton(width: 90, height: 40),
+                SizedBox(width: KSpace.s),
+                KSkeleton(width: 110, height: 40),
+                SizedBox(width: KSpace.s),
+                KSkeleton(width: 110, height: 40),
+              ]),
             ],
           ),
         ),

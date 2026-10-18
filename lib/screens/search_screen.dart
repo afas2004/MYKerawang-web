@@ -9,6 +9,7 @@ import '../language_cubit.dart';
 import '../utils/app_nav.dart';
 import '../utils/formatters.dart';
 import '../utils/roles.dart';
+import '../widgets/brand/brand.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/tap_card.dart';
 
@@ -406,11 +407,8 @@ class _SearchScreenState extends State<SearchScreen> {
         icon: Icons.wifi_off,
         title: s.connectionError,
         body: '',
-        action: FilledButton.icon(
-          onPressed: _performSearch,
-          icon: const Icon(Icons.refresh),
-          label: Text(s.tryAgain),
-        ),
+        actionLabel: s.tryAgain,
+        onAction: _performSearch,
       );
     }
 
@@ -639,73 +637,48 @@ class _SectionTitle extends StatelessWidget {
   final String title;
   final String action;
   final VoidCallback onAction;
-  final EdgeInsets padding;
+  final EdgeInsetsGeometry padding;
 
   const _SectionTitle({
     required this.title,
     required this.action,
     required this.onAction,
-    this.padding = const EdgeInsets.fromLTRB(16, 4, 8, 4),
+    this.padding = const EdgeInsets.fromLTRB(KSpace.l, KSpace.xs, KSpace.s, KSpace.xs),
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: padding,
-      child: Row(
-        children: [
-          Expanded(
-            child: Semantics(
-              header: true,
-              child: Text(title, style: Theme.of(context).textTheme.titleMedium),
-            ),
-          ),
-          TextButton(onPressed: onAction, child: Text(action)),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => SectionHeader(
+        title: title,
+        seeAllLabel: action,
+        onSeeAll: onAction,
+        padding: padding,
+      );
 }
 
-/// Prompt / no-results / error message. Swap for BrandEmptyState.
+/// Prompt / no-results / error message.
 class _SearchMessage extends StatelessWidget {
   final IconData icon;
   final String title;
   final String body;
-  final Widget? action;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   const _SearchMessage({
     required this.icon,
     required this.title,
     required this.body,
-    this.action,
+    this.actionLabel,
+    this.onAction,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 56, color: scheme.onSurfaceVariant),
-            const SizedBox(height: 16),
-            Text(title, textAlign: TextAlign.center, style: theme.textTheme.titleMedium),
-            if (body.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(body,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant)),
-            ],
-            if (action != null) ...[const SizedBox(height: 16), action!],
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => BrandEmptyState(
+        icon: icon,
+        title: title,
+        message: body.isEmpty ? null : body,
+        actionLabel: actionLabel,
+        onAction: onAction,
+      );
 }
 
 class _SearchSkeleton extends StatelessWidget {
@@ -713,15 +686,13 @@ class _SearchSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = Theme.of(context).colorScheme.surfaceContainerHighest;
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(KSpace.l),
       physics: const NeverScrollableScrollPhysics(),
       itemCount: 5,
-      itemBuilder: (_, __) => Container(
-        height: 100,
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(12)),
+      itemBuilder: (_, __) => const Padding(
+        padding: EdgeInsets.only(bottom: KSpace.m),
+        child: KSkeleton(height: 100, borderRadius: KRadius.card),
       ),
     );
   }

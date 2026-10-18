@@ -5,9 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/shell_strings.dart';
 import '../l10n/social_strings.dart';
-import '../theme/app_themes.dart';
 import '../widgets/kerawang_motif.dart';
-import '../widgets/lattice_placeholder.dart';
+import '../widgets/brand/brand.dart';
 import '../widgets/shell_actions.dart';
 import '../language_cubit.dart';
 
@@ -335,7 +334,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ExcludeSemantics(
               child: ColoredBox(
                 color: scheme.surfaceContainerLow,
-                child: LatticePlaceholder(color: scheme.tertiary, cell: 32, opacity: 0.18),
+                child: const KerawangLattice(tileSize: 28),
               ),
             ),
             Center(
@@ -348,7 +347,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     elevation: 1,
                     clipBehavior: Clip.antiAlias,
                     shape: RoundedRectangleBorder(
-                      borderRadius: kerawangCut,
+                      borderRadius: KRadius.cut,
                       side: BorderSide(color: scheme.outlineVariant),
                     ),
                     child: form,
@@ -374,7 +373,6 @@ class _StepHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final s = context.l10n;
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
       child: Column(
@@ -401,9 +399,8 @@ class _StepHeader extends StatelessWidget {
                   if (i > 0) const SizedBox(width: 6),
                   Expanded(
                     child: AnimatedContainer(
-                      duration: reduceMotion
-                          ? Duration.zero
-                          : const Duration(milliseconds: 250),
+                      duration: KMotion.of(context).slow,
+                      curve: KMotion.curve,
                       height: 6,
                       decoration: BoxDecoration(
                         color: i <= step ? scheme.primary : scheme.surfaceContainerHighest,

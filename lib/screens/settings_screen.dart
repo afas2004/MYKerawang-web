@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mykerawang/theme_cubit.dart';
 import '../theme/app_themes.dart';
+import '../widgets/brand/brand.dart';
 import '../utils/adaptive.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
@@ -14,7 +15,6 @@ import '../l10n/social_strings.dart';
 import '../services/account_data.dart';
 import 'privacy_policy_screen.dart';
 import 'profile_cubit.dart';
-import '../utils/responsive.dart';
 import '../services/update_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -330,13 +330,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       padding: const EdgeInsets.only(right: 10),
       child: InkWell(
         onTap: () => context.read<ThemeCubit>().changeTheme(theme),
-        borderRadius: kerawangCut,
+        borderRadius: KRadius.cut,
         child: Container(
           width: 140,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: spec.surface,
-            borderRadius: kerawangCut,
+            borderRadius: KRadius.cut,
             border: Border.all(
               color: selected ? scheme.primary : spec.border,
               width: selected ? 2.5 : 1,
@@ -436,7 +436,7 @@ class _SettingsGroup extends StatelessWidget {
             color: scheme.surfaceContainerLow,
             clipBehavior: Clip.antiAlias,
             shape: RoundedRectangleBorder(
-              borderRadius: kerawangCut,
+              borderRadius: KRadius.cut,
               side: BorderSide(color: scheme.outlineVariant),
             ),
             child: Column(

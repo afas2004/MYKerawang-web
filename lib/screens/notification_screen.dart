@@ -8,9 +8,8 @@ import '../language_cubit.dart';
 import '../services/unread_notifications.dart';
 import '../utils/formatters.dart';
 import '../utils/adaptive.dart';
-import '../utils/responsive.dart';
 import '../utils/roles.dart';
-import '../widgets/kerawang_motif.dart';
+import '../widgets/brand/brand.dart';
 
 /// Icon per notification type so the list is scannable.
 IconData _iconFor(String? type) => switch (type) {
@@ -424,7 +423,7 @@ NotifBucket notificationBucket(DateTime when, DateTime now) {
   return NotifBucket.earlier;
 }
 
-/// Empty / signed-out / error state. Swap for foundation's BrandEmptyState.
+/// Empty / signed-out / error state.
 class _NotifEmpty extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -436,31 +435,8 @@ class _NotifEmpty extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 56, color: scheme.onSurfaceVariant),
-            const SizedBox(height: 16),
-            Text(title,
-                textAlign: TextAlign.center, style: theme.textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(body,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: scheme.onSurfaceVariant)),
-            const SizedBox(height: 16),
-            const KerawangDivider(),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      BrandEmptyState(icon: icon, title: title, message: body.isEmpty ? null : body);
 }
 
 class _NotifSkeleton extends StatelessWidget {
@@ -468,33 +444,17 @@ class _NotifSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = Theme.of(context).colorScheme.surfaceContainerHighest;
-    Widget bar(double w, double h) => Container(
-          width: w,
-          height: h,
-          decoration:
-              BoxDecoration(color: c, borderRadius: BorderRadius.circular(6)),
-        );
     return ListView.builder(
       physics: const NeverScrollableScrollPhysics(),
       itemCount: 6,
       itemBuilder: (_, __) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, KSpace.m),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(backgroundColor: c),
-            const SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                bar(160, 14),
-                const SizedBox(height: 6),
-                bar(220, 12),
-                const SizedBox(height: 6),
-                bar(60, 10),
-              ],
-            ),
+            const KSkeleton.circle(),
+            const SizedBox(width: KSpace.l),
+            Expanded(child: KSkeleton.lines(3)),
           ],
         ),
       ),
