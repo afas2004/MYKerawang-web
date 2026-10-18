@@ -193,8 +193,7 @@ class EmbedCard extends StatelessWidget {
                       title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w600),
+                      style: theme.textTheme.titleLarge,
                     ),
                     if (contextLine.isNotEmpty) ...[
                       const SizedBox(height: 2),
@@ -213,8 +212,10 @@ class EmbedCard extends StatelessWidget {
                     const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
-                      child: FilledButton(
+                      child: FilledButton.tonal(
                         onPressed: onTap,
+                        style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(48)),
                         child: Text(isEvent ? s.viewEvent : s.viewItem),
                       ),
                     ),
