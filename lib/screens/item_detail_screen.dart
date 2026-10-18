@@ -34,6 +34,7 @@ class ItemDetailScreen extends StatefulWidget {
 class _ItemDetailScreenState extends State<ItemDetailScreen> {
   late Map<String, dynamic> _itemData;
   Map<String, dynamic>? _sellerProfile;
+  bool _loadingContact = false;
   int _currentImageIndex = 0; 
 
   @override
@@ -54,13 +55,11 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           .eq('id', _itemData['id'])
           .single();
 
-      // 2. Seller profile. Contact details (phone, payment QR) only for
-      // logged-in buyers; guests read the column-safe view.
+      // 2. Seller profile — public fields only. Phone and payment QR are
+      // fetched on demand by _showPurchaseDialog (get_listing_contact).
       final seller = await supabase
           .from(isLoggedIn ? 'profiles' : 'profiles_public')
-          .select(isLoggedIn
-              ? 'id, username, display_name, avatar_url, phone_number, payment_qr_url'
-              : 'id, username, display_name, avatar_url')
+          .select('id, username, display_name, avatar_url')
           .eq('id', freshItem['seller_id'])
           .maybeSingle();
 
@@ -137,11 +136,33 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   /// reminder to pay only once the deal is agreed.
   Future<void> _showPurchaseDialog() async {
     if (!requireLogin(context)) return;
-    if (_sellerProfile == null) return;
+    if (_loadingContact) return;
 
-    final qrUrl = _sellerProfile!['payment_qr_url'];
-    final phone = _sellerProfile!['phone_number'];
-    final sellerName = _sellerProfile!['username'] ?? context.l10nRead.seller;
+    // Contact details are private (profile_contacts) and only revealed —
+    // and logged — when a buyer asks for them here.
+    final Map<String, dynamic> contact;
+    setState(() => _loadingContact = true);
+    try {
+      final rows = await Supabase.instance.client
+          .rpc('get_listing_contact', params: {'p_listing_id': _itemData['id']});
+      final list = rows is List ? rows : const [];
+      contact = list.isEmpty ? <String, dynamic>{} : Map<String, dynamic>.from(list.first);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(context.l10nRead.errorWithDetail.fill([e]))));
+      }
+      return;
+    } finally {
+      if (mounted) setState(() => _loadingContact = false);
+    }
+    if (!mounted) return;
+
+    final qrUrl = contact['payment_qr_url'] as String?;
+    final phone = contact['phone_number'];
+    final sellerName = contact['username'] ??
+        _sellerProfile?['username'] ??
+        context.l10nRead.seller;
 
     // Track state LOCALLY inside this function logic
     bool showQr = false;
@@ -252,7 +273,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                               final ok = await saveImageBytes(
                                 response.bodyBytes,
                                 filename:
-                                    'duitnow-${_sellerProfile?['username'] ?? 'qr'}.jpg',
+                                    'duitnow-${contact['username'] ?? 'qr'}.jpg',
                               );
                               setModalState(() {
                                 isSaving = false;
@@ -531,7 +552,9 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
             // BUYER VIEW
             : ElevatedButton.icon(
                 onPressed: isSold ? null : _showPurchaseDialog, 
-                icon: const Icon(Icons.chat),
+                icon: _loadingContact
+                    ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onPrimary))
+                    : const Icon(Icons.chat),
                 label: Text(isSold ? s.sold : s.contactOrBuy),
                 // Sold = onPressed null, so the theme's disabled colours apply
                 style: ElevatedButton.styleFrom(
