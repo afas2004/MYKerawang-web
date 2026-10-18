@@ -15,7 +15,9 @@ import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
 import '../utils/file_saver.dart';
 import '../utils/formatters.dart';
+import '../utils/feedback.dart';
 import '../utils/guest_access.dart';
+import '../utils/listing_status.dart';
 import '../utils/roles.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/tap_card.dart';
@@ -35,7 +37,8 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   late Map<String, dynamic> _itemData;
   Map<String, dynamic>? _sellerProfile;
   bool _loadingContact = false;
-  int _currentImageIndex = 0; 
+  bool _savingStatus = false;
+int _currentImageIndex = 0; 
 
   @override
   void initState() {
@@ -74,31 +77,41 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     }
   }
 
-  // --- TOGGLE SOLD STATUS ---
-  Future<void> _toggleSoldStatus() async {
-    final currentStatus = _itemData['is_sold'] ?? false;
-    final newStatus = !currentStatus;
-
+  // --- LISTING STATUS (available / reserved / sold) ---
+  Future<void> _setStatus(ListingStatus next) async {
+    final previous = ListingStatus.of(_itemData);
+    if (next == previous || _savingStatus) return;
     final s = context.l10nRead;
 
-    // Optimistic Update
-    setState(() => _itemData['is_sold'] = newStatus);
+    // Optimistic; reverted on failure.
+    setState(() {
+      _savingStatus = true;
+      _itemData = {..._itemData, 'status': next.dbValue, 'is_sold': next == ListingStatus.sold};
+    });
 
     try {
+      // Both columns are written; the database trigger keeps them in
+      // sync either way (20261019002500_listing_status.sql).
       await Supabase.instance.client
           .from('listings')
-          .update({'is_sold': newStatus})
+          .update({'status': next.dbValue, 'is_sold': next == ListingStatus.sold})
           .eq('id', _itemData['id']);
-
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(newStatus ? s.markedSold : s.markedAvailable))
-      );
+      showSuccess(context, switch (next) {
+        ListingStatus.sold => s.markedSold,
+        ListingStatus.available => s.markedAvailable,
+        ListingStatus.reserved => s.statusUpdated,
+      });
     } catch (e) {
       if (!mounted) return;
-      // Revert if error
-      setState(() => _itemData['is_sold'] = currentStatus);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+      setState(() => _itemData = {
+            ..._itemData,
+            'status': previous.dbValue,
+            'is_sold': previous == ListingStatus.sold,
+          });
+      showErrorWithRetry(context, e, onRetry: () => _setStatus(next));
+    } finally {
+      if (mounted) setState(() => _savingStatus = false);
     }
   }
 
@@ -126,12 +139,12 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           popOrHome(context, true);
         }
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+        if (mounted) showErrorWithRetry(context, e, onRetry: _deleteItem);
       }
     }
   }
 
-  /// Contact sheet. Talking comes first: WhatsApp is the primary action,
+  /// Contact sheet.Talking comes first: WhatsApp is the primary action,
   /// and the seller's payment QR stays behind an explicit step with a
   /// reminder to pay only once the deal is agreed.
   Future<void> _showPurchaseDialog() async {
@@ -148,10 +161,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       final list = rows is List ? rows : const [];
       contact = list.isEmpty ? <String, dynamic>{} : Map<String, dynamic>.from(list.first);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(context.l10nRead.errorWithDetail.fill([e]))));
-      }
+      if (mounted) showErrorWithRetry(context, e, onRetry: _showPurchaseDialog);
       return;
     } finally {
       if (mounted) setState(() => _loadingContact = false);
@@ -317,7 +327,9 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   Widget build(BuildContext context) {
     final currentUser = Supabase.instance.client.auth.currentUser;
     final isOwner = currentUser != null && currentUser.id == _itemData['seller_id'];
-    final isSold = _itemData['is_sold'] == true;
+    final status = ListingStatus.of(_itemData);
+    final isSold = status == ListingStatus.sold;
+    final isReserved = status == ListingStatus.reserved;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final s = context.l10n;
@@ -375,12 +387,12 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                       );
                     },
                   ),
-                  if (isSold)
+                  if (status.badge(s) != null)
                     Positioned.fill(
                       child: IgnorePointer(
                         child: Container(
-                          color: photoScrim(0.4),
-                          child: Center(child: StatusBadge.stamp(s.sold)),
+                          color: photoScrim(isSold ? 0.4 : 0.25),
+                          child: Center(child: StatusBadge.stamp(status.badge(s)!)),
                         ),
                       ),
                     ),
@@ -439,6 +451,27 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         GuardedReportButton(targetId: _itemData['id'], type: 'listing'),
                     ],
                   ),
+                  if (isReserved && !isOwner) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: scheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.handshake_outlined, color: scheme.onSecondaryContainer),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(s.reservedHint,
+                                style: TextStyle(color: scheme.onSecondaryContainer)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 20),
 
                   if (_sellerProfile != null)
@@ -501,16 +534,44 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         child: isOwner
             ? Row(
                 children: [
-                  // 1. MARK SOLD BUTTON
+                  // 1. STATUS: available / reserved / sold
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: _toggleSoldStatus,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: scheme.primary,
-                        side: BorderSide(color: scheme.primary),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: PopupMenuButton<ListingStatus>(
+                      tooltip: s.listingStatus,
+                      enabled: !_savingStatus,
+                      initialValue: status,
+                      onSelected: _setStatus,
+                      itemBuilder: (_) => [
+                        for (final st in ListingStatus.values)
+                          CheckedPopupMenuItem(
+                            value: st,
+                            checked: st == status,
+                            child: Text(st.label(s)),
+                          ),
+                      ],
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: scheme.primary),
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (_savingStatus)
+                              const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                            else
+                              Icon(Icons.sell_outlined, size: 18, color: scheme.primary),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(status.label(s),
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w600)),
+                            ),
+                            Icon(Icons.arrow_drop_down, color: scheme.primary),
+                          ],
+                        ),
                       ),
-                      child: Text(isSold ? s.markAvailable : s.markAsSold),
                     ),
                   ),
                   const SizedBox(width: 8),

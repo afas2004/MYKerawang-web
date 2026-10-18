@@ -83,4 +83,52 @@ extension AccessStrings on AppStrings {
       "Only pay once you've met the seller or agreed on the deal.",
       "Bayar hanya selepas jumpa penjual atau dah setuju urusan.",
       "支払いは出品者と会うか、取引に合意してからにしましょう。");
+
+  // ---- listing status ----
+  String get statusAvailable => _t("Available", "Ada", "販売中");
+  String get statusReserved => _t("Reserved", "Ditempah", "取引中");
+  String get listingStatus => _t("Status", "Status", "ステータス");
+  String get reservedHint => _t(
+      "Someone is arranging this with the seller. You can still message them in case it falls through.",
+      "Ada orang sedang berurusan dengan penjual. Anda masih boleh mesej kalau tak jadi.",
+      "他の人が出品者と取引中です。不成立の場合に備えて連絡することはできます。");
+  String get statusUpdated =>
+      _t("Status updated", "Status dikemas kini", "ステータスを更新しました");
+
+  // ---- feedback ----
+  String get retry => _t("Retry", "Cuba lagi", "再試行");
+  String get somethingWentWrong => _t("Something went wrong. Check your connection and try again.",
+      "Ada masalah. Semak sambungan dan cuba lagi.", "問題が発生しました。接続を確認してもう一度お試しください。");
+  String get commentPosted => _t("Comment posted", "Komen dihantar", "コメントを投稿しました");
+
+  // ---- market filters ----
+  String get filters => _t("Filters", "Penapis", "絞り込み");
+  String get priceRange => _t("Price (RM)", "Harga (RM)", "価格（RM）");
+  String get minPrice => _t("Min", "Min", "最低");
+  String get maxPrice => _t("Max", "Maks", "最高");
+  String get sortBy => _t("Sort by", "Susun ikut", "並び替え");
+  String get sortNewest => _t("Newest", "Terbaru", "新着順");
+  String get sortCheapest => _t("Cheapest", "Termurah", "安い順");
+  String get sortPriciest => _t("Most expensive", "Termahal", "高い順");
+  String get resetFilters => _t("Reset", "Set semula", "リセット");
+  String get showResults => _t("Show results", "Tunjuk hasil", "結果を表示");
+  String get loadMore => _t("Load more", "Muat lagi", "さらに読み込む");
+  String get noMatchingItems => _t("No items match these filters.",
+      "Tiada barang sepadan dengan penapis ini.", "条件に合う商品はありません。");
+
+  // ---- events list ----
+  String get eventToday => _t("Today", "Hari ini", "今日");
+  String get eventTomorrow => _t("Tomorrow", "Esok", "明日");
+  String get eventInDays => _t("In {0} days", "Lagi {0} hari", "{0}日後");
+  String get eventHappeningNow => _t("Happening now", "Sedang berlangsung", "開催中");
+
+  // ---- event detail extras ----
+  String get addToCalendar =>
+      _t("Add to calendar", "Tambah ke kalendar", "カレンダーに追加");
+  String get calendarFileSaved => _t("Calendar file downloaded — open it to add the event.",
+      "Fail kalendar dimuat turun — buka untuk tambah acara.", "カレンダーファイルをダウンロードしました。開いて追加してください。");
+  String get followingGoingOne => _t("1 person you follow is going",
+      "1 orang yang anda follow akan pergi", "フォロー中の1人が参加予定");
+  String get followingGoingMany => _t("{0} people you follow are going",
+      "{0} orang yang anda follow akan pergi", "フォロー中の{0}人が参加予定");
 }
