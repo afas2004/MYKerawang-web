@@ -67,11 +67,9 @@ class CaseDetailPane extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AnimatedOpacity(
-          opacity: busy ? 1 : 0,
-          duration: const Duration(milliseconds: 150),
-          child: const LinearProgressIndicator(minHeight: 2),
-        ),
+        // Only built while busy: an indeterminate indicator keeps
+        // animating even when faded out.
+        SizedBox(height: 2, child: busy ? const LinearProgressIndicator(minHeight: 2) : null),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),

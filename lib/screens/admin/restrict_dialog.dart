@@ -147,9 +147,11 @@ class _RestrictDialogState extends State<RestrictDialog> {
                         Icon(Icons.visibility_outlined,
                             size: 16, color: severe ? scheme.onErrorContainer : scheme.primary),
                         const SizedBox(width: 6),
-                        Text(m.ui.previewTitle,
-                            style: theme.textTheme.labelLarge?.copyWith(
-                                color: severe ? scheme.onErrorContainer : scheme.primary)),
+                        Flexible(
+                          child: Text(m.ui.previewTitle,
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                  color: severe ? scheme.onErrorContainer : scheme.primary)),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 6),
