@@ -66,6 +66,7 @@ void main() {
               height: 360,
               child: BrandEmptyState(
                 icon: Icons.event_outlined,
+                illo: AppIllo.noEvents,
                 title: 'Belum ada acara',
                 message: 'Jom buat acara pertama untuk kolej anda.',
                 actionLabel: 'Buat acara',
@@ -132,6 +133,33 @@ void main() {
     expect(medium, Duration.zero);
     // No running animation → settles immediately.
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('every illustration loads and renders', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: buildAppTheme(AppTheme.noir),
+      home: Scaffold(
+        body: Wrap(children: [
+          for (final i in AppIllo.values) AppIllustration(i, size: 96),
+        ]),
+      ),
+    ));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    expect(find.byType(AppIllustration), findsNWidgets(AppIllo.values.length));
+  });
+
+  test('illustration recolour swaps the unDraw accent (and inks on dark)', () {
+    const svg = '<path fill="#6C63FF"/><path fill="#2f2e41"/><path fill="#a0616a"/>';
+    final light = buildAppTheme(AppTheme.kampus).colorScheme;
+    final dark = buildAppTheme(AppTheme.noir).colorScheme;
+    final l = AppIllustration.recolor(svg, light);
+    final d = AppIllustration.recolor(svg, dark);
+    expect(l.toLowerCase(), isNot(contains('#6c63ff')));
+    expect(l, contains('#2f2e41')); // ink untouched on light themes
+    expect(d, isNot(contains('#2f2e41'))); // ink lifted on dark
+    expect(d, contains('#a0616a')); // skin tones never change
   });
 
   test('size classes and grid columns', () {
