@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mykerawang/widgets/brand/brand.dart';
+import 'package:mykerawang/services/moderation_service.dart';
 import 'package:mykerawang/widgets/post_card.dart';
 
 import 'helpers/feed_fixtures.dart';
@@ -97,5 +98,35 @@ void main() {
       expect(size.height, greaterThanOrEqualTo(48), reason: '$f');
       expect(size.width, greaterThanOrEqualTo(48), reason: '$f');
     }
+  });
+
+  group('more menu', () {
+    Future<List<String>> openMenu(WidgetTester tester, Map<String, dynamic> post) async {
+      await pumpAt(tester, kCompact, Scaffold(body: PostCard(post: post)));
+      await tester.pump(); // role future
+      await tester.tap(find.byIcon(AppIcons.more));
+      await tester.pumpAndSettle();
+      final shown = [
+        for (final t in ['Pin to top', 'Unpin', 'Edit', 'Delete', 'Report'])
+          if (find.text(t).evaluate().isNotEmpty) t
+      ];
+      await tester.tapAt(const Offset(4, 4)); // close the menu
+      await tester.pumpAndSettle();
+      return shown;
+    }
+
+    testWidgets('author: edit + delete, no report, no pin', (tester) async {
+      expect(await openMenu(tester, samplePost(userId: 'me')), ['Edit', 'Delete']);
+    });
+
+    testWidgets('someone else: report only', (tester) async {
+      expect(await openMenu(tester, samplePost()), ['Report']);
+    });
+
+    testWidgets('admin: pin lives in the menu', (tester) async {
+      ModerationService.debugMyRole = () async => 'admin';
+      expect(await openMenu(tester, samplePost()), ['Pin to top', 'Report']);
+      expect(await openMenu(tester, samplePost(id: 'pp', pinned: true)), ['Unpin', 'Report']);
+    });
   });
 }
