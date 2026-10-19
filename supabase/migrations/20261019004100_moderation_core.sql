@@ -245,6 +245,21 @@ alter table public.reports
   add column if not exists counts_toward_auto_hide boolean not null default true,
   add column if not exists created_at      timestamptz not null default now();
 
+-- Older projects already had a free-text reports.status (and possibly
+-- category). Map legacy values onto the new set before constraining.
+update public.reports set status = case
+    when lower(trim(status)) in ('open','actioned','dismissed','closed') then lower(trim(status))
+    when lower(trim(status)) in ('resolved','reviewed','done','handled','removed','approved','action_taken','actioned_on')
+      then 'actioned'
+    when lower(trim(status)) in ('rejected','ignored','invalid','declined','no_action')
+      then 'dismissed'
+    else 'open'
+  end
+where status is null
+   or status not in ('open','actioned','dismissed','closed');
+alter table public.reports alter column status set default 'open';
+alter table public.reports alter column status set not null;
+
 alter table public.reports drop constraint if exists reports_status_valid;
 alter table public.reports add constraint reports_status_valid
   check (status in ('open','actioned','dismissed','closed'));
@@ -282,7 +297,8 @@ as $$
 $$;
 
 update public.reports set category = public.mod_category_from_reason(reason)
-where category is null;
+where category is null
+   or category not in ('spam','scam','harassment','inappropriate','minor_safety','misinformation','other');
 
 alter table public.reports drop constraint if exists reports_category_valid;
 alter table public.reports add constraint reports_category_valid
