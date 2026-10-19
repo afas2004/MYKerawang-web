@@ -22,23 +22,33 @@ abstract final class KSpace {
   static const double gutter = l;
 }
 
-/// Corner radii. [cut] is the signature asymmetric "kerawang cut".
+/// Corner radii — uniform and the same in every theme. Buttons and chips
+/// are fully rounded (stadium) via the theme.
 abstract final class KRadius {
-  /// Hero media, primary buttons (Istana/Noir), pinned/official cards.
-  static const BorderRadius cut = BorderRadius.only(
-    topLeft: Radius.circular(2),
-    topRight: Radius.circular(14),
-    bottomRight: Radius.circular(2),
-    bottomLeft: Radius.circular(14),
-  );
+  static const double cardValue = 16;
 
-  /// Regular cards, inputs, sheets.
-  static const BorderRadius card = BorderRadius.all(Radius.circular(12));
+  /// Cards, media, embeds.
+  static const BorderRadius card = BorderRadius.all(Radius.circular(cardValue));
 
-  /// Chips, badges, small tiles.
+  /// Text fields, search bars, filled list tiles.
+  static const BorderRadius input = BorderRadius.all(Radius.circular(12));
+
+  /// Badges, small thumbnails.
   static const BorderRadius small = BorderRadius.all(Radius.circular(8));
 
-  static const double cardValue = 12;
+  /// Bottom sheets (top corners only).
+  static const BorderRadius sheet =
+      BorderRadius.vertical(top: Radius.circular(24));
+
+  /// Dialogs.
+  static const BorderRadius dialog = BorderRadius.all(Radius.circular(20));
+
+  /// Pills: buttons, chips, tags.
+  static const BorderRadius pill = BorderRadius.all(Radius.circular(999));
+
+  /// Deprecated: the asymmetric "kerawang cut" was retired in the modern
+  /// redesign. Kept so existing call sites compile; equals [card].
+  static const BorderRadius cut = card;
 }
 
 /// Motion: 150–250 ms, standard easing. Use [KMotion.of] so durations
@@ -72,16 +82,16 @@ class KMotion {
 /// Theme-dependent brand roles, attached to ThemeData as an extension.
 @immutable
 class KTokens extends ThemeExtension<KTokens> {
-  /// Decorative gold: motif strokes, hairlines, verified/official marks,
-  /// the ◆ glyph. Not guaranteed to pass AA as small text on light themes —
-  /// for gold *text* use `colorScheme.tertiary` (text-safe).
+  /// The one accent (amber/gold), used sparingly: prices, verified,
+  /// pinned/official markers, as icon or fill. For accent *text* use
+  /// `colorScheme.tertiary` (AA-safe on every surface).
   final Color gold;
 
-  /// Lattice/motif colour (usually gold or a muted primary).
+  /// Deprecated with the lattice motif (which now renders nothing).
+  /// Kept for API compatibility; equals [gold].
   final Color motif;
 
-  /// Motif opacity per placement: band (headers), corner (official cards),
-  /// field (empty states, splash — the faintest).
+  /// Deprecated with the lattice motif; 0 in every theme.
   final double motifBandOpacity;
   final double motifCornerOpacity;
   final double motifFieldOpacity;
@@ -116,6 +126,9 @@ class KTokens extends ThemeExtension<KTokens> {
     this.elevationRaised = 3,
   });
 
+  /// Alias for [gold]: the one accent colour.
+  Color get accent => gold;
+
   /// Tokens for the current theme. Falls back to a neutral set so widgets
   /// still render under a bare `ThemeData()` (tests, dialogs in isolation).
   static KTokens of(BuildContext context) {
@@ -126,9 +139,9 @@ class KTokens extends ThemeExtension<KTokens> {
   factory KTokens.fallback(ColorScheme scheme) => KTokens(
         gold: scheme.tertiary,
         motif: scheme.tertiary,
-        motifBandOpacity: 0.5,
-        motifCornerOpacity: 0.6,
-        motifFieldOpacity: 0.08,
+        motifBandOpacity: 0,
+        motifCornerOpacity: 0,
+        motifFieldOpacity: 0,
         focusRing: scheme.primary,
         cardBorder: scheme.outlineVariant,
         cardBorderHover: scheme.outline,

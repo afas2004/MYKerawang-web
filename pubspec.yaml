@@ -58,6 +58,8 @@ dependencies:
   gal: ^2.3.2
   flutter_typeahead: ^6.0.0 # 5.x pulled flutter_keyboard_visibility_web (dart:html)
   flutter_parsed_text: ^2.2.1
+  lucide_icons_flutter: ^4.0.0
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:
