@@ -42,7 +42,7 @@ class ImagePreviewScreen extends StatelessWidget {
                   return Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.broken_image, color: kOnPhoto, size: 50),
+                      const Icon(AppIcons.photo, color: kOnPhoto, size: 50),
                       const SizedBox(height: 10),
                       Text(context.l10n.imageUnavailable, style: const TextStyle(color: kOnPhoto)),
                     ],

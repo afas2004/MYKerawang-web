@@ -333,7 +333,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
         );
       case 'saved':
-        return Icon(Icons.check_circle, size: 18, color: scheme.primary);
+        return Icon(AppIcons.success, size: 18, color: scheme.primary);
       default:
         return null;
     }
@@ -407,13 +407,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 ? MemoryImage(_avatarFile!.bytes)
                                 : (_currentAvatarUrl != null ? NetworkImage(_currentAvatarUrl!) : null) as ImageProvider?,
                               child: _avatarFile == null && _currentAvatarUrl == null
-                                ? Icon(Icons.camera_alt, size: 28, color: theme.colorScheme.onPrimaryContainer)
+                                ? Icon(AppIcons.camera, size: 28, color: theme.colorScheme.onPrimaryContainer)
                                 : null,
                             ),
                             CircleAvatar(
                               radius: 13,
                               backgroundColor: theme.colorScheme.primary,
-                              child: Icon(Icons.edit,
+                              child: Icon(AppIcons.edit,
                                   size: 14, color: theme.colorScheme.onPrimary),
                             ),
                           ],
@@ -424,7 +424,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
                       onPressed: () => _pickImage(true),
-                      icon: const Icon(Icons.photo_library_outlined),
+                      icon: const Icon(AppIcons.photo),
                       label: Text(s.changePhoto),
                     ),
                   ],
@@ -480,7 +480,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             _FormSection(
               title: s.shell.contactPayments,
               subtitle: s.shell.contactPrivate,
-              icon: Icons.lock_outline,
+              icon: AppIcons.lock,
               children: [
                 TextFormField(
                   controller: _phoneCtrl,
@@ -515,13 +515,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 Center(
                   child: InkWell(
                     onTap: () => _pickImage(false),
-                    borderRadius: KRadius.cut,
+                    borderRadius: KRadius.card,
                     child: Container(
                       height: 200,
                       width: 200,
                       decoration: BoxDecoration(
                         border: Border.all(color: theme.colorScheme.outlineVariant),
-                        borderRadius: KRadius.cut,
+                        borderRadius: KRadius.card,
                         color: theme.colorScheme.surfaceContainerHighest,
                         image: _qrFile != null
                             ? DecorationImage(image: MemoryImage(_qrFile!.bytes), fit: BoxFit.contain)
@@ -531,7 +531,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ? Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.qr_code_2, size: 44, color: theme.colorScheme.onSurfaceVariant),
+                                Icon(AppIcons.qrCode, size: 44, color: theme.colorScheme.onSurfaceVariant),
                                 const SizedBox(height: 6),
                                 Text(s.tapToUploadQr,
                                     style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
@@ -546,7 +546,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   Center(
                     child: TextButton.icon(
                       onPressed: () => _pickImage(false),
-                      icon: const Icon(Icons.edit, size: 16),
+                      icon: const Icon(AppIcons.edit, size: 16),
                       label: Text(s.changeQr),
                     ),
                   ),
@@ -570,14 +570,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(48),
-                  shape: const RoundedRectangleBorder(borderRadius: KRadius.cut),
                 ),
                 onPressed: _isSaving ? null : _save,
                 icon: _isSaving
                     ? const SizedBox(
                         width: 16, height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.check),
+                    : const Icon(AppIcons.check),
                 label: Text(_isSaving ? s.saving : s.saveChanges),
               ),
             ),
@@ -622,7 +621,7 @@ class _FormSection extends StatelessWidget {
       padding: const EdgeInsets.all(KSpace.l),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
-        borderRadius: KRadius.cut,
+        borderRadius: KRadius.card,
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
