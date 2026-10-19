@@ -4,7 +4,7 @@ import '../l10n/feed_strings.dart';
 import '../language_cubit.dart';
 import '../screens/create_post_screen.dart';
 import '../screens/profile_cubit.dart';
-import '../theme/app_themes.dart';
+import '../widgets/brand/brand.dart';
 
 /// Composer launcher at the top of the feed, on every size
 /// (Threads-style). Compact (<600): a slim row — avatar, hint, photo
@@ -44,7 +44,7 @@ class FeedComposer extends StatelessWidget {
     final hint = compact ? fs.composerHintCompact : context.l10n.composerHint;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(16, compact ? 8 : 12, 16, 4),
+      padding: EdgeInsets.fromLTRB(KSpace.gutter, compact ? KSpace.s : KSpace.m, KSpace.gutter, KSpace.xs),
       child: Semantics(
         button: true,
         label: hint,
@@ -53,7 +53,7 @@ class FeedComposer extends StatelessWidget {
         child: Material(
           color: theme.cardColor,
           shape: RoundedRectangleBorder(
-            borderRadius: kerawangCut,
+            borderRadius: KRadius.card,
             side: BorderSide(color: scheme.outlineVariant),
           ),
           clipBehavior: Clip.antiAlias,
@@ -61,20 +61,20 @@ class FeedComposer extends StatelessWidget {
             onTap: () => _open(context),
             child: Padding(
               padding: EdgeInsets.symmetric(
-                  horizontal: 12, vertical: compact ? 6 : 10),
+                  horizontal: KSpace.m, vertical: compact ? KSpace.xs : KSpace.s),
               child: Row(
                 children: [
                   CircleAvatar(
-                    radius: compact ? 16 : 18,
+                    radius: 20,
                     backgroundColor: scheme.primaryContainer,
                     backgroundImage:
                         avatar != null ? NetworkImage(avatar) : null,
                     child: avatar == null
-                        ? Icon(Icons.person,
+                        ? Icon(AppIcons.person,
                             size: 18, color: scheme.onPrimaryContainer)
                         : null,
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: KSpace.m),
                   Expanded(
                     child: Text(
                       hint,
@@ -89,8 +89,8 @@ class FeedComposer extends StatelessWidget {
                     child: SizedBox(
                       width: 48,
                       height: 48,
-                      child: Icon(Icons.add_photo_alternate_outlined,
-                          size: 22, color: scheme.primary),
+                      child: Icon(AppIcons.photo,
+                          size: 20, color: scheme.primary),
                     ),
                   ),
                 ],

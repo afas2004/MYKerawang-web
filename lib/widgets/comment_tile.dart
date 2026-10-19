@@ -1,7 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import '../l10n/feed_strings.dart';
 import '../l10n/post_strings.dart';
 import '../language_cubit.dart';
 import '../utils/app_nav.dart';
@@ -9,6 +8,7 @@ import '../utils/formatters.dart';
 import '../utils/guest_access.dart';
 import '../utils/report_helper.dart';
 import '../utils/roles.dart';
+import 'brand/brand.dart';
 import 'mention_text.dart';
 import 'owner_menu.dart';
 
@@ -46,7 +46,6 @@ class CommentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = context.l10n;
-    final fs = context.feedL10n;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final c = comment;
@@ -64,7 +63,7 @@ class CommentTile extends StatelessWidget {
     final mine = onEdit != null && onDelete != null;
 
     return Padding(
-      padding: const EdgeInsets.only(left: 12, top: 8),
+      padding: const EdgeInsets.only(left: KSpace.l, top: KSpace.m),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -85,7 +84,7 @@ class CommentTile extends StatelessWidget {
                           ? CachedNetworkImageProvider(avatarUrl)
                           : null,
                       child: avatarUrl == null
-                          ? Icon(isAnon ? Icons.visibility_off : Icons.person,
+                          ? Icon(isAnon ? AppIcons.anonymous : AppIcons.person,
                               size: 16,
                               color: isAnon
                                   ? scheme.onSurfaceVariant
@@ -98,16 +97,16 @@ class CommentTile extends StatelessWidget {
                   Expanded(
                     child: Container(
                       width: 2,
-                      margin: const EdgeInsets.only(top: 4),
+                      margin: const EdgeInsets.only(top: KSpace.xs),
                       color: scheme.outlineVariant,
                     ),
                   ),
               ],
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: KSpace.m),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: KSpace.s),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -119,7 +118,7 @@ class CommentTile extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.labelLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w600,
                               color: isAnon ? scheme.onSurfaceVariant : scheme.onSurface,
                             ),
                           ),
@@ -127,32 +126,35 @@ class CommentTile extends StatelessWidget {
                         if (authorId != null &&
                             authorId == highlightUserId &&
                             highlightLabel != null) ...[
-                          const SizedBox(width: 6),
+                          const SizedBox(width: KSpace.xs + 2),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                             decoration: BoxDecoration(
-                              color: scheme.tertiaryContainer,
-                              borderRadius: BorderRadius.circular(4),
+                              color: scheme.secondaryContainer,
+                              borderRadius: KRadius.small,
                             ),
                             child: Text(highlightLabel!,
                                 style: theme.textTheme.labelSmall?.copyWith(
-                                    color: scheme.onTertiaryContainer,
-                                    fontWeight: FontWeight.w700)),
+                                    color: scheme.onSecondaryContainer,
+                                    fontWeight: FontWeight.w600)),
                           ),
                         ],
+                        const SizedBox(width: KSpace.xs + 2),
+                        // name · @handle · time on one line
+                        Flexible(
+                          child: Text(
+                            [
+                              if (username != null) '@$username',
+                              formatRelative(context, created),
+                            ].join(' · '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: meta,
+                          ),
+                        ),
                       ],
                     ),
-                    Text(
-                      [
-                        if (isAnon) fs.anonymousSub,
-                        if (username != null) '@$username',
-                        formatRelative(context, created),
-                      ].join(' · '),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: meta,
-                    ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: KSpace.xs),
                     MentionText(
                       c['body'] ?? '',
                       style: theme.textTheme.bodyMedium

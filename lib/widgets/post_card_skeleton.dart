@@ -32,7 +32,7 @@ class PostCardSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(
-          horizontal: KSpace.gutter, vertical: KSpace.s - 2),
+          horizontal: KSpace.gutter, vertical: KSpace.m / 2),
       child: KCard(
         padding: const EdgeInsets.all(KSpace.l),
         child: Column(
@@ -42,35 +42,30 @@ class PostCardSkeleton extends StatelessWidget {
               children: [
                 KSkeleton.circle(size: 40),
                 SizedBox(width: KSpace.m),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    KSkeleton(width: 140, height: 12),
-                    SizedBox(height: KSpace.s - 2),
-                    KSkeleton(width: 80, height: 10),
-                  ],
-                ),
+                KSkeleton(width: 120, height: 12),
+                SizedBox(width: KSpace.s),
+                KSkeleton(width: 72, height: 10),
               ],
             ),
-            const SizedBox(height: KSpace.l),
-            const KSkeleton(width: 220, height: 18),
+            const SizedBox(height: KSpace.m),
+            const KSkeleton(width: 200, height: 16),
             const SizedBox(height: KSpace.m),
             KSkeleton.lines(2),
             if (withPhoto) ...[
               const SizedBox(height: KSpace.m),
               const AspectRatio(
                 aspectRatio: 4 / 3,
-                child: KSkeleton(height: double.infinity, borderRadius: KRadius.cut),
+                child: KSkeleton(height: double.infinity, borderRadius: KRadius.card),
               ),
             ],
             const SizedBox(height: KSpace.l),
             const Row(
               children: [
-                KSkeleton(width: 56, height: 20),
-                SizedBox(width: KSpace.l),
-                KSkeleton(width: 24, height: 20),
-                SizedBox(width: KSpace.l),
-                KSkeleton(width: 24, height: 20),
+                KSkeleton(width: 40, height: 20),
+                SizedBox(width: KSpace.xl),
+                KSkeleton(width: 20, height: 20),
+                SizedBox(width: KSpace.xl),
+                KSkeleton(width: 20, height: 20),
               ],
             ),
           ],
