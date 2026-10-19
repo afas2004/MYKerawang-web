@@ -163,23 +163,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: appBarConstrained(context, title: Text(s.settingsTitle)),
       body: PageBody(child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+            padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.s, KSpace.l, KSpace.xxl),
             children: [
-              // --- APPEARANCE: three named moods (DESIGN_SPEC §2) ---
+              // --- APPEARANCE: three named themes, always one row ---
               _SettingsGroup(
                 title: s.shell.appearance,
-                icon: Icons.palette_outlined,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                    child: SizedBox(
-                      height: 120,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: AppTheme.values
-                            .map((t) => _themeCard(context, t, t == currentTheme))
-                            .toList(),
-                      ),
+                    padding: const EdgeInsets.all(KSpace.m),
+                    child: Row(
+                      children: [
+                        for (final (i, t) in AppTheme.values.indexed) ...[
+                          if (i > 0) const SizedBox(width: KSpace.s),
+                          Expanded(child: _themeCard(context, t, t == currentTheme)),
+                        ],
+                      ],
                     ),
                   ),
                 ],
@@ -188,18 +186,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // --- LANGUAGE ---
               _SettingsGroup(
                 title: s.language,
-                icon: Icons.translate,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                    child: SegmentedButton<AppLanguage>(
-                      segments: [
-                        for (final lang in kSupportedLanguages)
-                          ButtonSegment(value: lang, label: Text(lang.nativeName)),
-                      ],
-                      selected: {context.watch<LanguageCubit>().state.language},
-                      onSelectionChanged: (sel) =>
-                          context.read<LanguageCubit>().changeLanguage(sel.first),
+                    padding: const EdgeInsets.all(KSpace.m),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: SegmentedButton<AppLanguage>(
+                        showSelectedIcon: false,
+                        segments: [
+                          for (final lang in kSupportedLanguages)
+                            ButtonSegment(value: lang, label: Text(lang.nativeName)),
+                        ],
+                        selected: {context.watch<LanguageCubit>().state.language},
+                        onSelectionChanged: (sel) =>
+                            context.read<LanguageCubit>().changeLanguage(sel.first),
+                      ),
                     ),
                   ),
                 ],
@@ -208,21 +209,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // --- NOTIFICATIONS ---
               _SettingsGroup(
                 title: s.notifications,
-                icon: Icons.notifications_outlined,
                 children: [
                   ListTile(
-                    leading: const Icon(Icons.inbox_outlined),
+                    leading: const Icon(AppIcons.notifications),
                     title: Text(s.notificationsTitle),
-                    trailing: const Icon(Icons.chevron_right),
+                    trailing: const Icon(AppIcons.chevronRight),
                     onTap: () => context.push('/notifications'),
                   ),
                   // App-settings shortcut only makes sense on mobile
                   if (!kIsWeb)
                     ListTile(
-                      leading: const Icon(Icons.settings_applications_outlined),
+                      leading: const Icon(AppIcons.settings),
                       title: Text(s.fixNotifPermissions),
                       subtitle: Text(s.openSystemSettings),
-                      trailing: const Icon(Icons.open_in_new, size: 18),
+                      trailing: const Icon(AppIcons.externalLink, size: 18),
                       // Opens the phone's App Settings page
                       onTap: openAppSettings,
                     ),
@@ -232,13 +232,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // --- PRIVACY & DATA ---
               _SettingsGroup(
                 title: s.social.privacyData,
-                icon: Icons.shield_outlined,
                 children: [
                   ListTile(
-                    leading: const Icon(Icons.policy_outlined),
+                    leading: const Icon(AppIcons.lock),
                     title: Text(s.social.privacyPolicy),
                     subtitle: Text(s.social.privacyPolicySub),
-                    trailing: const Icon(Icons.chevron_right),
+                    trailing: const Icon(AppIcons.chevronRight),
                     onTap: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen())),
                   ),
@@ -250,7 +249,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               padding: EdgeInsets.all(2),
                               child: CircularProgressIndicator(strokeWidth: 2),
                             ))
-                        : const Icon(Icons.download_outlined),
+                        : const Icon(AppIcons.download),
                     title: Text(s.social.downloadMyData),
                     subtitle: Text(_exporting
                         ? s.social.preparingExport
@@ -258,28 +257,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     enabled: !_exporting,
                     onTap: _exportData,
                   ),
-                  ListTile(
-                    leading: Icon(Icons.delete_forever_outlined, color: scheme.error),
-                    title: Text(s.social.deleteAccount,
-                        style: TextStyle(color: scheme.error)),
-                    subtitle: Text(s.social.deleteAccountSub),
-                    onTap: _deleteAccount,
-                  ),
                 ],
               ),
 
               // --- ACCOUNT ---
               _SettingsGroup(
                 title: s.shell.account,
-                icon: Icons.person_outline,
                 children: [
                   if (email != null)
                     ListTile(
-                      leading: const Icon(Icons.alternate_email),
+                      leading: const Icon(AppIcons.email),
                       title: Text(email),
                     ),
                   ListTile(
-                    leading: const Icon(Icons.info_outline),
+                    leading: const Icon(AppIcons.info),
                     title: Text(UpdateService.isSupported
                         ? s.versionBuildLabel.fill([UpdateService.appVersion, UpdateService.buildId])
                         : s.versionLabel.fill([UpdateService.appVersion])),
@@ -288,33 +279,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         : ValueListenableBuilder<bool>(
                             valueListenable: UpdateService.instance.updateAvailable,
                             builder: (context, available, _) => available
-                                ? FilledButton.icon(
+                                ? FilledButton(
                                     onPressed: UpdateService.instance.applyUpdate,
-                                    icon: const Icon(Icons.system_update),
-                                    label: Text(s.updateNow),
+                                    child: Text(s.updateNow),
                                   )
-                                : TextButton.icon(
+                                : TextButton(
                                     onPressed: _checkingUpdate ? null : _checkForUpdates,
-                                    icon: _checkingUpdate
+                                    child: _checkingUpdate
                                         ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                                        : const Icon(Icons.refresh),
-                                    label: Text(s.checkForUpdates),
+                                        : Text(s.checkForUpdates),
                                   ),
                           ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    child: OutlinedButton.icon(
-                      onPressed: _signOut,
-                      // Theme error colour — readable on Songket Noir too.
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: scheme.error,
-                        side: BorderSide(color: scheme.error),
-                        minimumSize: const Size.fromHeight(48),
-                      ),
-                      icon: const Icon(Icons.logout),
-                      label: Text(s.signOut),
-                    ),
+                ],
+              ),
+
+              // --- DESTRUCTIVE, last and in the error colour ---
+              const SizedBox(height: KSpace.xl),
+              _SettingsGroup(
+                children: [
+                  ListTile(
+                    leading: Icon(AppIcons.logout, color: scheme.error),
+                    title: Text(s.signOut, style: TextStyle(color: scheme.error)),
+                    onTap: _signOut,
+                  ),
+                  ListTile(
+                    leading: Icon(AppIcons.delete, color: scheme.error),
+                    title: Text(s.social.deleteAccount,
+                        style: TextStyle(color: scheme.error)),
+                    subtitle: Text(s.social.deleteAccountSub),
+                    onTap: _deleteAccount,
                   ),
                 ],
               ),
@@ -323,55 +317,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// One theme: a mini preview (background, primary, accent) + name.
+  /// Sized by its Expanded parent so all three always fit one row.
   Widget _themeCard(BuildContext context, AppTheme theme, bool selected) {
     final spec = kThemeSpecs[theme]!;
     final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(right: 10),
+    final text = Theme.of(context).textTheme;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: spec.displayName,
+      excludeSemantics: true,
       child: InkWell(
         onTap: () => context.read<ThemeCubit>().changeTheme(theme),
-        borderRadius: KRadius.cut,
-        child: Container(
-          width: 140,
-          padding: const EdgeInsets.all(KSpace.m),
+        borderRadius: KRadius.card,
+        child: AnimatedContainer(
+          duration: KMotion.of(context).fast,
+          padding: const EdgeInsets.all(KSpace.s),
           decoration: BoxDecoration(
-            color: spec.surface,
-            borderRadius: KRadius.cut,
+            borderRadius: KRadius.card,
             border: Border.all(
-              color: selected ? scheme.primary : spec.border,
-              width: selected ? 2.5 : 1,
+              color: selected ? scheme.primary : scheme.outlineVariant,
+              width: selected ? 2 : 1,
             ),
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Preview tile in the theme's own colours.
+              AspectRatio(
+                aspectRatio: 1.4,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: spec.background,
+                    borderRadius: KRadius.small,
+                    border: Border.all(color: spec.border),
+                  ),
+                  padding: const EdgeInsets.all(KSpace.s),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 8,
+                        width: 36,
+                        decoration: BoxDecoration(
+                            color: spec.primary, borderRadius: KRadius.pill),
+                      ),
+                      const SizedBox(height: KSpace.xs),
+                      Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                            color: spec.text.withValues(alpha: 0.25),
+                            borderRadius: KRadius.pill),
+                      ),
+                      const Spacer(),
+                      Align(
+                        alignment: Alignment.bottomRight,
+                        child: CircleAvatar(radius: 6, backgroundColor: spec.gold),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: KSpace.s),
               Row(
                 children: [
-                  _swatch(spec.background),
-                  _swatch(spec.primary),
-                  _swatch(spec.gold),
-                  const Spacer(),
+                  Expanded(
+                    child: Text(spec.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: text.labelLarge),
+                  ),
                   if (selected)
-                    Icon(Icons.check_circle, size: 18, color: scheme.primary),
+                    Icon(AppIcons.success, size: 16, color: scheme.primary),
                 ],
-              ),
-              const Spacer(),
-              // Flexible + ellipsis: long taglines or large text sizes
-              // must not overflow the fixed-height card.
-              Text(spec.displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      color: spec.text)),
-              Flexible(
-                child: Text(_tagline(context, theme),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        fontSize: 11,
-                        color: spec.text.withValues(alpha: 0.6))),
               ),
             ],
           ),
@@ -379,71 +398,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
-
-  Widget _swatch(Color c) => Container(
-        width: 16,
-        height: 16,
-        margin: const EdgeInsets.only(right: 4),
-        decoration: BoxDecoration(
-          color: c,
-          shape: BoxShape.circle,
-          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-        ),
-      );
-
-  String _tagline(BuildContext context, AppTheme theme) {
-    final s = context.l10n;
-    return switch (theme) {
-      AppTheme.kampus => s.taglineKampus,
-      AppTheme.istana => s.taglineIstana,
-      AppTheme.noir => s.taglineNoir,
-    };
-  }
 }
 
-/// One titled card of settings rows.
+/// A section title over one rounded group of rows.
 class _SettingsGroup extends StatelessWidget {
-  final String title;
-  final IconData icon;
+  final String? title;
   final List<Widget> children;
 
-  const _SettingsGroup(
-      {required this.title, required this.icon, required this.children});
+  const _SettingsGroup({this.title, required this.children});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.only(top: KSpace.l),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 8),
-            child: Semantics(
-              header: true,
-              child: Row(
-                children: [
-                  Icon(icon, size: 18, color: scheme.primary),
-                  const SizedBox(width: KSpace.s),
-                  Text(title, style: theme.textTheme.titleMedium),
-                ],
+          if (title != null)
+            Padding(
+              padding: const EdgeInsets.only(left: KSpace.xs, bottom: KSpace.s),
+              child: Semantics(
+                header: true,
+                child: Text(title!,
+                    style: theme.textTheme.labelLarge
+                        ?.copyWith(color: scheme.primary)),
               ),
             ),
-          ),
           Material(
             color: scheme.surfaceContainerLow,
             clipBehavior: Clip.antiAlias,
-            shape: RoundedRectangleBorder(
-              borderRadius: KRadius.cut,
-              side: BorderSide(color: scheme.outlineVariant),
-            ),
+            shape: const RoundedRectangleBorder(borderRadius: KRadius.card),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (var i = 0; i < children.length; i++) ...[
-                  if (i > 0) Divider(height: 1, color: scheme.outlineVariant),
+                  if (i > 0)
+                    Divider(height: 1, indent: KSpace.l, color: scheme.outlineVariant),
                   children[i],
                 ],
               ],
@@ -480,7 +472,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
     final ok = AccountData.confirms(_ctrl.text, widget.username);
 
     return AlertDialog(
-      icon: Icon(Icons.warning_amber_rounded, color: scheme.error),
+      icon: Icon(AppIcons.warning, color: scheme.error),
       title: Text(s.social.deleteAccountTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
