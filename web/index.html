@@ -18,7 +18,7 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="theme-color" content="#FAF7FF">
+  <meta name="theme-color" content="#F6F6F9">
   <meta name="description" content="MYKerawang — community marketplace and events platform.">
 
   <!-- Link previews (WhatsApp, Telegram, X…). Crawlers don't run Flutter,
@@ -56,43 +56,29 @@
   <link rel="manifest" href="manifest.json">
 
   <!-- Splash: shown while the engine + app download (several seconds on
-       mobile data), removed on Flutter's first frame. Colours follow the
-       saved theme (Kampus Bold / Istana Modern / Songket Noir — same values
-       as lib/theme/app_themes.dart) so there's no flash when Flutter paints.
-       The lattice is the app's kerawang tile as an inline SVG pattern,
-       faded out radially so it frames the logo instead of papering the page. -->
+       mobile data), removed on Flutter's first frame. Background follows the
+       saved theme (same values as lib/theme/app_themes.dart) so there's no
+       flash when Flutter paints: plain background, logo, small spinner. -->
   <style>
-    :root { --bg: #FAF7FF; --primary: #5B3E96; --gold: #F0A81C; --lattice: .10; }
-    html[data-theme="istana"] { --bg: #F6F0E4; --primary: #3D2B56; --gold: #BA7517; --lattice: .11; }
-    html[data-theme="noir"]   { --bg: #171122; --primary: #A58BE6; --gold: #E8C766; --lattice: .09; }
+    :root { --bg: #F6F6F9; --primary: #5B3E96; --track: rgba(91,62,150,.15); }
+    html[data-theme="istana"] { --bg: #F7F4EE; --primary: #4E3680; --track: rgba(78,54,128,.15); }
+    html[data-theme="noir"]   { --bg: #0F0E13; --primary: #A48BEA; --track: rgba(164,139,234,.18); }
     html, body { margin: 0; height: 100%; background: var(--bg); }
     #splash {
       position: fixed; inset: 0; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 24px;
-      background: var(--bg); transition: opacity .25s ease;
+      align-items: center; justify-content: center; gap: 28px;
+      background: var(--bg); transition: opacity .2s ease;
     }
-    #splash .lattice {
-      position: absolute; inset: 0; color: var(--gold); opacity: var(--lattice);
-      -webkit-mask-image: radial-gradient(circle at 50% 45%, #000 0, #000 90px, transparent 260px);
-              mask-image: radial-gradient(circle at 50% 45%, #000 0, #000 90px, transparent 260px);
+    #splash img { width: 88px; height: 88px; border-radius: 50%; background: #fff; }
+    #splash .spinner {
+      width: 22px; height: 22px; border-radius: 50%;
+      border: 2.5px solid var(--track); border-top-color: var(--primary);
+      animation: spin .8s linear infinite;
     }
-    #splash .lattice svg { width: 100%; height: 100%; display: block; }
-    #splash .mark {
-      position: relative; width: 112px; height: 112px; border-radius: 50%;
-      display: grid; place-items: center;
-      box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold) 55%, transparent);
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      #splash .spinner { animation: none; border-color: var(--track); }
     }
-    #splash img { width: 96px; height: 96px; border-radius: 50%; background: #fff; }
-    #splash .bar {
-      position: relative; width: 120px; height: 3px; border-radius: 2px; overflow: hidden;
-      background: color-mix(in srgb, var(--primary) 20%, transparent);
-    }
-    #splash .bar::after {
-      content: ""; display: block; width: 40%; height: 100%;
-      background: var(--primary); animation: slide 1.1s ease-in-out infinite;
-    }
-    @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
-    @media (prefers-reduced-motion: reduce) { #splash .bar::after { animation: none; width: 100%; } }
   </style>
   <script>
     // Match the saved theme before first paint (shared_preferences on web
@@ -102,7 +88,7 @@
       try { t = JSON.parse(localStorage.getItem('flutter.appTheme')) || t; } catch (e) {}
       if (t !== 'istana' && t !== 'noir') t = 'kampus';
       document.documentElement.setAttribute('data-theme', t);
-      var c = { kampus: '#FAF7FF', istana: '#F6F0E4', noir: '#171122' }[t];
+      var c = { kampus: '#F6F6F9', istana: '#F7F4EE', noir: '#0F0E13' }[t];
       var m = document.querySelector('meta[name="theme-color"]');
       if (m) m.setAttribute('content', c);
     })();
@@ -110,23 +96,8 @@
 </head>
 <body>
   <div id="splash" role="progressbar" aria-label="Loading MYKerawang">
-    <div class="lattice" aria-hidden="true">
-      <svg xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <pattern id="k" width="24" height="24" patternUnits="userSpaceOnUse">
-            <g fill="none" stroke="currentColor" stroke-width="1">
-              <path d="M12 0L24 12L12 24L0 12Z"/>
-              <path d="M12 7L17 12L12 17L7 12Z"/>
-              <path d="M12 0V7M24 12H17M12 24V17M0 12H7"/>
-            </g>
-            <path fill="currentColor" d="M0 -2.6L2.6 0L0 2.6L-2.6 0ZM24 -2.6L26.6 0L24 2.6L21.4 0ZM0 21.4L2.6 24L0 26.6L-2.6 24ZM24 21.4L26.6 24L24 26.6L21.4 24Z"/>
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#k)"/>
-      </svg>
-    </div>
-    <div class="mark"><img src="icons/Icon-192.png" alt=""></div>
-    <div class="bar"></div>
+    <img src="icons/Icon-192.png" alt="">
+    <div class="spinner"></div>
   </div>
   <script>
     window.addEventListener('flutter-first-frame', function () {

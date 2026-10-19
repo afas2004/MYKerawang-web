@@ -1,31 +1,38 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/app_icons.dart';
 import '../../theme/tokens.dart';
 import 'official_frame.dart';
 
-/// The standard card: surface fill, 12-radius outline, and consistent
+/// The standard card: surface fill, 16-radius 1px outline, and consistent
 /// hover / keyboard-focus / pressed feedback when tappable.
 ///
-/// - hover: outline darkens and the card lifts slightly
+/// - hover: outline darkens (no shadow — the system uses borders, not
+///   elevation)
 /// - focus: a 2 px focus ring drawn outside the layout (no jump)
 /// - pressed: themed ink ripple
 ///
-/// [official] switches to the kerawang cut and wraps it in [OfficialFrame]
-/// (gold hairline + corner lattice) — for official / pinned content only.
+/// [official] gives the card an accent outline; with [officialLabel] it also
+/// shows a small accent label row at the top ("Pinned", "Official").
 ///
 ///   KCard(onTap: () => context.goEvent(e), child: ...)
-///   KCard(official: true, semanticLabel: s.pinned, child: ...)
+///   KCard(official: true, officialLabel: s.pinned, child: ...)
 class KCard extends StatefulWidget {
   final Widget child;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final EdgeInsetsGeometry padding;
 
-  /// Official / pinned styling (kerawang cut + gold frame).
+  /// Official / pinned styling (accent outline).
   final bool official;
 
-  /// Overrides the radius (defaults: [KRadius.card], or [KRadius.cut] when
-  /// [official]).
+  /// Label row text for [official] cards; no row when null.
+  final String? officialLabel;
+
+  /// Icon for the label row (defaults to [AppIcons.pin]).
+  final IconData officialIcon;
+
+  /// Overrides the radius (default [KRadius.card]).
   final BorderRadius? borderRadius;
 
   /// Fill; defaults to `theme.cardColor`.
@@ -41,6 +48,8 @@ class KCard extends StatefulWidget {
     this.onLongPress,
     this.padding = const EdgeInsets.all(KSpace.l),
     this.official = false,
+    this.officialLabel,
+    this.officialIcon = AppIcons.pin,
     this.borderRadius,
     this.color,
     this.semanticLabel,
@@ -59,10 +68,9 @@ class _KCardState extends State<KCard> {
     final theme = Theme.of(context);
     final k = KTokens.of(context);
     final motion = KMotion.of(context);
-    final radius = widget.borderRadius ??
-        (widget.official ? KRadius.cut : KRadius.card);
+    final radius = widget.borderRadius ?? KRadius.card;
     final interactive = widget.onTap != null || widget.onLongPress != null;
-    final lifted = interactive && _hovered;
+    final hovered = interactive && _hovered;
 
     Widget content = Padding(padding: widget.padding, child: widget.child);
     if (interactive) {
@@ -83,19 +91,8 @@ class _KCardState extends State<KCard> {
         color: widget.color ?? theme.cardColor,
         borderRadius: radius,
         border: Border.all(
-          color: widget.official
-              ? k.gold
-              : (lifted ? k.cardBorderHover : k.cardBorder),
+          color: hovered ? k.cardBorderHover : k.cardBorder,
         ),
-        boxShadow: lifted
-            ? [
-                BoxShadow(
-                  color: theme.colorScheme.shadow.withValues(alpha: 0.08),
-                  blurRadius: k.elevationRaised * 3,
-                  offset: Offset(0, k.elevationRaised / 2),
-                ),
-              ]
-            : null,
       ),
       // Focus ring painted on top so it never shifts the layout.
       foregroundDecoration: _focused
@@ -113,7 +110,12 @@ class _KCardState extends State<KCard> {
     );
 
     if (widget.official) {
-      card = OfficialFrame(borderRadius: radius, child: card);
+      card = OfficialFrame(
+        borderRadius: radius,
+        label: widget.officialLabel,
+        icon: widget.officialIcon,
+        child: card,
+      );
     }
     if (widget.semanticLabel != null) {
       card = Semantics(
