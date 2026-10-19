@@ -161,14 +161,14 @@ class _RestrictionsTabState extends State<RestrictionsTab>
             const Spacer(),
             FilledButton.tonalIcon(
               onPressed: _restrictSomeone,
-              icon: const Icon(Icons.person_off_outlined, size: 18),
+              icon: const Icon(ModIcons.userX, size: 18),
               label: Text(m.restrictSomeone),
             ),
           ],
         ),
       ),
       empty: ModEmptyState(
-        icon: Icons.verified_user_outlined,
+        icon: ModIcons.official,
         title: m.noRestrictions,
       ),
       itemBuilder: (context, r) {
@@ -201,7 +201,7 @@ class _RestrictionsTabState extends State<RestrictionsTab>
                   children: [
                     ModChip(
                       label: m.scopeLabel(scope),
-                      icon: Icons.block,
+                      icon: ModIcons.ban,
                       background: scheme.errorContainer,
                       foreground: scheme.onErrorContainer,
                     ),
@@ -217,7 +217,7 @@ class _RestrictionsTabState extends State<RestrictionsTab>
                     if (r['automatic'] == true)
                       ModChip(
                         label: m.automatic,
-                        icon: Icons.smart_toy_outlined,
+                        icon: ModIcons.bot,
                         background: scheme.secondaryContainer,
                         foreground: scheme.onSecondaryContainer,
                       ),
@@ -246,7 +246,7 @@ class _RestrictionsTabState extends State<RestrictionsTab>
                     alignment: Alignment.centerRight,
                     child: OutlinedButton.icon(
                       onPressed: busy ? null : () => _lift(r),
-                      icon: const Icon(Icons.lock_open, size: 18),
+                      icon: const Icon(ModIcons.unlock, size: 18),
                       label: Text(m.lift),
                     ),
                   ),

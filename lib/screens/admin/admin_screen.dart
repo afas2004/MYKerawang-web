@@ -13,7 +13,6 @@ import 'club_approvals_tab.dart';
 import 'log_tab.dart';
 import 'restrictions_tab.dart';
 import 'settings_tab.dart';
-import '../../widgets/brand/brand.dart';
 
 /// /admin — moderation console. The route is reachable by URL, so the
 /// page checks the role itself; the database checks it again on every
@@ -51,7 +50,7 @@ class _AdminScreenState extends State<AdminScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 ModEmptyState(
-                    icon: Icons.lock_outline, title: m.adminOnly, body: m.adminOnlyBody),
+                    icon: ModIcons.lock, title: m.adminOnly, body: m.adminOnlyBody),
                 FilledButton(
                   onPressed: () => context.go('/home'),
                   child: Text(context.l10n.goHome),
@@ -67,12 +66,12 @@ class _AdminScreenState extends State<AdminScreen> {
         }
 
         final tabs = <(String, IconData, Widget)>[
-          (m.tabCases, Icons.inbox_outlined, const CasesTab()),
-          (m.tabClubs, Icons.verified_outlined, const ClubApprovalsTab()),
-          (m.tabAppeals, Icons.gavel_outlined, const AppealsTab()),
-          (m.tabRestrictions, Icons.block_outlined, const RestrictionsTab()),
-          (m.tabLog, Icons.receipt_long_outlined, const LogTab()),
-          if (owner) (m.tabSettings, Icons.tune, const SettingsTab()),
+          (m.tabCases, ModIcons.inbox, const CasesTab()),
+          (m.tabClubs, ModIcons.verified, const ClubApprovalsTab()),
+          (m.tabAppeals, ModIcons.appeal, const AppealsTab()),
+          (m.tabRestrictions, ModIcons.ban, const RestrictionsTab()),
+          (m.tabLog, ModIcons.log, const LogTab()),
+          if (owner) (m.tabSettings, ModIcons.settings, const SettingsTab()),
         ];
 
         return DefaultTabController(
@@ -81,20 +80,12 @@ class _AdminScreenState extends State<AdminScreen> {
             appBar: AppBar(
               leading: const AppBackButton(),
               title: Text(m.moderation),
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(72 + 9),
-                child: Column(
-                  children: [
-                    TabBar(
-                      isScrollable: true,
-                      tabAlignment: TabAlignment.start,
-                      tabs: [
-                        for (final t in tabs) Tab(icon: Icon(t.$2, size: 20), text: t.$1),
-                      ],
-                    ),
-                    const LatticeBand(),
-                  ],
-                ),
+              bottom: TabBar(
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                tabs: [
+                  for (final t in tabs) Tab(icon: Icon(t.$2, size: 20), text: t.$1),
+                ],
               ),
             ),
             body: Builder(
@@ -215,14 +206,14 @@ class _AdminError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, size: 48, color: scheme.error),
+            Icon(ModIcons.error, size: 48, color: scheme.error),
             const SizedBox(height: 12),
             Text(modErrorText(context, error, fallback: context.l10n.connectionError),
                 textAlign: TextAlign.center),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
+              icon: const Icon(ModIcons.refresh),
               label: Text(m.retry),
             ),
           ],
@@ -256,7 +247,7 @@ class AdminUserLine extends StatelessWidget {
           backgroundColor: scheme.surfaceContainerHighest,
           backgroundImage: avatar != null && !anonymous ? NetworkImage(avatar) : null,
           child: avatar == null || anonymous
-              ? Icon(anonymous ? Icons.visibility_off : Icons.person,
+              ? Icon(anonymous ? ModIcons.hidden : ModIcons.person,
                   size: 14, color: scheme.onSurfaceVariant)
               : null,
         ),

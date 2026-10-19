@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mykerawang/l10n/app_strings.dart';
 import 'package:mykerawang/l10n/moderation_strings.dart';
 import 'package:mykerawang/language_cubit.dart';
 import 'package:mykerawang/screens/admin/admin_overview.dart';
@@ -11,6 +12,7 @@ import 'package:mykerawang/screens/admin/restrict_dialog.dart';
 import 'package:mykerawang/screens/standing_screen.dart';
 import 'package:mykerawang/services/moderation_service.dart';
 import 'package:mykerawang/utils/moderation_logic.dart';
+import 'package:mykerawang/widgets/brand/brand.dart';
 import 'package:mykerawang/widgets/report_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -116,6 +118,10 @@ void main() {
         // Master–detail: list and the selected case's detail side by side.
         expect(find.byType(CaseDetailPane), findsOneWidget);
         expect(find.textContaining('Asked for a deposit', skipOffstage: false), findsOneWidget);
+        // Grouped sections: content, reports, author.
+        expect(find.text(m.ui.contentHeading), findsOneWidget);
+        expect(find.text(m.ui.reportsHeading.fill([2]), skipOffstage: false), findsOneWidget);
+        expect(find.text(m.ui.historyHeading, skipOffstage: false), findsOneWidget);
         expect(find.text(m.actionRestore), findsOneWidget); // hidden case → Restore
         await tester.tap(find.text(m.actionRestore));
         expect(acted, ['dismiss 1']);
@@ -151,6 +157,21 @@ void main() {
       );
       expect(find.text('12'), findsOneWidget);
       expect(find.text('4d'), findsOneWidget);
+      // Grid: 2 columns on phones, 3 on tablets, one row of 5 on desktop.
+      final cols = w >= 900 ? 5 : (w >= 600 ? 3 : 2);
+      final ys = [
+        for (final v in ['12', '4d', '3', '2', '1'])
+          tester.getTopLeft(find.ancestor(of: find.text(v), matching: find.byType(KCard)).first).dy.round(),
+      ];
+      expect(ys.toSet().length, (5 / cols).ceil(), reason: 'rows at ${w.toInt()} px');
+      expect(ys.take(cols).toSet().length, 1, reason: 'first row shares one line');
+    });
+
+    testWidgets('case rows show priority chip and age at ${w.toInt()} px', (tester) async {
+      await pumpAt(tester, w, workspace(selected: null));
+      expect(find.text(m.priorityUrgent), findsOneWidget);
+      expect(find.text(m.priorityHigh), findsOneWidget);
+      expect(find.text('2d 3h'), findsNWidgets(3));
     });
 
     testWidgets('standing view lays out at ${w.toInt()} px', (tester) async {
