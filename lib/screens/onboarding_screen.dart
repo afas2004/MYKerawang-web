@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/shell_strings.dart';
 import '../l10n/social_strings.dart';
-import '../widgets/kerawang_motif.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/shell_actions.dart';
 import '../language_cubit.dart';
@@ -195,7 +194,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(s.setupTitle, style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.only(bottom: KSpace.xl),
+                              child: AppIllustration(AppIllo.welcome, size: 200),
+                            ),
+                          ),
+                          Text(s.setupTitle, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
                           const SizedBox(height: KSpace.s),
                           Text(s.setupSubtitle),
                           const SizedBox(height: KSpace.xxl),
@@ -235,7 +240,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(s.contactDetails, style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          Text(s.contactDetails, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
                           const SizedBox(height: KSpace.s),
                           Text(s.contactSubtitle),
                           const SizedBox(height: KSpace.xl),
@@ -246,7 +251,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             keyboardType: TextInputType.phone,
                             decoration: InputDecoration(
                               labelText: s.whatsappNumber,
-                              prefixIcon: const Icon(Icons.phone),
+                              prefixIcon: const Icon(AppIcons.phone),
                               helperText: s.social.whatsappOptionalHelper,
                             ),
                           ),
@@ -271,7 +276,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                   subtitle: Text(s.registeringClubSub),
                                   value: _isClub,
                                   onChanged: (val) => setState(() => _isClub = val),
-                                  secondary: const Icon(Icons.groups),
+                                  secondary: const Icon(AppIcons.people),
                                 ),
                                 
                                 // Verification Field (Only if Club is ON)
@@ -324,19 +329,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ),
       );
 
-    // Phone: full screen. ≥ 600: a centred card on a lattice backdrop.
+    // Phone: full screen. ≥ 600: a centred card on a quiet surface.
     return Scaffold(
       body: LayoutBuilder(builder: (context, c) {
         if (c.maxWidth < 600) return SafeArea(child: form);
         return Stack(
           fit: StackFit.expand,
           children: [
-            ExcludeSemantics(
-              child: ColoredBox(
-                color: scheme.surfaceContainerLow,
-                child: const KerawangLattice(tileSize: 28),
-              ),
-            ),
+            ColoredBox(color: scheme.surfaceContainerLow),
             Center(
               child: Padding(
                 padding: const EdgeInsets.all(KSpace.xl),
@@ -344,10 +344,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   constraints: const BoxConstraints(maxWidth: 520, maxHeight: 760),
                   child: Material(
                     color: theme.scaffoldBackgroundColor,
-                    elevation: 1,
+                    elevation: 0,
                     clipBehavior: Clip.antiAlias,
                     shape: RoundedRectangleBorder(
-                      borderRadius: KRadius.cut,
+                      borderRadius: KRadius.dialog,
                       side: BorderSide(color: scheme.outlineVariant),
                     ),
                     child: form,
@@ -362,7 +362,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 }
 
-/// Wordmark, motif and a two-segment progress bar with "Step n of m".
+/// Wordmark and a two-segment progress bar with "Step n of m".
 class _StepHeader extends StatelessWidget {
   final int step;
   final int total;
@@ -374,15 +374,13 @@ class _StepHeader extends StatelessWidget {
     final scheme = theme.colorScheme;
     final s = context.l10n;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      padding: const EdgeInsets.fromLTRB(KSpace.xl, KSpace.l, KSpace.xl, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Flexible(child: Wordmark(fontSize: 22)),
-              const SizedBox(width: KSpace.m),
-              const KerawangDivider(size: 6),
+              const Flexible(child: Wordmark(fontSize: 20)),
               const Spacer(),
               const SizedBox(width: KSpace.m),
               Text(s.shell.stepOf.fill([step + 1, total]),
@@ -396,7 +394,7 @@ class _StepHeader extends StatelessWidget {
             child: Row(
               children: [
                 for (var i = 0; i < total; i++) ...[
-                  if (i > 0) const SizedBox(width: 6),
+                  if (i > 0) const SizedBox(width: KSpace.s),
                   Expanded(
                     child: AnimatedContainer(
                       duration: KMotion.of(context).slow,
