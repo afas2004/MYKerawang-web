@@ -166,6 +166,8 @@ class StandingView extends StatelessWidget {
   }
 }
 
+/// Clean account: a friendly illustration. Otherwise a plain heading and
+/// one reassuring line — no alarm colours at the top of the page.
 class _Summary extends StatelessWidget {
   final bool clean;
   const _Summary({required this.clean});
@@ -174,47 +176,40 @@ class _Summary extends StatelessWidget {
   Widget build(BuildContext context) {
     final m = context.l10n.mod;
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return KCard(
-      color: clean ? scheme.secondaryContainer : null,
-      padding: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(KSpace.xl),
-            child: Column(
-              children: [
-                Icon(
-                  clean ? ModIcons.official : ModIcons.moderation,
-                  size: 40,
-                  color: clean ? scheme.onSecondaryContainer : scheme.primary,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  clean ? m.goodStanding : m.accountStatus,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: clean
-                        ? scheme.onSecondaryContainer
-                        : scheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  clean ? m.goodStandingBody : m.ui.standingIntro,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: clean
-                        ? scheme.onSecondaryContainer
-                        : scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
+    if (clean) {
+      return BrandEmptyState(
+        icon: ModIcons.official,
+        illo: AppIllo.welcome,
+        title: m.goodStanding,
+        message: m.goodStandingBody,
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(14),
           ),
-        ],
-      ),
+          child: Icon(ModIcons.moderation, color: theme.colorScheme.onPrimaryContainer),
+        ),
+        const SizedBox(width: KSpace.l),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(m.accountStatus, style: theme.textTheme.titleLarge),
+              const SizedBox(height: KSpace.xs),
+              Text(m.ui.standingIntro,
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

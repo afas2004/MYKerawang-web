@@ -27,53 +27,89 @@ class AdminOverview extends StatelessWidget {
     final oldest = DateTime.tryParse('${s?['oldest_open_at']}');
     final age = oldest == null
         ? u.statNone
-        : compactAge(DateTime.now().difference(oldest.toLocal()),
-            day: m.ageDay, hour: m.ageHour, minute: m.ageMinute, lessThanMinute: m.ageNow);
+        : compactAge(
+            DateTime.now().difference(oldest.toLocal()),
+            day: m.ageDay,
+            hour: m.ageHour,
+            minute: m.ageMinute,
+            lessThanMinute: m.ageNow,
+          );
 
     final cards = [
-      _Stat(icon: ModIcons.inbox, label: u.statOpen, value: s == null ? null : '${n('open_cases')}',
-          onTap: () => onOpenTab?.call(0), emphasis: n('open_cases') > 0),
-      _Stat(icon: ModIcons.clock, label: u.statOldest, value: s == null ? null : age),
-      _Stat(icon: ModIcons.hidden, label: u.statHidden,
-          value: s == null ? null : '${n('hidden_cases')}', onTap: () => onOpenTab?.call(0),
-          emphasis: n('hidden_cases') > 0),
-      _Stat(icon: ModIcons.verified, label: u.statClubs,
-          value: s == null ? null : '${n('club_requests')}', onTap: () => onOpenTab?.call(1)),
-      _Stat(icon: ModIcons.appeal, label: u.statAppeals,
-          value: s == null ? null : '${n('pending_appeals')}', onTap: () => onOpenTab?.call(2)),
+      _Stat(
+        icon: ModIcons.inbox,
+        label: u.statOpen,
+        value: s == null ? null : '${n('open_cases')}',
+        onTap: () => onOpenTab?.call(0),
+        emphasis: n('open_cases') > 0,
+      ),
+      _Stat(
+        icon: ModIcons.clock,
+        label: u.statOldest,
+        value: s == null ? null : age,
+      ),
+      _Stat(
+        icon: ModIcons.hidden,
+        label: u.statHidden,
+        value: s == null ? null : '${n('hidden_cases')}',
+        onTap: () => onOpenTab?.call(0),
+        emphasis: n('hidden_cases') > 0,
+      ),
+      _Stat(
+        icon: ModIcons.verified,
+        label: u.statClubs,
+        value: s == null ? null : '${n('club_requests')}',
+        onTap: () => onOpenTab?.call(1),
+      ),
+      _Stat(
+        icon: ModIcons.appeal,
+        label: u.statAppeals,
+        value: s == null ? null : '${n('pending_appeals')}',
+        onTap: () => onOpenTab?.call(2),
+      ),
     ];
 
-    return LayoutBuilder(builder: (context, c) {
-      // Grid: 2 columns on phones, 3 on tablets, all 5 in one row from
-      // the desktop breakpoint. Each row shares its width equally.
-      final cols = c.maxWidth >= Responsive.desktopBreakpoint
-          ? 5
-          : c.maxWidth >= 600
-              ? 3
-              : 2;
-      final rows = <List<Widget>>[
-        for (var i = 0; i < cards.length; i += cols)
-          cards.sublist(i, (i + cols).clamp(0, cards.length)),
-      ];
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, KSpace.s),
-        child: Column(
-          children: [
-            for (var r = 0; r < rows.length; r++) ...[
-              if (r > 0) const SizedBox(height: KSpace.s),
-              Row(
-                children: [
-                  for (var i = 0; i < rows[r].length; i++) ...[
-                    if (i > 0) const SizedBox(width: KSpace.s),
-                    Expanded(child: rows[r][i]),
-                  ],
-                ],
-              ),
+    return LayoutBuilder(
+      builder: (context, c) {
+        // Grid: 2 columns on phones, 3 on tablets, all 5 in one row from
+        // the desktop breakpoint. Each row shares its width equally.
+        final cols = c.maxWidth >= Responsive.desktopBreakpoint
+            ? 5
+            : c.maxWidth >= 600
+            ? 3
+            : 2;
+        final rows = <List<Widget>>[
+          for (var i = 0; i < cards.length; i += cols)
+            cards.sublist(i, (i + cols).clamp(0, cards.length)),
+        ];
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(
+            KSpace.l,
+            KSpace.m,
+            KSpace.l,
+            KSpace.s,
+          ),
+          child: Column(
+            children: [
+              for (var r = 0; r < rows.length; r++) ...[
+                if (r > 0) const SizedBox(height: KSpace.s),
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < rows[r].length; i++) ...[
+                        if (i > 0) const SizedBox(width: KSpace.s),
+                        Expanded(child: rows[r][i]),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ],
-          ],
-        ),
-      );
-    });
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -84,14 +120,24 @@ class _Stat extends StatelessWidget {
   final VoidCallback? onTap;
   final bool emphasis;
 
-  const _Stat({required this.icon, required this.label, required this.value, this.onTap, this.emphasis = false});
+  const _Stat({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.onTap,
+    this.emphasis = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final tileBg = emphasis ? scheme.tertiaryContainer : scheme.primaryContainer;
-    final tileFg = emphasis ? scheme.onTertiaryContainer : scheme.onPrimaryContainer;
+    final tileBg = emphasis
+        ? scheme.tertiaryContainer
+        : scheme.primaryContainer;
+    final tileFg = emphasis
+        ? scheme.onTertiaryContainer
+        : scheme.onPrimaryContainer;
     return KCard(
       onTap: onTap,
       semanticLabel: '$label: ${value ?? ''}',
@@ -101,7 +147,10 @@ class _Stat extends StatelessWidget {
           Container(
             width: 40,
             height: 40,
-            decoration: BoxDecoration(color: tileBg, borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(
+              color: tileBg,
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Icon(icon, size: 20, color: tileFg),
           ),
           const SizedBox(width: KSpace.m),
@@ -113,17 +162,29 @@ class _Stat extends StatelessWidget {
                 AnimatedSwitcher(
                   duration: KMotion.of(context).medium,
                   child: value == null
-                      ? const KSkeleton(key: ValueKey('loading'), width: 36, height: 22)
-                      : Text(value!,
+                      ? const KSkeleton(
+                          key: ValueKey('loading'),
+                          width: 36,
+                          height: 22,
+                        )
+                      : Text(
+                          value!,
                           key: ValueKey(value),
                           maxLines: 1,
-                          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                 ),
                 const SizedBox(height: 2),
-                Text(label,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+                Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
               ],
             ),
           ),
