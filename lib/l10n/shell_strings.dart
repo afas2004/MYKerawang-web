@@ -34,6 +34,7 @@ class ShellStrings {
   final String thisWeek;
   final String earlier;
   final String markRead;
+  final String unread;
   final String allCaughtUp;
   final String notificationsEmptyBody;
 
@@ -68,6 +69,7 @@ class ShellStrings {
     required this.thisWeek,
     required this.earlier,
     required this.markRead,
+    required this.unread,
     required this.allCaughtUp,
     required this.notificationsEmptyBody,
     required this.recentSearches,
@@ -99,6 +101,7 @@ class ShellStrings {
     thisWeek: "This week",
     earlier: "Earlier",
     markRead: "Mark as read",
+    unread: "Unread",
     allCaughtUp: "You're all caught up",
     notificationsEmptyBody: "Follows, mentions and replies will show up here.",
     recentSearches: "Recent searches",
@@ -130,6 +133,7 @@ class ShellStrings {
     thisWeek: "Minggu ini",
     earlier: "Sebelum ini",
     markRead: "Tanda dibaca",
+    unread: "Belum dibaca",
     allCaughtUp: "Semua dah dibaca",
     notificationsEmptyBody: "Ikutan, sebutan dan balasan akan muncul di sini.",
     recentSearches: "Carian terkini",
