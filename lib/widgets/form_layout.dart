@@ -116,7 +116,10 @@ class PublishBar extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       child: SafeArea(
         top: false,
+        // heightFactor: 1 — a plain Center as Scaffold.bottomNavigationBar
+        // grows to the whole screen and hides the form and the app bar.
         child: Center(
+          heightFactor: 1,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
             child: FilledButton.icon(
