@@ -2,6 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
+import '../l10n/app_strings.dart';
+import '../l10n/shell_strings.dart';
+import '../l10n/social_strings.dart';
+import '../widgets/kerawang_motif.dart';
+import '../widgets/brand/brand.dart';
+import '../widgets/shell_actions.dart';
+import '../language_cubit.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -43,13 +50,29 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (user == null) return;
     
     // Fetch what we already know about the user
-    final data = await _supabase.from('profiles').select().eq('id', user.id).maybeSingle();
+    final data = await _supabase
+        .from('profiles')
+        .select('display_name, username')
+        .eq('id', user.id)
+        .maybeSingle();
+
+    // Phone is private (profile_contacts, owner-only).
+    try {
+      final contact = await _supabase
+          .from('profile_contacts')
+          .select('phone_number')
+          .eq('user_id', user.id)
+          .maybeSingle();
+      final phone = contact?['phone_number'];
+      if (phone is String && mounted) _phoneCtrl.text = phone;
+    } catch (e) {
+      debugPrint("Error loading contact details: $e");
+    }
     
     if (data != null && mounted) {
       setState(() {
         // Pre-fill fields so they don't have to type it again
         _nameCtrl.text = data['display_name'] ?? ''; 
-        _phoneCtrl.text = data['phone_number'] ?? '';
         
         // If they managed to set a username before but got stuck, load it too
         if (data['username'] != null) {
@@ -78,7 +101,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       final res = await _supabase.from('profiles').select('id').eq('username', value).maybeSingle();
       if (mounted) {
         setState(() {
-          _usernameError = res != null ? "Username already taken" : null;
+          _usernameError = res != null ? context.l10nRead.usernameTakenShort : null;
         });
       }
     });
@@ -90,7 +113,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     
     // Club Verification Check
     if (_isClub && _clubReasonCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please provide club details/ID for verification.")));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.clubDetailsNeeded)));
       return;
     }
 
@@ -103,19 +126,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         'id': user!.id,
         'username': _usernameCtrl.text.trim().toLowerCase(),
         'display_name': _nameCtrl.text.trim(),
-        'phone_number': _phoneCtrl.text.trim(), // <--- SAVING PHONE
         'role': _isClub ? 'club_pending' : 'student',
         // We save the club justification in 'bio' or a separate column for admin review
         'bio': _isClub ? "Club Verification: ${_clubReasonCtrl.text}" : null,
         'updated_at': DateTime.now().toIso8601String(),
       });
 
+      // Optional here; create_listing asks for it before selling.
+      final phone = _phoneCtrl.text.trim();
+      if (phone.isNotEmpty) {
+        await _supabase.from('profile_contacts').upsert({
+          'user_id': user.id,
+          'phone_number': phone,
+          'updated_at': DateTime.now().toIso8601String(),
+        }, onConflict: 'user_id');
+      }
+
       if (mounted) {
         // Go to Home (router replaces the stack)
         context.go('/home');
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.errorWithDetail.fill([e]))));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -125,7 +157,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     // Validate Step 1 before moving
     if (_step == 0) {
       if (_usernameCtrl.text.isEmpty || _nameCtrl.text.isEmpty || _usernameError != null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fix errors first.")));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.fixErrorsFirst)));
         return;
       }
     }
@@ -142,19 +174,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
-    return Scaffold(
-      appBar: AppBar(title: const Text("Welcome!"), automaticallyImplyLeading: false),
-      body: Form(
+    final scheme = theme.colorScheme;
+    final s = context.l10n;
+
+    final form = Form(
         key: _formKey,
         child: Column(
           children: [
-            // PROGRESS BAR
-            LinearProgressIndicator(
-              value: _step == 0 ? 0.5 : 1.0, 
-              backgroundColor: theme.colorScheme.surfaceContainer,
-            ),
-            
+            _StepHeader(step: _step, total: 2),
+
             Expanded(
               child: PageView(
                 physics: const NeverScrollableScrollPhysics(), // Disable swipe
@@ -162,40 +190,38 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 children: [
                   // --- STEP 1: IDENTITY ---
                   Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(KSpace.xl),
                     child: SingleChildScrollView(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("Let's get you set up.", style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                          const Text("Create a unique ID so friends can find you."),
-                          const SizedBox(height: 32),
+                          Text(s.setupTitle, style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: KSpace.s),
+                          Text(s.setupSubtitle),
+                          const SizedBox(height: KSpace.xxl),
                           
                           // Username
                           TextFormField(
                             controller: _usernameCtrl,
                             decoration: InputDecoration(
-                              labelText: "Username",
+                              labelText: s.username,
                               prefixText: "@",
                               errorText: _usernameError,
-                              border: const OutlineInputBorder(),
-                              helperText: "Unique ID (e.g. fahmi_99)",
+                              helperText: s.usernameHelper,
                             ),
                             onChanged: _onUsernameChanged,
-                            validator: (v) => (v!.length < 3) ? "Too short" : null,
+                            validator: (v) => (v!.length < 3) ? s.usernameMin : null,
                           ),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: KSpace.xl),
                           
                           // Display Name
                           TextFormField(
                             controller: _nameCtrl,
-                            decoration: const InputDecoration(
-                              labelText: "Display Name",
-                              border: OutlineInputBorder(),
-                              helperText: "Your real name or club name",
+                            decoration: InputDecoration(
+                              labelText: s.displayName,
+                              helperText: s.displayNameHelper,
                             ),
-                            validator: (v) => v!.isEmpty ? "Required" : null,
+                            validator: (v) => v!.isEmpty ? s.required : null,
                           ),
                         ],
                       ),
@@ -204,47 +230,45 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
                   // --- STEP 2: CONTACT & ROLE ---
                   Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(KSpace.xl),
                     child: SingleChildScrollView(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("Contact Details", style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                          const Text("How should people contact you regarding events or items?"),
-                          const SizedBox(height: 24),
+                          Text(s.contactDetails, style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: KSpace.s),
+                          Text(s.contactSubtitle),
+                          const SizedBox(height: KSpace.xl),
                           
-                          // PHONE NUMBER (Crucial)
+                          // PHONE NUMBER (optional until they sell)
                           TextFormField(
                             controller: _phoneCtrl,
                             keyboardType: TextInputType.phone,
-                            decoration: const InputDecoration(
-                              labelText: "WhatsApp Number",
-                              prefixIcon: Icon(Icons.phone),
-                              border: OutlineInputBorder(),
-                              helperText: "Required for Marketplace & Events",
+                            decoration: InputDecoration(
+                              labelText: s.whatsappNumber,
+                              prefixIcon: const Icon(Icons.phone),
+                              helperText: s.social.whatsappOptionalHelper,
                             ),
-                            validator: (v) => v!.isEmpty ? "Phone number is required" : null,
                           ),
                           
-                          const SizedBox(height: 32),
+                          const SizedBox(height: KSpace.xxl),
                           const Divider(),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: KSpace.l),
 
                           // CLUB TOGGLE
                           Container(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(KSpace.l),
                             decoration: BoxDecoration(
-                              border: Border.all(color: _isClub ? theme.primaryColor : Colors.grey.shade300),
+                              border: Border.all(color: _isClub ? scheme.primary : scheme.outlineVariant),
                               borderRadius: BorderRadius.circular(12),
-                              color: _isClub ? theme.primaryColor.withOpacity(0.05) : null,
+                              color: _isClub ? scheme.primary.withValues(alpha: 0.05) : null,
                             ),
                             child: Column(
                               children: [
                                 SwitchListTile(
                                   contentPadding: EdgeInsets.zero,
-                                  title: const Text("I am registering a Club"),
-                                  subtitle: const Text("Switch to Club Account (Requires Approval)"),
+                                  title: Text(s.registeringClub),
+                                  subtitle: Text(s.registeringClubSub),
                                   value: _isClub,
                                   onChanged: (val) => setState(() => _isClub = val),
                                   secondary: const Icon(Icons.groups),
@@ -252,15 +276,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 
                                 // Verification Field (Only if Club is ON)
                                 if (_isClub) ...[
-                                  const SizedBox(height: 12),
+                                  const SizedBox(height: KSpace.m),
                                   TextFormField(
                                     controller: _clubReasonCtrl,
-                                    decoration: const InputDecoration(
-                                      labelText: "Club ID / Reference",
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                      border: OutlineInputBorder(),
-                                      helperText: "Provide ID for admin verification",
+                                    decoration: InputDecoration(
+                                      labelText: s.clubReference,
+                                      helperText: s.clubReferenceHelper,
                                     ),
                                   ),
                                 ]
@@ -277,11 +298,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             
             // BOTTOM BUTTONS
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(KSpace.xl),
               child: Row(
                 children: [
                   if (_step > 0)
-                    TextButton(onPressed: _prevPage, child: const Text("Back")),
+                    TextButton(onPressed: _prevPage, child: Text(s.back)),
                   const Spacer(),
                   FilledButton(
                     onPressed: _isLoading ? null : () {
@@ -293,14 +314,105 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     },
                     style: FilledButton.styleFrom(minimumSize: const Size(120, 50)),
                     child: _isLoading 
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
-                      : Text(_step == 0 ? "Next" : "Finish"),
+                      ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onPrimary))
+                      : Text(_step == 0 ? s.next : s.finish),
                   ),
                 ],
               ),
             ),
           ],
         ),
+      );
+
+    // Phone: full screen. ≥ 600: a centred card on a lattice backdrop.
+    return Scaffold(
+      body: LayoutBuilder(builder: (context, c) {
+        if (c.maxWidth < 600) return SafeArea(child: form);
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            ExcludeSemantics(
+              child: ColoredBox(
+                color: scheme.surfaceContainerLow,
+                child: const KerawangLattice(tileSize: 28),
+              ),
+            ),
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(KSpace.xl),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520, maxHeight: 760),
+                  child: Material(
+                    color: theme.scaffoldBackgroundColor,
+                    elevation: 1,
+                    clipBehavior: Clip.antiAlias,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: KRadius.cut,
+                      side: BorderSide(color: scheme.outlineVariant),
+                    ),
+                    child: form,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      }),
+    );
+  }
+}
+
+/// Wordmark, motif and a two-segment progress bar with "Step n of m".
+class _StepHeader extends StatelessWidget {
+  final int step;
+  final int total;
+  const _StepHeader({required this.step, required this.total});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final s = context.l10n;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Flexible(child: Wordmark(fontSize: 22)),
+              const SizedBox(width: KSpace.m),
+              const KerawangDivider(size: 6),
+              const Spacer(),
+              const SizedBox(width: KSpace.m),
+              Text(s.shell.stepOf.fill([step + 1, total]),
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(color: scheme.onSurfaceVariant)),
+            ],
+          ),
+          const SizedBox(height: KSpace.m),
+          Semantics(
+            label: s.shell.stepOf.fill([step + 1, total]),
+            child: Row(
+              children: [
+                for (var i = 0; i < total; i++) ...[
+                  if (i > 0) const SizedBox(width: 6),
+                  Expanded(
+                    child: AnimatedContainer(
+                      duration: KMotion.of(context).slow,
+                      curve: KMotion.curve,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: i <= step ? scheme.primary : scheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

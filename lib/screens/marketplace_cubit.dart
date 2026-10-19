@@ -1,117 +1,225 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../database_helper.dart'; // Import DB Helper
+import '../database_helper.dart';
+import '../utils/listing_status.dart';
+
+enum MarketSort { newest, cheapest, priciest }
+
+/// What the market list is showing. Everything here is applied by the
+/// database, so the app only ever downloads one page at a time.
+class MarketFilters {
+  /// null = every category.
+  final String? category;
+  final double? minPrice;
+  final double? maxPrice;
+  final Set<ListingStatus> statuses;
+  final MarketSort sort;
+
+  /// Sold listings are history; they're hidden until asked for.
+  static const defaultStatuses = {ListingStatus.available, ListingStatus.reserved};
+
+  const MarketFilters({
+    this.category,
+    this.minPrice,
+    this.maxPrice,
+    this.statuses = defaultStatuses,
+    this.sort = MarketSort.newest,
+  });
+
+  MarketFilters copyWith({
+    String? Function()? category,
+    double? Function()? minPrice,
+    double? Function()? maxPrice,
+    Set<ListingStatus>? statuses,
+    MarketSort? sort,
+  }) {
+    return MarketFilters(
+      category: category != null ? category() : this.category,
+      minPrice: minPrice != null ? minPrice() : this.minPrice,
+      maxPrice: maxPrice != null ? maxPrice() : this.maxPrice,
+      statuses: statuses ?? this.statuses,
+      sort: sort ?? this.sort,
+    );
+  }
+
+  /// Filters set in the sheet beyond the defaults (the badge count).
+  int get activeCount =>
+      (category != null ? 1 : 0) +
+      (minPrice != null || maxPrice != null ? 1 : 0) +
+      (statuses.length != defaultStatuses.length ||
+              !statuses.containsAll(defaultStatuses)
+          ? 1
+          : 0) +
+      (sort != MarketSort.newest ? 1 : 0);
+
+  bool get isDefault => activeCount == 0;
+}
 
 class MarketplaceState {
-  final List<Map<String, dynamic>> allItems;
-  final List<Map<String, dynamic>> displayedItems;
-  final String selectedFilter;
+  final List<Map<String, dynamic>> items;
+  final MarketFilters filters;
   final String searchQuery;
   final bool isLoading;
+  final bool isLoadingMore;
+  final bool hasMore;
   final String? errorMessage;
 
-  MarketplaceState({
-    this.allItems = const [],
-    this.displayedItems = const [],
-    this.selectedFilter = 'All',
+  /// Loading the next page failed; the footer offers a retry.
+  final bool loadMoreFailed;
+
+  const MarketplaceState({
+    this.items = const [],
+    this.filters = const MarketFilters(),
     this.searchQuery = '',
     this.isLoading = true,
+    this.isLoadingMore = false,
+    this.hasMore = false,
     this.errorMessage,
+    this.loadMoreFailed = false,
   });
 
   MarketplaceState copyWith({
-    List<Map<String, dynamic>>? allItems,
-    List<Map<String, dynamic>>? displayedItems,
-    String? selectedFilter,
+    List<Map<String, dynamic>>? items,
+    MarketFilters? filters,
     String? searchQuery,
     bool? isLoading,
+    bool? isLoadingMore,
+    bool? hasMore,
     String? errorMessage,
+    bool? loadMoreFailed,
   }) {
     return MarketplaceState(
-      allItems: allItems ?? this.allItems,
-      displayedItems: displayedItems ?? this.displayedItems,
-      selectedFilter: selectedFilter ?? this.selectedFilter,
+      items: items ?? this.items,
+      filters: filters ?? this.filters,
       searchQuery: searchQuery ?? this.searchQuery,
       isLoading: isLoading ?? this.isLoading,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      hasMore: hasMore ?? this.hasMore,
       errorMessage: errorMessage,
+      loadMoreFailed: loadMoreFailed ?? false,
     );
   }
 }
 
 class MarketplaceCubit extends Cubit<MarketplaceState> {
-  MarketplaceCubit() : super(MarketplaceState()) {
+  MarketplaceCubit() : super(const MarketplaceState()) {
     loadData();
   }
 
-  StreamSubscription? _subscription;
+  static const pageSize = 24;
+
   final _supabase = Supabase.instance.client;
+  Timer? _searchDebounce;
 
+  /// Bumped on every fresh load so a slow, superseded response can't
+  /// overwrite newer results.
+  int _generation = 0;
+
+  bool get _isUnfiltered => state.filters.isDefault && state.searchQuery.isEmpty;
+
+  /// First page for the current filters (also pull-to-refresh / retry).
   Future<void> loadData() async {
-    emit(state.copyWith(isLoading: true));
+    final gen = ++_generation;
+    emit(state.copyWith(isLoading: state.items.isEmpty, hasMore: false));
 
-    // 1. FAST: Cache Load
-    final cachedData = await DatabaseHelper.instance.getCachedListings();
-    
-    if (cachedData.isNotEmpty) {
-      final filtered = _applyFilters(cachedData, state.selectedFilter, state.searchQuery);
-      emit(state.copyWith(
-        allItems: cachedData,
-        displayedItems: filtered,
-        isLoading: false,
-      ));
+    // Instant paint from the offline cache, for the default view only.
+    if (_isUnfiltered && state.items.isEmpty) {
+      final cached = await DatabaseHelper.instance.getCachedListings();
+      final visible = cached
+          .where((i) => MarketFilters.defaultStatuses.contains(ListingStatus.of(i)))
+          .toList();
+      if (gen == _generation && visible.isNotEmpty && !isClosed) {
+        emit(state.copyWith(items: visible, isLoading: false));
+      }
     }
 
-    // 2. SLOW: Network Load
-    _subscription?.cancel(); // drop the previous stream before resubscribing
-    _subscription = _supabase
-        .from('listings')
-        .stream(primaryKey: ['id'])
-        .order('created_at')
-        .limit(200) // newest 200 — not the whole table over mobile data
-        .listen((data) async {
-          final items = List<Map<String, dynamic>>.from(data);
-          
-          // Update Cache
-          await DatabaseHelper.instance.cacheListings(items);
-
-          final filtered = _applyFilters(items, state.selectedFilter, state.searchQuery);
-
-          if (!isClosed) {
-            emit(state.copyWith(
-              allItems: items,
-              displayedItems: filtered,
-              isLoading: false,
-            ));
-          }
-        }, onError: (error) {
-          if (!isClosed) emit(state.copyWith(isLoading: false, errorMessage: error.toString()));
-        });
+    try {
+      final page = await _fetch(offset: 0);
+      if (gen != _generation || isClosed) return;
+      if (_isUnfiltered) await DatabaseHelper.instance.cacheListings(page);
+      emit(state.copyWith(
+        items: page,
+        isLoading: false,
+        hasMore: page.length == pageSize,
+      ));
+    } catch (e) {
+      debugPrint('Market load failed: $e');
+      if (gen != _generation || isClosed) return;
+      emit(state.copyWith(isLoading: false, errorMessage: e.toString()));
+    }
   }
 
-  void updateFilter(String filter) {
-    final filtered = _applyFilters(state.allItems, filter, state.searchQuery);
-    emit(state.copyWith(selectedFilter: filter, displayedItems: filtered));
+  Future<void> loadMore() async {
+    if (state.isLoadingMore || !state.hasMore || state.isLoading) return;
+    final gen = _generation;
+    emit(state.copyWith(isLoadingMore: true, hasMore: true));
+    try {
+      final page = await _fetch(offset: state.items.length);
+      if (gen != _generation || isClosed) return;
+      emit(state.copyWith(
+        items: [...state.items, ...page],
+        isLoadingMore: false,
+        hasMore: page.length == pageSize,
+      ));
+    } catch (e) {
+      debugPrint('Market load more failed: $e');
+      if (gen != _generation || isClosed) return;
+      emit(state.copyWith(isLoadingMore: false, hasMore: true, loadMoreFailed: true));
+    }
   }
+
+  Future<List<Map<String, dynamic>>> _fetch({required int offset}) async {
+    final f = state.filters;
+    var query = _supabase.from('listings').select();
+
+    if (f.category != null) query = query.eq('category', f.category!);
+    if (f.minPrice != null) query = query.gte('price', f.minPrice!);
+    if (f.maxPrice != null) query = query.lte('price', f.maxPrice!);
+    if (f.statuses.length < ListingStatus.values.length) {
+      query = query.inFilter('status', [for (final st in f.statuses) st.dbValue]);
+    }
+    final q = state.searchQuery.trim();
+    if (q.isNotEmpty) {
+      // Escape LIKE wildcards so "50%" searches for the literal text.
+      final escaped = q.replaceAll(r'\', r'\\').replaceAll('%', r'\%').replaceAll('_', r'\_');
+      query = query.ilike('title', '%$escaped%');
+    }
+
+    final ordered = switch (f.sort) {
+      MarketSort.newest => query.order('created_at', ascending: false),
+      MarketSort.cheapest =>
+        query.order('price', ascending: true).order('created_at', ascending: false),
+      MarketSort.priciest =>
+        query.order('price', ascending: false).order('created_at', ascending: false),
+    };
+
+    final rows = await ordered.range(offset, offset + pageSize - 1);
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  void applyFilters(MarketFilters filters) {
+    emit(state.copyWith(filters: filters, items: const []));
+    loadData();
+  }
+
+  /// Quick category chips above the grid.
+  void updateCategory(String? category) =>
+      applyFilters(state.filters.copyWith(category: () => category));
 
   void updateSearch(String query) {
-    final filtered = _applyFilters(state.allItems, state.selectedFilter, query);
-    emit(state.copyWith(searchQuery: query, displayedItems: filtered));
-  }
-
-  List<Map<String, dynamic>> _applyFilters(
-      List<Map<String, dynamic>> items, String filter, String query) {
-    return items.where((i) {
-      final matchesCategory = filter == 'All' || i['category'] == filter;
-      final matchesSearch = query.isEmpty ||
-          (i['title'] as String).toLowerCase().contains(query.toLowerCase());
-      return matchesCategory && matchesSearch;
-    }).toList();
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (isClosed || query == state.searchQuery) return;
+      emit(state.copyWith(searchQuery: query, items: const []));
+      loadData();
+    });
   }
 
   @override
   Future<void> close() {
-    _subscription?.cancel();
+    _searchDebounce?.cancel();
     return super.close();
   }
 }

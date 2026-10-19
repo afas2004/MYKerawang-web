@@ -4,10 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'language_cubit.dart';
 import 'screens/event_detail_screen.dart';
+import 'screens/guest_views.dart';
 import 'screens/events_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/item_detail_screen.dart';
+import 'screens/login_cubit.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_scaffold.dart';
 import 'screens/marketplace_screen.dart';
@@ -17,7 +20,10 @@ import 'screens/post_detail_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
+import 'utils/guest_access.dart';
+import 'utils/responsive.dart';
 import 'widgets/app_sidebar.dart';
+import 'screens/admin/moderation_routes.dart';
 
 /// Notifies the router whenever Supabase auth state changes, so the
 /// redirect below re-runs on login/logout.
@@ -25,7 +31,11 @@ class AuthChangeNotifier extends ChangeNotifier {
   late final StreamSubscription<AuthState> _sub;
 
   AuthChangeNotifier() {
-    _sub = Supabase.instance.client.auth.onAuthStateChange.listen((_) {
+    _sub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final user = data.session?.user;
+      if (data.event == AuthChangeEvent.signedIn && user != null) {
+        enforceStudentEmailForNewAccount(user);
+      }
       notifyListeners();
     });
   }
@@ -38,6 +48,9 @@ class AuthChangeNotifier extends ChangeNotifier {
 }
 
 final _rootKey = GlobalKey<NavigatorState>();
+
+/// Pages a shared link may open without logging in (read-only).
+final _publicPath = RegExp(r'^/(event|item|post|u)/[^/]+/?$');
 final _shellKey = GlobalKey<NavigatorState>();
 
 GoRouter buildRouter() {
@@ -48,19 +61,32 @@ GoRouter buildRouter() {
     initialLocation: '/home',
     refreshListenable: authNotifier,
 
-    // Auth gate. Also drops the OAuth "?code=..." from the address bar,
-    // because redirecting rewrites the location without the query.
+    // Auth gate. Shared detail pages stay readable when logged out;
+    // everything else sends the visitor to /login, remembering where
+    // they were headed in ?from= so login can bring them back.
+    // Also drops the OAuth "?code=..." from the address bar, because
+    // redirecting rewrites the location without the query.
     redirect: (context, state) {
       final loggedIn = Supabase.instance.client.auth.currentSession != null;
       final path = state.uri.path;
       final atLogin = path == '/login';
       final atOnboarding = path == '/onboarding';
 
-      if (!loggedIn) return atLogin ? null : '/login';
+      if (!loggedIn) {
+        if (atLogin || _publicPath.hasMatch(path)) return null;
+        final query = Map.of(state.uri.queryParameters)..remove('code');
+        return loginPathFor(Uri(
+          path: path,
+          queryParameters: query.isEmpty ? null : query,
+        ).toString());
+      }
 
-      // Logged in: bounce away from the login page, and strip any
+      // Logged in: leave the login page for wherever the visitor came
+      // from (email and Google sign-in both land here), and strip any
       // leftover OAuth query parameters.
-      if (atLogin) return '/home';
+      if (atLogin) {
+        return safeReturnPath(state.uri.queryParameters['from']) ?? '/home';
+      }
       if (state.uri.queryParameters.containsKey('code') && !atOnboarding) {
         return path == '/' ? '/home' : path;
       }
@@ -71,7 +97,11 @@ GoRouter buildRouter() {
       GoRoute(path: '/', redirect: (_, __) => '/home'),
       GoRoute(
         path: '/login',
-        builder: (context, state) => const LoginScreen(),
+        builder: (context, state) =>
+            LoginScreen(
+              from: state.uri.queryParameters['from'],
+              oauthError: state.uri.queryParameters['error_description'],
+            ),
       ),
       GoRoute(
         path: '/onboarding',
@@ -128,6 +158,8 @@ GoRouter buildRouter() {
         // (inside a shell branch it would stay on the tab's URL).
         parentNavigatorKey: _rootKey,
         builder: (context, state) => DesktopChrome(
+          // Room for AdaptiveScaffoldBody's two columns on desktop.
+          maxWidth: Responsive.detailMaxWidth,
           child: _DetailLoader(
             table: 'listings',
             id: state.pathParameters['id']!,
@@ -140,6 +172,8 @@ GoRouter buildRouter() {
         path: '/event/:id',
         parentNavigatorKey: _rootKey,
         builder: (context, state) => DesktopChrome(
+          // Room for AdaptiveScaffoldBody's two columns on desktop.
+          maxWidth: Responsive.detailMaxWidth,
           child: _DetailLoader(
             table: 'events',
             id: state.pathParameters['id']!,
@@ -152,12 +186,18 @@ GoRouter buildRouter() {
         path: '/post/:id',
         parentNavigatorKey: _rootKey,
         builder: (context, state) => DesktopChrome(
+          // Room for AdaptiveScaffoldBody's two columns on desktop.
+          maxWidth: Responsive.detailMaxWidth,
           child: _DetailLoader(
             table: 'posts_public', // anonymity-safe view
             id: state.pathParameters['id']!,
             select: '*',
             initial: state.extra as Map<String, dynamic>?,
-            build: (data) => PostDetailScreen(post: data),
+            // Logged-out visitors get a read-only view; the full screen
+            // assumes a signed-in user for commenting and reporting.
+            build: (data) => isLoggedIn
+                ? PostDetailScreen(post: data)
+                : GuestPostScreen(post: data),
           ),
         ),
       ),
@@ -165,7 +205,9 @@ GoRouter buildRouter() {
         path: '/u/:id',
         parentNavigatorKey: _rootKey,
         builder: (context, state) => DesktopChrome(
-          child: ProfileScreen(userId: state.pathParameters['id']),
+          child: isLoggedIn
+              ? ProfileScreen(userId: state.pathParameters['id'])
+              : GuestProfileScreen(userId: state.pathParameters['id']!),
         ),
       ),
 
@@ -182,6 +224,9 @@ GoRouter buildRouter() {
         builder: (context, state) =>
             const DesktopChrome(child: NotificationScreen()),
       ),
+
+      // --- MODERATION (/admin, /standing) ---
+      ...moderationRoutes(_rootKey),
     ],
 
     errorBuilder: (context, state) => Scaffold(
@@ -191,11 +236,11 @@ GoRouter buildRouter() {
           children: [
             const Icon(Icons.explore_off_outlined, size: 48),
             const SizedBox(height: 12),
-            const Text("Page not found"),
+            Text(context.l10n.pageNotFound),
             const SizedBox(height: 12),
             FilledButton(
               onPressed: () => context.go('/home'),
-              child: const Text("Go home"),
+              child: Text(context.l10n.goHome),
             ),
           ],
         ),
@@ -267,11 +312,11 @@ class _DetailLoaderState extends State<_DetailLoader> {
                 children: [
                   const Icon(Icons.search_off, size: 48),
                   const SizedBox(height: 12),
-                  const Text("This content is no longer available"),
+                  Text(context.l10n.contentUnavailable),
                   const SizedBox(height: 12),
                   FilledButton(
                     onPressed: () => context.go('/home'),
-                    child: const Text("Go home"),
+                    child: Text(context.l10n.goHome),
                   ),
                 ],
               )

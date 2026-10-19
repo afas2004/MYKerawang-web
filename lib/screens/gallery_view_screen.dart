@@ -5,6 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../l10n/access_strings.dart';
+import '../l10n/app_strings.dart';
+import '../language_cubit.dart';
+import '../theme/app_themes.dart';
 import '../utils/local_image.dart';
 
 /// Opens the gallery as an overlay popup rather than a pushed page.
@@ -19,7 +23,7 @@ Future<void> showGallery(
 }) {
   return showDialog(
     context: context,
-    barrierColor: Colors.black.withValues(alpha: 0.92),
+    barrierColor: photoScrim(0.92),
     barrierDismissible: true,
     useSafeArea: false,
     builder: (_) => GalleryViewScreen(
@@ -34,7 +38,9 @@ Future<void> showGallery(
 ///
 /// Desktop web has no swipe gesture and PhotoView swallows drags for
 /// panning, so paging needs explicit affordances (UI_UX_AUDIT §13):
-/// hover arrows, ← → keys, mouse wheel, and Esc / backdrop to close.
+/// hover arrows, ← → / Home / End keys, mouse wheel, and Esc / backdrop
+/// to close. Zoom: pinch or double-tap on touch, + / − keys, Ctrl+wheel
+/// and the zoom buttons on web.
 class GalleryViewScreen extends StatefulWidget {
   final List<dynamic> galleryItems; // String (URL) or LocalImage
   final int initialIndex;
@@ -61,6 +67,11 @@ class _GalleryViewScreenState extends State<GalleryViewScreen> {
   bool _hovering = false;
   DateTime _lastWheel = DateTime.fromMillisecondsSinceEpoch(0);
 
+  /// One controller per page, created on demand, so zoom can be driven
+  /// by keys/buttons and reset when paging.
+  final Map<int, PhotoViewController> _zoom = {};
+  PhotoViewController _zoomFor(int i) => _zoom.putIfAbsent(i, PhotoViewController.new);
+
   @override
   void initState() {
     super.initState();
@@ -72,21 +83,41 @@ class _GalleryViewScreenState extends State<GalleryViewScreen> {
   void dispose() {
     _pageController.dispose();
     _focusNode.dispose();
+    for (final c in _zoom.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
   bool get _canPrev => _index > 0;
   bool get _canNext => _index < widget.galleryItems.length - 1;
 
-  void _go(int delta) {
-    final target = _index + delta;
-    if (target < 0 || target >= widget.galleryItems.length) return;
-    _pageController.animateToPage(
-      target,
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeOutCubic,
-    );
+  void _go(int delta) => _goTo(_index + delta);
+
+  void _goTo(int target) {
+    if (target < 0 || target >= widget.galleryItems.length || target == _index) return;
+    // Leaving a page resets its zoom.
+    _zoom[_index]?.reset();
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+      _pageController.jumpToPage(target);
+    } else {
+      _pageController.animateToPage(
+        target,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    }
   }
+
+  static const double _zoomStep = 1.4;
+
+  void _zoomBy(double factor) {
+    final c = _zoomFor(_index);
+    final current = c.scale ?? 1.0;
+    c.scale = (current * factor).clamp(0.2, 8.0);
+  }
+
+  void _resetZoom() => _zoom[_index]?.reset();
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
@@ -96,6 +127,24 @@ class _GalleryViewScreenState extends State<GalleryViewScreen> {
         return KeyEventResult.handled;
       case LogicalKeyboardKey.arrowLeft:
         _go(-1);
+        return KeyEventResult.handled;
+      case LogicalKeyboardKey.home:
+        _goTo(0);
+        return KeyEventResult.handled;
+      case LogicalKeyboardKey.end:
+        _goTo(widget.galleryItems.length - 1);
+        return KeyEventResult.handled;
+      case LogicalKeyboardKey.equal:
+      case LogicalKeyboardKey.add:
+      case LogicalKeyboardKey.numpadAdd:
+        _zoomBy(_zoomStep);
+        return KeyEventResult.handled;
+      case LogicalKeyboardKey.minus:
+      case LogicalKeyboardKey.numpadSubtract:
+        _zoomBy(1 / _zoomStep);
+        return KeyEventResult.handled;
+      case LogicalKeyboardKey.digit0:
+        _resetZoom();
         return KeyEventResult.handled;
       case LogicalKeyboardKey.escape:
         Navigator.of(context).maybePop();
@@ -108,6 +157,11 @@ class _GalleryViewScreenState extends State<GalleryViewScreen> {
   /// several images.
   void _onPointerSignal(PointerSignalEvent event) {
     if (event is! PointerScrollEvent) return;
+    // Ctrl + wheel (and trackpad pinch on web) zooms instead of paging.
+    if (HardwareKeyboard.instance.isControlPressed) {
+      _zoomBy(event.scrollDelta.dy < 0 ? 1.15 : 1 / 1.15);
+      return;
+    }
     final now = DateTime.now();
     if (now.difference(_lastWheel).inMilliseconds < 220) return;
     _lastWheel = now;
@@ -117,21 +171,40 @@ class _GalleryViewScreenState extends State<GalleryViewScreen> {
   @override
   Widget build(BuildContext context) {
     final multiple = widget.galleryItems.length > 1;
+    final s = context.l10n;
+    final count = widget.galleryItems.length;
 
     return Scaffold(
-      backgroundColor: widget.asDialog ? Colors.transparent : Colors.black,
+      backgroundColor: widget.asDialog ? Colors.transparent : photoScrim(1),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: kOnPhoto),
         elevation: 0,
-        title: Text(
-          "${_index + 1} / ${widget.galleryItems.length}",
-          style: const TextStyle(color: Colors.white),
+        automaticallyImplyLeading: false,
+        title: Semantics(
+          liveRegion: true,
+          label: s.photoCount.fill([_index + 1, count]),
+          child: ExcludeSemantics(
+            child: Text(
+              "${_index + 1} / $count",
+              style: const TextStyle(color: kOnPhoto),
+            ),
+          ),
         ),
         actions: [
           IconButton(
-            tooltip: "Close",
-            icon: const Icon(Icons.close, color: Colors.white),
+            tooltip: s.zoomOut,
+            icon: const Icon(Icons.zoom_out, color: kOnPhoto),
+            onPressed: () => _zoomBy(1 / _zoomStep),
+          ),
+          IconButton(
+            tooltip: s.zoomIn,
+            icon: const Icon(Icons.zoom_in, color: kOnPhoto),
+            onPressed: () => _zoomBy(_zoomStep),
+          ),
+          IconButton(
+            tooltip: s.closeGallery,
+            icon: const Icon(Icons.close, color: kOnPhoto),
             onPressed: () => Navigator.of(context).maybePop(),
           ),
         ],
@@ -160,7 +233,10 @@ class _GalleryViewScreenState extends State<GalleryViewScreen> {
                   scrollPhysics: const BouncingScrollPhysics(),
                   itemCount: widget.galleryItems.length,
                   pageController: _pageController,
-                  onPageChanged: (i) => setState(() => _index = i),
+                  onPageChanged: (i) {
+                    _zoom[_index]?.reset();
+                    setState(() => _index = i);
+                  },
                   backgroundDecoration:
                       const BoxDecoration(color: Colors.transparent),
                   builder: (context, index) {
@@ -170,6 +246,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen> {
                         : CachedNetworkImageProvider(item as String);
 
                     return PhotoViewGalleryPageOptions(
+                      controller: _zoomFor(index),
                       imageProvider: provider,
                       initialScale: PhotoViewComputedScale.contained,
                       minScale: PhotoViewComputedScale.contained,
@@ -178,7 +255,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen> {
                     );
                   },
                   loadingBuilder: (context, event) => const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
+                    child: CircularProgressIndicator(color: kOnPhoto),
                   ),
                 ),
 
@@ -190,8 +267,8 @@ class _GalleryViewScreenState extends State<GalleryViewScreen> {
                     _arrow(alignLeft: false),
                 ],
 
-                // Dot indicator
-                if (multiple)
+                // Dot indicator (the counter in the app bar covers big sets)
+                if (multiple && count <= 12)
                   Positioned(
                     bottom: 24,
                     left: 0,
@@ -206,8 +283,8 @@ class _GalleryViewScreenState extends State<GalleryViewScreen> {
                           margin: const EdgeInsets.symmetric(horizontal: 3),
                           decoration: BoxDecoration(
                             color: i == _index
-                                ? Colors.white
-                                : Colors.white.withValues(alpha: 0.4),
+                                ? kOnPhoto
+                                : kOnPhoto.withValues(alpha: 0.4),
                             borderRadius: BorderRadius.circular(99),
                           ),
                         ),
@@ -230,18 +307,21 @@ class _GalleryViewScreenState extends State<GalleryViewScreen> {
       bottom: 0,
       child: Center(
         child: Material(
-          color: Colors.black.withValues(alpha: 0.45),
+          color: photoScrim(0.45),
           shape: const CircleBorder(),
           child: InkWell(
             customBorder: const CircleBorder(),
             onTap: () => _go(alignLeft ? -1 : 1),
-            child: Padding(
+            child: Tooltip(
+              message: alignLeft ? context.l10n.previousPhoto : context.l10n.nextPhoto,
+              child: Padding(
               padding: const EdgeInsets.all(12),
               child: Icon(
                 alignLeft ? Icons.chevron_left : Icons.chevron_right,
-                color: Colors.white,
+                color: kOnPhoto,
                 size: 30,
               ),
+            ),
             ),
           ),
         ),

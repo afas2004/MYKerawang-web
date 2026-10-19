@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -39,18 +41,46 @@ class ProfileState {
 class ProfileCubit extends Cubit<ProfileState> {
   ProfileCubit() : super(ProfileState()) {
     loadProfile();
+    // Created once at app start, so follow the session: load on sign-in
+    // (no reload needed), clear on sign-out, swap on account switch.
+    _authSub = _supabase.auth.onAuthStateChange.listen((data) {
+      final uid = data.session?.user.id;
+      if (uid == null) {
+        _loadedFor = null;
+        emit(ProfileState(isLoading: false));
+      } else if (uid != _loadedFor ||
+          data.event == AuthChangeEvent.userUpdated) {
+        loadProfile();
+      }
+    });
   }
 
   final _supabase = Supabase.instance.client;
+  late final StreamSubscription<AuthState> _authSub;
+
+  /// User whose data is in [state]; guards against a slow load for the
+  /// previous account landing after a switch.
+  String? _loadedFor;
+
+  @override
+  Future<void> close() {
+    _authSub.cancel();
+    return super.close();
+  }
 
   Future<void> loadProfile() async {
     try {
       final user = _supabase.auth.currentUser;
-      if (user == null) return;
-
-      if (state.profile == null) {
-        emit(state.copyWith(isLoading: true));
+      if (user == null) {
+        emit(ProfileState(isLoading: false));
+        return;
       }
+
+      if (state.profile == null || _loadedFor != user.id) {
+        // Never show the previous account's data while loading.
+        emit(ProfileState(isLoading: true));
+      }
+      _loadedFor = user.id;
 
       // 1. Fetch Profile
       final profileData = await _supabase
@@ -71,6 +101,9 @@ class ProfileCubit extends Cubit<ProfileState> {
           .select()
           .eq('organizer_id', user.id); 
 
+      // Signed out or switched while we were fetching.
+      if (_supabase.auth.currentUser?.id != user.id) return;
+
       emit(state.copyWith(
           isLoading: false, // Done!
           profile: profileData,
@@ -80,19 +113,6 @@ class ProfileCubit extends Cubit<ProfileState> {
       } catch (e) {
         emit(state.copyWith(isLoading: false, errorMessage: e.toString()));
       }
-  }
-
-  // ... (Keep updateProfile and uploadAvatar functions EXACTLY as they were before) ...
-  Future<void> updateProfile({required String fullName, required String phone, required String bio}) async {
-    try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) return;
-      emit(state.copyWith(isLoading: true));
-      await _supabase.from('profiles').update({'full_name': fullName, 'phone_number': phone, 'bio': bio}).eq('id', user.id);
-      await loadProfile();
-    } catch (e) {
-      emit(state.copyWith(isLoading: false, errorMessage: e.toString()));
-    }
   }
 
   Future<void> uploadAvatar(XFile imageFile) async {

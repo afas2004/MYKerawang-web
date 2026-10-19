@@ -1,25 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:custom_refresh_indicator/custom_refresh_indicator.dart';
 
+/// The app's one pull-to-refresh: a thin primary-coloured bar instead of
+/// the Material spinner. Use this everywhere a list can be refreshed.
 class LinearRefresher extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final Widget child;
   final double offset; 
-  final double triggerDistance; // <--- NEW: Controls sensitivity
+  /// Pull distance (px) before a release triggers a refresh.
+  final double triggerDistance;
 
   const LinearRefresher({
     super.key, 
     required this.onRefresh, 
     required this.child,
     this.offset = 0.0, 
-    this.triggerDistance = 300.0, // <--- HIGHER VALUE = LESS SENSITIVE
+    this.triggerDistance = 120.0,
   });
 
   @override
   Widget build(BuildContext context) {
     return CustomRefreshIndicator(
       onRefresh: onRefresh,
-      offsetToArmed: triggerDistance, // <--- APPLIED HERE
+      offsetToArmed: triggerDistance,
       builder: (context, child, controller) {
         return Stack(
           children: [

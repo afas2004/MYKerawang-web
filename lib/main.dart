@@ -12,6 +12,8 @@ import 'language_cubit.dart';
 import 'router.dart';
 // --- IMPORT YOUR SERVICES ---
 import 'services/notification_service.dart';
+import 'services/saved_items.dart';
+import 'services/unread_notifications.dart';
 import 'services/update_service.dart';
 import 'widgets/update_banner.dart';
 import 'utils/responsive.dart';
@@ -78,10 +80,13 @@ class _MyAppState extends State<MyApp> {
             scrollBehavior: AppScrollBehavior(),
             routerConfig: _router,
 
-            // Centre the app on desktop + run session side effects
-            // (onboarding redirect, notification stream) above every route.
+            // Session side effects (onboarding redirect, notification
+            // stream) above every route. No mid-band clamp: MainScaffold
+            // has a real medium (600–899) layout.
             builder: (context, child) => SessionWatcher(
-              child: UpdateBanner(child: ResponsiveShell(child: child!)),
+              child: UpdateBanner(
+                child: ResponsiveShell(clampMidBand: false, child: child!),
+              ),
             ),
 
             // 3. Named theme (Kampus Bold / Istana Modern / Songket Noir)
@@ -117,6 +122,8 @@ class _SessionWatcherState extends State<SessionWatcher> {
     if (session != null) {
       _checkUserProfile(session.user.id);
       _startNotificationStream(session.user.id);
+      UnreadNotifications.instance.start(session.user.id);
+      SavedItems.instance.start(session.user.id);
     }
 
     _authSubscription =
@@ -127,8 +134,14 @@ class _SessionWatcherState extends State<SessionWatcher> {
       if (session == null) {
         _notificationSubscription?.cancel();
         _notificationSubscription = null;
+        UnreadNotifications.instance.stop();
+        SavedItems.instance.stop();
         return;
       }
+
+      // No-ops for the same user; swap state on an account switch.
+      UnreadNotifications.instance.start(session.user.id);
+      SavedItems.instance.start(session.user.id);
 
       if (event == AuthChangeEvent.signedIn) {
         NotificationService.requestPermission();
@@ -183,7 +196,7 @@ class _SessionWatcherState extends State<SessionWatcher> {
           if (difference < 30) {
             NotificationService.showNotification(
               latest['title'],
-              latest['message'] ?? latest['body'] ?? 'New Notification',
+              latest['message'] ?? latest['body'] ?? context.l10nRead.notifications,
             );
           }
         });
@@ -193,6 +206,7 @@ class _SessionWatcherState extends State<SessionWatcher> {
   void dispose() {
     _authSubscription.cancel();
     _notificationSubscription?.cancel();
+    UnreadNotifications.instance.stop();
     super.dispose();
   }
 

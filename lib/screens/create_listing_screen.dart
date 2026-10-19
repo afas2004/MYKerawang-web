@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:image_picker/image_picker.dart';
-// Ensure you have this utility (or copy it from previous steps)
 import '../utils/image_compressor.dart';
 import '../utils/local_image.dart';
 import '../utils/categories.dart';
-import 'gallery_view_screen.dart';
+import '../l10n/access_strings.dart';
+import '../l10n/app_strings.dart';
+import '../l10n/social_strings.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
-import '../utils/responsive.dart';
+import '../utils/formatters.dart';
+import '../widgets/form_layout.dart';
+import '../widgets/media_picker_grid.dart';
+import '../widgets/restriction_gate.dart';
+import 'edit_profile_screen.dart';
 
 class CreateListingScreen extends StatefulWidget {
   final Map<String, dynamic>? itemToEdit; 
@@ -74,67 +78,72 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     super.dispose();
   }
 
-  // --- 1. UNIFIED PICKER LOGIC ---
-  Future<void> _pickImage(ImageSource source) async {
-    final picker = ImagePicker();
-    try {
-      if (source == ImageSource.camera) {
-        final XFile? picked = await picker.pickImage(source: ImageSource.camera, maxWidth: kPhotoMaxDimension, maxHeight: kPhotoMaxDimension, imageQuality: kPhotoQuality);
-        if (picked != null) {
-          final img = await LocalImage.fromXFile(picked);
-          setState(() => _mediaItems.add(img));
-        }
-      } else {
-        final List<XFile> pickedList = await picker.pickMultiImage(maxWidth: kPhotoMaxDimension, maxHeight: kPhotoMaxDimension, imageQuality: kPhotoQuality);
-        if (pickedList.isNotEmpty) {
-          final imgs = await Future.wait(pickedList.map(LocalImage.fromXFile));
-          setState(() {
-            _mediaItems.addAll(imgs);
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint("Error picking image: $e");
-    }
+  Future<bool> _hasPhone(String userId) async {
+    final row = await _supabase
+        .from('profile_contacts')
+        .select('phone_number')
+        .eq('user_id', userId)
+        .maybeSingle();
+    final phone = row?['phone_number'];
+    return phone is String && phone.trim().isNotEmpty;
   }
 
-  void _showAddOptions() {
-    showAdaptiveSheet(
+  /// Buyers reach sellers on WhatsApp, and onboarding no longer asks for
+  /// the number — so selling is where it becomes required. Offers Edit
+  /// profile and re-checks when they come back.
+  Future<bool> _ensurePhone(String userId) async {
+    if (await _hasPhone(userId)) return true;
+    if (!mounted) return false;
+    final s = context.l10nRead;
+    final goEdit = await showDialog<bool>(
       context: context,
-      builder: (_) => SafeArea(
-        child: Wrap(
-          children: [
-            // Desktop browsers can't capture; phone PWAs can (see canUseCamera)
-            if (canUseCamera(context))
-              ListTile(
-                leading: const Icon(Icons.photo_camera),
-                title: Text(context.l10n.takePhoto),
-                onTap: () { Navigator.pop(context); _pickImage(ImageSource.camera); },
-              ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: Text(context.l10n.chooseFromGallery),
-              onTap: () { Navigator.pop(context); _pickImage(ImageSource.gallery); },
-            ),
-          ],
-        ),
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.phone),
+        title: Text(s.social.whatsappNeededTitle),
+        content: Text(s.social.whatsappNeededBody),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(s.cancel)),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(s.editProfile)),
+        ],
       ),
     );
+    if (goEdit != true || !mounted) return false;
+    await Navigator.push(
+        context, MaterialPageRoute(builder: (_) => const EditProfileScreen()));
+    return _hasPhone(userId);
   }
 
   // --- 2. UPLOAD LOGIC ---
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    
+    final s = context.l10nRead;
+
     if (_mediaItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please add at least 1 photo.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.addPhotoRequired)));
       return;
     }
 
     final user = _supabase.auth.currentUser;
     if (user == null) return;
+    if (!await ensureCanWrite(context, ModScope.market) || !mounted) return;
 
     setState(() => _isLoading = true);
+    try {
+      if (!await _ensurePhone(user.id)) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+        setState(() => _isLoading = false);
+      }
+      return;
+    }
 
     try {
       String? finalCoverUrl;
@@ -180,235 +189,112 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
       if (widget.itemToEdit != null) {
         await _supabase.from('listings').update(data).eq('id', widget.itemToEdit!['id']);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Listing Updated!')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.listingUpdated)));
       } else {
         await _supabase.from('listings').insert(data);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Listing Published!')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.listingPublished)));
       }
 
       if (mounted) Navigator.pop(context, true); 
 
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeWriteError(context, e))));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // --- 3. UI HELPER: IMAGE MENU ---
-  void _showImageMenu(int index) {
-    showAdaptiveSheet(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Wrap(
-          children: [
-            if (index != 0)
-              ListTile(
-                leading: const Icon(Icons.star_border),
-                title: Text(context.l10n.setAsCover),
-                onTap: () {
-                  Navigator.pop(context);
-                  setState(() {
-                    final item = _mediaItems.removeAt(index);
-                    _mediaItems.insert(0, item);
-                  });
-                },
-              ),
-            ListTile(
-              leading: const Icon(Icons.fullscreen),
-              title: Text(context.l10n.viewFullscreen),
-              onTap: () {
-                Navigator.pop(context);
-                showGallery(context, items: _mediaItems, initialIndex: index);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Remove Photo', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(context);
-                setState(() => _mediaItems.removeAt(index));
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.itemToEdit != null;
-    final theme = Theme.of(context);
+    final s = context.l10n;
 
     return Scaffold(
       appBar: appBarConstrained(context,
-          title: Text(isEditing ? 'Edit Listing' : 'Sell Item')),
-      body: PageBody(child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+          title: Text(isEditing ? s.editListing : s.sellItem)),
+      body: FormPageBody(
         child: Form(
           key: _formKey,
+          // Errors show as soon as a field is touched, not only on submit.
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // --- UNIFIED MEDIA GRID ---
-              const Padding(
-                padding: EdgeInsets.only(bottom: 8),
-                child: Text("Photos", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              ),
-              if (_mediaItems.isEmpty)
-                GestureDetector(
-                  onTap: _showAddOptions,
-                  child: Container(
-                    height: 150,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainer,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.add_a_photo, size: 40, color: theme.colorScheme.primary),
-                        const SizedBox(height: 8),
-                        Text("Add Photos", style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
-                )
-              else
-                SizedBox(
-                  height: 140,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _mediaItems.length + 1,
-                    itemBuilder: (context, index) {
-                      // "Add More" Button at the end
-                      if (index == _mediaItems.length) {
-                        return GestureDetector(
-                          onTap: _showAddOptions,
-                          child: Container(
-                            width: 100,
-                            margin: const EdgeInsets.only(right: 8),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surfaceContainer,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
-                            ),
-                            child: const Icon(Icons.add, size: 30),
-                          ),
-                        );
-                      }
-
-                      final item = _mediaItems[index];
-                      final isCover = index == 0;
-
-                      return GestureDetector(
-                        onTap: () => _showImageMenu(index),
-                        child: Container(
-                          width: 140,
-                          margin: const EdgeInsets.only(right: 8),
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: item is LocalImage
-                                    ? Image.memory(item.bytes, fit: BoxFit.cover)
-                                    : Image.network(item as String, fit: BoxFit.cover),
-                              ),
-                              if (isCover)
-                                Positioned(
-                                  bottom: 0, left: 0, right: 0,
-                                  child: Container(
-                                    color: Colors.black54,
-                                    padding: const EdgeInsets.symmetric(vertical: 4),
-                                    child: const Text("COVER", textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                                  ),
-                                ),
-                              Positioned(
-                                top: 4, right: 4,
-                                child: GestureDetector(
-                                  onTap: () => setState(() => _mediaItems.removeAt(index)),
-                                  child: const CircleAvatar(radius: 10, backgroundColor: Colors.red, child: Icon(Icons.close, size: 12, color: Colors.white)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                
-              if (_mediaItems.isNotEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(top: 8, bottom: 20),
-                  child: Text("Tip: Tap a photo to set it as Cover.", style: TextStyle(fontSize: 12, color: Colors.grey)),
-                ),
-              SizedBox(height: 12),
-
-              // --- FORM FIELDS ---
-              TextFormField(
-                controller: _titleController,
-                decoration: const InputDecoration(labelText: 'Title', hintText: 'e.g. Pre-loved Textbook', border: OutlineInputBorder()),
-                validator: (v) => v!.isEmpty ? 'Required' : null,
-              ),
-              const SizedBox(height: 16),
-              
-              Row(
+              FormSection(
+                title: s.sectionPhotos,
+                icon: Icons.photo_library_outlined,
                 children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _priceController,
-                      decoration: const InputDecoration(labelText: 'Price (RM)', prefixText: 'RM ', border: OutlineInputBorder()),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (v) => (v == null || double.tryParse(v) == null) ? 'Invalid' : null,
-                    ),
+                  // Shared with the event form
+                  MediaPickerGrid(items: _mediaItems, onChanged: () => setState(() {})),
+                ],
+              ),
+              FormSection(
+                title: s.sectionDetails,
+                icon: Icons.edit_note,
+                children: [
+                  TextFormField(
+                    controller: _titleController,
+                    textInputAction: TextInputAction.next,
+                    decoration: InputDecoration(labelText: s.title, hintText: s.listingTitleHint),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? s.required : null,
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _category,
-                      decoration: const InputDecoration(labelText: 'Category', border: OutlineInputBorder()),
-                      items: kListingCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                      onChanged: (v) => setState(() => _category = v!),
-                    ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _descriptionController,
+                    minLines: 3,
+                    maxLines: 6,
+                    decoration: InputDecoration(labelText: s.description, alignLabelWithHint: true),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? s.required : null,
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              
-              TextFormField(
-                controller: _descriptionController,
-                maxLines: 5,
-                decoration: const InputDecoration(labelText: 'Description', alignLabelWithHint: true, border: OutlineInputBorder()),
-                validator: (v) => v!.isEmpty ? 'Required' : null,
+              FormSection(
+                title: s.sectionPricing,
+                icon: Icons.sell_outlined,
+                children: [
+                  LayoutBuilder(builder: (context, c) {
+                    final price = TextFormField(
+                      controller: _priceController,
+                      decoration: InputDecoration(
+                          labelText: s.priceLabel, prefixText: kCurrencyPrefix, hintText: '12.50'),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      validator: (v) {
+                        final n = double.tryParse((v ?? '').trim());
+                        return (n == null || n < 0) ? s.priceInvalid : null;
+                      },
+                    );
+                    final category = DropdownButtonFormField<String>(
+                      initialValue: _category,
+                      decoration: InputDecoration(labelText: s.category),
+                      items: kListingCategories
+                          .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                          .toList(),
+                      onChanged: (v) => setState(() => _category = v!),
+                    );
+                    if (c.maxWidth < 420) {
+                      return Column(children: [price, const SizedBox(height: 16), category]);
+                    }
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: price),
+                        const SizedBox(width: 16),
+                        Expanded(child: category),
+                      ],
+                    );
+                  }),
+                ],
               ),
-              const SizedBox(height: 80),
             ],
           ),
         ),
-      )),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor, 
-          border: Border(top: BorderSide(color: theme.dividerColor.withOpacity(0.1)))
-        ),
-        child: ElevatedButton(
-          onPressed: _isLoading ? null : _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: theme.colorScheme.primary,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
-          ),
-          child: _isLoading 
-            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
-            : Text(isEditing ? "Save Changes" : "Publish Listing"),
-        ),
+      ),
+      bottomNavigationBar: PublishBar(
+        busy: _isLoading,
+        editing: isEditing,
+        label: isEditing ? s.saveChanges : s.publish,
+        busyLabel: s.saving,
+        onPressed: _submit,
       ),
     );
   }

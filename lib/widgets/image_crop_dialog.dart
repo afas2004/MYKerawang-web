@@ -111,7 +111,7 @@ Future<void> showImagePreview(BuildContext context,
     {String? url, Uint8List? bytes}) {
   return showDialog(
     context: context,
-    barrierColor: Colors.black.withValues(alpha: 0.85),
+    barrierColor: photoScrim(0.85),
     builder: (ctx) => GestureDetector(
       onTap: () => Navigator.pop(ctx),
       child: Dialog(

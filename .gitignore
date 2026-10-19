@@ -60,3 +60,5 @@ android/build/
 /supabase_anonymity_fix.sql
 /supabase_roles_owner.sql
 /verify_security.js
+/supabase/.temp/
+/apply_migrations.sh
