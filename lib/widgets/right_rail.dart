@@ -90,7 +90,7 @@ class _RightRailState extends State<RightRail> {
                 child: IconButton(
                   tooltip: s.refresh,
                   onPressed: loading ? null : _refresh,
-                  icon: const Icon(Icons.refresh),
+                  icon: const Icon(AppIcons.refresh),
                 ),
               ),
               if (snap.hasError)
@@ -100,7 +100,7 @@ class _RightRailState extends State<RightRail> {
                       Text(s.connectionError, textAlign: TextAlign.center),
                       TextButton.icon(
                         onPressed: _refresh,
-                        icon: const Icon(Icons.refresh),
+                        icon: const Icon(AppIcons.refresh),
                         label: Text(s.social.retry),
                       ),
                     ],
@@ -156,14 +156,8 @@ class _RailCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(KSpace.m),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: KRadius.cut,
-        border: Border.all(color: KTokens.of(context).cardBorder),
-      ),
+    return KCard(
+      padding: const EdgeInsets.all(KSpace.l),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -257,10 +251,10 @@ class _ItemGrid extends StatelessWidget {
             button: true,
             label: '${item['title'] ?? ''}, ${formatPrice(item['price'] as num?)}',
             child: InkWell(
-              borderRadius: KRadius.cut,
+              borderRadius: KRadius.small,
               onTap: () => context.goItem(item),
               child: ClipRRect(
-                borderRadius: KRadius.cut,
+                borderRadius: KRadius.small,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -270,7 +264,7 @@ class _ItemGrid extends StatelessWidget {
                       memCacheWidth: 300,
                       errorWidget: (_, __, ___) => Container(
                           color: theme.colorScheme.surfaceContainerHighest,
-                          child: const Icon(Icons.storefront, size: 20)),
+                          child: const Icon(AppIcons.market, size: 20)),
                     ),
                     Positioned(
                       left: 0,
@@ -326,7 +320,7 @@ class _SkeletonGrid extends StatelessWidget {
         crossAxisSpacing: KSpace.s,
         children: [
           for (int i = 0; i < 4; i++)
-            const KSkeleton(height: 100, borderRadius: KRadius.cut),
+            const KSkeleton(height: 100, borderRadius: KRadius.small),
         ],
       );
 }
