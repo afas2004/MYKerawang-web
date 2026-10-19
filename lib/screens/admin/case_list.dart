@@ -4,6 +4,7 @@ import '../../l10n/app_strings.dart';
 import '../../l10n/moderation_strings.dart';
 import '../../language_cubit.dart';
 import '../../utils/moderation_logic.dart';
+import '../../widgets/brand/brand.dart';
 import '../../widgets/moderation_ui.dart';
 
 IconData caseTypeIcon(String? t) => switch (t) {
@@ -52,7 +53,7 @@ class CaseListPane extends StatelessWidget {
       controller: controller,
       padding: const EdgeInsets.symmetric(vertical: 4),
       itemCount: cases.length,
-      separatorBuilder: (_, __) => const Divider(height: 1, indent: 72),
+      separatorBuilder: (_, __) => const SizedBox(height: 2),
       itemBuilder: (context, i) {
         final c = cases[i];
         final id = '${c['id']}';
@@ -98,84 +99,112 @@ class CaseListTile extends StatelessWidget {
     final first = DateTime.tryParse('${c['first_reported_at']}');
     final count = (c['report_count'] as num?)?.toInt() ?? 0;
 
-    final (Color iconBg, Color iconFg) = switch (priority) {
-      >= 2 => (scheme.error, scheme.onError),
-      1 => (scheme.errorContainer, scheme.onErrorContainer),
-      _ => (scheme.surfaceContainerHighest, scheme.onSurfaceVariant),
-    };
     final age = first == null
         ? ''
         : compactAge(DateTime.now().difference(first.toLocal()),
             day: m.ageDay, hour: m.ageHour, minute: m.ageMinute, lessThanMinute: m.ageNow);
-
-    final meta = <String>[
+    final meta = [
       m.typeLabel(c['target_type'] as String?),
       count == 1 ? m.ui.reportsShortOne : m.ui.reportsShort.fill([count]),
-      if (age.isNotEmpty) age,
-    ];
+    ].join(' · ');
+    final muted = theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant);
 
-    return Material(
-      color: selected ? scheme.secondaryContainer : Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 64),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: [
-                if (bulk)
-                  Checkbox(value: bulkSelected, onChanged: (v) => onBulkToggle?.call(v == true)),
-                Tooltip(
-                  message: priority >= 2
-                      ? m.priorityUrgent
-                      : priority == 1
-                          ? m.priorityHigh
-                          : m.typeLabel(c['target_type'] as String?),
-                  child: CircleAvatar(
-                    radius: 20,
-                    backgroundColor: iconBg,
-                    child: Icon(caseTypeIcon(c['target_type'] as String?), size: 20, color: iconFg),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: KSpace.s, vertical: 2),
+      child: Material(
+        color: selected ? scheme.secondaryContainer : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 64),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: KSpace.m, vertical: KSpace.s + 2),
+              child: Row(
+                children: [
+                  if (bulk)
+                    Checkbox(value: bulkSelected, onChanged: (v) => onBulkToggle?.call(v == true)),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: scheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(caseTypeIcon(c['target_type'] as String?),
+                        size: 20, color: scheme.onSurfaceVariant),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        caseSnippet(m, c),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: selected ? scheme.onSecondaryContainer : scheme.onSurface,
+                  const SizedBox(width: KSpace.m),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          caseSnippet(m, c),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: selected ? scheme.onSecondaryContainer : scheme.onSurface,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        meta.join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-                      ),
+                        const SizedBox(height: KSpace.xs),
+                        Row(
+                          children: [
+                            if (priority > 0) ...[
+                              PriorityChip(priority: priority),
+                              const SizedBox(width: KSpace.s),
+                            ],
+                            Flexible(
+                              child: Text(meta,
+                                  maxLines: 1, overflow: TextOverflow.ellipsis, style: muted),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: KSpace.s),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (age.isNotEmpty) Text(age, style: muted),
+                      const SizedBox(height: KSpace.xs),
+                      if (status == 'hidden')
+                        Tooltip(
+                          message: m.statusHidden,
+                          child: Icon(ModIcons.hidden, size: 16, color: scheme.tertiary),
+                        )
+                      else if (status != 'open')
+                        Text(m.decisionLabel(c['decision'] as String?),
+                            style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
                     ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                if (status == 'hidden')
-                  Tooltip(
-                    message: m.statusHidden,
-                    child: Icon(ModIcons.hidden, size: 18, color: scheme.tertiary),
-                  )
-                else if (status != 'open')
-                  Text(m.decisionLabel(c['decision'] as String?),
-                      style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
-              ],
+                ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// "Urgent" (error) / "High" (error container) pill.
+class PriorityChip extends StatelessWidget {
+  final int priority;
+  const PriorityChip({super.key, required this.priority});
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.l10n.mod;
+    final scheme = Theme.of(context).colorScheme;
+    final urgent = priority >= 2;
+    return ModChip(
+      label: urgent ? m.priorityUrgent : m.priorityHigh,
+      icon: urgent ? ModIcons.urgent : null,
+      background: urgent ? scheme.error : scheme.errorContainer,
+      foreground: urgent ? scheme.onError : scheme.onErrorContainer,
     );
   }
 }

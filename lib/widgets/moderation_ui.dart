@@ -317,9 +317,16 @@ class ModEmptyState extends StatelessWidget {
   final String? body;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final AppIllo? illo;
 
   const ModEmptyState(
-      {super.key, required this.icon, required this.title, this.body, this.actionLabel, this.onAction});
+      {super.key,
+      required this.icon,
+      required this.title,
+      this.body,
+      this.actionLabel,
+      this.onAction,
+      this.illo});
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -329,6 +336,7 @@ class ModEmptyState extends StatelessWidget {
             child: Center(
               child: BrandEmptyState(
                 icon: icon,
+                illo: illo,
                 title: title,
                 message: body,
                 actionLabel: actionLabel,
@@ -361,7 +369,7 @@ class ModChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: KSpace.s, vertical: 3),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: KRadius.small,
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

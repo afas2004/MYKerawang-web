@@ -44,26 +44,31 @@ class AdminOverview extends StatelessWidget {
     ];
 
     return LayoutBuilder(builder: (context, c) {
-      // Compact: one scrolling row so the queue keeps the screen.
-      if (c.maxWidth < 600) {
-        return SizedBox(
-          height: 88,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: KSpace.m, vertical: KSpace.s),
-            itemCount: cards.length,
-            separatorBuilder: (_, __) => const SizedBox(width: KSpace.s),
-            itemBuilder: (_, i) => SizedBox(width: 150, child: cards[i]),
-          ),
-        );
-      }
+      // Grid: 2 columns on phones, 3 on tablets, all 5 in one row from
+      // the desktop breakpoint. Each row shares its width equally.
+      final cols = c.maxWidth >= Responsive.desktopBreakpoint
+          ? 5
+          : c.maxWidth >= 600
+              ? 3
+              : 2;
+      final rows = <List<Widget>>[
+        for (var i = 0; i < cards.length; i += cols)
+          cards.sublist(i, (i + cols).clamp(0, cards.length)),
+      ];
       return Padding(
-        padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.m, KSpace.m, KSpace.xs),
-        child: Row(
+        padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, KSpace.s),
+        child: Column(
           children: [
-            for (var i = 0; i < cards.length; i++) ...[
-              if (i > 0) const SizedBox(width: KSpace.s),
-              Expanded(child: cards[i]),
+            for (var r = 0; r < rows.length; r++) ...[
+              if (r > 0) const SizedBox(height: KSpace.s),
+              Row(
+                children: [
+                  for (var i = 0; i < rows[r].length; i++) ...[
+                    if (i > 0) const SizedBox(width: KSpace.s),
+                    Expanded(child: rows[r][i]),
+                  ],
+                ],
+              ),
             ],
           ],
         ),
@@ -85,42 +90,44 @@ class _Stat extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final bg = emphasis ? scheme.tertiaryContainer : null;
-    final fg = emphasis ? scheme.onTertiaryContainer : scheme.onSurface;
+    final tileBg = emphasis ? scheme.tertiaryContainer : scheme.primaryContainer;
+    final tileFg = emphasis ? scheme.onTertiaryContainer : scheme.onPrimaryContainer;
     return KCard(
       onTap: onTap,
-      color: bg,
       semanticLabel: '$label: ${value ?? ''}',
-      padding: const EdgeInsets.symmetric(horizontal: KSpace.m, vertical: KSpace.s),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 48),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Row(
+      padding: const EdgeInsets.all(KSpace.m),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: tileBg, borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, size: 20, color: tileFg),
+          ),
+          const SizedBox(width: KSpace.m),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 16, color: fg),
-                const SizedBox(width: KSpace.xs + 2),
-                Expanded(
-                  child: Text(label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(color: fg)),
+                AnimatedSwitcher(
+                  duration: KMotion.of(context).medium,
+                  child: value == null
+                      ? const KSkeleton(key: ValueKey('loading'), width: 36, height: 22)
+                      : Text(value!,
+                          key: ValueKey(value),
+                          maxLines: 1,
+                          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
                 ),
+                const SizedBox(height: 2),
+                Text(label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
               ],
             ),
-            const SizedBox(height: KSpace.xs),
-            AnimatedSwitcher(
-              duration: KMotion.of(context).medium,
-              child: value == null
-                  ? const KSkeleton(key: ValueKey('loading'), width: 36, height: 20)
-                  : Text(value!,
-                      key: ValueKey(value),
-                      style: theme.textTheme.titleLarge?.copyWith(color: fg)),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
