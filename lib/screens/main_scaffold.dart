@@ -1,9 +1,12 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../l10n/shell_strings.dart';
 import '../language_cubit.dart';
 import '../services/unread_notifications.dart';
 import '../utils/app_nav.dart';
+import '../utils/browser_history_stub.dart'
+    if (dart.library.js_interop) '../utils/browser_history_web.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/app_sidebar.dart';
 import '../widgets/right_rail.dart';
@@ -35,14 +38,79 @@ class MainScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ShellFrame(
+    return ShellBackScope(
       currentIndex: navigationShell.currentIndex,
-      onSelect: (index) => navigationShell.goBranch(
-        index,
-        // Tapping the active tab returns it to its root.
-        initialLocation: index == navigationShell.currentIndex,
+      goHome: () => selectTab(context, navigationShell, ShellBranch.home),
+      child: ShellFrame(
+        currentIndex: navigationShell.currentIndex,
+        onSelect: (index) => selectTab(context, navigationShell, index),
+        child: navigationShell,
       ),
-      child: navigationShell,
+    );
+  }
+}
+
+/// Switches tab without piling up history.
+///
+/// * Home → another tab adds one history entry, so the browser's back
+///   returns to Home.
+/// * Between other tabs the entry is replaced (Router.neglect), so back
+///   still returns to Home rather than walking through every tab.
+/// * Another tab → Home steps the browser back to that Home entry when
+///   there is one, otherwise replaces the entry. Back on Home then leaves
+///   the app (browser default).
+/// * Tapping the active tab returns it to its root, without history.
+void selectTab(BuildContext context, StatefulNavigationShell shell, int index) {
+  final current = shell.currentIndex;
+  void go() => shell.goBranch(index, initialLocation: index == current);
+
+  if (index == current) {
+    Router.neglect(context, go);
+    return;
+  }
+  if (current == ShellBranch.home) {
+    TabHistory.homeIsBelow = true;
+    go();
+    return;
+  }
+  if (index == ShellBranch.home && TabHistory.homeIsBelow && TabHistory.stepBack()) {
+    TabHistory.homeIsBelow = false;
+    return;
+  }
+  Router.neglect(context, go);
+}
+
+/// Whether the browser entry under the current tab is Home (set when a
+/// tab was opened from Home with a new entry).
+abstract final class TabHistory {
+  static bool homeIsBelow = false;
+
+  /// Web: browser back; elsewhere false (tabs have no history to step).
+  static bool Function() stepBack = () => kIsWeb && browserHistoryBack();
+}
+
+/// System back (Android, PWA gesture) on a tab: other tabs go to Home;
+/// on Home it's let through, which leaves the app.
+class ShellBackScope extends StatelessWidget {
+  final int currentIndex;
+  final VoidCallback goHome;
+  final Widget child;
+
+  const ShellBackScope({
+    super.key,
+    required this.currentIndex,
+    required this.goHome,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: currentIndex == ShellBranch.home,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) goHome();
+      },
+      child: child,
     );
   }
 }

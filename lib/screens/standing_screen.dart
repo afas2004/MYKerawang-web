@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/app_strings.dart';
+import 'package:mykerawang/utils/app_nav.dart';
 import '../l10n/moderation_strings.dart';
 import '../language_cubit.dart';
 import '../services/moderation_service.dart';
@@ -56,7 +57,7 @@ class _StandingScreenState extends State<StandingScreen> {
   Widget build(BuildContext context) {
     final m = context.l10n.mod;
     return Scaffold(
-      appBar: AppBar(title: Text(m.accountStatus)),
+      appBar: AppBar(leading: const AppBackButton(), title: Text(m.accountStatus)),
       body: FutureBuilder<ModerationStatus>(
         future: _future,
         builder: (context, snap) {

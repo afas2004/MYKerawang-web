@@ -70,6 +70,7 @@ class _FollowListScreenState extends State<FollowListScreen> {
     return Scaffold(
       appBar: appBarConstrained(
         context,
+        leading: const AppBackButton(),
         title: Text(widget.type == 'followers' ? s.followers : s.following),
       ),
       body: PageBody(child: _isLoading

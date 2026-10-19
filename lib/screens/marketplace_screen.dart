@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mykerawang/widgets/linear_refresher.dart';
-import 'create_listing_screen.dart';
 import '../l10n/access_strings.dart';
 import '../utils/app_nav.dart';
+import '../widgets/shell_actions.dart';
 import '../utils/categories.dart';
 import '../utils/formatters.dart';
 import '../utils/listing_status.dart';
@@ -41,7 +41,8 @@ class MarketplaceView extends StatefulWidget {
   State<MarketplaceView> createState() => _MarketplaceViewState();
 }
 
-class _MarketplaceViewState extends State<MarketplaceView> {
+class _MarketplaceViewState extends State<MarketplaceView>
+    with RefreshOnContentChange {
   final TextEditingController _searchCtrl = TextEditingController();
 
   @override
@@ -50,13 +51,14 @@ class _MarketplaceViewState extends State<MarketplaceView> {
     super.dispose();
   }
 
-  Future<void> _openCreate(BuildContext context) async {
-    final result = await Navigator.push(
-        context, MaterialPageRoute(builder: (_) => const CreateListingScreen()));
-    if (result == true && context.mounted) {
-      context.read<MarketplaceCubit>().loadData();
-    }
-  }
+  /// Used by the empty state only; the one general Create entry is the
+  /// shell's (centre button / rail / sidebar).
+  void _openCreate(BuildContext context) => context.goCreateListing();
+
+  // Lists refresh after something is published, edited or deleted.
+  @override
+  void onContentChanged() => context.read<MarketplaceCubit>().loadData();
+
 
   Future<void> _openFilterSheet(BuildContext context, MarketFilters current) async {
     final cubit = context.read<MarketplaceCubit>();
@@ -87,6 +89,7 @@ class _MarketplaceViewState extends State<MarketplaceView> {
             appBar: AppBar(
               title: Text(s.marketplaceTitle),
               actions: [
+                const ShellSearchButton(),
                 if (!sidePanel)
                   IconButton(
                     tooltip: s.filters,
@@ -95,16 +98,6 @@ class _MarketplaceViewState extends State<MarketplaceView> {
                       isLabelVisible: active > 0,
                       label: Text('$active'),
                       child: const Icon(Icons.tune),
-                    ),
-                  ),
-                // Desktop has no FAB, so creation lives here instead (H1.1).
-                if (isWide(context))
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilledButton.icon(
-                      onPressed: () => _openCreate(context),
-                      icon: const Icon(Icons.add, size: 18),
-                      label: Text(s.sellItem),
                     ),
                   ),
               ],
@@ -157,15 +150,6 @@ class _MarketplaceViewState extends State<MarketplaceView> {
                 ],
               ),
             ),
-            // See G5 — no floating corner button on desktop.
-            floatingActionButton: isWide(context)
-                ? null
-                : FloatingActionButton(
-                    heroTag: 'market_fab',
-                    tooltip: s.sellItem,
-                    onPressed: () => _openCreate(context),
-                    child: const Icon(Icons.add),
-                  ),
           );
         });
       },

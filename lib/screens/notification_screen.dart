@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mykerawang/utils/app_nav.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/shell_strings.dart';
@@ -205,6 +206,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     return Scaffold(
       appBar: appBarConstrained(
         context,
+        leading: const AppBackButton(),
         title: Text(s.notificationsTitle),
         actions: [
           if (_userId != null)

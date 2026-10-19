@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:mykerawang/utils/app_nav.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -378,6 +379,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       child: Scaffold(
       appBar: appBarConstrained(
         context,
+        leading: const AppBackButton(),
         title: Text(context.l10n.editProfile),
       ),
       body: PageBody(child: Form(

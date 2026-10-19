@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/app_strings.dart';
+import 'package:mykerawang/utils/app_nav.dart';
 import '../l10n/social_strings.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
@@ -26,7 +27,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
         identical(s, AppStrings.ms) ? _sectionsMs() : _sectionsEn();
 
     return Scaffold(
-      appBar: appBarConstrained(context, title: Text(s.social.privacyPolicy)),
+      appBar: appBarConstrained(context,
+          leading: const AppBackButton(), title: Text(s.social.privacyPolicy)),
       body: PageBody(
         child: SelectionArea(
           child: ListView(

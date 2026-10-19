@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kIsWeb, listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../l10n/app_strings.dart';
@@ -11,6 +14,7 @@ import '../language_cubit.dart';
 import '../services/mention_service.dart';
 import '../services/post_service.dart';
 import '../theme/app_themes.dart';
+import '../utils/app_nav.dart';
 import '../utils/tags.dart';
 import '../widgets/media_picker_grid.dart';
 import '../widgets/brand/brand.dart';
@@ -21,40 +25,33 @@ import 'profile_cubit.dart';
 /// below it is a full-screen page.
 const double kComposerDialogBreakpoint = Responsive.mediumBreakpoint;
 
-/// Opens the post editor — new post, or [post] to edit. Dialog over the
-/// current page on ≥600 px, full screen below. Completes with true when
-/// something was published or saved.
+/// Opens the post editor — new post, or [post] to edit — as a route
+/// (/create/post, /post/:id/edit): a dialog-style page on >=600px, full
+/// screen below. Completes with true once something is published or
+/// saved (via [contentChanges]: route futures don't complete when the
+/// browser removes a page), or false when the editor is closed.
 Future<bool> openPostComposer(
   BuildContext context, {
   Map<String, dynamic>? post,
   Map<String, dynamic>? sharedEvent,
   Map<String, dynamic>? sharedListing,
-}) async {
-  final form = CreatePostScreen(
-    editPost: post,
-    sharedEvent: sharedEvent,
-    sharedListing: sharedListing,
-  );
-  final dialog =
-      MediaQuery.sizeOf(context).width >= kComposerDialogBreakpoint;
-  final Future<bool?> route = dialog
-      ? showDialog<bool>(
-          context: context,
-          builder: (_) => Dialog(
-            clipBehavior: Clip.antiAlias,
-            insetPadding: const EdgeInsets.all(24),
-            shape: const RoundedRectangleBorder(borderRadius: kerawangCut),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640, maxHeight: 760),
-              child: form,
-            ),
-          ),
-        )
-      : Navigator.push<bool>(
-          context,
-          MaterialPageRoute(fullscreenDialog: true, builder: (_) => form),
-        );
-  return await route == true;
+}) {
+  final done = Completer<bool>();
+  void onChange() {
+    if (!done.isCompleted) done.complete(true);
+  }
+
+  contentChanges.addListener(onChange);
+  final Future<Object?> route = post != null
+      ? context.push('/post/${post['id']}/edit', extra: post)
+      : context.push('/create/post', extra: {
+          if (sharedEvent != null) 'sharedEvent': sharedEvent,
+          if (sharedListing != null) 'sharedListing': sharedListing,
+        });
+  route.then((_) {
+    if (!done.isCompleted) done.complete(false);
+  });
+  return done.future.whenComplete(() => contentChanges.removeListener(onChange));
 }
 
 /// Edit [post] in the composer.
@@ -87,6 +84,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _tagFocus = FocusNode();
   bool _isAnon = false;
   bool _isLoading = false;
+  String? _newPostId;
 
   /// Committed tags in stored form (see utils/tags.dart).
   final List<String> _tags = [];
@@ -129,6 +127,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     _initialPhotos = _photos.length;
     _bodyCtrl.addListener(_rebuild);
     _titleCtrl.addListener(_rebuild);
+    // Leaving with unsaved input asks first, with this form's own wording
+    // (router onExit: close button, Android back, browser back alike).
+    FormGuard.register(() => _dirty && !_isLoading, confirm: (_) => _confirmDiscard());
   }
 
   @override
@@ -137,6 +138,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     _titleCtrl.dispose();
     _tagCtrl.dispose();
     _tagFocus.dispose();
+    FormGuard.clear();
     super.dispose();
   }
 
@@ -218,11 +220,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     return ok == true;
   }
 
-  Future<void> _close() async {
-    if (!_dirty || await _confirmDiscard()) {
-      if (mounted) Navigator.of(context).pop(false);
-    }
-  }
+  /// Close (X, Esc): back to where the editor was opened from; the route's
+  /// onExit asks about unsaved input.
+  void _close() => appBack(context);
 
   // ---------------------------------------------------------- submit
 
@@ -282,6 +282,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           'image_url': photoUrls.firstOrNull,
           'gallery_urls': photoUrls.skip(1).toList(),
         }).select('id').single();
+        _newPostId = newPost['id'];
         PostService.rememberMine(newPost['id']);
 
         await MentionService.notify(
@@ -292,9 +293,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       }
 
       if (mounted) {
-        Navigator.pop(context, true);
-        messenger.showSnackBar(SnackBar(
-            content: Text(edit != null ? ps.postUpdated : s.postedSuccess)));
+        if (edit != null) {
+          completeEdit(context, message: ps.postUpdated);
+        } else {
+          // The editor is replaced by the new post, so back from there
+          // returns to where the user started, not to this form.
+          completePublish(context, '/post/$_newPostId', message: s.postedSuccess);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -471,17 +476,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       ],
     );
 
-    return PopScope(
-      canPop: !_dirty || _isLoading,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _close();
-      },
-      child: CallbackShortcuts(
+    return CallbackShortcuts(
         bindings: {
           const SingleActivator(LogicalKeyboardKey.enter, control: true): _submit,
           const SingleActivator(LogicalKeyboardKey.enter, meta: true): _submit,
-          const SingleActivator(LogicalKeyboardKey.escape): () =>
-              Navigator.of(context).maybePop(),
+          const SingleActivator(LogicalKeyboardKey.escape): _close,
         },
         child: Focus(
           autofocus: true,
@@ -490,7 +489,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               leading: IconButton(
                 tooltip: s.close,
                 icon: const Icon(Icons.close),
-                onPressed: () => Navigator.of(context).maybePop(),
+                onPressed: _close,
               ),
               title: Text(_isEdit ? ps.editPost : s.createPostTitle),
               actions: [submit],
@@ -503,7 +502,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             ),
           ),
         ),
-      ),
     );
   }
 }

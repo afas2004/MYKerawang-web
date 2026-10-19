@@ -3,13 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:mykerawang/widgets/linear_refresher.dart';
-import 'create_event_screen.dart';
 import 'events_cubit.dart';
 import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
-import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
+import '../widgets/shell_actions.dart';
 import '../utils/categories.dart';
 import '../utils/formatters.dart';
 import '../utils/roles.dart';
@@ -69,7 +68,8 @@ class EventsView extends StatefulWidget {
   State<EventsView> createState() => _EventsViewState();
 }
 
-class _EventsViewState extends State<EventsView> {
+class _EventsViewState extends State<EventsView>
+    with RefreshOnContentChange {
   final TextEditingController _searchCtrl = TextEditingController();
   final List<String> _tags = ['All', ...kEventTags];
 
@@ -79,13 +79,14 @@ class _EventsViewState extends State<EventsView> {
     super.dispose();
   }
 
-  Future<void> _openCreate(BuildContext context) async {
-    final result = await Navigator.push(
-        context, MaterialPageRoute(builder: (_) => const CreateEventScreen()));
-    if (result == true && context.mounted) {
-      context.read<EventsCubit>().loadData();
-    }
-  }
+  /// Used by the empty state only; the one general Create entry is the
+  /// shell's (centre button / rail / sidebar).
+  void _openCreate(BuildContext context) => context.goCreateEvent();
+
+  // Lists refresh after something is published, edited or deleted.
+  @override
+  void onContentChanged() => context.read<EventsCubit>().loadData();
+
 
   @override
   Widget build(BuildContext context) {
@@ -97,18 +98,7 @@ class _EventsViewState extends State<EventsView> {
           return Scaffold(
             appBar: AppBar(
               title: Text(s.navEvents),
-              // Desktop has no FAB, so creation lives here instead (H1.1).
-              actions: [
-                if (isWide(context))
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilledButton.icon(
-                      onPressed: () => _openCreate(context),
-                      icon: const Icon(Icons.add, size: 18),
-                      label: Text(s.createEvent),
-                    ),
-                  ),
-              ],
+              actions: const [ShellSearchButton()],
               bottom: withFilterColumn
                   ? LatticeBand.preferred()
                   : PreferredSize(
@@ -142,16 +132,6 @@ class _EventsViewState extends State<EventsView> {
                     )
                   : _content(context, state, withSearch: true),
             ),
-            // Desktop creates from the header — a FAB floating in the
-            // far corner of a wide window is a phone pattern (G5).
-            floatingActionButton: isWide(context)
-                ? null
-                : FloatingActionButton(
-                    heroTag: 'events_fab',
-                    tooltip: s.createEvent,
-                    onPressed: () => _openCreate(context),
-                    child: const Icon(Icons.add),
-                  ),
           );
         });
       },

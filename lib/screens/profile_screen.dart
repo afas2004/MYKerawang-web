@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:mykerawang/screens/edit_profile_screen.dart';
-import 'package:mykerawang/screens/follow_list_screen.dart';
 import 'package:mykerawang/l10n/app_strings.dart';
 import 'package:mykerawang/language_cubit.dart';
 import 'package:mykerawang/theme/app_themes.dart';
@@ -304,14 +302,16 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     final s = context.l10n;
     if (_isLoading && _profile == null) {
       return Scaffold(
-        appBar: AppBar(),
+        appBar: AppBar(leading: widget.userId != null ? const AppBackButton() : null),
         body: _loadError
             ? _ErrorRetry(onRetry: _retry)
             : const _ProfileSkeleton(),
       );
     }
     if (_profile == null) {
-      return Scaffold(appBar: AppBar(), body: Center(child: Text(s.userNotFound)));
+      return Scaffold(
+          appBar: AppBar(leading: widget.userId != null ? const AppBackButton() : null),
+          body: Center(child: Text(s.userNotFound)));
     }
 
     final theme = Theme.of(context);
@@ -320,6 +320,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
     return Scaffold(
       appBar: AppBar(
+        // Someone else's profile is a pushed page (/u/:id); also works cold.
+        leading: widget.userId != null ? const AppBackButton() : null,
         title: Text(p['username'] != null ? "@${p['username']}" : s.profileTitle),
         actions: [
           if (_isMe && widget.userId == null) const ShellSearchButton(),
@@ -543,10 +545,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   void _openFollows(String type) {
     final uid = widget.userId ?? _supabase.auth.currentUser?.id;
     if (uid == null) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => FollowListScreen(userId: uid, type: type)),
-    );
+    context.goFollowList(uid, type);
   }
 
   Widget _primaryAction(BuildContext context) {
@@ -559,12 +558,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           minimumSize: minSize,
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         ),
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const EditProfileScreen()),
-        ).then((value) {
-          if (value == true) _fetchProfileData();
-        }),
+        // Its own route; leaving it refreshes this page (contentChanges).
+        onPressed: () => context.goEditProfile(),
         icon: const Icon(Icons.edit_outlined, size: 18),
         label: Text(s.editProfile),
       );

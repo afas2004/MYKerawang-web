@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../l10n/access_strings.dart';
 import '../language_cubit.dart';
 import 'report_helper.dart';
+import 'app_nav.dart';
 
 /// Shared links open read-only for visitors who aren't logged in
 /// (/event, /item, /post, /u). These helpers gate the actions on those
@@ -71,13 +72,10 @@ bool requireLogin(BuildContext context) {
 
 /// Back button for pages that can be opened cold from a shared link,
 /// where there is nothing underneath to pop to.
-void popOrHome(BuildContext context, [Object? result]) {
-  if (Navigator.of(context).canPop()) {
-    Navigator.of(context).pop(result);
-  } else {
-    context.go('/home');
-  }
-}
+///
+/// Opened cold, back goes to the matching tab (item → Market, event →
+/// Events, post / user → Home) — see [appBack].
+void popOrHome(BuildContext context) => appBack(context);
 
 /// Full-width "Log in to …" bar used in place of an action bar for guests.
 class GuestActionBar extends StatelessWidget {

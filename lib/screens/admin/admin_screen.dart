@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mykerawang/utils/app_nav.dart';
 
 import '../../l10n/moderation_strings.dart';
 import '../../language_cubit.dart';
@@ -38,14 +39,14 @@ class _AdminScreenState extends State<AdminScreen> {
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
           return Scaffold(
-            appBar: AppBar(title: Text(m.moderation)),
+            appBar: AppBar(leading: const AppBackButton(), title: Text(m.moderation)),
             body: const Center(child: CircularProgressIndicator()),
           );
         }
         final (admin, owner) = snap.data ?? (false, false);
         if (!admin) {
           return Scaffold(
-            appBar: AppBar(title: Text(m.moderation)),
+            appBar: AppBar(leading: const AppBackButton(), title: Text(m.moderation)),
             body: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -78,6 +79,7 @@ class _AdminScreenState extends State<AdminScreen> {
           length: tabs.length,
           child: Scaffold(
             appBar: AppBar(
+              leading: const AppBackButton(),
               title: Text(m.moderation),
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(72 + 9),

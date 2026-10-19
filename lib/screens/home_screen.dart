@@ -1,8 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:mykerawang/screens/create_event_screen.dart';
-import 'package:mykerawang/screens/create_listing_screen.dart';
 import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../l10n/app_strings.dart';
@@ -10,13 +8,13 @@ import '../l10n/feed_strings.dart';
 import '../language_cubit.dart';
 import '../l10n/social_strings.dart';
 import '../services/unread_notifications.dart';
-import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/embed_card.dart';
 import '../widgets/error_state.dart';
 import '../widgets/feed_composer.dart';
 import '../widgets/hover_carousel.dart';
+import '../widgets/shell_actions.dart';
 import '../widgets/universal_card.dart';
 import '../widgets/post_card.dart';
 import 'create_post_screen.dart';
@@ -50,7 +48,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 /// Loads the feed; [FeedView] lays it out.
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with RefreshOnContentChange {
   final _supabase = Supabase.instance.client;
 
   bool _isLoading = true;
@@ -166,6 +165,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // New / edited / deleted content elsewhere refreshes the feed.
+  @override
+  void onContentChanged() => _fetchFeedData();
+
   Future<void> _openComposer() async {
     if (await openPostComposer(context) && mounted) _fetchFeedData();
   }
@@ -187,8 +190,8 @@ class _HomeScreenState extends State<HomeScreen> {
       onLoadMore: _loadMore,
       onCompose: _openComposer,
       onPosted: _fetchFeedData,
-      onCreateMenu: () => _showCreateOptions(context),
       actions: [
+        const ShellSearchButton(),
         // Pull-to-refresh has no mouse equivalent on web
         if (kIsWeb)
           IconButton(
@@ -211,42 +214,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showCreateOptions(BuildContext context) {
-    final s = context.l10nRead;
-    showAdaptiveSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.chat_bubble_outline),
-              title: Text(s.createPostTitle),
-              onTap: () {
-                Navigator.pop(ctx);
-                _openComposer();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.calendar_today),
-              title: Text(s.createEvent),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateEventScreen()));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.storefront),
-              title: Text(s.sellItem),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateListingScreen()));
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 /// The home feed layout, fed with data — no Supabase, so it can be
@@ -271,7 +238,6 @@ class FeedView extends StatelessWidget {
   final VoidCallback onLoadMore;
   final VoidCallback onCompose;
   final VoidCallback onPosted;
-  final VoidCallback? onCreateMenu;
   final List<Widget> actions;
 
   const FeedView({
@@ -289,7 +255,6 @@ class FeedView extends StatelessWidget {
     required this.onLoadMore,
     required this.onCompose,
     required this.onPosted,
-    this.onCreateMenu,
     this.actions = const [],
   });
 
@@ -327,13 +292,6 @@ class FeedView extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      floatingActionButton: (desktop || onCreateMenu == null)
-          ? null // the sidebar and composer cover creation on desktop
-          : FloatingActionButton(
-              tooltip: s.createPost,
-              onPressed: onCreateMenu,
-              child: const Icon(Icons.add),
-            ),
       body: LinearRefresher(
         onRefresh: onRefresh,
         offset: topPadding,

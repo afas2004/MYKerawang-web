@@ -21,8 +21,6 @@ import '../widgets/mention_text.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/tap_card.dart';
-import 'create_post_screen.dart'; 
-import 'create_event_screen.dart';
 import 'gallery_view_screen.dart';
 import '../widgets/restriction_gate.dart';
 import '../widgets/save_button.dart';
@@ -36,7 +34,8 @@ class EventDetailScreen extends StatefulWidget {
   State<EventDetailScreen> createState() => _EventDetailScreenState();
 }
 
-class _EventDetailScreenState extends State<EventDetailScreen> {
+class _EventDetailScreenState extends State<EventDetailScreen>
+    with RefreshOnContentChange {
   late Map<String, dynamic> _event;
   Map<String, dynamic>? _organizer;
   bool _isLoading = true;
@@ -317,7 +316,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         await Supabase.instance.client.from('events').delete().eq('id', _event['id']);
         if (mounted) {
           showSuccess(context, s.eventDeleted);
-          popOrHome(context, true); // true = refresh profile/home
+          notifyContentChanged(); // lists drop the deleted event
+          popOrHome(context);
         }
       } catch (e) {
         if (mounted) showErrorWithRetry(context, e, onRetry: _deleteEvent);
@@ -325,13 +325,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     }
   }
 
-  Future<void> _editEvent() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => CreateEventScreen(eventToEdit: _event)),
-    );
-    if (result == true) _fetchEventDetails();
-  }
+  /// Edit is its own route; saving brings us back here and refreshes
+  /// through [contentChanges].
+  Future<void> _editEvent() async => context.goEditEvent(_event);
+
+  @override
+  void onContentChanged() => _fetchEventDetails();
 
   // --- 2. SAFETY: LINK CHECKER ---
   Future<void> _launchSafeUrl(String url) async {
@@ -1115,8 +1114,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             TextButton.icon(
               onPressed: () {
                 if (!requireLogin(context)) return;
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => CreatePostScreen(sharedEvent: _event)));
+                context.goCreatePost(sharedEvent: _event);
               },
               icon: const Icon(Icons.repeat, size: 16),
               label: Text(s.repost),

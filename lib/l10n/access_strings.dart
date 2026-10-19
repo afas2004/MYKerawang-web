@@ -184,4 +184,8 @@ extension AccessStrings on AppStrings {
       "Sekurang-kurangnya 6 aksara.", "6文字以上");
   String get priceInvalid => _t("Enter a price, e.g. 12.50",
       "Masukkan harga, cth. 12.50", "価格を入力してください（例：12.50）");
+
+  // ---- navigation ----
+  String get eventPublished => _t("Event published", "Acara diterbitkan", "イベントを公開しました");
+  String get eventUpdated => _t("Event updated", "Acara dikemas kini", "イベントを更新しました");
 }

@@ -13,7 +13,7 @@ import '../language_cubit.dart';
 import '../l10n/shell_strings.dart';
 import '../l10n/social_strings.dart';
 import '../services/account_data.dart';
-import 'privacy_policy_screen.dart';
+import '../utils/app_nav.dart';
 import 'profile_cubit.dart';
 import '../services/update_service.dart';
 
@@ -161,7 +161,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final email = _supabase.auth.currentUser?.email;
 
     return Scaffold(
-      appBar: appBarConstrained(context, title: Text(s.settingsTitle)),
+      appBar: appBarConstrained(context,
+          leading: const AppBackButton(), title: Text(s.settingsTitle)),
       body: PageBody(child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
@@ -239,8 +240,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: Text(s.social.privacyPolicy),
                     subtitle: Text(s.social.privacyPolicySub),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen())),
+                    onTap: () => context.goPrivacyPolicy(),
                   ),
                   ListTile(
                     leading: _exporting

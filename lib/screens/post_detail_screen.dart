@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:mykerawang/utils/app_nav.dart';
 import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/mention_service.dart';
@@ -220,7 +220,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
 
   /// A cold deep link has nothing underneath to pop back to.
-  void _leave() => context.canPop() ? context.pop() : context.go('/home');
+  /// Back: to where the post was opened from; opened cold, to Home.
+  void _leave() => appBack(context);
 
   Future<void> _submitComment() async {
     final text = _commentCtrl.text.trim();

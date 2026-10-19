@@ -13,11 +13,9 @@ import '../widgets/linear_refresher.dart';
 import '../widgets/post_card.dart';
 import '../widgets/post_card_skeleton.dart';
 
-/// Opens the feed of posts carrying [tag] (pushed, not a route — no
-/// deep link yet).
-Future<void> openTagFeed(BuildContext context, String tag) =>
-    Navigator.push(context,
-        MaterialPageRoute(builder: (_) => TagFeedScreen(tag: tag)));
+/// Opens the feed of posts carrying [tag] at `/tag/:tag` (linkable).
+Future<void> openTagFeed(BuildContext context, String tag) async =>
+    context.goTag(tag);
 
 /// Posts with one hashtag, newest first, loaded a page at a time.
 class TagFeedScreen extends StatefulWidget {
@@ -238,7 +236,7 @@ class TagFeedView extends StatelessWidget {
         leading: IconButton(
           tooltip: s.back,
           icon: const BackButtonIcon(),
-          onPressed: () => Navigator.of(context).maybePop(),
+          onPressed: () => appBack(context),
         ),
         bottom: LatticeBand.preferred(),
       ),

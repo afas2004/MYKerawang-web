@@ -5,8 +5,6 @@ import 'package:http/http.dart' as http;
 import 'package:mykerawang/services/share_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
  
-import 'create_listing_screen.dart';
-import 'create_post_screen.dart';
 import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
@@ -34,7 +32,8 @@ class ItemDetailScreen extends StatefulWidget {
   State<ItemDetailScreen> createState() => _ItemDetailScreenState();
 }
 
-class _ItemDetailScreenState extends State<ItemDetailScreen> {
+class _ItemDetailScreenState extends State<ItemDetailScreen>
+    with RefreshOnContentChange {
   late Map<String, dynamic> _itemData;
   Map<String, dynamic>? _sellerProfile;
   bool _loadingContact = false;
@@ -54,6 +53,9 @@ int _currentImageIndex = 0;
     _itemData = widget.item;
     _refreshData();
   }
+
+  @override
+  void onContentChanged() => _refreshData();
 
   Future<void> _refreshData() async {
     try {
@@ -144,7 +146,8 @@ int _currentImageIndex = 0;
         await Supabase.instance.client.from('listings').delete().eq('id', _itemData['id']);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.listingDeleted)));
-          popOrHome(context, true);
+          notifyContentChanged(); // lists drop the deleted listing
+          popOrHome(context);
         }
       } catch (e) {
         if (mounted) showErrorWithRetry(context, e, onRetry: _deleteItem);
@@ -786,8 +789,7 @@ int _currentImageIndex = 0;
             TextButton.icon(
               onPressed: () {
                 if (!requireLogin(context)) return;
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => CreatePostScreen(sharedListing: _itemData)));
+                context.goCreatePost(sharedListing: _itemData);
               },
               icon: const Icon(Icons.repeat, size: 16),
               label: Text(s.repost),
@@ -861,11 +863,9 @@ int _currentImageIndex = 0;
           // 2. EDIT
           Expanded(
             child: FilledButton(
-              onPressed: () async {
-                final result = await Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => CreateListingScreen(itemToEdit: _itemData)));
-                if (result == true) _refreshData();
-              },
+              // Edit is its own route; saving brings us back here and
+              // refreshes through contentChanges.
+              onPressed: () => context.goEditListing(_itemData),
               style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
               child: Text(s.edit),
             ),

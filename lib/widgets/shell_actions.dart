@@ -4,11 +4,9 @@ import 'package:go_router/go_router.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/shell_strings.dart';
 import '../language_cubit.dart';
-import '../screens/create_event_screen.dart';
-import '../screens/create_listing_screen.dart';
-import '../screens/create_post_screen.dart';
 import '../theme/app_themes.dart';
 import '../utils/adaptive.dart';
+import '../utils/app_nav.dart';
 import '../utils/guest_access.dart';
 
 /// The one "Create" entry point, shared by the bottom bar's centre button,
@@ -18,9 +16,10 @@ Future<void> showCreateSheet(BuildContext context) async {
   if (!requireLogin(context)) return;
   final s = context.l10nRead;
 
-  void open(BuildContext ctx, Widget screen) {
+  // Each form is a route (/create/...), so back and the browser behave.
+  void open(BuildContext ctx, void Function() go) {
     Navigator.pop(ctx);
-    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+    go();
   }
 
   await showAdaptiveSheet<void>(
@@ -43,19 +42,19 @@ Future<void> showCreateSheet(BuildContext context) async {
                 icon: Icons.chat_bubble_outline,
                 title: s.createPostTitle,
                 subtitle: s.shell.createPostSub,
-                onTap: () => open(ctx, const CreatePostScreen()),
+                onTap: () => open(ctx, context.goCreatePost),
               ),
               _CreateOption(
                 icon: Icons.event_outlined,
                 title: s.createEvent,
                 subtitle: s.shell.createEventSub,
-                onTap: () => open(ctx, const CreateEventScreen()),
+                onTap: () => open(ctx, context.goCreateEvent),
               ),
               _CreateOption(
                 icon: Icons.storefront_outlined,
                 title: s.sellItem,
                 subtitle: s.shell.sellItemSub,
-                onTap: () => open(ctx, const CreateListingScreen()),
+                onTap: () => open(ctx, context.goCreateListing),
               ),
             ],
           ),
