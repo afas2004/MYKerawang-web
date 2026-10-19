@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../language_cubit.dart';
+import '../theme/app_icons.dart';
 
 /// Asks before deleting. Completes with true when confirmed.
 Future<bool> confirmDelete(
@@ -54,7 +55,7 @@ class OwnerMenuButton extends StatelessWidget {
     final s = context.l10n;
     return PopupMenuButton<String>(
       tooltip: tooltip ?? s.more,
-      icon: Icon(Icons.more_vert,
+      icon: Icon(AppIcons.more,
           size: iconSize, color: scheme.onSurfaceVariant),
       onSelected: (v) => v == 'edit' ? onEdit() : onDelete(),
       itemBuilder: (_) => [
@@ -62,7 +63,7 @@ class OwnerMenuButton extends StatelessWidget {
           value: 'edit',
           child: Row(
             children: [
-              Icon(Icons.edit_outlined, color: scheme.onSurface, size: 20),
+              Icon(AppIcons.edit, color: scheme.onSurface, size: 20),
               const SizedBox(width: 8),
               Text(s.edit),
             ],
@@ -72,7 +73,7 @@ class OwnerMenuButton extends StatelessWidget {
           value: 'delete',
           child: Row(
             children: [
-              Icon(Icons.delete_outline, color: scheme.error, size: 20),
+              Icon(AppIcons.delete, color: scheme.error, size: 20),
               const SizedBox(width: 8),
               Text(s.delete, style: TextStyle(color: scheme.error)),
             ],

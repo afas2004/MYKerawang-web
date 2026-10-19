@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mykerawang/widgets/brand/brand.dart';
+import 'package:mykerawang/theme/app_icons.dart';
 import 'package:mykerawang/widgets/post_card.dart';
 
 import 'helpers/feed_fixtures.dart';
@@ -62,23 +63,24 @@ void main() {
     expect(find.text('+2'), findsOneWidget);
   });
 
-  testWidgets('pinned post has the gold frame', (tester) async {
+  testWidgets('pinned post is an official card labelled Pinned', (tester) async {
     await pumpAt(
       tester,
       kCompact,
       Scaffold(body: PostCard(post: samplePost(pinned: true))),
     );
-    expect(find.byType(OfficialFrame), findsOneWidget);
+    expect(find.text('Pinned'), findsOneWidget);
+    expect(find.widgetWithIcon(KCard, AppIcons.pin), findsOneWidget);
 
     await pumpAt(tester, kCompact,
         Scaffold(body: PostCard(post: samplePost(id: 'plain'))));
-    expect(find.byType(OfficialFrame), findsNothing);
+    expect(find.text('Pinned'), findsNothing);
   });
 
   testWidgets('verified author shows the badge', (tester) async {
     await pumpAt(tester, kCompact,
         Scaffold(body: PostCard(post: samplePost(verified: true))));
-    expect(find.byIcon(Icons.verified), findsOneWidget);
+    expect(find.byIcon(AppIcons.verified), findsOneWidget);
     expect(find.byTooltip('Verified'), findsOneWidget);
   });
 
