@@ -1,20 +1,17 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import '../language_cubit.dart';
-import '../theme/app_themes.dart';
 import '../utils/formatters.dart';
+import 'brand/brand.dart';
 
-/// IG-style feed embed for injected marketplace items and events
-/// (DESIGN_SPEC.md §4). Same width as posts, visually louder:
-/// full-bleed image (kerawang cut), gold category label, title,
-/// one line of context, single CTA.
+/// An event or listing inside the feed, styled like the market / event
+/// cards: 16:10 photo, title, then the price or the date · place line.
+///
+/// [compact] is the horizontal variant used inside a post that shares an
+/// event or listing, so it supports the post rather than dominating it.
 class EmbedCard extends StatelessWidget {
   final Map<String, dynamic> data;
   final bool isEvent;
   final VoidCallback onTap;
-
-  /// Compact horizontal variant, used for content cross-posted inside a
-  /// post so the embed supports the post rather than dominating it.
   final bool compact;
 
   const EmbedCard({
@@ -25,207 +22,142 @@ class EmbedCard extends StatelessWidget {
     this.compact = false,
   });
 
+  /// Price for items; "date · location" for events.
+  String _meta() {
+    if (isEvent) {
+      final start = parseLocal(data['start_datetime']);
+      final date = start != null ? formatDate(start) : '';
+      final location = (data['location'] ?? '').toString();
+      return [date, location].where((e) => e.isNotEmpty).join(' · ');
+    }
+    final price = data['price'];
+    return price is num ? formatPrice(price) : '';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final s = context.l10n;
-
-    final label = (isEvent ? s.kindEvent : s.navMarket).toUpperCase();
-    final title = data['title'] ?? '';
+    final title = (data['title'] ?? '').toString();
     final imageUrl = data['image_url'] as String?;
+    final meta = _meta();
+    final kindIcon = isEvent ? AppIcons.events : AppIcons.market;
 
-    // Context line: price for items, date + location for events
-    String contextLine;
-    if (isEvent) {
-      final start = parseLocal(data['start_datetime']);
-      final date = start != null ? formatDate(start) : '';
-      final location = data['location'] ?? '';
-      contextLine = [date, location].where((e) => e.isNotEmpty).join(' · ');
-    } else {
-      final price = data['price'];
-      contextLine = price is num ? formatPrice(price) : '';
-    }
+    final metaStyle = isEvent
+        ? theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)
+        : theme.textTheme.titleSmall?.copyWith(
+            color: scheme.tertiary, fontWeight: FontWeight.w700);
+
+    Widget photo(int cacheWidth) => (imageUrl != null && imageUrl.isNotEmpty)
+        ? CachedNetworkImage(
+            imageUrl: imageUrl,
+            fit: BoxFit.cover,
+            memCacheWidth: cacheWidth,
+            fadeInDuration: const Duration(milliseconds: 200),
+            placeholder: (_, __) =>
+                ColoredBox(color: scheme.surfaceContainerHighest),
+            errorWidget: (_, __, ___) => _Placeholder(icon: kindIcon),
+          )
+        : _Placeholder(icon: kindIcon);
+
+    final metaRow = meta.isEmpty
+        ? null
+        : Row(
+            children: [
+              if (isEvent) ...[
+                Icon(AppIcons.calendar, size: 14, color: scheme.onSurfaceVariant),
+                const SizedBox(width: KSpace.xs),
+              ],
+              Expanded(
+                child: Text(meta,
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: metaStyle),
+              ),
+            ],
+          );
 
     if (compact) {
       return Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: InkWell(
+        padding: const EdgeInsets.only(top: KSpace.m),
+        child: KCard(
           onTap: onTap,
-          borderRadius: kerawangCut,
-          child: Container(
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: kerawangCut,
-              border: Border.all(color: scheme.outlineVariant),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 88,
-                  height: 88,
-                  child: (imageUrl != null && imageUrl.isNotEmpty)
-                      ? CachedNetworkImage(
-                          imageUrl: imageUrl,
-                          fit: BoxFit.cover,
-                          memCacheWidth: 260,
-                          placeholder: (_, __) =>
-                              Container(color: scheme.surfaceContainerHighest),
-                          errorWidget: (_, __, ___) => Container(
-                            color: scheme.surfaceContainerHighest,
-                            child: Icon(
-                                isEvent ? Icons.event : Icons.storefront,
-                                color: scheme.onSurfaceVariant),
-                          ),
-                        )
-                      : Container(
-                          color: scheme.surfaceContainerHighest,
-                          child: Icon(isEvent ? Icons.event : Icons.storefront,
-                              color: scheme.onSurfaceVariant),
-                        ),
+          padding: const EdgeInsets.all(KSpace.s),
+          color: scheme.surfaceContainerLow,
+          semanticLabel: [title, meta].where((e) => e.isNotEmpty).join(', '),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: KRadius.small,
+                child: SizedBox(width: 64, height: 64, child: photo(200)),
+              ),
+              const SizedBox(width: KSpace.m),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w600)),
+                    if (metaRow != null) ...[
+                      const SizedBox(height: 2),
+                      metaRow,
+                    ],
+                  ],
                 ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          "◆ $label",
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: scheme.tertiary,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        if (contextLine.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            contextLine,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: isEvent
-                                  ? scheme.onSurfaceVariant
-                                  : scheme.primary,
-                              fontWeight: isEvent ? null : FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: Icon(Icons.arrow_forward_ios,
-                      size: 14, color: scheme.onSurfaceVariant),
-                ),
-              ],
-            ),
+              ),
+              Icon(AppIcons.chevronRight, size: 20, color: scheme.onSurfaceVariant),
+            ],
           ),
         ),
       );
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: InkWell(
+      padding: const EdgeInsets.symmetric(
+          horizontal: KSpace.gutter, vertical: KSpace.m / 2),
+      child: KCard(
         onTap: onTap,
-        borderRadius: kerawangCut,
-        child: Container(
-          decoration: BoxDecoration(
-            color: theme.cardColor,
-            borderRadius: kerawangCut,
-            border: Border.all(color: scheme.outlineVariant),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (imageUrl != null && imageUrl.isNotEmpty)
-                AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: CachedNetworkImage(
-                    imageUrl: imageUrl,
-                    fit: BoxFit.cover,
-                    memCacheWidth: 1000,
-                    fadeInDuration: const Duration(milliseconds: 200),
-                    placeholder: (_, __) =>
-                        Container(color: scheme.surfaceContainerHighest),
-                    errorWidget: (_, __, ___) => Container(
-                      color: scheme.surfaceContainerHighest,
-                      child: Icon(
-                        isEvent ? Icons.event : Icons.storefront,
-                        size: 40,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Gold category label — specialness marker (spec §2)
-                    Text(
-                      "◆ $label",
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: scheme.tertiary,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      title,
+        padding: EdgeInsets.zero,
+        semanticLabel: [title, meta].where((e) => e.isNotEmpty).join(', '),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AspectRatio(aspectRatio: 16 / 10, child: photo(1000)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, KSpace.l),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleLarge,
-                    ),
-                    if (contextLine.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        contextLine,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: isEvent
-                              ? scheme.onSurfaceVariant
-                              : scheme.primary,
-                          fontWeight: isEvent ? null : FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.tonal(
-                        onPressed: onTap,
-                        style: FilledButton.styleFrom(
-                            minimumSize: const Size.fromHeight(48)),
-                        child: Text(isEvent ? s.viewEvent : s.viewItem),
-                      ),
-                    ),
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w600)),
+                  if (metaRow != null) ...[
+                    const SizedBox(height: KSpace.xs),
+                    metaRow,
                   ],
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+class _Placeholder extends StatelessWidget {
+  final IconData icon;
+  const _Placeholder({required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ColoredBox(
+      color: scheme.surfaceContainerHighest,
+      child: Center(child: Icon(icon, color: scheme.onSurfaceVariant)),
     );
   }
 }

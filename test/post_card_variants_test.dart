@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mykerawang/widgets/brand/brand.dart';
-import 'package:mykerawang/theme/app_icons.dart';
 import 'package:mykerawang/widgets/post_card.dart';
 
 import 'helpers/feed_fixtures.dart';
