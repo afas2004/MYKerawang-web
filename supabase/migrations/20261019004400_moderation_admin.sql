@@ -484,7 +484,12 @@ end;
 $$;
 
 -- The old function stays for the SQL editor only.
-revoke execute on function public.admin_unmask_post(uuid) from public, anon, authenticated;
+do $$
+begin
+  if to_regprocedure('public.admin_unmask_post(uuid)') is not null then
+    revoke execute on function public.admin_unmask_post(uuid) from public, anon, authenticated;
+  end if;
+end $$;
 
 -- ====================================================== clubs
 create or replace function public.admin_club_requests()
