@@ -276,7 +276,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (!_commentsLoaded) {
       if (_commentsError != null) {
         return Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(KSpace.l),
           child: Column(
             children: [
               Text(s.connectionError,
@@ -284,7 +284,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   style: TextStyle(color: scheme.onSurfaceVariant)),
               TextButton.icon(
                 onPressed: _loadComments,
-                icon: const Icon(Icons.refresh),
+                icon: const Icon(AppIcons.refresh),
                 label: Text(s.tryAgain),
               ),
             ],
@@ -292,14 +292,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         );
       }
       return const Padding(
-          padding: EdgeInsets.all(32),
+          padding: EdgeInsets.all(KSpace.xxl),
           child: Center(child: CircularProgressIndicator()));
     }
 
     if (_comments.isEmpty) {
       return BrandEmptyState(
         compact: true,
-        icon: Icons.chat_bubble_outline,
+        icon: AppIcons.comment,
         title: s.beFirstToComment,
       );
     }
@@ -309,10 +309,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       children: [
         if (_hasEarlier)
           Padding(
-            padding: const EdgeInsets.only(bottom: 4),
+            padding: const EdgeInsets.only(bottom: KSpace.xs),
             child: _loadingEarlier
                 ? const Padding(
-                    padding: EdgeInsets.all(12),
+                    padding: EdgeInsets.all(KSpace.m),
                     child: Center(
                       child: SizedBox(
                           width: 20,
@@ -321,7 +321,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     ))
                 : TextButton.icon(
                     onPressed: _showEarlier,
-                    icon: const Icon(Icons.expand_less),
+                    icon: const RotatedBox(
+                        quarterTurns: 3, child: Icon(AppIcons.chevronRight)),
                     label: Text(ps.showEarlierComments),
                   ),
           ),
@@ -508,7 +509,7 @@ class CommentComposer extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border(top: BorderSide(color: scheme.outlineVariant)),
         ),
-        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+        padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.s, KSpace.s, KSpace.s),
         child: SafeArea(
           top: false,
           child: Column(
@@ -517,7 +518,7 @@ class CommentComposer extends StatelessWidget {
             children: [
               FilterChip(
                 avatar: Icon(
-                  anonymous ? Icons.visibility_off : Icons.visibility_outlined,
+                  anonymous ? AppIcons.anonymous : AppIcons.visible,
                   size: 18,
                 ),
                 label: Text(anonymous ? fs.anonToggleOn : fs.anonToggle),
@@ -526,16 +527,17 @@ class CommentComposer extends StatelessWidget {
                 tooltip: anonymous ? ps.commentAnonOn : ps.commentAnonOff,
                 onSelected: (_) => onToggleAnonymous(),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: KSpace.s),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: KSpace.l, vertical: KSpace.m - 2),
                       decoration: BoxDecoration(
-                        color: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(20),
+                        color: scheme.surfaceContainerHigh,
+                        // Stadium field, like the app's buttons.
+                        borderRadius: BorderRadius.circular(999),
                       ),
                       child: MentionInput(
                         controller: controller,
@@ -547,7 +549,7 @@ class CommentComposer extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: KSpace.xs),
                   IconButton(
                     tooltip: ps.sendComment,
                     onPressed: canSend ? onSend : null,
@@ -556,7 +558,8 @@ class CommentComposer extends StatelessWidget {
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2))
-                        : Icon(Icons.send,
+                        : Icon(AppIcons.send,
+                            size: 20,
                             color: canSend ? scheme.primary : scheme.onSurfaceVariant),
                   ),
                 ],
