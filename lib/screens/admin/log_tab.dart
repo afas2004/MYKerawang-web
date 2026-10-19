@@ -86,7 +86,7 @@ class _LogTabState extends State<LogTab> with AutomaticKeepAliveClientMixin {
               child: TextField(
                 decoration: InputDecoration(
                   isDense: true,
-                  prefixIcon: const Icon(Icons.search, size: 18),
+                  prefixIcon: const Icon(ModIcons.search, size: 18),
                   hintText: m.filterAction,
                   border: const OutlineInputBorder(),
                 ),
@@ -114,13 +114,13 @@ class _LogTabState extends State<LogTab> with AutomaticKeepAliveClientMixin {
             ),
             OutlinedButton.icon(
               onPressed: _export,
-              icon: const Icon(Icons.download, size: 18),
+              icon: const Icon(ModIcons.download, size: 18),
               label: Text(m.downloadCsv),
             ),
           ],
         ),
       ),
-      empty: ModEmptyState(icon: Icons.receipt_long_outlined, title: m.noLog),
+      empty: ModEmptyState(icon: ModIcons.log, title: m.noLog),
       itemBuilder: (context, row) {
         final at = DateTime.tryParse('${row['created_at']}');
         final system = row['actor'] == 'system';
@@ -129,7 +129,7 @@ class _LogTabState extends State<LogTab> with AutomaticKeepAliveClientMixin {
             .join(' ');
         return ListTile(
           dense: true,
-          leading: Icon(system ? Icons.smart_toy_outlined : Icons.person_outline,
+          leading: Icon(system ? ModIcons.bot : ModIcons.person,
               color: system ? scheme.secondary : scheme.primary),
           title: Text('${row['action']}  ·  $target',
               style: const TextStyle(fontWeight: FontWeight.w600)),

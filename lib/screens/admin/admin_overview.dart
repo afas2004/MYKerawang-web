@@ -4,6 +4,7 @@ import '../../l10n/moderation_strings.dart';
 import '../../language_cubit.dart';
 import '../../utils/moderation_logic.dart';
 import '../../widgets/brand/brand.dart';
+import '../../widgets/moderation_ui.dart';
 
 /// Bumped by any tab after an action so the overview re-fetches.
 final adminSummaryRefresh = ValueNotifier<int>(0);
@@ -30,15 +31,15 @@ class AdminOverview extends StatelessWidget {
             day: m.ageDay, hour: m.ageHour, minute: m.ageMinute, lessThanMinute: m.ageNow);
 
     final cards = [
-      _Stat(icon: Icons.inbox_outlined, label: u.statOpen, value: s == null ? null : '${n('open_cases')}',
+      _Stat(icon: ModIcons.inbox, label: u.statOpen, value: s == null ? null : '${n('open_cases')}',
           onTap: () => onOpenTab?.call(0), emphasis: n('open_cases') > 0),
-      _Stat(icon: Icons.schedule, label: u.statOldest, value: s == null ? null : age),
-      _Stat(icon: Icons.visibility_off_outlined, label: u.statHidden,
+      _Stat(icon: ModIcons.clock, label: u.statOldest, value: s == null ? null : age),
+      _Stat(icon: ModIcons.hidden, label: u.statHidden,
           value: s == null ? null : '${n('hidden_cases')}', onTap: () => onOpenTab?.call(0),
           emphasis: n('hidden_cases') > 0),
-      _Stat(icon: Icons.verified_outlined, label: u.statClubs,
+      _Stat(icon: ModIcons.verified, label: u.statClubs,
           value: s == null ? null : '${n('club_requests')}', onTap: () => onOpenTab?.call(1)),
-      _Stat(icon: Icons.gavel_outlined, label: u.statAppeals,
+      _Stat(icon: ModIcons.appeal, label: u.statAppeals,
           value: s == null ? null : '${n('pending_appeals')}', onTap: () => onOpenTab?.call(2)),
     ];
 

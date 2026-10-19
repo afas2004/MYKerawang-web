@@ -144,7 +144,7 @@ class _RestrictDialogState extends State<RestrictDialog> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.visibility_outlined,
+                        Icon(ModIcons.visible,
                             size: 16, color: severe ? scheme.onErrorContainer : scheme.primary),
                         const SizedBox(width: 6),
                         Flexible(

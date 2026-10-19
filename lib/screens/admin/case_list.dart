@@ -4,13 +4,14 @@ import '../../l10n/app_strings.dart';
 import '../../l10n/moderation_strings.dart';
 import '../../language_cubit.dart';
 import '../../utils/moderation_logic.dart';
+import '../../widgets/moderation_ui.dart';
 
 IconData caseTypeIcon(String? t) => switch (t) {
-      'post' => Icons.article_outlined,
-      'comment' => Icons.chat_bubble_outline,
-      'event' => Icons.event_outlined,
-      'listing' => Icons.storefront_outlined,
-      _ => Icons.person_outline,
+      'post' => ModIcons.post,
+      'comment' => ModIcons.comment,
+      'event' => ModIcons.event,
+      'listing' => ModIcons.listing,
+      _ => ModIcons.person,
     };
 
 /// One-line summary of a case's content for list rows.
@@ -165,7 +166,7 @@ class CaseListTile extends StatelessWidget {
                 if (status == 'hidden')
                   Tooltip(
                     message: m.statusHidden,
-                    child: Icon(Icons.visibility_off, size: 18, color: scheme.tertiary),
+                    child: Icon(ModIcons.hidden, size: 18, color: scheme.tertiary),
                   )
                 else if (status != 'open')
                   Text(m.decisionLabel(c['decision'] as String?),

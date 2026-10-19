@@ -181,13 +181,12 @@ class _Summary extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const LatticeBand(),
           Padding(
             padding: const EdgeInsets.all(KSpace.xl),
             child: Column(
               children: [
                 Icon(
-                  clean ? Icons.verified_user_outlined : Icons.shield_outlined,
+                  clean ? ModIcons.official : ModIcons.moderation,
                   size: 40,
                   color: clean ? scheme.onSecondaryContainer : scheme.primary,
                 ),
@@ -234,7 +233,7 @@ class _AppealFooter extends StatelessWidget {
         alignment: Alignment.centerLeft,
         child: ModChip(
           label: m.appealStatusLabel(status),
-          icon: Icons.gavel,
+          icon: ModIcons.appeal,
           background: scheme.primaryContainer,
           foreground: scheme.onPrimaryContainer,
         ),
@@ -245,7 +244,7 @@ class _AppealFooter extends StatelessWidget {
       alignment: Alignment.centerRight,
       child: OutlinedButton.icon(
         onPressed: onAppeal,
-        icon: const Icon(Icons.gavel, size: 18),
+        icon: const Icon(ModIcons.appeal, size: 18),
         label: Text(m.appeal),
         style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
       ),
@@ -274,7 +273,7 @@ class _RestrictionCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.pause_circle_outline, color: fg),
+                Icon(ModIcons.pause, color: fg),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -331,11 +330,11 @@ class _HistoryItem extends StatelessWidget {
     final preview = c['preview'] as Map<String, dynamic>?;
     final decision = c['decision'] as String?;
     final (label, icon) = c['status'] == 'hidden'
-        ? (m.caseHiddenPending, Icons.hourglass_top)
+        ? (m.caseHiddenPending, ModIcons.pending)
         : switch (decision) {
-            'removed' => (m.caseRemoved, Icons.visibility_off_outlined),
-            'warned' => (m.caseWarned, Icons.info_outline),
-            _ => (m.caseRestored, Icons.check_circle_outline),
+            'removed' => (m.caseRemoved, ModIcons.hidden),
+            'warned' => (m.caseWarned, ModIcons.info),
+            _ => (m.caseRestored, ModIcons.success),
           };
     final snippet = '${preview?['title'] ?? preview?['body'] ?? ''}'.trim();
     final categories = ((c['categories'] as List?) ?? const []).cast<String>();

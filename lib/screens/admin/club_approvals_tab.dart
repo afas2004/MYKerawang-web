@@ -71,7 +71,7 @@ class _ClubApprovalsTabState extends State<ClubApprovalsTab>
       future: _future,
       onRetry: _reload,
       empty: ModEmptyState(
-        icon: Icons.verified_outlined,
+        icon: ModIcons.verified,
         title: m.noClubRequests,
       ),
       itemBuilder: (context, p) {
@@ -101,7 +101,7 @@ class _ClubApprovalsTabState extends State<ClubApprovalsTab>
                     const SizedBox(width: 8),
                     FilledButton.icon(
                       onPressed: busy ? null : () => _decide(p, true),
-                      icon: const Icon(Icons.verified, size: 18),
+                      icon: const Icon(ModIcons.verified, size: 18),
                       label: Text(m.approve),
                     ),
                   ],

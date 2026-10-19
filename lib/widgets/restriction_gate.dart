@@ -52,7 +52,7 @@ Future<void> showRestrictionNotice(BuildContext context, Restriction? r,
     builder: (ctx) {
       final scheme = Theme.of(ctx).colorScheme;
       return AlertDialog(
-        icon: Icon(Icons.block, color: scheme.error),
+        icon: Icon(ModIcons.ban, color: scheme.error),
         title: Text(m.cantTitle(s.db)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
