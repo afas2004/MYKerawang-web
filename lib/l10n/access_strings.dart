@@ -193,4 +193,5 @@ extension AccessStrings on AppStrings {
   String get pastEvents => _t("Past events", "Acara lepas", "過去のイベント");
   String get pastEventsCount =>
       _t("{0} ended or cancelled", "{0} dah tamat atau dibatalkan", "{0}件 終了・中止");
+  String get postedOn => _t("Posted", "Dipos", "投稿日");
 }

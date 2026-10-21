@@ -228,7 +228,7 @@ int _currentImageIndex = 0;
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    icon: const Icon(Icons.chat),
+                    icon: const Icon(AppIcons.comment),
                     label: Text(s.chatOnWhatsApp),
                     style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
                     onPressed: () {
@@ -255,7 +255,7 @@ int _currentImageIndex = 0;
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        icon: const Icon(Icons.qr_code_2),
+                        icon: const Icon(AppIcons.qrCode),
                         label: Text(s.showPaymentQr),
                         style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
                         onPressed: () => setModalState(() => showQr = true),
@@ -271,7 +271,7 @@ int _currentImageIndex = 0;
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.info_outline, size: 18, color: scheme.onTertiaryContainer),
+                          Icon(AppIcons.info, size: 18, color: scheme.onTertiaryContainer),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(s.paymentCaution,
@@ -318,7 +318,7 @@ int _currentImageIndex = 0;
                           },
                       icon: isSaving
                         ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                        : Icon(isSaved ? Icons.check_circle : Icons.save_alt, color: isSaved ? scheme.primary : null),
+                        : Icon(isSaved ? AppIcons.success : AppIcons.download, color: isSaved ? scheme.primary : null),
                       label: Text(
                         isSaving
                             ? s.saving
@@ -359,7 +359,7 @@ int _currentImageIndex = 0;
         ...?(_itemData['gallery_urls'] as List?)?.whereType<String>(),
       ];
 
-  /// Two columns (gallery left, summary card right) from this width.
+  /// Two columns (gallery left, details right) from this width.
   static const double _wideFrom = Responsive.desktopBreakpoint;
 
   @override
@@ -367,18 +367,12 @@ int _currentImageIndex = 0;
     return LayoutBuilder(builder: (context, constraints) {
       final wide = constraints.maxWidth >= _wideFrom;
       return Scaffold(
-        appBar: wide
-            ? AppBar(
-                leading: IconButton(
-                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                  icon: const Icon(Icons.arrow_back),
-                  // A shared link opens this page cold, with nothing
-                  // underneath to pop back to.
-                  onPressed: () => popOrHome(context),
-                ),
-                actions: [..._actions(context, onPhoto: false), const SizedBox(width: 8)],
-              )
-            : null,
+        // A plain app bar on every size: back, save, share, more — no
+        // dark circles floating on the photo.
+        appBar: AppBar(
+          leading: const AppBackButton(),
+          actions: [..._actions(context), const SizedBox(width: KSpace.xs)],
+        ),
         body: AdaptiveScaffoldBody(
           primaryFlex: 3,
           secondaryFlex: 2,
@@ -389,55 +383,33 @@ int _currentImageIndex = 0;
               padding: const EdgeInsets.only(top: KSpace.s, bottom: KSpace.xxl),
               children: [
                 AspectRatio(
-                  aspectRatio: 1,
-                  child: ClipRRect(borderRadius: KRadius.cut, child: _gallery(context)),
+                  aspectRatio: 4 / 3,
+                  child: ClipRRect(borderRadius: KRadius.card, child: _gallery(context)),
                 ),
                 if (_images.length > 1) ...[
                   const SizedBox(height: KSpace.m),
                   _thumbnails(context),
                 ],
-                const SizedBox(height: KSpace.xxl),
+                const SizedBox(height: KSpace.xl),
                 _descriptionSection(context),
               ],
             ),
           ),
-          // ---- right: price, status, seller, Contact ----
+          // ---- right: price, details, seller, primary action ----
           secondary: SingleChildScrollView(
             padding: const EdgeInsets.only(top: KSpace.s, bottom: KSpace.xl),
-            child: KCard(
-              borderRadius: KRadius.cut,
-              padding: const EdgeInsets.all(KSpace.l + KSpace.xs),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _summary(context),
-                  const SizedBox(height: KSpace.l + KSpace.xs),
-                  _actionBar(context),
-                ],
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _summary(context),
+                const SizedBox(height: KSpace.l),
+                _actionBar(context),
+              ],
             ),
           ),
         ),
-        // Compact: Contact (or owner controls) pinned to the bottom.
-        bottomSheet: wide
-            ? null
-            : bottomBarConstrained(
-                context,
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    boxShadow: [
-                      BoxShadow(
-                          color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, -2)),
-                    ],
-                  ),
-                  child: SafeArea(top: false, child: _actionBar(context)),
-                ),
-              ),
+        // Compact: the primary action is pinned to the bottom.
+        bottomNavigationBar: wide ? null : _bottomBar(context),
       );
     });
   }
@@ -448,44 +420,24 @@ int _currentImageIndex = 0;
 
   Widget _compactBody(BuildContext context) {
     return PageBody(
-      child: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 400,
-            pinned: true,
-            leading: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: CircleAvatar(
-                backgroundColor: photoScrim(0.5),
-                child: IconButton(
-                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                  icon: const Icon(Icons.arrow_back, color: kOnPhoto),
-                  onPressed: () => popOrHome(context),
-                ),
-              ),
+      child: ListView(
+        padding: const EdgeInsets.only(bottom: KSpace.xl),
+        children: [
+          AspectRatio(aspectRatio: 16 / 10, child: _gallery(context)),
+          if (_images.length > 1)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, 0),
+              child: _thumbnails(context),
             ),
-            actions: _actions(context, onPhoto: true),
-            flexibleSpace: FlexibleSpaceBar(
-              background: ClipRRect(
-                borderRadius: BorderRadius.only(
-                  bottomLeft: KRadius.cut.bottomLeft,
-                  bottomRight: KRadius.cut.bottomRight,
-                ),
-                child: _gallery(context),
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 112),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _summary(context),
-                  const SizedBox(height: 24),
-                  _descriptionSection(context),
-                ],
-              ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.l, KSpace.l, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _summary(context),
+                const SizedBox(height: KSpace.xl),
+                _descriptionSection(context),
+              ],
             ),
           ),
         ],
@@ -493,30 +445,63 @@ int _currentImageIndex = 0;
     );
   }
 
+  Widget _bottomBar(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        border: Border(top: BorderSide(color: scheme.outlineVariant)),
+      ),
+      padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, KSpace.m),
+      child: SafeArea(top: false, child: _actionBar(context)),
+    );
+  }
+
   // ---------------------------------------------------------------------
   // Pieces
   // ---------------------------------------------------------------------
 
-  List<Widget> _actions(BuildContext context, {required bool onPhoto}) {
+  /// Save, share, and a "more" menu: Report for visitors; Edit and Delete
+  /// for the seller (Delete lives here, not as a big red button).
+  List<Widget> _actions(BuildContext context) {
     final s = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final fg = onPhoto ? kOnPhoto : scheme.onSurfaceVariant;
-    Widget wrap(Widget child) => onPhoto
-        ? Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-            child: CircleAvatar(backgroundColor: photoScrim(0.5), child: child),
-          )
-        : child;
     return [
-      wrap(SaveButton(type: SavedType.listing, id: _itemData['id'], color: fg)),
-      wrap(IconButton(tooltip: s.share, icon: Icon(Icons.share, color: fg), onPressed: _share)),
-      if (!_isOwner)
-        wrap(GuardedReportButton(
+      SaveButton(type: SavedType.listing, id: _itemData['id'], color: scheme.onSurfaceVariant),
+      IconButton(tooltip: s.share, icon: const Icon(AppIcons.share), onPressed: _share),
+      if (_isOwner)
+        PopupMenuButton<String>(
+          tooltip: s.more,
+          icon: const Icon(AppIcons.more),
+          onSelected: (v) {
+            if (v == 'edit') context.goEditListing(_itemData);
+            if (v == 'delete') _deleteItem();
+          },
+          itemBuilder: (_) => [
+            PopupMenuItem(
+              value: 'edit',
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(AppIcons.edit),
+                title: Text(s.edit),
+              ),
+            ),
+            PopupMenuItem(
+              value: 'delete',
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(AppIcons.delete, color: scheme.error),
+                title: Text(s.deletePermanently, style: TextStyle(color: scheme.error)),
+              ),
+            ),
+          ],
+        )
+      else
+        GuardedReportButton(
           targetId: _itemData['id'],
           type: 'listing',
-          icon: Icon(Icons.more_vert, color: fg),
-        )),
-      if (onPhoto) const SizedBox(width: 6),
+          icon: const Icon(AppIcons.more),
+        ),
     ];
   }
 
@@ -534,7 +519,7 @@ int _currentImageIndex = 0;
     );
   }
 
-  /// Photos with the RESERVED / SOLD stamp and a counter.
+  /// Photos with the Reserved / Sold badge and a counter.
   Widget _gallery(BuildContext context) {
     final s = context.l10n;
     final theme = Theme.of(context);
@@ -550,7 +535,7 @@ int _currentImageIndex = 0;
           ColoredBox(
             color: scheme.surfaceContainerHighest,
             child: Center(
-              child: Icon(Icons.storefront_outlined, size: 56, color: scheme.onSurfaceVariant),
+              child: Icon(AppIcons.photo, size: 48, color: scheme.onSurfaceVariant),
             ),
           )
         else
@@ -574,50 +559,30 @@ int _currentImageIndex = 0;
                   placeholder: (_, __) => ColoredBox(color: scheme.surfaceContainerHighest),
                   errorWidget: (_, __, ___) => ColoredBox(
                     color: scheme.surfaceContainerHighest,
-                    child: Icon(Icons.broken_image, color: scheme.onSurfaceVariant),
+                    child: Icon(AppIcons.photo, color: scheme.onSurfaceVariant),
                   ),
                 ),
               ),
             ),
           ),
-        // Top scrim so the back / action buttons stay visible.
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 100,
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [photoScrim(0.45), photoScrim(0)],
-                ),
-              ),
-            ),
-          ),
-        ),
         if (status.badge(s) != null)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: ColoredBox(
-                color: photoScrim(isSold ? 0.4 : 0.25),
-                child: Center(child: StatusBadge.stamp(status.badge(s)!)),
-              ),
-            ),
+          Positioned(
+            top: KSpace.m,
+            left: KSpace.m,
+            child: IgnorePointer(child: StatusBadge.stamp(status.badge(s)!)),
           ),
         if (images.length > 1)
           Positioned(
-            bottom: 16,
-            right: 16,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration:
-                  BoxDecoration(color: photoScrim(), borderRadius: BorderRadius.circular(20)),
-              child: Text("${_currentImageIndex + 1} / ${images.length}",
-                  style: theme.textTheme.labelMedium
-                      ?.copyWith(color: kOnPhoto, fontWeight: FontWeight.bold)),
+            bottom: KSpace.m,
+            right: KSpace.m,
+            child: IgnorePointer(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: KSpace.s + 2, vertical: KSpace.xs),
+                decoration: BoxDecoration(color: photoScrim(0.6), borderRadius: KRadius.pill),
+                child: Text("${_currentImageIndex + 1} / ${images.length}",
+                    style: theme.textTheme.labelMedium
+                        ?.copyWith(color: kOnPhoto, fontWeight: FontWeight.w600)),
+              ),
             ),
           ),
       ],
@@ -629,16 +594,16 @@ int _currentImageIndex = 0;
     final s = context.l10n;
     final images = _images;
     return SizedBox(
-      height: 72,
+      height: 64,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: images.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, __) => const SizedBox(width: KSpace.s),
         itemBuilder: (context, i) {
           final selected = i == _currentImageIndex;
           return TapCard(
             semanticLabel: s.photoCount.fill([i + 1, images.length]),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: KRadius.small,
             border: BorderSide(
               color: selected ? scheme.primary : scheme.outlineVariant,
               width: selected ? 2 : 1,
@@ -647,11 +612,11 @@ int _currentImageIndex = 0;
               setState(() => _currentImageIndex = i);
               if (_galleryController.hasClients) {
                 _galleryController.animateToPage(i,
-                    duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
+                    duration: KMotion.of(context).medium, curve: KMotion.curve);
               }
             },
             child: SizedBox(
-              width: 72,
+              width: 64,
               child: CachedNetworkImage(imageUrl: images[i], fit: BoxFit.cover),
             ),
           );
@@ -660,116 +625,132 @@ int _currentImageIndex = 0;
     );
   }
 
-  /// Category, price (gold), title, status, reserved note and seller.
+  /// Price and title, then the details card, the reserved note and the
+  /// seller card.
   Widget _summary(BuildContext context) {
     final s = context.l10n;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final status = ListingStatus.of(_itemData);
     final isSold = status == ListingStatus.sold;
+    final posted = parseLocal(_itemData['created_at']);
+
+    Widget infoRow(IconData icon, String label, String value) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: KSpace.s),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: scheme.onSurfaceVariant),
+              const SizedBox(width: KSpace.m),
+              Expanded(
+                child: Text(label,
+                    style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant)),
+              ),
+              Flexible(
+                child: Text(value,
+                    textAlign: TextAlign.end,
+                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+        );
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Chip(
-              label: Text(_itemData['category'] ?? s.categoryGeneral),
-              backgroundColor: scheme.secondaryContainer,
-              labelStyle: TextStyle(color: scheme.onSecondaryContainer),
-              side: BorderSide.none,
-            ),
-            Chip(
-              avatar: Icon(
-                switch (status) {
-                  ListingStatus.available => Icons.check_circle_outline,
-                  ListingStatus.reserved => Icons.handshake_outlined,
-                  ListingStatus.sold => Icons.block,
-                },
-                size: 16,
-              ),
-              label: Text(status.label(s)),
-              side: BorderSide(color: scheme.outlineVariant),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
         Text(
           formatPrice(_itemData['price']),
           style: theme.textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-            // Gold is for prices (design direction).
+            fontWeight: FontWeight.w700,
             color: isSold ? scheme.onSurfaceVariant : scheme.tertiary,
             decoration: isSold ? TextDecoration.lineThrough : null,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(_itemData['title'] ?? '',
-            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+        const SizedBox(height: KSpace.xs),
+        Text(_itemData['title'] ?? '', style: theme.textTheme.titleLarge),
+        const SizedBox(height: KSpace.l),
+
+        // ---- details ----
+        KCard(
+          padding: const EdgeInsets.symmetric(horizontal: KSpace.l, vertical: KSpace.xs),
+          child: Column(
+            children: [
+              infoRow(AppIcons.price, s.category, _itemData['category'] ?? s.categoryGeneral),
+              const Divider(height: 1),
+              infoRow(
+                switch (status) {
+                  ListingStatus.available => AppIcons.success,
+                  ListingStatus.reserved => AppIcons.clock,
+                  ListingStatus.sold => AppIcons.sold,
+                },
+                s.listingStatus,
+                status.label(s),
+              ),
+              if (posted != null) ...[
+                const Divider(height: 1),
+                infoRow(AppIcons.calendar, s.postedOn, formatDate(posted)),
+              ],
+            ],
+          ),
+        ),
+
         if (status == ListingStatus.reserved && !_isOwner) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: KSpace.m),
           Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(KSpace.m),
             decoration: BoxDecoration(
               color: scheme.secondaryContainer,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: KRadius.input,
             ),
             child: Row(
               children: [
-                Icon(Icons.handshake_outlined, color: scheme.onSecondaryContainer),
-                const SizedBox(width: 12),
+                Icon(AppIcons.info, size: 18, color: scheme.onSecondaryContainer),
+                const SizedBox(width: KSpace.m),
                 Expanded(
                   child: Text(s.reservedHint,
-                      style: TextStyle(color: scheme.onSecondaryContainer)),
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: scheme.onSecondaryContainer)),
                 ),
               ],
             ),
           ),
         ],
+
+        // ---- seller ----
         if (_sellerProfile != null) ...[
-          const SizedBox(height: 16),
-          TapCard(
+          const SizedBox(height: KSpace.m),
+          KCard(
             onTap: () => context.goUser(_sellerProfile!['id']),
-            color: scheme.surfaceContainerHigh,
-            border: BorderSide(color: scheme.outlineVariant),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: scheme.primaryContainer,
-                    backgroundImage: _sellerProfile!['avatar_url'] != null
-                        ? CachedNetworkImageProvider(_sellerProfile!['avatar_url'])
-                        : null,
-                    child: _sellerProfile!['avatar_url'] == null
-                        ? Icon(Icons.person, color: scheme.onPrimaryContainer)
-                        : null,
+            padding: const EdgeInsets.all(KSpace.m),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: scheme.primaryContainer,
+                  backgroundImage: _sellerProfile!['avatar_url'] != null
+                      ? CachedNetworkImageProvider(_sellerProfile!['avatar_url'])
+                      : null,
+                  child: _sellerProfile!['avatar_url'] == null
+                      ? Icon(AppIcons.person, color: scheme.onPrimaryContainer)
+                      : null,
+                ),
+                const SizedBox(width: KSpace.m),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(s.seller,
+                          style: theme.textTheme.labelSmall
+                              ?.copyWith(color: scheme.onSurfaceVariant)),
+                      Text(displayNameFor(s, _sellerProfile),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(s.seller,
-                            style: theme.textTheme.labelSmall
-                                ?.copyWith(color: scheme.onSurfaceVariant)),
-                        Text(displayNameFor(s, _sellerProfile),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleSmall
-                                ?.copyWith(fontWeight: FontWeight.w700)),
-                        Text(s.viewProfile,
-                            style: theme.textTheme.bodySmall?.copyWith(color: scheme.primary)),
-                      ],
-                    ),
-                  ),
-                  Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
-                ],
-              ),
+                ),
+                Text(s.viewProfile,
+                    style: theme.textTheme.labelLarge?.copyWith(color: scheme.primary)),
+                Icon(AppIcons.chevronRight, size: 18, color: scheme.primary),
+              ],
             ),
           ),
         ],
@@ -785,18 +766,18 @@ int _currentImageIndex = 0;
       children: [
         Row(
           children: [
-            Expanded(child: Text(s.description, style: theme.textTheme.titleLarge)),
+            Expanded(child: Text(s.description, style: theme.textTheme.titleMedium)),
             TextButton.icon(
               onPressed: () {
                 if (!requireLogin(context)) return;
                 context.goCreatePost(sharedListing: _itemData);
               },
-              icon: const Icon(Icons.repeat, size: 16),
+              icon: const Icon(AppIcons.repost, size: 16),
               label: Text(s.repost),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: KSpace.s),
         Text(
           (_itemData['description'] ?? '').toString().trim().isEmpty
               ? s.noDetails
@@ -807,7 +788,8 @@ int _currentImageIndex = 0;
     );
   }
 
-  /// Owner: status, edit, delete. Guest: log in. Buyer: Contact.
+  /// Seller: status dropdown + Edit (Delete is in the ⋮ menu). Guest: log
+  /// in. Buyer: Contact.
   Widget _actionBar(BuildContext context) {
     final s = context.l10n;
     final scheme = Theme.of(context).colorScheme;
@@ -817,7 +799,6 @@ int _currentImageIndex = 0;
     if (_isOwner) {
       return Row(
         children: [
-          // 1. STATUS: available / reserved / sold
           Expanded(
             child: PopupMenuButton<ListingStatus>(
               tooltip: s.listingStatus,
@@ -834,10 +815,10 @@ int _currentImageIndex = 0;
               ],
               child: Container(
                 constraints: const BoxConstraints(minHeight: 48),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.symmetric(horizontal: KSpace.m),
                 decoration: BoxDecoration(
-                  border: Border.all(color: scheme.primary),
-                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: scheme.outline),
+                  borderRadius: KRadius.pill,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -846,41 +827,30 @@ int _currentImageIndex = 0;
                       const SizedBox(
                           width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                     else
-                      Icon(Icons.sell_outlined, size: 18, color: scheme.primary),
-                    const SizedBox(width: 8),
+                      Icon(AppIcons.price, size: 18, color: scheme.onSurface),
+                    const SizedBox(width: KSpace.s),
                     Flexible(
                       child: Text(status.label(s),
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w600)),
+                          style: Theme.of(context).textTheme.labelLarge),
                     ),
-                    Icon(Icons.arrow_drop_down, color: scheme.primary),
+                    const SizedBox(width: KSpace.xs),
+                    Icon(AppIcons.chevronRight, size: 16, color: scheme.onSurfaceVariant),
                   ],
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          // 2. EDIT
+          const SizedBox(width: KSpace.s),
           Expanded(
-            child: FilledButton(
+            child: FilledButton.icon(
               // Edit is its own route; saving brings us back here and
               // refreshes through contentChanges.
               onPressed: () => context.goEditListing(_itemData),
               style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-              child: Text(s.edit),
+              icon: const Icon(AppIcons.edit, size: 18),
+              label: Text(s.edit),
             ),
-          ),
-          const SizedBox(width: 8),
-          // 3. DELETE
-          IconButton.filledTonal(
-            style: IconButton.styleFrom(
-              backgroundColor: scheme.errorContainer,
-              foregroundColor: scheme.onErrorContainer,
-              minimumSize: const Size(48, 48),
-            ),
-            icon: const Icon(Icons.delete_outline),
-            tooltip: s.deletePermanently,
-            onPressed: _deleteItem,
           ),
         ],
       );
@@ -896,7 +866,7 @@ int _currentImageIndex = 0;
               width: 16,
               height: 16,
               child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onPrimary))
-          : const Icon(Icons.chat),
+          : const Icon(AppIcons.comment),
       // Sold = onPressed null, so the theme's disabled colours apply
       label: Text(isSold ? s.sold : s.contactOrBuy),
     );
