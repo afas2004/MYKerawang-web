@@ -46,6 +46,8 @@ class ShellStrings {
   final String searchPromptBody;
   final String noResultsFor;
   final String tryDifferent;
+  final String seePostsTagged;
+  final String clubs;
 
   // Onboarding
   final String stepOf;
@@ -80,6 +82,8 @@ class ShellStrings {
     required this.searchPromptBody,
     required this.noResultsFor,
     required this.tryDifferent,
+    required this.seePostsTagged,
+    required this.clubs,
     required this.stepOf,
     required this.registerClubLater,
   });
@@ -113,6 +117,8 @@ class ShellStrings {
     searchPromptBody: "People, posts, events and Market items.",
     noResultsFor: "Nothing found for “{0}”",
     tryDifferent: "Try another word or a different filter.",
+    seePostsTagged: "See posts tagged {0}",
+    clubs: "Clubs",
     stepOf: "Step {0} of {1}",
     registerClubLater: "Registering a club? Do it after sign-up",
   );
@@ -146,6 +152,8 @@ class ShellStrings {
     searchPromptBody: "Orang, post, acara dan barang Pasar.",
     noResultsFor: "Tiada hasil untuk “{0}”",
     tryDifferent: "Cuba perkataan lain atau tapis yang berbeza.",
+    seePostsTagged: "Lihat post bertag {0}",
+    clubs: "Kelab",
     stepOf: "Langkah {0} daripada {1}",
     registerClubLater: "Daftar kelab? Buat selepas pendaftaran",
   );
