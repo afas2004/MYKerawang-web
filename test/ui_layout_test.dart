@@ -95,7 +95,7 @@ void main() {
         child: EventCard(event: {...event, 'cancelled_at': '2026-10-19T00:00:00Z'}),
       ),
     );
-    expect(find.text('CANCELLED'), findsOneWidget);
+    expect(find.text('Cancelled'), findsOneWidget);
     expect(find.byType(CountdownChip), findsNothing);
   });
 
@@ -103,8 +103,9 @@ void main() {
   /// Width the market grid gives one tile at a screen width (side panel
   /// from 900).
   double marketTileWidth(double width) {
-    final grid = (width >= 900 ? width - 281 : width) - 32;
-    final cols = Responsive.gridColumnsFor(grid + 32);
+    // Side panel from 900; 16px gutters each side.
+    final grid = (width >= 900 ? width - 281 : width) - 2 * KSpace.l;
+    final cols = Responsive.gridColumnsFor(grid + 2 * KSpace.l);
     return (grid - KSpace.m * (cols - 1)) / cols;
   }
 
@@ -127,14 +128,14 @@ void main() {
             alignment: Alignment.topLeft,
             child: SizedBox(
               width: w,
-              height: w / MarketCard.aspectRatio,
+              height: MarketCard.heightFor(w, TextScaler.linear(scale)),
               child: MarketCard(item: listing),
             ),
           ),
           textScale: scale,
         );
         expect(tester.takeException(), isNull);
-        expect(find.text('RESERVED'), findsOneWidget);
+        expect(find.text('Reserved'), findsOneWidget);
         expect(find.textContaining('12345.50'), findsOneWidget);
       });
     }
