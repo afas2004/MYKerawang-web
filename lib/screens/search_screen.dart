@@ -11,7 +11,6 @@ import '../utils/formatters.dart';
 import '../utils/roles.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/status_badge.dart';
-import '../widgets/tap_card.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -289,75 +288,81 @@ class _SearchScreenState extends State<SearchScreen> {
       'Market': s.navMarket,
     };
 
+    // Search field lives in the app bar; filter chips sit right under it.
     return Scaffold(
-      appBar: AppBar(title: Text(s.navSearch)),
+      appBar: AppBar(
+        toolbarHeight: 64,
+        titleSpacing: KSpace.l,
+        title: TextField(
+          controller: _searchCtrl,
+          autofocus: true,
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            hintText: s.searchHint,
+            prefixIcon: const Icon(AppIcons.search, size: 20),
+            filled: true,
+            fillColor: scheme.surfaceContainerHigh,
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(vertical: KSpace.m),
+            border: const OutlineInputBorder(
+              borderRadius: KRadius.pill,
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: const OutlineInputBorder(
+              borderRadius: KRadius.pill,
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: KRadius.pill,
+              borderSide: BorderSide(color: scheme.primary, width: 2),
+            ),
+            suffixIcon: _searchCtrl.text.isNotEmpty
+                ? IconButton(
+                    tooltip: MaterialLocalizations.of(context).deleteButtonTooltip,
+                    icon: const Icon(AppIcons.close, size: 20),
+                    onPressed: () {
+                      _searchCtrl.clear();
+                      _onSearchChanged('');
+                      setState(() {});
+                    },
+                  )
+                : null,
+          ),
+          onChanged: (v) {
+            setState(() {}); // clear button
+            _onSearchChanged(v);
+          },
+          onSubmitted: (v) {
+            if (v.trim().isNotEmpty) _useRecent(v.trim());
+          },
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(56),
+          child: SizedBox(
+            height: 56,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.xs, KSpace.l, KSpace.s),
+              children: [
+                for (final f in filters.entries)
+                  Padding(
+                    padding: const EdgeInsets.only(right: KSpace.s),
+                    child: ChoiceChip(
+                      label: Text(f.value),
+                      selected: _activeFilter == f.key,
+                      showCheckmark: false,
+                      onSelected: (_) => _setFilter(f.key),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 680),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // --- SEARCH BAR ---
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                child: TextField(
-                  controller: _searchCtrl,
-                  autofocus: true,
-                  textInputAction: TextInputAction.search,
-                  decoration: InputDecoration(
-                    hintText: s.searchHint,
-                    prefixIcon: const Icon(Icons.search),
-                    filled: true,
-                    fillColor: scheme.surfaceContainerHigh,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(28),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(28),
-                      borderSide: BorderSide(color: scheme.primary, width: 2),
-                    ),
-                    suffixIcon: _searchCtrl.text.isNotEmpty
-                        ? IconButton(
-                            tooltip: MaterialLocalizations.of(context).deleteButtonTooltip,
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              _searchCtrl.clear();
-                              _onSearchChanged('');
-                            },
-                          )
-                        : null,
-                  ),
-                  onChanged: (v) {
-                    setState(() {}); // clear button
-                    _onSearchChanged(v);
-                  },
-                  onSubmitted: (v) {
-                    if (v.trim().isNotEmpty) _useRecent(v.trim());
-                  },
-                ),
-              ),
-
-              // --- SEGMENTED FILTERS ---
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: SegmentedButton<String>(
-                  showSelectedIcon: false,
-                  segments: [
-                    for (final f in filters.entries)
-                      ButtonSegment(value: f.key, label: Text(f.value)),
-                  ],
-                  selected: {_activeFilter},
-                  onSelectionChanged: (sel) => _setFilter(sel.first),
-                ),
-              ),
-              Divider(height: 1, color: scheme.outlineVariant),
-
-              Expanded(child: _body(context)),
-            ],
-          ),
+          constraints: const BoxConstraints(maxWidth: Responsive.feedMaxWidth),
+          child: _body(context),
         ),
       ),
     );
@@ -371,7 +376,7 @@ class _SearchScreenState extends State<SearchScreen> {
     if (_query.isEmpty) {
       if (_recent.isEmpty) {
         return _SearchMessage(
-          icon: Icons.travel_explore,
+          icon: AppIcons.search,
           title: s.shell.searchPromptTitle,
           body: s.shell.searchPromptBody,
         );
@@ -386,12 +391,12 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
           for (final r in _recent)
             ListTile(
-              leading: const Icon(Icons.history),
+              leading: const Icon(AppIcons.history),
               title: Text(r),
               onTap: () => _useRecent(r),
               trailing: IconButton(
                 tooltip: s.shell.removeRecent,
-                icon: const Icon(Icons.close),
+                icon: const Icon(AppIcons.close),
                 onPressed: () =>
                     _saveRecent(_recent.where((x) => x != r).toList()),
               ),
@@ -404,7 +409,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
     if (_error && _results.isEmpty) {
       return _SearchMessage(
-        icon: Icons.wifi_off,
+        icon: AppIcons.error,
+        illo: AppIllo.offline,
         title: s.connectionError,
         body: '',
         actionLabel: s.tryAgain,
@@ -414,7 +420,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
     if (_results.isEmpty) {
       return _SearchMessage(
-        icon: Icons.search_off,
+        icon: AppIcons.search,
+        illo: AppIllo.noResults,
         title: s.shell.noResultsFor.fill([_query]),
         body: s.shell.tryDifferent,
       );
@@ -486,14 +493,14 @@ class _SearchScreenState extends State<SearchScreen> {
         backgroundImage: item['avatar_url'] != null 
             ? CachedNetworkImageProvider(item['avatar_url']) 
             : null,
-        child: item['avatar_url'] == null ? const Icon(Icons.person) : null,
+        child: item['avatar_url'] == null ? const Icon(AppIcons.person) : null,
       ),
       title: Text(displayNameFor(s, item), style: const TextStyle(fontWeight: FontWeight.bold)),
       subtitle: Text([
         if (item['username'] != null) '@${item['username']}',
         roleLabel(s, item['role']),
       ].join(' · ')),
-      trailing: const Icon(Icons.chevron_right),
+      trailing: const Icon(AppIcons.chevronRight),
       onTap: () => context.goUser(item['id']),
     );
   }
@@ -520,25 +527,24 @@ class _SearchScreenState extends State<SearchScreen> {
       subtitle = start != null ? formatEventDate(start) : s.dateTba;
       badgeLabel = s.kindEvent;
       badgeColor = scheme.primary;
-      placeholderIcon = Icons.event;
+      placeholderIcon = AppIcons.events;
     } else if (isPost) {
       // For posts, show who posted it
       final author = item['profiles']?['display_name'] ?? s.anonymous;
       subtitle = s.postedBy.fill([author]);
       badgeLabel = s.kindPost;
       badgeColor = scheme.secondary;
-      placeholderIcon = Icons.article;
+      placeholderIcon = AppIcons.comment;
     } else {
       // Market — gold label, same as the feed embed's "◆ MARKET".
       subtitle = formatPrice(item['price']);
       badgeLabel = s.navMarket;
       badgeColor = scheme.tertiary;
-      placeholderIcon = Icons.store;
+      placeholderIcon = AppIcons.market;
     }
 
-    final card = TapCard(
-      color: theme.cardColor,
-      border: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
+    final card = KCard(
+      padding: EdgeInsets.zero,
       onTap: () {
         if (isEvent) {
           context.goEvent(item);
@@ -554,7 +560,8 @@ class _SearchScreenState extends State<SearchScreen> {
           children: [
             // Image Section
             ClipRRect(
-              borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
+              borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(KRadius.cardValue)),
               child: SizedBox(
                 width: 100,
                 height: 100,
@@ -567,7 +574,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         memCacheWidth: 300,
                         fit: BoxFit.cover,
                         placeholder: (_,__) => Container(color: scheme.surfaceContainerHighest),
-                        errorWidget: (_,__,___) => Icon(Icons.broken_image, color: scheme.onSurfaceVariant),
+                        errorWidget: (_,__,___) => Icon(AppIcons.photo, color: scheme.onSurfaceVariant),
                       )
                     : Container(
                         color: scheme.surfaceContainerHighest,
@@ -589,15 +596,15 @@ class _SearchScreenState extends State<SearchScreen> {
                   children: [
                     // Badge
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: KSpace.s, vertical: 2),
                       decoration: BoxDecoration(
                         color: badgeColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: KRadius.pill,
                       ),
                       child: Text(
-                        badgeLabel.toUpperCase(),
+                        badgeLabel,
                         style: theme.textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w600,
                           color: badgeColor,
                         ),
                       ),
@@ -658,6 +665,7 @@ class _SectionTitle extends StatelessWidget {
 /// Prompt / no-results / error message.
 class _SearchMessage extends StatelessWidget {
   final IconData icon;
+  final AppIllo? illo;
   final String title;
   final String body;
   final String? actionLabel;
@@ -665,6 +673,7 @@ class _SearchMessage extends StatelessWidget {
 
   const _SearchMessage({
     required this.icon,
+    this.illo,
     required this.title,
     required this.body,
     this.actionLabel,
@@ -674,6 +683,7 @@ class _SearchMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => BrandEmptyState(
         icon: icon,
+        illo: illo,
         title: title,
         message: body.isEmpty ? null : body,
         actionLabel: actionLabel,

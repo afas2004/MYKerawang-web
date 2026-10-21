@@ -36,8 +36,7 @@ void main() {
         onRefresh: () async {},
         onLoadMore: () {},
         onCompose: () {},
-        onPosted: () {},
-        onCreateMenu: () {},
+
       );
 
   for (final size in [kCompact, kMedium, kExpanded]) {

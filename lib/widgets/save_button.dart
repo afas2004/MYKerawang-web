@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/social_strings.dart';
 import '../language_cubit.dart';
+import '../theme/app_icons.dart';
 import '../services/saved_items.dart';
 
 export '../services/saved_items.dart' show SavedType;
@@ -82,7 +83,7 @@ class _SaveButtonState extends State<SaveButton> {
           iconSize: widget.iconSize,
           onPressed: _busy ? null : _toggle,
           icon: Icon(
-            saved ? Icons.bookmark : Icons.bookmark_border,
+            saved ? AppIcons.saved : AppIcons.save,
             color: widget.color ?? (saved ? scheme.primary : null),
           ),
         );

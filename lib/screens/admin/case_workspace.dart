@@ -126,7 +126,7 @@ class CaseWorkspace extends StatelessWidget {
               child: selected == null
                   ? ModEmptyState(
                       key: const ValueKey('none'),
-                      icon: Icons.ads_click,
+                      icon: ModIcons.pointer,
                       title: m.ui.selectCase,
                       body: m.ui.selectCaseBody,
                     )
@@ -269,7 +269,7 @@ class ShortcutHint extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.keyboard_outlined, size: 16, color: theme.colorScheme.onSurfaceVariant),
+            Icon(ModIcons.keyboard, size: 16, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(width: 6),
             Flexible(
               child: Text(u.shortcutsHint,

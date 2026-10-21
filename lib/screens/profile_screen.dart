@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:mykerawang/screens/edit_profile_screen.dart';
-import 'package:mykerawang/screens/follow_list_screen.dart';
 import 'package:mykerawang/l10n/app_strings.dart';
 import 'package:mykerawang/language_cubit.dart';
 import 'package:mykerawang/theme/app_themes.dart';
@@ -12,6 +10,7 @@ import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../utils/roles.dart';
+import '../l10n/feed_strings.dart';
 import '../l10n/social_strings.dart';
 import '../widgets/post_card.dart';
 import '../widgets/saved_items_view.dart';
@@ -255,7 +254,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.videocam_off, color: theme.colorScheme.onSurfaceVariant, size: 40),
+                                  Icon(AppIcons.camera, color: theme.colorScheme.onSurfaceVariant, size: 40),
                                   const SizedBox(height: KSpace.m),
                                   Text(
                                     s.cameraError.fill([error.errorCode.name]),
@@ -304,14 +303,17 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     final s = context.l10n;
     if (_isLoading && _profile == null) {
       return Scaffold(
-        appBar: AppBar(),
+        appBar: AppBar(leading: widget.userId != null ? const AppBackButton() : null),
         body: _loadError
             ? _ErrorRetry(onRetry: _retry)
             : const _ProfileSkeleton(),
       );
     }
     if (_profile == null) {
-      return Scaffold(appBar: AppBar(), body: Center(child: Text(s.userNotFound)));
+      return Scaffold(
+        appBar: AppBar(leading: widget.userId != null ? const AppBackButton() : null),
+        body: BrandEmptyState(icon: AppIcons.person, title: s.userNotFound),
+      );
     }
 
     final theme = Theme.of(context);
@@ -320,32 +322,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
     return Scaffold(
       appBar: AppBar(
+        // Someone else's profile is a pushed page (/u/:id); also works cold.
+        leading: widget.userId != null ? const AppBackButton() : null,
         title: Text(p['username'] != null ? "@${p['username']}" : s.profileTitle),
         actions: [
           if (_isMe && widget.userId == null) const ShellSearchButton(),
-          IconButton(
-            tooltip: s.refresh,
-            icon: const Icon(Icons.refresh),
-            onPressed: _fetchProfileData,
-          ),
-          IconButton(
-            tooltip: s.qrCode,
-            icon: const Icon(Icons.qr_code),
-            onPressed: _showQRCode,
-          ),
-          if (_isMe)
-            IconButton(
-              tooltip: s.settings,
-              icon: const Icon(Icons.settings_outlined),
-              onPressed: () => context.goSettings(),
-            )
-          else
-            ReportMenuButton(
-              targetId: widget.userId!,
-              type: 'user',
-              label: s.reportUser,
-              icon: const Icon(Icons.more_vert),
-            ),
+          _overflowMenu(context),
         ],
       ),
       body: LinearRefresher(
@@ -355,7 +337,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           physics: const BouncingScrollPhysics(
               parent: AlwaysScrollableScrollPhysics()),
           headerSliverBuilder: (context, _) => [
-            SliverToBoxAdapter(child: _identityHeader(context, p)),
+            SliverToBoxAdapter(child: _header(context, p)),
             SliverPersistentHeader(
               pinned: true,
               delegate: _TabBarDelegate(
@@ -364,11 +346,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   labelColor: scheme.primary,
                   unselectedLabelColor: scheme.onSurfaceVariant,
                   indicatorColor: scheme.primary,
+                  indicatorSize: TabBarIndicatorSize.label,
+                  labelStyle: theme.textTheme.labelLarge,
                   tabs: [
-                    Tab(text: s.activity),
-                    Tab(text: s.navEvents),
-                    Tab(text: s.navMarket),
-                    if (_isMe) Tab(text: s.social.saved),
+                    Tab(icon: const Icon(AppIcons.list, size: 20), text: s.activity, height: 60),
+                    Tab(icon: const Icon(AppIcons.events, size: 20), text: s.navEvents, height: 60),
+                    Tab(icon: const Icon(AppIcons.market, size: 20), text: s.navMarket, height: 60),
+                    if (_isMe)
+                      Tab(icon: const Icon(AppIcons.save, size: 20), text: s.social.saved, height: 60),
                   ],
                 ),
                 background: theme.scaffoldBackgroundColor,
@@ -381,10 +366,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             children: [
               _postsTab(context),
               _userEvents.isEmpty
-                  ? _TabEmpty(icon: Icons.event_outlined, text: s.noEventsYet)
+                  ? _TabEmpty(icon: AppIcons.events, text: s.noEventsYet)
                   : _tileGrid(_userEvents, isEvent: true),
               _userListings.isEmpty
-                  ? _TabEmpty(icon: Icons.storefront_outlined, text: s.nothingForSale)
+                  ? _TabEmpty(icon: AppIcons.market, text: s.nothingForSale)
                   : _tileGrid(_userListings, isEvent: false),
               if (_isMe) const SavedItemsView(),
             ],
@@ -394,6 +379,47 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
   }
 
+  /// QR, refresh and settings (own) / report (others) in one menu.
+  Widget _overflowMenu(BuildContext context) {
+    final s = context.l10n;
+    return PopupMenuButton<String>(
+      icon: const Icon(AppIcons.more),
+      tooltip: MaterialLocalizations.of(context).showMenuTooltip,
+      onSelected: (v) {
+        switch (v) {
+          case 'qr':
+            _showQRCode();
+          case 'refresh':
+            _fetchProfileData();
+          case 'settings':
+            context.goSettings();
+          case 'report':
+            showReportDialog(context, widget.userId!, 'user');
+        }
+      },
+      itemBuilder: (_) => [
+        _menuItem('qr', AppIcons.qrCode, s.qrCode),
+        _menuItem('refresh', AppIcons.refresh, s.refresh),
+        if (_isMe)
+          _menuItem('settings', AppIcons.settings, s.settings)
+        else
+          _menuItem('report', AppIcons.report, s.reportUser),
+      ],
+    );
+  }
+
+  PopupMenuItem<String> _menuItem(String value, IconData icon, String label) =>
+      PopupMenuItem(
+        value: value,
+        child: Row(
+          children: [
+            Icon(icon, size: 20),
+            const SizedBox(width: KSpace.m),
+            Text(label),
+          ],
+        ),
+      );
+
   void _retry() {
     setState(() {
       _loadError = false;
@@ -402,140 +428,121 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     _fetchProfileData();
   }
 
-  /// Cover band with lattice, overlapping avatar, Fraunces name, gold
-  /// accent for verified/club accounts, stat chips and the main action.
-  Widget _identityHeader(BuildContext context, Map<String, dynamic> p) {
+  /// Avatar left, name/handle/role beside it, then bio, a one-line stats
+  /// row and the full-width primary action.
+  Widget _header(BuildContext context, Map<String, dynamic> p) {
     final s = context.l10n;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final official = p['is_verified'] == true || p['role'] == 'club';
     final avatarUrl = p['avatar_url'] as String?;
     final name = displayNameFor(s, p);
-    const coverHeight = 96.0;
-    const avatarRadius = 44.0;
 
-    return OfficialFrame(
-      enabled: official,
-      borderRadius: BorderRadius.zero,
-      semanticLabel: roleLabel(s, p['role']),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.l, KSpace.l, KSpace.l),
       child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: coverHeight + avatarRadius,
-          child: Stack(
-            clipBehavior: Clip.none,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Positioned.fill(
-                bottom: avatarRadius,
-                child: _CoverBand(
-                    color: scheme.primaryContainer,
-                    motif: KTokens.of(context).motif),
-              ),
-              Positioned(
-                left: 16,
-                bottom: 0,
-                child: Semantics(
-                  button: avatarUrl != null,
-                  label: name,
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: avatarUrl == null
-                        ? null
-                        // Full original image, uncropped (BoxFit.contain)
-                        : () => showImagePreview(context, url: avatarUrl),
-                    child: Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        // Gold ring = official (verified or club). Decorative
-                        // gold, so the token, not tertiary.
-                        color: official
-                            ? KTokens.of(context).gold
-                            : theme.scaffoldBackgroundColor,
-                      ),
-                      child: CircleAvatar(
-                        radius: avatarRadius,
-                        backgroundColor: scheme.primaryContainer,
-                        foregroundColor: scheme.onPrimaryContainer,
-                        backgroundImage:
-                            avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                        child: avatarUrl == null
-                            ? Text(name.characters.first.toUpperCase(),
-                                style: theme.textTheme.headlineMedium
-                                    ?.copyWith(color: scheme.onPrimaryContainer))
-                            : null,
-                      ),
-                    ),
+              Semantics(
+                button: avatarUrl != null,
+                label: name,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: avatarUrl == null
+                      ? null
+                      // Full original image, uncropped (BoxFit.contain)
+                      : () => showImagePreview(context, url: avatarUrl),
+                  child: CircleAvatar(
+                    radius: 44,
+                    backgroundColor: scheme.primaryContainer,
+                    foregroundColor: scheme.onPrimaryContainer,
+                    backgroundImage:
+                        avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                    child: avatarUrl == null
+                        ? Text(name.characters.first.toUpperCase(),
+                            style: theme.textTheme.headlineMedium
+                                ?.copyWith(color: scheme.onPrimaryContainer))
+                        : null,
                   ),
                 ),
               ),
-              Positioned(
-                right: 16,
-                bottom: 4,
-                child: _primaryAction(context),
+              const SizedBox(width: KSpace.l),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                                fontSize: 22, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        if (p['is_verified'] == true) ...[
+                          const SizedBox(width: KSpace.xs),
+                          Icon(AppIcons.verified,
+                              color: scheme.primary,
+                              size: 20,
+                              semanticLabel: context.feedL10n.verified),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: KSpace.xs),
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: KSpace.s,
+                      runSpacing: KSpace.xs,
+                      children: [
+                        if (p['username'] != null)
+                          Text('@${p['username']}',
+                              style: theme.textTheme.bodyMedium
+                                  ?.copyWith(color: scheme.onSurfaceVariant)),
+                        _RoleChip(
+                          label: roleLabel(s, p['role']),
+                          official: p['role'] == 'club' || p['is_verified'] == true,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          if ((p['bio'] ?? '').toString().trim().isNotEmpty) ...[
+            const SizedBox(height: KSpace.m),
+            Text(p['bio'], style: theme.textTheme.bodyMedium),
+          ],
+          const SizedBox(height: KSpace.s),
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 6,
-                children: [
-                  Text(name, style: theme.textTheme.headlineSmall),
-                  if (p['is_verified'] == true)
-                    Icon(Icons.verified, color: scheme.tertiary, size: 22),
-                ],
+              _StatLink(
+                count: _userPosts.length,
+                label: s.posts,
+                onTap: () => _tabController.animateTo(0),
               ),
-              const SizedBox(height: KSpace.xs),
-              Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  if (p['username'] != null)
-                    Text('@${p['username']}',
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(color: scheme.onSurfaceVariant)),
-                  _RoleChip(label: roleLabel(s, p['role']), official: official),
-                ],
+              const _Dot(),
+              _StatLink(
+                count: _followerCount,
+                label: s.followers,
+                onTap: () => _openFollows('followers'),
               ),
-              if ((p['bio'] ?? '').toString().trim().isNotEmpty) ...[
-                const SizedBox(height: KSpace.m),
-                Text(p['bio'], style: theme.textTheme.bodyMedium),
-              ],
-              const SizedBox(height: KSpace.l),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _StatChip(
-                    count: _userPosts.length,
-                    label: s.posts,
-                    onTap: () => _tabController.animateTo(0),
-                  ),
-                  _StatChip(
-                    count: _followerCount,
-                    label: s.followers,
-                    onTap: () => _openFollows('followers'),
-                  ),
-                  _StatChip(
-                    count: _followingCount,
-                    label: s.following,
-                    onTap: () => _openFollows('following'),
-                  ),
-                ],
+              const _Dot(),
+              _StatLink(
+                count: _followingCount,
+                label: s.following,
+                onTap: () => _openFollows('following'),
               ),
-              const SizedBox(height: KSpace.l),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: KSpace.s),
+          SizedBox(width: double.infinity, child: _primaryAction(context)),
+        ],
       ),
     );
   }
@@ -543,44 +550,34 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   void _openFollows(String type) {
     final uid = widget.userId ?? _supabase.auth.currentUser?.id;
     if (uid == null) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => FollowListScreen(userId: uid, type: type)),
-    );
+    context.goFollowList(uid, type);
   }
 
   Widget _primaryAction(BuildContext context) {
     final s = context.l10n;
-    final scheme = Theme.of(context).colorScheme;
-    const minSize = Size(112, 44);
+    const minSize = Size.fromHeight(48);
     if (_isMe) {
       return OutlinedButton.icon(
-        style: OutlinedButton.styleFrom(
-          minimumSize: minSize,
-          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        ),
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const EditProfileScreen()),
-        ).then((value) {
-          if (value == true) _fetchProfileData();
-        }),
-        icon: const Icon(Icons.edit_outlined, size: 18),
+        style: OutlinedButton.styleFrom(minimumSize: minSize),
+        // Its own route; leaving it refreshes this page (contentChanges).
+        onPressed: () => context.goEditProfile(),
+        icon: const Icon(AppIcons.edit, size: 18),
         label: Text(s.editProfile),
       );
     }
+    if (_isFollowing) {
+      return FilledButton.tonalIcon(
+        style: FilledButton.styleFrom(minimumSize: minSize),
+        onPressed: _toggleFollow,
+        icon: const Icon(AppIcons.following, size: 18),
+        label: Text(s.following),
+      );
+    }
     return FilledButton.icon(
+      style: FilledButton.styleFrom(minimumSize: minSize),
       onPressed: _toggleFollow,
-      // Scheme roles so it reads on Songket Noir too
-      style: FilledButton.styleFrom(
-        minimumSize: minSize,
-        shape: const RoundedRectangleBorder(borderRadius: KRadius.cut),
-        backgroundColor:
-            _isFollowing ? scheme.surfaceContainerHighest : scheme.primary,
-        foregroundColor: _isFollowing ? scheme.onSurface : scheme.onPrimary,
-      ),
-      icon: Icon(_isFollowing ? Icons.check : Icons.person_add_alt, size: 18),
-      label: Text(_isFollowing ? s.following : s.follow),
+      icon: const Icon(AppIcons.follow, size: 18),
+      label: Text(s.follow),
     );
   }
 
@@ -588,7 +585,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   Widget _postsTab(BuildContext context) {
     final s = context.l10n;
     if (_userPosts.isEmpty) {
-      return _TabEmpty(icon: Icons.forum_outlined, text: s.noPostsYet);
+      return _TabEmpty(icon: AppIcons.comment, text: s.noPostsYet);
     }
     Widget card(dynamic post) => PostCard(
           post: post,
@@ -599,7 +596,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     return LayoutBuilder(builder: (context, c) {
       if (c.maxWidth < 900) {
         return ListView.builder(
-          padding: const EdgeInsets.all(KSpace.l),
+          padding: const EdgeInsets.symmetric(vertical: KSpace.s),
           itemCount: _userPosts.length,
           itemBuilder: (_, i) => card(_userPosts[i]),
         );
@@ -629,8 +626,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         padding: const EdgeInsets.all(KSpace.l),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: cols,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
+          crossAxisSpacing: KSpace.m,
+          mainAxisSpacing: KSpace.m,
           childAspectRatio: 0.78,
         ),
         itemCount: items.length,
@@ -662,7 +659,6 @@ class _ProfileTile extends StatelessWidget {
 
     return KCard(
       padding: EdgeInsets.zero,
-      borderRadius: KRadius.cut,
       color: scheme.surfaceContainerLow,
       semanticLabel: '${item['title'] ?? s.untitled}, $subtitle',
       onTap: () => isEvent ? context.goEvent(item) : context.goItem(item),
@@ -679,7 +675,7 @@ class _ProfileTile extends StatelessWidget {
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Container(
                     color: scheme.surfaceContainerHighest,
-                    child: Icon(isEvent ? Icons.event : Icons.storefront,
+                    child: Icon(isEvent ? AppIcons.events : AppIcons.market,
                         color: scheme.onSurfaceVariant),
                   ),
                 ),
@@ -706,8 +702,7 @@ class _ProfileTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      // Prices are gold; dates stay neutral.
-                      color: isEvent ? scheme.onSurfaceVariant : scheme.tertiary,
+                      color: isEvent ? scheme.onSurfaceVariant : scheme.primary,
                       fontWeight: isEvent ? null : FontWeight.w600,
                     )),
               ],
@@ -719,12 +714,12 @@ class _ProfileTile extends StatelessWidget {
   }
 }
 
-/// Tappable count, e.g. "128 Followers". ≥ 48 px tall.
-class _StatChip extends StatelessWidget {
+/// "128 Followers" as plain tappable text, padded to a 48 px target.
+class _StatLink extends StatelessWidget {
   final int count;
   final String label;
   final VoidCallback onTap;
-  const _StatChip({required this.count, required this.label, required this.onTap});
+  const _StatLink({required this.count, required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -734,32 +729,43 @@ class _StatChip extends StatelessWidget {
       button: true,
       label: '$count $label',
       excludeSemantics: true,
-      child: Material(
-        color: scheme.surfaceContainer,
-        shape: StadiumBorder(side: BorderSide(color: scheme.outlineVariant)),
-        child: InkWell(
-          customBorder: const StadiumBorder(),
-          onTap: onTap,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 48),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: KSpace.l),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('$count', style: theme.textTheme.titleMedium),
-                  const SizedBox(width: 6),
-                  Text(label,
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(color: scheme.onSurfaceVariant)),
-                ],
-              ),
+      child: InkWell(
+        borderRadius: KRadius.small,
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: KSpace.xs),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('$count',
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(width: KSpace.xs),
+                Text(label,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: scheme.onSurfaceVariant)),
+              ],
             ),
           ),
         ),
       ),
     );
   }
+}
+
+class _Dot extends StatelessWidget {
+  const _Dot();
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: KSpace.xs),
+          child: Text('·',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+        ),
+      );
 }
 
 class _RoleChip extends StatelessWidget {
@@ -771,34 +777,20 @@ class _RoleChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    // Gold only for official accounts.
-    final c = official ? scheme.tertiary : scheme.onSurfaceVariant;
+    final bg = official ? scheme.primaryContainer : scheme.surfaceContainerHigh;
+    final fg = official ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        borderRadius: KRadius.cut,
-        border: Border.all(color: c),
-      ),
-      child: Text(label, style: theme.textTheme.labelMedium?.copyWith(color: c)),
-    );
-  }
-}
-
-/// Colour band with a faint lattice — the "carved panel" the profile sits
-/// in.
-class _CoverBand extends StatelessWidget {
-  final Color color;
-  final Color motif;
-  const _CoverBand({required this.color, required this.motif});
-
-  @override
-  Widget build(BuildContext context) {
-    return ExcludeSemantics(
-      child: DecoratedBox(
-        decoration: BoxDecoration(color: color),
-        // No text sits on the band, so the field can be a little stronger
-        // than the default background opacity.
-        child: KerawangLattice(color: motif, tileSize: 22, opacity: 0.22),
+      padding: const EdgeInsets.symmetric(horizontal: KSpace.s, vertical: 2),
+      decoration: BoxDecoration(color: bg, borderRadius: KRadius.pill),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (official) ...[
+            Icon(AppIcons.official, size: 14, color: fg),
+            const SizedBox(width: KSpace.xs),
+          ],
+          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: fg)),
+        ],
       ),
     );
   }
@@ -849,7 +841,8 @@ class _ErrorRetry extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.l10n;
     return BrandEmptyState(
-      icon: Icons.wifi_off,
+      icon: AppIcons.error,
+      illo: AppIllo.offline,
       title: s.connectionError,
       actionLabel: s.tryAgain,
       onAction: onRetry,
@@ -866,25 +859,29 @@ class _ProfileSkeleton extends StatelessWidget {
     return ListView(
       physics: const NeverScrollableScrollPhysics(),
       children: const [
-        KSkeleton(height: 96, borderRadius: BorderRadius.zero),
         Padding(
           padding: EdgeInsets.all(KSpace.l),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              KSkeleton.circle(size: 88),
-              SizedBox(height: KSpace.m),
-              KSkeleton(width: 180, height: 22),
-              SizedBox(height: KSpace.s),
-              KSkeleton(width: 120, height: 14),
-              SizedBox(height: KSpace.l),
               Row(children: [
-                KSkeleton(width: 90, height: 40),
-                SizedBox(width: KSpace.s),
-                KSkeleton(width: 110, height: 40),
-                SizedBox(width: KSpace.s),
-                KSkeleton(width: 110, height: 40),
+                KSkeleton.circle(size: 88),
+                SizedBox(width: KSpace.l),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      KSkeleton(width: 180, height: 22),
+                      SizedBox(height: KSpace.s),
+                      KSkeleton(width: 120, height: 14),
+                    ],
+                  ),
+                ),
               ]),
+              SizedBox(height: KSpace.l),
+              KSkeleton(width: 260, height: 14),
+              SizedBox(height: KSpace.l),
+              KSkeleton(height: 48, borderRadius: KRadius.pill),
             ],
           ),
         ),

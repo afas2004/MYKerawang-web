@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/app_icons.dart';
 import '../../theme/tokens.dart';
-import 'kerawang_lattice.dart';
 
-/// Marks official / pinned / verified content: a gold hairline in the
-/// kerawang cut plus a small lattice ornament in one corner.
+/// Marks official / pinned / verified content: a 1px accent border and,
+/// when there's a [label] (or [semanticLabel]), a small accent label row
+/// at the top — e.g. "📌 Pinned", "✓ Official club".
 ///
-/// Gold means "special" (rule 3), so use this only for content that is
-/// genuinely official or pinned. Keep the ornament's corner free of text —
-/// give the child at least [cornerExtent] of padding on that corner, or put
-/// it where an image or whitespace sits.
+/// The accent is the app's one special colour; use this only for content
+/// that is genuinely official or pinned.
 ///
-///   OfficialFrame(child: PostCard(...))
-///   OfficialFrame(enabled: post['is_pinned'] == true, child: ...)
+///   OfficialFrame(label: s.pinned, child: PostCard(...))
+///   OfficialFrame(enabled: isClub, semanticLabel: roleLabel(...), child: ...)
 class OfficialFrame extends StatelessWidget {
   final Widget child;
 
@@ -20,55 +19,77 @@ class OfficialFrame extends StatelessWidget {
   final bool enabled;
 
   final BorderRadius borderRadius;
+
+  /// Text for the label row. Defaults to [semanticLabel]; no row when both
+  /// are null.
+  final String? label;
+
+  /// Icon before the label (pin for pinned, [AppIcons.verified] for official).
+  final IconData icon;
+
+  /// Read by screen readers; also the default [label].
+  final String? semanticLabel;
+
+  /// Unused since the corner ornament was retired; kept for compatibility.
   final Alignment corner;
   final double cornerExtent;
-
-  /// Read by screen readers, e.g. "Pinned" or "Official".
-  final String? semanticLabel;
 
   const OfficialFrame({
     super.key,
     required this.child,
     this.enabled = true,
-    this.borderRadius = KRadius.cut,
+    this.borderRadius = KRadius.card,
+    this.label,
+    this.icon = AppIcons.verified,
+    this.semanticLabel,
     this.corner = Alignment.topRight,
     this.cornerExtent = 36,
-    this.semanticLabel,
   });
 
   @override
   Widget build(BuildContext context) {
     if (!enabled) return child;
+    final theme = Theme.of(context);
     final k = KTokens.of(context);
+    final text = label ?? semanticLabel;
 
-    final framed = Stack(
-      children: [
-        ClipRRect(borderRadius: borderRadius, child: child),
-        Positioned(
-          top: corner.y < 0 ? 0 : null,
-          bottom: corner.y > 0 ? 0 : null,
-          left: corner.x < 0 ? 0 : null,
-          right: corner.x > 0 ? 0 : null,
-          child: ClipRRect(
-            borderRadius: borderRadius,
-            child: KerawangLattice.corner(
-              corner: corner,
-              extent: cornerExtent,
-              tileSize: cornerExtent / 4,
-            ),
-          ),
-        ),
-        Positioned.fill(
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: borderRadius,
-                border: Border.all(color: k.gold, width: 1),
+    final framed = DecoratedBox(
+      position: DecorationPosition.foreground,
+      decoration: BoxDecoration(
+        borderRadius: borderRadius,
+        border: Border.all(color: k.accent.withValues(alpha: 0.7)),
+      ),
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (text != null)
+              Container(
+                color: k.accent.withValues(alpha: 0.10),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: KSpace.m, vertical: KSpace.xs + 2),
+                child: Row(
+                  children: [
+                    Icon(icon, size: 14, color: theme.colorScheme.tertiary),
+                    const SizedBox(width: KSpace.xs + 2),
+                    Flexible(
+                      child: Text(
+                        text,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelMedium
+                            ?.copyWith(color: theme.colorScheme.tertiary),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ),
+            child,
+          ],
         ),
-      ],
+      ),
     );
 
     if (semanticLabel == null) return framed;

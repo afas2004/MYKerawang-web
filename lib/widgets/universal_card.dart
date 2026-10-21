@@ -1,16 +1,15 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../language_cubit.dart';
-import '../theme/app_themes.dart';
 import '../utils/formatters.dart';
-import 'tap_card.dart';
+import 'brand/brand.dart';
 
-/// Small event / listing card for horizontal lists and grids: photo,
-/// gold kind label, title, date range or price.
+/// Small event / listing card for horizontal lists: photo, title, and the
+/// date range or price — the same style as the market and event cards.
 ///
 /// In a slot with a fixed height (carousels) the photo takes whatever the
 /// text doesn't, so the card never overflows; unconstrained it uses a
-/// 4:3 photo.
+/// 16:10 photo.
 class UniversalCard extends StatelessWidget {
   final Map<String, dynamic> data;
   final VoidCallback onTap;
@@ -22,7 +21,7 @@ class UniversalCard extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final s = context.l10n;
-    final title = data['title'] ?? s.untitled;
+    final title = (data['title'] ?? s.untitled).toString();
     final image = data['image_url'] as String?;
     final isEvent = data.containsKey('start_datetime');
 
@@ -43,57 +42,45 @@ class UniversalCard extends StatelessWidget {
                 ColoredBox(color: scheme.surfaceContainerHighest),
             errorWidget: (_, __, ___) => ColoredBox(
               color: scheme.surfaceContainerHighest,
-              child: Icon(Icons.broken_image_outlined,
-                  color: scheme.onSurfaceVariant),
+              child: Icon(AppIcons.photo, color: scheme.onSurfaceVariant),
             ),
           )
         : ColoredBox(
             color: scheme.surfaceContainerHighest,
-            child: Icon(isEvent ? Icons.event : Icons.storefront,
-                size: 36, color: scheme.onSurfaceVariant),
+            child: Icon(isEvent ? AppIcons.events : AppIcons.market,
+                size: 32, color: scheme.onSurfaceVariant),
           );
 
     final text = Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.s, KSpace.m, KSpace.m),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Gold kind label — specialness marker (spec §2)
-          Text(
-            "◆ ${(isEvent ? s.kindEvent : s.navMarket).toUpperCase()}",
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: scheme.tertiary,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 4),
           Text(
             title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 2),
           Text(
             subtitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: isEvent ? scheme.onSurfaceVariant : scheme.primary,
-              fontWeight: isEvent ? FontWeight.w500 : FontWeight.w700,
-            ),
+            style: isEvent
+                ? theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)
+                : theme.textTheme.titleSmall?.copyWith(
+                    color: scheme.tertiary, fontWeight: FontWeight.w700),
           ),
         ],
       ),
     );
 
-    return TapCard(
+    return KCard(
       onTap: onTap,
-      borderRadius: kerawangCut,
-      color: theme.cardColor,
-      border: BorderSide(color: scheme.outlineVariant),
+      padding: EdgeInsets.zero,
+      semanticLabel: '$title, $subtitle',
       child: LayoutBuilder(
         builder: (context, box) {
           final bounded = box.hasBoundedHeight;
@@ -104,7 +91,7 @@ class UniversalCard extends StatelessWidget {
               if (bounded)
                 Expanded(child: photo)
               else
-                AspectRatio(aspectRatio: 4 / 3, child: photo),
+                AspectRatio(aspectRatio: 16 / 10, child: photo),
               text,
             ],
           );

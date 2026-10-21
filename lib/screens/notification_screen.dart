@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mykerawang/utils/app_nav.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/shell_strings.dart';
@@ -13,12 +14,12 @@ import '../widgets/brand/brand.dart';
 
 /// Icon per notification type so the list is scannable.
 IconData _iconFor(String? type) => switch (type) {
-      'mention' => Icons.alternate_email,
-      'follow' => Icons.person_add_alt,
-      'comment' => Icons.chat_bubble_outline,
-      'event' => Icons.event_available,
-      'listing' => Icons.storefront,
-      _ => Icons.notifications,
+      'mention' => AppIcons.mention,
+      'follow' => AppIcons.follow,
+      'comment' => AppIcons.comment,
+      'event' => AppIcons.calendarJoined,
+      'listing' => AppIcons.market,
+      _ => AppIcons.notifications,
     };
 
 /// Opens whatever the notification refers to (UI_UX_AUDIT 12.1).
@@ -205,15 +206,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
     return Scaffold(
       appBar: appBarConstrained(
         context,
+        leading: const AppBackButton(),
         title: Text(s.notificationsTitle),
         actions: [
           if (_userId != null)
             ValueListenableBuilder<int>(
               valueListenable: UnreadNotifications.instance.count,
-              builder: (context, unread, _) => TextButton.icon(
+              builder: (context, unread, _) => TextButton(
                 onPressed: unread > 0 ? _markAllRead : null,
-                icon: const Icon(Icons.done_all),
-                label: Text(s.social.markAllRead),
+                child: Text(s.social.markAllRead),
               ),
             ),
           const SizedBox(width: KSpace.s),
@@ -221,6 +222,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
       ),
       body: PageBody(child: _userId == null
         ? _NotifEmpty(
+            illo: AppIllo.noNotifications,
             title: s.loginToSeeNotifications,
             body: s.shell.notificationsEmptyBody,
           )
@@ -229,7 +231,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
             builder: (context, snapshot) {
               if (snapshot.hasError) {
                 return _NotifEmpty(
-                  icon: Icons.wifi_off,
+                  icon: AppIcons.error,
+                  illo: AppIllo.offline,
                   title: s.connectionError,
                   body: '${snapshot.error}',
                 );
@@ -240,6 +243,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
               _resolve(notifications);
               if (notifications.isEmpty) {
                 return _NotifEmpty(
+                  illo: AppIllo.noNotifications,
                   title: s.shell.allCaughtUp,
                   body: s.shell.notificationsEmptyBody,
                 );
@@ -258,15 +262,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
               }
 
               return ListView(
-                padding: const EdgeInsets.only(bottom: 24),
+                padding: const EdgeInsets.only(bottom: KSpace.xl),
                 children: [
                   for (final entry in groups.entries) ...[
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.l, KSpace.l, KSpace.xs),
                       child: Semantics(
                         header: true,
                         child: Text(entry.key,
-                            style: Theme.of(context).textTheme.titleSmall
+                            style: Theme.of(context).textTheme.labelLarge
                                 ?.copyWith(color: scheme.onSurfaceVariant)),
                       ),
                     ),
@@ -288,99 +292,100 @@ class _NotificationScreenState extends State<NotificationScreen> {
     final avatar = actor?['avatar_url'] as String?;
 
     final leading = actor != null
-        ? Stack(
-            clipBehavior: Clip.none,
-            children: [
-              CircleAvatar(
-                backgroundColor: scheme.primaryContainer,
-                foregroundColor: scheme.onPrimaryContainer,
-                backgroundImage: avatar != null ? NetworkImage(avatar) : null,
-                child: avatar == null
-                    ? Text(displayNameFor(s, actor).characters.first.toUpperCase())
-                    : null,
-              ),
-              // Small type glyph on the avatar keeps the list scannable.
-              Positioned(
-                right: -4,
-                bottom: -4,
-                child: CircleAvatar(
-                  radius: 10,
-                  backgroundColor: scheme.surface,
-                  child: Icon(_iconFor(notif['type']), size: 12, color: scheme.primary),
-                ),
-              ),
-            ],
+        ? CircleAvatar(
+            radius: 22,
+            backgroundColor: scheme.primaryContainer,
+            foregroundColor: scheme.onPrimaryContainer,
+            backgroundImage: avatar != null ? NetworkImage(avatar) : null,
+            child: avatar == null
+                ? Text(displayNameFor(s, actor).characters.first.toUpperCase())
+                : null,
           )
         // No (visible) actor: neutral type icon.
         : CircleAvatar(
-            backgroundColor:
-                isRead ? scheme.surfaceContainerHighest : scheme.primaryContainer,
-            child: Icon(
-              _iconFor(notif['type']),
-              size: 20,
-              color: isRead ? scheme.onSurfaceVariant : scheme.primary,
-            ),
+            radius: 22,
+            backgroundColor: scheme.surfaceContainerHigh,
+            child: Icon(_iconFor(notif['type']),
+                size: 20, color: scheme.onSurfaceVariant),
           );
 
-    final tile = Material(
-      color: isRead ? Colors.transparent : scheme.primaryContainer.withValues(alpha: 0.35),
+    final time = formatRelative(context, DateTime.parse(notif['created_at']));
+
+    final tile = Semantics(
+      // Read state is otherwise only a colour dot.
+      label: isRead ? null : s.shell.unread,
       child: InkWell(
         onTap: () {
           // Mark as read, then open what it refers to (12.1)
           _markRead(notif);
           _openTarget(context, notif);
         },
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 64),
-          padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-          decoration: BoxDecoration(
-            border: Border(
-              // Unread rows carry a primary edge, not just a tint.
-              left: BorderSide(
-                color: isRead ? Colors.transparent : scheme.primary,
-                width: 3,
-              ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 72),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, KSpace.m),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                leading,
+                const SizedBox(width: KSpace.m),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              notif['title'] ?? s.notifications,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: isRead ? FontWeight.w500 : FontWeight.w700),
+                            ),
+                          ),
+                          const SizedBox(width: KSpace.s),
+                          Text(time,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                  color: isRead ? scheme.onSurfaceVariant : scheme.primary)),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(_sentence(s, notif, actor),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(color: scheme.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+                // Unread dot, level with the title line.
+                SizedBox(
+                  width: KSpace.l,
+                  height: 20,
+                  child: isRead
+                      ? null
+                      : Align(
+                          alignment: Alignment.centerRight,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                                color: scheme.primary, shape: BoxShape.circle),
+                          ),
+                        ),
+                ),
+              ],
             ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              leading,
-              const SizedBox(width: KSpace.l),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(notif['title'] ?? s.notifications,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: isRead ? FontWeight.w500 : FontWeight.w700)),
-                    const SizedBox(height: 2),
-                    Text(_sentence(s, notif, actor),
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(color: scheme.onSurfaceVariant)),
-                    const SizedBox(height: KSpace.xs),
-                    Text(
-                      formatRelative(context, DateTime.parse(notif['created_at'])),
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: scheme.onSurfaceVariant),
-                    ),
-                  ],
-                ),
-              ),
-              if (!isRead)
-                IconButton(
-                  tooltip: s.shell.markRead,
-                  icon: const Icon(Icons.mark_email_read_outlined),
-                  onPressed: () => _markRead(notif),
-                ),
-            ],
           ),
         ),
       ),
     );
 
-    if (isRead) return tile;
-    // Swipe either way to mark read; the row stays (the stream updates it).
+    // Swipe to mark read on phones; the row stays (the stream updates it).
+    if (isRead || !Responsive.isCompact(context)) return tile;
     return Dismissible(
       key: ValueKey('notif-${notif['id']}'),
       confirmDismiss: (_) async {
@@ -402,7 +407,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.mark_email_read_outlined, color: scheme.onSecondaryContainer),
+          Icon(AppIcons.check, color: scheme.onSecondaryContainer),
           const SizedBox(width: KSpace.s),
           Text(context.l10n.shell.markRead,
               style: TextStyle(color: scheme.onSecondaryContainer)),
@@ -426,17 +431,23 @@ NotifBucket notificationBucket(DateTime when, DateTime now) {
 /// Empty / signed-out / error state.
 class _NotifEmpty extends StatelessWidget {
   final IconData icon;
+  final AppIllo? illo;
   final String title;
   final String body;
   const _NotifEmpty({
-    this.icon = Icons.notifications_none,
+    this.icon = AppIcons.notifications,
+    this.illo,
     required this.title,
     required this.body,
   });
 
   @override
-  Widget build(BuildContext context) =>
-      BrandEmptyState(icon: icon, title: title, message: body.isEmpty ? null : body);
+  Widget build(BuildContext context) => BrandEmptyState(
+        icon: icon,
+        illo: illo,
+        title: title,
+        message: body.isEmpty ? null : body,
+      );
 }
 
 class _NotifSkeleton extends StatelessWidget {

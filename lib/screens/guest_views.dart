@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import '../widgets/brand/brand.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../l10n/access_strings.dart';
@@ -9,7 +10,6 @@ import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
 import '../utils/formatters.dart';
 import '../utils/guest_access.dart';
-import '../utils/responsive.dart';
 import '../utils/roles.dart';
 import '../widgets/comment_tile.dart';
 import '../widgets/embed_card.dart';
@@ -28,7 +28,7 @@ AppBar _guestAppBar(BuildContext context, {Widget? title}) => AppBar(
       title: title,
       leading: IconButton(
         tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-        icon: const Icon(Icons.arrow_back),
+        icon: const Icon(AppIcons.back),
         onPressed: () => popOrHome(context),
       ),
     );
@@ -72,7 +72,7 @@ Widget _avatar(BuildContext context, String? url, {double radius = 20, bool anon
         anonymous ? scheme.surfaceContainerHighest : scheme.primaryContainer,
     backgroundImage: url != null ? CachedNetworkImageProvider(url) : null,
     child: url == null
-        ? Icon(anonymous ? Icons.visibility_off : Icons.person,
+        ? Icon(anonymous ? AppIcons.anonymous : AppIcons.person,
             size: radius,
             color: anonymous ? scheme.onSurfaceVariant : scheme.onPrimaryContainer)
         : null,
@@ -164,7 +164,7 @@ class _GuestPostScreenState extends State<GuestPostScreen> {
             for (var i = 0; i < images.length; i++) ...[
               const SizedBox(height: 12),
               ClipRRect(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: KRadius.card,
                 child: InkWell(
                   onTap: () =>
                       showGallery(context, items: images, initialIndex: i),
@@ -352,7 +352,7 @@ class _GuestProfileScreenState extends State<GuestProfileScreen> {
             ),
             if (p['is_verified'] == true) ...[
               const SizedBox(width: 4),
-              Icon(Icons.verified, size: 18, color: scheme.tertiary),
+              Icon(AppIcons.verified, size: 18, color: scheme.tertiary),
             ],
           ],
         ),
@@ -420,7 +420,7 @@ class _GuestProfileScreenState extends State<GuestProfileScreen> {
                   ? null
                   : Text(formatRelative(
                       context, DateTime.parse(post['created_at']))),
-              trailing: const Icon(Icons.chevron_right),
+              trailing: const Icon(AppIcons.chevronRight),
               onTap: () => context.goPost(post),
             ),
       ],

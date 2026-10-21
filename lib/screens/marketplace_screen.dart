@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mykerawang/widgets/linear_refresher.dart';
-import 'create_listing_screen.dart';
 import '../l10n/access_strings.dart';
 import '../utils/app_nav.dart';
 import '../utils/categories.dart';
@@ -41,7 +40,8 @@ class MarketplaceView extends StatefulWidget {
   State<MarketplaceView> createState() => _MarketplaceViewState();
 }
 
-class _MarketplaceViewState extends State<MarketplaceView> {
+class _MarketplaceViewState extends State<MarketplaceView>
+    with RefreshOnContentChange {
   final TextEditingController _searchCtrl = TextEditingController();
 
   @override
@@ -50,13 +50,14 @@ class _MarketplaceViewState extends State<MarketplaceView> {
     super.dispose();
   }
 
-  Future<void> _openCreate(BuildContext context) async {
-    final result = await Navigator.push(
-        context, MaterialPageRoute(builder: (_) => const CreateListingScreen()));
-    if (result == true && context.mounted) {
-      context.read<MarketplaceCubit>().loadData();
-    }
-  }
+  /// Used by the empty state only; the one general Create entry is the
+  /// shell's (centre button / rail / sidebar).
+  void _openCreate(BuildContext context) => context.goCreateListing();
+
+  // Lists refresh after something is published, edited or deleted.
+  @override
+  void onContentChanged() => context.read<MarketplaceCubit>().loadData();
+
 
   Future<void> _openFilterSheet(BuildContext context, MarketFilters current) async {
     final cubit = context.read<MarketplaceCubit>();
@@ -84,43 +85,7 @@ class _MarketplaceViewState extends State<MarketplaceView> {
         return LayoutBuilder(builder: (context, constraints) {
           final sidePanel = constraints.maxWidth >= _kSidePanelFrom;
           return Scaffold(
-            appBar: AppBar(
-              title: Text(s.marketplaceTitle),
-              actions: [
-                if (!sidePanel)
-                  IconButton(
-                    tooltip: s.filters,
-                    onPressed: () => _openFilterSheet(context, state.filters),
-                    icon: Badge(
-                      isLabelVisible: active > 0,
-                      label: Text('$active'),
-                      child: const Icon(Icons.tune),
-                    ),
-                  ),
-                // Desktop has no FAB, so creation lives here instead (H1.1).
-                if (isWide(context))
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilledButton.icon(
-                      onPressed: () => _openCreate(context),
-                      icon: const Icon(Icons.add, size: 18),
-                      label: Text(s.sellItem),
-                    ),
-                  ),
-              ],
-              // Quick category chips; on wide layouts the side panel has them.
-              bottom: sidePanel
-                  ? LatticeBand.preferred()
-                  : PreferredSize(
-                      preferredSize: const Size.fromHeight(52 + 9),
-                      child: Column(
-                        children: [
-                          _CategoryChipRow(selected: state.filters.category),
-                          const LatticeBand(),
-                        ],
-                      ),
-                    ),
-            ),
+            appBar: AppBar(title: Text(s.marketplaceTitle)),
             body: LinearRefresher(
               offset: 0.0,
               onRefresh: () => cubit.loadData(),
@@ -145,11 +110,34 @@ class _MarketplaceViewState extends State<MarketplaceView> {
                   Expanded(
                     child: Column(
                       children: [
-                        // Outside the scroll view, so it stays put (sticky).
+                        // Outside the scroll view, so it stays put (sticky):
+                        // search + filter in one row, categories under it.
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                          child: _searchField(context),
+                          padding: const EdgeInsets.fromLTRB(
+                              KSpace.l, KSpace.s, KSpace.l, KSpace.s),
+                          child: Row(
+                            children: [
+                              Expanded(child: _searchField(context)),
+                              if (!sidePanel) ...[
+                                const SizedBox(width: KSpace.s),
+                                IconButton.filledTonal(
+                                  tooltip: s.filters,
+                                  onPressed: () =>
+                                      _openFilterSheet(context, state.filters),
+                                  icon: Badge(
+                                    isLabelVisible: active > 0,
+                                    label: Text('$active'),
+                                    child: const Icon(AppIcons.filter),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
+                        // Quick category chips; wide layouts have them in
+                        // the side panel.
+                        if (!sidePanel)
+                          _CategoryChipRow(selected: state.filters.category),
                         Expanded(child: _results(context, state)),
                       ],
                     ),
@@ -157,15 +145,6 @@ class _MarketplaceViewState extends State<MarketplaceView> {
                 ],
               ),
             ),
-            // See G5 — no floating corner button on desktop.
-            floatingActionButton: isWide(context)
-                ? null
-                : FloatingActionButton(
-                    heroTag: 'market_fab',
-                    tooltip: s.sellItem,
-                    onPressed: () => _openCreate(context),
-                    child: const Icon(Icons.add),
-                  ),
           );
         });
       },
@@ -184,12 +163,12 @@ class _MarketplaceViewState extends State<MarketplaceView> {
       },
       decoration: InputDecoration(
         hintText: s.searchItems,
-        prefixIcon: Icon(Icons.search, color: scheme.onSurfaceVariant),
+        prefixIcon: Icon(AppIcons.search, color: scheme.onSurfaceVariant),
         suffixIcon: _searchCtrl.text.isEmpty
             ? null
             : IconButton(
                 tooltip: s.clearSearch,
-                icon: const Icon(Icons.close),
+                icon: const Icon(AppIcons.close),
                 onPressed: () {
                   _searchCtrl.clear();
                   context.read<MarketplaceCubit>().updateSearch('');
@@ -198,8 +177,9 @@ class _MarketplaceViewState extends State<MarketplaceView> {
               ),
         filled: true,
         fillColor: scheme.surfaceContainerHighest,
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        isDense: true,
+        border: const OutlineInputBorder(
+            borderRadius: KRadius.pill, borderSide: BorderSide.none),
       ),
     );
   }
@@ -209,9 +189,11 @@ class _MarketplaceViewState extends State<MarketplaceView> {
 
     return LayoutBuilder(builder: (context, constraints) {
       final columns = Responsive.gridColumnsFor(constraints.maxWidth);
+      final tileWidth = (constraints.maxWidth - 2 * KSpace.l - KSpace.m * (columns - 1)) / columns;
+      final extent = MarketCard.heightFor(tileWidth, MediaQuery.textScalerOf(context));
 
       if (state.isLoading && state.items.isEmpty) {
-        return _MarketGridSkeleton(columns: columns);
+        return _MarketGridSkeleton(columns: columns, extent: extent);
       }
       if (state.errorMessage != null && state.items.isEmpty) {
         return ErrorState(onRetry: cubit.loadData);
@@ -229,11 +211,11 @@ class _MarketplaceViewState extends State<MarketplaceView> {
       return CustomScrollView(
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.s, KSpace.l, KSpace.l),
             sliver: SliverGrid.builder(
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: columns,
-                childAspectRatio: MarketCard.aspectRatio,
+                mainAxisExtent: extent,
                 crossAxisSpacing: KSpace.m,
                 mainAxisSpacing: KSpace.m,
               ),
@@ -272,7 +254,7 @@ class _MarketplaceViewState extends State<MarketplaceView> {
           const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: cubit.loadMore,
-            icon: const Icon(Icons.refresh, size: 18),
+            icon: const Icon(AppIcons.refresh, size: 18),
             label: Text(s.retry),
           ),
         ],
@@ -289,16 +271,19 @@ class _MarketplaceViewState extends State<MarketplaceView> {
 // Market card
 // ---------------------------------------------------------------------------
 
-/// Grid tile for a listing: square photo with the RESERVED / SOLD badge,
-/// title, and the price in gold. Lifts on hover / focus on web.
+/// Grid tile for a listing: 4:3 photo (with a Reserved / Sold badge
+/// only when it isn't available), title on up to two lines, and the price
+/// in the accent colour.
 class MarketCard extends StatelessWidget {
   final Map<String, dynamic> item;
   final VoidCallback? onTap;
 
   const MarketCard({super.key, required this.item, this.onTap});
 
-  /// Width / height of a tile (photo square + two text lines).
-  static const double aspectRatio = 0.68;
+  /// Tile height for a tile [width] wide: the 4:3 photo plus the text
+  /// block, scaled with the user's text size.
+  static double heightFor(double width, TextScaler textScaler) =>
+      width * 3 / 4 + textScaler.scale(64) + KSpace.m * 2 + 2;
 
   @override
   Widget build(BuildContext context) {
@@ -311,64 +296,64 @@ class MarketCard extends StatelessWidget {
     final title = (item['title'] ?? '').toString();
     final price = formatPrice(item['price'] as num?);
 
-    return Opacity(
-      opacity: isSold ? 0.6 : 1,
-      child: KCard(
-        onTap: onTap,
-        padding: EdgeInsets.zero,
-        semanticLabel: '$title, $price${badge != null ? ', $badge' : ''}',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  CachedNetworkImage(
-                    imageUrl: item['image_url'] ?? '',
-                    fadeInDuration: Duration.zero,
-                    fadeOutDuration: Duration.zero,
-                    fit: BoxFit.cover,
-                    memCacheWidth: 500,
-                    // Sold photos are desaturated, not tinted.
-                    color: isSold ? scheme.outline : null,
-                    colorBlendMode: isSold ? BlendMode.saturation : null,
-                    placeholder: (_, __) => ColoredBox(color: scheme.surfaceContainerHighest),
-                    errorWidget: (_, __, ___) => ColoredBox(
-                      color: scheme.surfaceContainerHighest,
-                      child: Center(
-                        child: Icon(Icons.storefront_outlined,
-                            color: scheme.onSurfaceVariant, size: 30),
-                      ),
+    return KCard(
+      onTap: onTap,
+      padding: EdgeInsets.zero,
+      semanticLabel: '$title, $price${badge != null ? ', $badge' : ''}',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AspectRatio(
+            aspectRatio: 4 / 3,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                CachedNetworkImage(
+                  imageUrl: item['image_url'] ?? '',
+                  fadeInDuration: Duration.zero,
+                  fadeOutDuration: Duration.zero,
+                  fit: BoxFit.cover,
+                  memCacheWidth: 500,
+                  // Sold photos are desaturated, not tinted.
+                  color: isSold ? scheme.outline : null,
+                  colorBlendMode: isSold ? BlendMode.saturation : null,
+                  placeholder: (_, __) => ColoredBox(color: scheme.surfaceContainerHighest),
+                  errorWidget: (_, __, ___) => ColoredBox(
+                    color: scheme.surfaceContainerHighest,
+                    child: Center(
+                      child: Icon(AppIcons.photo, color: scheme.onSurfaceVariant, size: 28),
                     ),
                   ),
-                  if (badge != null) Positioned(top: 8, left: 8, child: StatusBadge(badge)),
-                ],
-              ),
+                ),
+                if (badge != null)
+                  Positioned(top: KSpace.s, left: KSpace.s, child: StatusBadge(badge)),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.s, KSpace.m, KSpace.m),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(KSpace.m),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 4),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                          color: isSold ? scheme.onSurfaceVariant : scheme.onSurface)),
+                  const Spacer(),
                   Text(price,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleMedium?.copyWith(
-                          // Gold is for prices (design direction).
                           color: isSold ? scheme.onSurfaceVariant : scheme.tertiary,
                           decoration: isSold ? TextDecoration.lineThrough : null,
-                          fontWeight: FontWeight.w800)),
+                          fontWeight: FontWeight.w700)),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -391,7 +376,7 @@ class _CategoryChipRow extends StatelessWidget {
       height: 52,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: KSpace.l, vertical: KSpace.xs),
         itemCount: categories.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
@@ -603,7 +588,8 @@ class _EmptyMarket extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.l10n;
     return BrandEmptyState(
-      icon: Icons.storefront_outlined,
+      icon: AppIcons.market,
+      illo: AppIllo.emptyMarket,
       title: filtered ? s.noMatchingItems : s.noItemsFound,
       message: filtered ? null : s.noItemsYetHint,
       actionLabel: onReset != null ? s.resetFilters : (filtered ? null : s.sellItem),
@@ -614,17 +600,18 @@ class _EmptyMarket extends StatelessWidget {
 
 class _MarketGridSkeleton extends StatelessWidget {
   final int columns;
-  const _MarketGridSkeleton({required this.columns});
+  final double extent;
+  const _MarketGridSkeleton({required this.columns, required this.extent});
 
   @override
   Widget build(BuildContext context) {
     return ExcludeSemantics(
       child: GridView.builder(
         physics: const NeverScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(KSpace.l, 0, KSpace.l, KSpace.l),
+        padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.s, KSpace.l, KSpace.l),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: columns,
-          childAspectRatio: MarketCard.aspectRatio,
+          mainAxisExtent: extent,
           crossAxisSpacing: KSpace.m,
           mainAxisSpacing: KSpace.m,
         ),
@@ -632,7 +619,10 @@ class _MarketGridSkeleton extends StatelessWidget {
         itemBuilder: (_, __) => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: KSkeleton(height: double.infinity, borderRadius: KRadius.card)),
+            AspectRatio(
+              aspectRatio: 4 / 3,
+              child: KSkeleton(height: double.infinity, borderRadius: KRadius.card),
+            ),
             SizedBox(height: KSpace.s),
             KSkeleton(height: 14),
             SizedBox(height: KSpace.xs),

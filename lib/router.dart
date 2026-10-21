@@ -5,7 +5,14 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'language_cubit.dart';
+import 'screens/create_event_screen.dart';
+import 'screens/create_listing_screen.dart';
+import 'screens/create_post_screen.dart';
+import 'screens/edit_profile_screen.dart';
 import 'screens/event_detail_screen.dart';
+import 'screens/follow_list_screen.dart';
+import 'screens/privacy_policy_screen.dart';
+import 'screens/tag_feed_screen.dart';
 import 'screens/guest_views.dart';
 import 'screens/events_screen.dart';
 import 'screens/home_screen.dart';
@@ -20,9 +27,11 @@ import 'screens/post_detail_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
+import 'utils/app_nav.dart';
 import 'utils/guest_access.dart';
 import 'utils/responsive.dart';
 import 'widgets/app_sidebar.dart';
+import 'widgets/brand/brand.dart' show KRadius;
 import 'screens/admin/moderation_routes.dart';
 
 /// Notifies the router whenever Supabase auth state changes, so the
@@ -54,6 +63,10 @@ final _publicPath = RegExp(r'^/(event|item|post|u)/[^/]+/?$');
 final _shellKey = GlobalKey<NavigatorState>();
 
 GoRouter buildRouter() {
+  // Pushed pages (details, forms) get their own URL in the address bar:
+  // shareable, reload-safe, and what the history-aware back relies on.
+  // go_router's default keeps the URL of the page underneath.
+  GoRouter.optionURLReflectsImperativeAPIs = true;
   final authNotifier = AuthChangeNotifier();
 
   return GoRouter(
@@ -150,13 +163,15 @@ GoRouter buildRouter() {
       ),
 
       // --- SHAREABLE DETAIL ROUTES ---
+      // Pushed above the shell (root navigator) so the browser URL updates.
       // `extra` carries the already-loaded row for instant in-app pushes;
-      // deep links / refreshes fall back to fetching by id.
+      // deep links / refreshes fall back to fetching by id. Back pops to
+      // where you came from; opened cold, back goes to the matching tab
+      // (see backFallbackFor). onExit keeps browser history in step.
       GoRoute(
         path: '/item/:id',
-        // Push onto the root navigator so the browser URL updates
-        // (inside a shell branch it would stay on the tab's URL).
         parentNavigatorKey: _rootKey,
+        onExit: historyAwareExit,
         builder: (context, state) => DesktopChrome(
           // Room for AdaptiveScaffoldBody's two columns on desktop.
           maxWidth: Responsive.detailMaxWidth,
@@ -171,8 +186,8 @@ GoRouter buildRouter() {
       GoRoute(
         path: '/event/:id',
         parentNavigatorKey: _rootKey,
+        onExit: historyAwareExit,
         builder: (context, state) => DesktopChrome(
-          // Room for AdaptiveScaffoldBody's two columns on desktop.
           maxWidth: Responsive.detailMaxWidth,
           child: _DetailLoader(
             table: 'events',
@@ -185,8 +200,8 @@ GoRouter buildRouter() {
       GoRoute(
         path: '/post/:id',
         parentNavigatorKey: _rootKey,
+        onExit: historyAwareExit,
         builder: (context, state) => DesktopChrome(
-          // Room for AdaptiveScaffoldBody's two columns on desktop.
           maxWidth: Responsive.detailMaxWidth,
           child: _DetailLoader(
             table: 'posts_public', // anonymity-safe view
@@ -204,29 +219,151 @@ GoRouter buildRouter() {
       GoRoute(
         path: '/u/:id',
         parentNavigatorKey: _rootKey,
+        onExit: historyAwareExit,
         builder: (context, state) => DesktopChrome(
           child: isLoggedIn
               ? ProfileScreen(userId: state.pathParameters['id'])
               : GuestProfileScreen(userId: state.pathParameters['id']!),
         ),
       ),
+      GoRoute(
+        path: '/u/:id/:type(followers|following)',
+        parentNavigatorKey: _rootKey,
+        onExit: historyAwareExit,
+        builder: (context, state) => DesktopChrome(
+          child: FollowListScreen(
+            userId: state.pathParameters['id']!,
+            type: state.pathParameters['type']!,
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/tag/:tag',
+        parentNavigatorKey: _rootKey,
+        onExit: historyAwareExit,
+        builder: (context, state) => DesktopChrome(
+          child: TagFeedScreen(tag: state.pathParameters['tag']!),
+        ),
+      ),
+
+      // --- CREATE / EDIT FORMS ---
+      // Full screen on phones, a centred dialog-style page from 600px.
+      // onExit asks before discarding unsaved input (close button,
+      // Android back, browser back alike). Publishing replaces the form
+      // with the new page (completePublish).
+      GoRoute(
+        path: '/create/post',
+        parentNavigatorKey: _rootKey,
+        onExit: leaveFormRoute,
+        pageBuilder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? const {};
+          return formPage(
+            context,
+            state,
+            CreatePostScreen(
+              sharedEvent: extra['sharedEvent'] as Map<String, dynamic>?,
+              sharedListing: extra['sharedListing'] as Map<String, dynamic>?,
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/create/event',
+        parentNavigatorKey: _rootKey,
+        onExit: leaveFormRoute,
+        pageBuilder: (context, state) =>
+            formPage(context, state, const CreateEventScreen()),
+      ),
+      GoRoute(
+        path: '/create/listing',
+        parentNavigatorKey: _rootKey,
+        onExit: leaveFormRoute,
+        pageBuilder: (context, state) =>
+            formPage(context, state, const CreateListingScreen()),
+      ),
+      GoRoute(
+        path: '/post/:id/edit',
+        parentNavigatorKey: _rootKey,
+        onExit: leaveFormRoute,
+        pageBuilder: (context, state) => formPage(
+          context,
+          state,
+          _DetailLoader(
+            table: 'posts_public',
+            id: state.pathParameters['id']!,
+            initial: state.extra as Map<String, dynamic>?,
+            build: (data) => CreatePostScreen(editPost: data),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/event/:id/edit',
+        parentNavigatorKey: _rootKey,
+        onExit: leaveFormRoute,
+        pageBuilder: (context, state) => formPage(
+          context,
+          state,
+          _DetailLoader(
+            table: 'events',
+            id: state.pathParameters['id']!,
+            initial: state.extra as Map<String, dynamic>?,
+            build: (data) => CreateEventScreen(eventToEdit: data),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/item/:id/edit',
+        parentNavigatorKey: _rootKey,
+        onExit: leaveFormRoute,
+        pageBuilder: (context, state) => formPage(
+          context,
+          state,
+          _DetailLoader(
+            table: 'listings',
+            id: state.pathParameters['id']!,
+            initial: state.extra as Map<String, dynamic>?,
+            build: (data) => CreateListingScreen(itemToEdit: data),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/profile/edit',
+        parentNavigatorKey: _rootKey,
+        // Edit profile keeps its own unsaved-changes prompt; leaving it
+        // refreshes the profile (its route result may never arrive on web).
+        onExit: (context, state) {
+          notifyContentChanged();
+          return historyAwareExit(context, state);
+        },
+        builder: (context, state) =>
+            const DesktopChrome(child: EditProfileScreen()),
+      ),
 
       // --- SECONDARY PAGES ---
       GoRoute(
         path: '/settings',
         parentNavigatorKey: _rootKey,
+        onExit: historyAwareExit,
         builder: (context, state) =>
             const DesktopChrome(child: SettingsScreen()),
       ),
       GoRoute(
+        path: '/settings/privacy',
+        parentNavigatorKey: _rootKey,
+        onExit: historyAwareExit,
+        builder: (context, state) =>
+            const DesktopChrome(child: PrivacyPolicyScreen()),
+      ),
+      GoRoute(
         path: '/notifications',
         parentNavigatorKey: _rootKey,
+        onExit: historyAwareExit,
         builder: (context, state) =>
             const DesktopChrome(child: NotificationScreen()),
       ),
 
       // --- MODERATION (/admin, /standing) ---
-      ...moderationRoutes(_rootKey),
+      ...moderationRoutes(_rootKey).map(_withHistoryAwareExit),
     ],
 
     errorBuilder: (context, state) => Scaffold(
@@ -247,6 +384,75 @@ GoRouter buildRouter() {
       ),
     ),
   );
+}
+
+/// Gives a route from elsewhere (moderation) the history-aware onExit.
+RouteBase _withHistoryAwareExit(RouteBase route) {
+  if (route is! GoRoute || route.onExit != null) return route;
+  return GoRoute(
+    path: route.path,
+    name: route.name,
+    builder: route.builder,
+    pageBuilder: route.pageBuilder,
+    parentNavigatorKey: route.parentNavigatorKey,
+    redirect: route.redirect,
+    onExit: historyAwareExit,
+    routes: route.routes,
+  );
+}
+
+/// Page for a create / edit form: full screen on phones; from 600px a
+/// centred dialog-style page over the current screen.
+Page<void> formPage(BuildContext context, GoRouterState state, Widget child) {
+  final wide = MediaQuery.sizeOf(context).width >= Responsive.mediumBreakpoint;
+  if (!wide) {
+    return MaterialPage<void>(key: state.pageKey, fullscreenDialog: true, child: child);
+  }
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    opaque: false,
+    // Not dismissed by a stray click outside: that would throw input away.
+    barrierDismissible: false,
+    barrierColor: Colors.black54,
+    transitionDuration: const Duration(milliseconds: 200),
+    reverseTransitionDuration: const Duration(milliseconds: 150),
+    child: _FormDialogFrame(child: child),
+    transitionsBuilder: (context, animation, _, child) {
+      final reduce = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+      if (reduce) return child;
+      final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+      return FadeTransition(
+        opacity: curved,
+        child: ScaleTransition(
+            scale: Tween(begin: 0.97, end: 1.0).animate(curved), child: child),
+      );
+    },
+  );
+}
+
+class _FormDialogFrame extends StatelessWidget {
+  final Widget child;
+  const _FormDialogFrame({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760, maxHeight: 900),
+            child: Material(
+              clipBehavior: Clip.antiAlias,
+              elevation: 8,
+              shape: const RoundedRectangleBorder(borderRadius: KRadius.cut),
+              child: child,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Renders a detail screen from `extra` when available (instant),

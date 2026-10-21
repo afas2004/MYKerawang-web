@@ -307,7 +307,8 @@ class _CasesTabState extends State<CasesTab> with AutomaticKeepAliveClientMixin 
               header,
               Expanded(
                 child: ModEmptyState(
-                  icon: Icons.check_circle_outline,
+                  icon: ModIcons.success,
+                  illo: unfiltered ? AppIllo.noNotifications : AppIllo.noResults,
                   title: unfiltered ? m.noOpenCases : m.noCasesFilter,
                   body: unfiltered ? m.noOpenCasesBody : null,
                 ),

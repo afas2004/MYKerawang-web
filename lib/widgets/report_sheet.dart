@@ -5,6 +5,7 @@ import '../language_cubit.dart';
 import '../services/moderation_service.dart';
 import '../utils/moderation_logic.dart';
 import 'restriction_gate.dart';
+import 'moderation_ui.dart';
 
 typedef ReportSubmit = Future<ReportOutcome> Function({
   required String targetId,
@@ -156,7 +157,7 @@ class _ReportSheetState extends State<ReportSheet> {
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
             child: Row(
               children: [
-                Icon(Icons.lock_outline, size: 16, color: scheme.onSurfaceVariant),
+                Icon(ModIcons.lock, size: 16, color: scheme.onSurfaceVariant),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(u.reportPrivacy,
@@ -186,11 +187,11 @@ class _ReportSheetState extends State<ReportSheet> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final (IconData icon, Color color, String title, String body) = switch (o.result) {
-      ReportResult.received => (Icons.check_circle_outline, scheme.primary, u.reportDoneTitle, m.reportReceived),
-      ReportResult.duplicate => (Icons.info_outline, scheme.primary, u.reportDupTitle, m.reportDuplicate),
-      ReportResult.ownContent => (Icons.person_outline, scheme.onSurfaceVariant, u.reportOwnTitle, m.reportOwn),
-      ReportResult.missing => (Icons.search_off, scheme.onSurfaceVariant, u.reportMissingTitle, m.reportMissing),
-      _ => (Icons.wifi_off, scheme.error, u.reportFailedTitle, m.reportFailed),
+      ReportResult.received => (ModIcons.success, scheme.primary, u.reportDoneTitle, m.reportReceived),
+      ReportResult.duplicate => (ModIcons.info, scheme.primary, u.reportDupTitle, m.reportDuplicate),
+      ReportResult.ownContent => (ModIcons.person, scheme.onSurfaceVariant, u.reportOwnTitle, m.reportOwn),
+      ReportResult.missing => (ModIcons.searchOff, scheme.onSurfaceVariant, u.reportMissingTitle, m.reportMissing),
+      _ => (ModIcons.offline, scheme.error, u.reportFailedTitle, m.reportFailed),
     };
     final failed = o.result == ReportResult.failed;
     return Padding(

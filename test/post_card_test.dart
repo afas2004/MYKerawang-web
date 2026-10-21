@@ -6,6 +6,7 @@ import 'package:mykerawang/language_cubit.dart';
 import 'package:mykerawang/services/post_service.dart';
 import 'package:mykerawang/services/moderation_service.dart';
 import 'package:mykerawang/services/saved_items.dart';
+import 'package:mykerawang/theme/app_icons.dart';
 import 'package:mykerawang/widgets/post_card.dart';
 import 'package:mykerawang/widgets/post_card_skeleton.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -97,7 +98,7 @@ void main() {
     expect(find.text(en.anonymous), findsOneWidget);
     expect(find.text('Amir'), findsNothing);
     expect(find.textContaining('@amir'), findsNothing);
-    expect(find.byIcon(Icons.visibility_off), findsOneWidget);
+    expect(find.byIcon(AppIcons.anonymous), findsOneWidget);
     expect(find.byTooltip(en.postedAnonymously), findsOneWidget);
   });
 

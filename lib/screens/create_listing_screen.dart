@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/brand/brand.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/image_compressor.dart';
 import '../utils/local_image.dart';
@@ -9,10 +10,10 @@ import '../l10n/social_strings.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
 import '../utils/formatters.dart';
+import '../utils/app_nav.dart';
 import '../widgets/form_layout.dart';
 import '../widgets/media_picker_grid.dart';
 import '../widgets/restriction_gate.dart';
-import 'edit_profile_screen.dart';
 
 class CreateListingScreen extends StatefulWidget {
   final Map<String, dynamic>? itemToEdit; 
@@ -25,7 +26,8 @@ class CreateListingScreen extends StatefulWidget {
 
 class _CreateListingScreenState extends State<CreateListingScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _supabase = Supabase.instance.client;
+  // Looked up on use so the form can be built in widget tests.
+  SupabaseClient get _supabase => Supabase.instance.client;
   
   // Controllers
   late TextEditingController _titleController;
@@ -68,13 +70,30 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         }
       }
     }
+
+    // Leaving with unsaved input asks first (router onExit).
+    _initialSnapshot = _snapshot();
+    FormGuard.register(() => !_isLoading && _snapshot() != _initialSnapshot);
   }
+
+  late final String _initialSnapshot;
+
+  /// Everything the user can change, to tell whether leaving loses input.
+  String _snapshot() => [
+        _titleController.text,
+        _priceController.text,
+        _descriptionController.text,
+        _category,
+        _mediaItems.length,
+        _mediaItems.map((m) => m is String ? m : identityHashCode(m)).join(','),
+      ].join('|');
 
   @override
   void dispose() {
     _titleController.dispose();
     _priceController.dispose();
     _descriptionController.dispose();
+    FormGuard.clear();
     super.dispose();
   }
 
@@ -98,7 +117,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     final goEdit = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.phone),
+        icon: const Icon(AppIcons.phone),
         title: Text(s.social.whatsappNeededTitle),
         content: Text(s.social.whatsappNeededBody),
         actions: [
@@ -112,9 +131,10 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
       ),
     );
     if (goEdit != true || !mounted) return false;
-    await Navigator.push(
-        context, MaterialPageRoute(builder: (_) => const EditProfileScreen()));
-    return _hasPhone(userId);
+    // Edit profile is its own page; the form stays underneath with its
+    // input, and Publish re-checks the number when they come back.
+    context.goEditProfile();
+    return false;
   }
 
   // --- 2. UPLOAD LOGIC ---
@@ -189,13 +209,17 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
       if (widget.itemToEdit != null) {
         await _supabase.from('listings').update(data).eq('id', widget.itemToEdit!['id']);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.listingUpdated)));
+        // Back to the listing page, which refreshes.
+        if (mounted) completeEdit(context, message: s.listingUpdated);
       } else {
-        await _supabase.from('listings').insert(data);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.listingPublished)));
+        final row = await _supabase.from('listings').insert(data).select().single();
+        // The form is replaced by the new listing's page, so back from
+        // there returns to where the user started, not to this form.
+        if (mounted) {
+          completePublish(context, '/item/${row['id']}',
+              extra: row, message: s.listingPublished);
+        }
       }
-
-      if (mounted) Navigator.pop(context, true); 
 
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeWriteError(context, e))));
@@ -211,6 +235,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
     return Scaffold(
       appBar: appBarConstrained(context,
+          leading: const AppCloseButton(),
           title: Text(isEditing ? s.editListing : s.sellItem)),
       body: FormPageBody(
         child: Form(
@@ -222,7 +247,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
             children: [
               FormSection(
                 title: s.sectionPhotos,
-                icon: Icons.photo_library_outlined,
+                icon: AppIcons.photo,
                 children: [
                   // Shared with the event form
                   MediaPickerGrid(items: _mediaItems, onChanged: () => setState(() {})),
@@ -230,7 +255,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
               ),
               FormSection(
                 title: s.sectionDetails,
-                icon: Icons.edit_note,
+                icon: AppIcons.edit,
                 children: [
                   TextFormField(
                     controller: _titleController,
@@ -250,7 +275,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
               ),
               FormSection(
                 title: s.sectionPricing,
-                icon: Icons.sell_outlined,
+                icon: AppIcons.price,
                 children: [
                   LayoutBuilder(builder: (context, c) {
                     final price = TextFormField(

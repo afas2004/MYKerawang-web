@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../language_cubit.dart';
@@ -60,7 +61,7 @@ class MediaPickerGrid extends StatelessWidget {
             // Desktop browsers can't capture; phone PWAs can (see canUseCamera)
             if (canUseCamera(context))
               ListTile(
-                leading: const Icon(Icons.photo_camera),
+                leading: const Icon(AppIcons.camera),
                 title: Text(s.takePhoto),
                 onTap: () {
                   Navigator.pop(sheet);
@@ -68,7 +69,7 @@ class MediaPickerGrid extends StatelessWidget {
                 },
               ),
             ListTile(
-              leading: const Icon(Icons.photo_library),
+              leading: const Icon(AppIcons.photo),
               title: Text(s.chooseFromGallery),
               onTap: () {
                 Navigator.pop(sheet);
@@ -91,7 +92,7 @@ class MediaPickerGrid extends StatelessWidget {
           children: [
             if (index != 0)
               ListTile(
-                leading: const Icon(Icons.star_border),
+                leading: const Icon(_kCoverIcon),
                 title: Text(s.setAsCover),
                 onTap: () {
                   Navigator.pop(sheet);
@@ -100,7 +101,7 @@ class MediaPickerGrid extends StatelessWidget {
                 },
               ),
             ListTile(
-              leading: const Icon(Icons.fullscreen),
+              leading: const Icon(AppIcons.visible),
               title: Text(s.viewFullscreen),
               onTap: () {
                 Navigator.pop(sheet);
@@ -108,7 +109,7 @@ class MediaPickerGrid extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: Icon(Icons.delete, color: error),
+              leading: Icon(AppIcons.delete, color: error),
               title: Text(s.removePhoto, style: TextStyle(color: error)),
               onTap: () {
                 Navigator.pop(sheet);
@@ -145,7 +146,7 @@ class MediaPickerGrid extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.add_a_photo, size: 40, color: scheme.primary),
+              Icon(AppIcons.camera, size: 36, color: scheme.primary),
               const SizedBox(height: 8),
               Text(s.addPhotos,
                   style: TextStyle(
@@ -175,7 +176,7 @@ class MediaPickerGrid extends StatelessWidget {
                     child: SizedBox(
                       width: 100,
                       height: _tileHeight,
-                      child: Icon(Icons.add,
+                      child: Icon(AppIcons.create,
                           size: 32, color: scheme.onSurfaceVariant),
                     ),
                   ),
@@ -225,7 +226,7 @@ class MediaPickerGrid extends StatelessWidget {
                               onTap: () => _remove(index),
                               child: Padding(
                                 padding: const EdgeInsets.all(4),
-                                child: Icon(Icons.close,
+                                child: Icon(AppIcons.close,
                                     size: 12, color: scheme.onError),
                               ),
                             ),
@@ -249,3 +250,7 @@ class MediaPickerGrid extends StatelessWidget {
     );
   }
 }
+
+/// "Set as cover". Not in AppIcons yet (lib/theme is shared); add it
+/// there and use AppIcons.cover when it is.
+const IconData _kCoverIcon = LucideIcons.star;

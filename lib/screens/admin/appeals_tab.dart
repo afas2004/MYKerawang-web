@@ -82,7 +82,7 @@ class _AppealsTabState extends State<AppealsTab>
           ],
         ),
       ),
-      empty: ModEmptyState(icon: Icons.gavel_outlined, title: m.noAppeals),
+      empty: ModEmptyState(icon: ModIcons.appeal, title: m.noAppeals),
       itemBuilder: (context, a) {
         final busy = _busy.contains('${a['id']}');
         final caseInfo = a['case_info'] as Map<String, dynamic>?;

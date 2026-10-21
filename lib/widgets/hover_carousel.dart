@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
+import '../theme/app_icons.dart';
+
 /// Horizontal carousel with desktop affordances: chevron buttons appear
 /// on hover (web only) so mouse users can page through without
 /// Shift+scroll or dragging. On touch it behaves like a plain ListView.
@@ -81,18 +83,19 @@ class _HoverCarouselState extends State<HoverCarousel> {
       bottom: 0,
       child: Center(
         child: Material(
-          color: scheme.surface.withValues(alpha: 0.9),
-          shape: const CircleBorder(),
-          elevation: 2,
+          color: scheme.surface,
+          // Borders, not shadows (modern foundation).
+          shape: CircleBorder(side: BorderSide(color: scheme.outlineVariant)),
           child: InkWell(
             customBorder: const CircleBorder(),
             onTap: () => _page(alignLeft ? -1 : 1),
             child: Padding(
               padding: const EdgeInsets.all(8),
-              child: Icon(
-                alignLeft ? Icons.chevron_left : Icons.chevron_right,
-                size: 24,
-                color: scheme.onSurface,
+              // AppIcons has one chevron; mirror it for "previous".
+              child: RotatedBox(
+                quarterTurns: alignLeft ? 2 : 0,
+                child: Icon(AppIcons.chevronRight,
+                    size: 24, color: scheme.onSurface),
               ),
             ),
           ),

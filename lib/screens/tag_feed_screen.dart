@@ -13,11 +13,9 @@ import '../widgets/linear_refresher.dart';
 import '../widgets/post_card.dart';
 import '../widgets/post_card_skeleton.dart';
 
-/// Opens the feed of posts carrying [tag] (pushed, not a route — no
-/// deep link yet).
-Future<void> openTagFeed(BuildContext context, String tag) =>
-    Navigator.push(context,
-        MaterialPageRoute(builder: (_) => TagFeedScreen(tag: tag)));
+/// Opens the feed of posts carrying [tag] at `/tag/:tag` (linkable).
+Future<void> openTagFeed(BuildContext context, String tag) async =>
+    context.goTag(tag);
 
 /// Posts with one hashtag, newest first, loaded a page at a time.
 class TagFeedScreen extends StatefulWidget {
@@ -141,7 +139,7 @@ class TagFeedView extends StatelessWidget {
     final title = displayTag(tag);
 
     final header = Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.s, KSpace.l, KSpace.m),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -149,7 +147,9 @@ class TagFeedView extends StatelessWidget {
             header: true,
             label: ps.tagPostsLabel.fill([title]),
             excludeSemantics: true,
-            child: Text(title, style: theme.textTheme.headlineSmall),
+            child: Text(title,
+                style: theme.textTheme.headlineSmall
+                    ?.copyWith(fontWeight: FontWeight.w700)),
           ),
           if (count != null)
             Text(
@@ -175,9 +175,9 @@ class TagFeedView extends StatelessWidget {
         children: [
           header,
           BrandEmptyState(
-            icon: Icons.tag,
+            icon: AppIcons.hashtag,
+            illo: AppIllo.noResults,
             title: ps.noTaggedPosts,
-            compact: true,
           ),
         ],
       );
@@ -189,7 +189,7 @@ class TagFeedView extends StatelessWidget {
         },
         child: ListView.builder(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.only(bottom: 24),
+          padding: const EdgeInsets.only(bottom: KSpace.xl),
           itemCount: posts.length + 2,
           itemBuilder: (context, i) {
             if (i == 0) return header;
@@ -206,13 +206,13 @@ class TagFeedView extends StatelessWidget {
             // Footer: next page loading, failed (retry), or the end.
             if (error != null) {
               return Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(KSpace.l),
                 child: Column(
                   children: [
                     Text(ps.loadMoreFailed),
                     TextButton.icon(
                       onPressed: onLoadMore,
-                      icon: const Icon(Icons.refresh),
+                      icon: const Icon(AppIcons.refresh),
                       label: Text(s.tryAgain),
                     ),
                   ],
@@ -221,7 +221,7 @@ class TagFeedView extends StatelessWidget {
             }
             if (hasMore) return const PostCardSkeleton();
             return Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(KSpace.xl),
               child: Center(
                 child: Text(fs.feedEnd,
                     style: theme.textTheme.labelLarge
@@ -238,9 +238,8 @@ class TagFeedView extends StatelessWidget {
         leading: IconButton(
           tooltip: s.back,
           icon: const BackButtonIcon(),
-          onPressed: () => Navigator.of(context).maybePop(),
+          onPressed: () => appBack(context),
         ),
-        bottom: LatticeBand.preferred(),
       ),
       body: Center(
         child: ConstrainedBox(

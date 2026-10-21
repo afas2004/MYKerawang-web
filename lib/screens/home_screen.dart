@@ -1,8 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:mykerawang/screens/create_event_screen.dart';
-import 'package:mykerawang/screens/create_listing_screen.dart';
 import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../l10n/app_strings.dart';
@@ -10,16 +8,15 @@ import '../l10n/feed_strings.dart';
 import '../language_cubit.dart';
 import '../l10n/social_strings.dart';
 import '../services/unread_notifications.dart';
-import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/embed_card.dart';
 import '../widgets/error_state.dart';
 import '../widgets/feed_composer.dart';
 import '../widgets/hover_carousel.dart';
+import '../widgets/shell_actions.dart';
 import '../widgets/universal_card.dart';
 import '../widgets/post_card.dart';
-import 'create_post_screen.dart';
 import '../widgets/post_card_skeleton.dart';
 
 /// Posts with one discovery embed (alternating event / listing) after
@@ -50,7 +47,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 /// Loads the feed; [FeedView] lays it out.
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with RefreshOnContentChange {
   final _supabase = Supabase.instance.client;
 
   bool _isLoading = true;
@@ -166,9 +164,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _openComposer() async {
-    if (await openPostComposer(context) && mounted) _fetchFeedData();
-  }
+  // New / edited / deleted content elsewhere refreshes the feed.
+  @override
+  void onContentChanged() => _fetchFeedData();
+
+  /// The editor is a route (/create/post); publishing lands on the new
+  /// post and the feed refreshes through [onContentChanged].
+  void _openComposer() => context.goCreatePost();
 
   @override
   Widget build(BuildContext context) {
@@ -186,67 +188,26 @@ class _HomeScreenState extends State<HomeScreen> {
       onRefresh: _fetchFeedData,
       onLoadMore: _loadMore,
       onCompose: _openComposer,
-      onPosted: _fetchFeedData,
-      onCreateMenu: () => _showCreateOptions(context),
+      // Search and notifications only. Settings live in Profile; refresh
+      // is pull-to-refresh, with a button only for mouse users on desktop.
       actions: [
-        // Pull-to-refresh has no mouse equivalent on web
-        if (kIsWeb)
+        const ShellSearchButton(),
+        if (kIsWeb && Responsive.isDesktop(context))
           IconButton(
             tooltip: s.refresh,
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(AppIcons.refresh),
             onPressed: _fetchFeedData,
           ),
         IconButton(
           tooltip: s.notifications,
-          icon: const UnreadBadge(child: Icon(Icons.notifications_outlined)),
+          icon: const UnreadBadge(child: Icon(AppIcons.notifications)),
           onPressed: () => context.goNotifications(),
         ),
-        IconButton(
-          tooltip: s.settings,
-          icon: const Icon(Icons.settings_outlined),
-          onPressed: () => context.goSettings(),
-        ),
-        const SizedBox(width: 8),
+        const SizedBox(width: KSpace.s),
       ],
     );
   }
 
-  void _showCreateOptions(BuildContext context) {
-    final s = context.l10nRead;
-    showAdaptiveSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.chat_bubble_outline),
-              title: Text(s.createPostTitle),
-              onTap: () {
-                Navigator.pop(ctx);
-                _openComposer();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.calendar_today),
-              title: Text(s.createEvent),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateEventScreen()));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.storefront),
-              title: Text(s.sellItem),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateListingScreen()));
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 /// The home feed layout, fed with data — no Supabase, so it can be
@@ -270,8 +231,6 @@ class FeedView extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final VoidCallback onLoadMore;
   final VoidCallback onCompose;
-  final VoidCallback onPosted;
-  final VoidCallback? onCreateMenu;
   final List<Widget> actions;
 
   const FeedView({
@@ -288,8 +247,6 @@ class FeedView extends StatelessWidget {
     required this.onRefresh,
     required this.onLoadMore,
     required this.onCompose,
-    required this.onPosted,
-    this.onCreateMenu,
     this.actions = const [],
   });
 
@@ -320,20 +277,12 @@ class FeedView extends StatelessWidget {
     final s = context.l10n;
     final width = MediaQuery.sizeOf(context).width;
     final size = Responsive.sizeFor(width);
-    final desktop = size.isExpanded;
     final railVisible = size.isLarge; // MainScaffold shows the rail here
     final items = buildFeedItems(posts, injectables, inject: !railVisible);
     final topPadding = MediaQuery.paddingOf(context).top + kToolbarHeight;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      floatingActionButton: (desktop || onCreateMenu == null)
-          ? null // the sidebar and composer cover creation on desktop
-          : FloatingActionButton(
-              tooltip: s.createPost,
-              onPressed: onCreateMenu,
-              child: const Icon(Icons.add),
-            ),
       body: LinearRefresher(
         onRefresh: onRefresh,
         offset: topPadding,
@@ -345,17 +294,16 @@ class FeedView extends StatelessWidget {
               SliverAppBar(
                 floating: true,
                 snap: true,
-                // On desktop the sidebar already carries the wordmark (F2.7)
                 title: Text(
-                  desktop ? s.navHome : AppStrings.appName,
-                  style: theme.textTheme.titleLarge,
+                  AppStrings.appName,
+                  style: theme.textTheme.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 centerTitle: false,
                 actions: actions,
-                bottom: LatticeBand.preferred(),
               ),
 
-              _column(SliverToBoxAdapter(child: FeedComposer(onPosted: onPosted))),
+              _column(SliverToBoxAdapter(child: FeedComposer(onTap: onCompose))),
 
               if (!isLoading && hasError && posts.isEmpty)
                 SliverFillRemaining(
@@ -370,7 +318,7 @@ class FeedView extends StatelessWidget {
                       onSeeAll: () => context.go('/events'),
                       items: events,
                       onTap: (e) => context.goEvent(e),
-                      cardWidth: 240,
+                      cardWidth: 220,
                     ),
                   )),
                 if (!railVisible && !isLoading && listings.isNotEmpty)
@@ -380,7 +328,7 @@ class FeedView extends StatelessWidget {
                       onSeeAll: () => context.go('/market'),
                       items: listings,
                       onTap: (l) => context.goItem(l),
-                      cardWidth: 180,
+                      cardWidth: 160,
                     ),
                   )),
                 if (isLoading)
@@ -426,13 +374,13 @@ class FeedView extends StatelessWidget {
     final theme = Theme.of(context);
     if (loadMoreError) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: KSpace.l),
         child: Column(
           children: [
             Text(s.social.loadMoreFailed),
             TextButton.icon(
               onPressed: onLoadMore,
-              icon: const Icon(Icons.refresh),
+              icon: const Icon(AppIcons.refresh),
               label: Text(s.social.retry),
             ),
           ],
@@ -448,7 +396,7 @@ class FeedView extends StatelessWidget {
       return const PostCardSkeleton();
     }
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 96),
+      padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.xl, KSpace.l, 96),
       child: Center(
         child: Text(context.feedL10n.feedEnd,
             style: theme.textTheme.labelLarge
@@ -477,7 +425,7 @@ class _FeedSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: KSpace.m, bottom: KSpace.s),
+      padding: const EdgeInsets.only(top: KSpace.s),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -486,12 +434,13 @@ class _FeedSection extends StatelessWidget {
             onSeeAll: onSeeAll,
             padding: const EdgeInsets.fromLTRB(KSpace.l, 0, KSpace.s, KSpace.xs),
           ),
+          // Compact strip: photo + two text lines.
           HoverCarousel(
-            height: 250,
+            height: 196,
             itemCount: items.length,
             itemBuilder: (context, i) => Container(
               width: cardWidth,
-              margin: const EdgeInsets.only(right: 12, bottom: 8),
+              margin: const EdgeInsets.only(right: KSpace.m, bottom: KSpace.s),
               child: UniversalCard(data: items[i], onTap: () => onTap(items[i])),
             ),
           ),
@@ -512,7 +461,8 @@ class _EmptyFeed extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: KSpace.xl),
       child: BrandEmptyState(
-        icon: Icons.forum_outlined,
+        icon: AppIcons.compose,
+        illo: AppIllo.emptyFeed,
         title: s.social.feedEmptyTitle,
         message: s.social.feedEmptyBody,
         actionLabel: s.social.createFirstPost,

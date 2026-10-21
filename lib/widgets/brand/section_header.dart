@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../language_cubit.dart';
 import '../../theme/tokens.dart';
 
-/// Section title (Fraunces, titleLarge) with an optional "See all" or a
+/// Section title (sans, 18 semibold) with an optional "See all" or a
 /// custom trailing widget. Announced as a heading to screen readers.
 ///
 ///   SectionHeader(title: s.happeningSoon, onSeeAll: () => context.go('/events'))
@@ -43,7 +43,8 @@ class SectionHeader extends StatelessWidget {
               header: true,
               child: Text(
                 title,
-                style: theme.textTheme.titleLarge,
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontSize: 18, fontWeight: FontWeight.w600),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -52,11 +53,9 @@ class SectionHeader extends StatelessWidget {
           if (trailing != null)
             trailing!
           else if (onSeeAll != null)
-            TextButton.icon(
+            TextButton(
               onPressed: onSeeAll,
-              iconAlignment: IconAlignment.end,
-              icon: const Icon(Icons.arrow_forward, size: 18),
-              label: Text(seeAllLabel ?? context.l10n.seeAll),
+              child: Text(seeAllLabel ?? context.l10n.seeAll),
             ),
         ],
       ),

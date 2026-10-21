@@ -4,7 +4,7 @@ import '../language_cubit.dart';
 import '../utils/adaptive.dart';
 import '../utils/roles.dart';
 import '../utils/app_nav.dart';
-import '../utils/responsive.dart';
+import '../widgets/brand/brand.dart';
 
 class FollowListScreen extends StatefulWidget {
   final String userId;
@@ -70,6 +70,7 @@ class _FollowListScreenState extends State<FollowListScreen> {
     return Scaffold(
       appBar: appBarConstrained(
         context,
+        leading: const AppBackButton(),
         title: Text(widget.type == 'followers' ? s.followers : s.following),
       ),
       body: PageBody(child: _isLoading
@@ -86,7 +87,7 @@ class _FollowListScreenState extends State<FollowListScreen> {
                         ? NetworkImage(user['avatar_url']) 
                         : null,
                     child: user['avatar_url'] == null 
-                        ? const Icon(Icons.person) 
+                        ? const Icon(AppIcons.person) 
                         : null,
                   ),
                   title: Text(displayNameFor(s, user)),

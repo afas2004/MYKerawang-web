@@ -176,7 +176,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                 icon: _saving
                     ? const SizedBox(
                         width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.save_outlined),
+                    : const Icon(ModIcons.saveFile),
                 label: Text(m.save),
               ),
             ],

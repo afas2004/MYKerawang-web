@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/brand/brand.dart';
 import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/image_compressor.dart';
@@ -8,6 +9,7 @@ import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
 import '../utils/formatters.dart';
+import '../utils/app_nav.dart';
 import '../widgets/form_layout.dart';
 import '../widgets/media_picker_grid.dart';
 import '../widgets/restriction_gate.dart';
@@ -68,10 +70,29 @@ if (event['tags'] != null) {
         _mediaItems.addAll(List<String>.from(event['gallery_urls']));
       }
     } else {
-      _startDate = DateTime.now(); 
+      _startDate = DateTime.now();
       _endDate = DateTime.now().add(const Duration(hours: 2));
     }
+
+    // Leaving with unsaved input asks first (router onExit).
+    _initialSnapshot = _snapshot();
+    FormGuard.register(() => !_isLoading && _snapshot() != _initialSnapshot);
   }
+
+  late final String _initialSnapshot;
+
+  /// Everything the user can change, to tell whether leaving loses input.
+  String _snapshot() => [
+        _titleController.text,
+        _locationController.text,
+        _descController.text,
+        _linkController.text,
+        _startDate?.toIso8601String(),
+        _endDate?.toIso8601String(),
+        _selectedTags.join(','),
+        _mediaItems.length,
+        _mediaItems.map((m) => m is String ? m : identityHashCode(m)).join(','),
+      ].join('|');
 
   @override
   void dispose() {
@@ -79,6 +100,7 @@ if (event['tags'] != null) {
     _locationController.dispose();
     _descController.dispose();
     _linkController.dispose();
+    FormGuard.clear();
     super.dispose();
   }
 
@@ -146,12 +168,18 @@ if (event['tags'] != null) {
 
       if (widget.eventToEdit != null) {
         await supabase.from('events').update(data).eq('id', widget.eventToEdit!['id']);
+        // Back to the event page, which refreshes.
+        if (mounted) completeEdit(context, message: s.eventUpdated);
       } else {
         final newEvent = await supabase.from('events').insert(data).select().single();
         await _processMentions(_descController.text, newEvent['id']);
+        // The form is replaced by the new event's page, so back from
+        // there returns to where the user started, not to this form.
+        if (mounted) {
+          completePublish(context, '/event/${newEvent['id']}',
+              extra: newEvent, message: s.eventPublished);
+        }
       }
-      
-      if (mounted) Navigator.pop(context, true);
 
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeWriteError(context, e))));
@@ -200,6 +228,7 @@ if (event['tags'] != null) {
 
     return Scaffold(
       appBar: appBarConstrained(context,
+          leading: const AppCloseButton(),
           title: Text(isEditing ? s.editEvent : s.createEvent)),
       body: FormPageBody(
         child: Form(
@@ -211,7 +240,7 @@ if (event['tags'] != null) {
             children: [
               FormSection(
                 title: s.sectionPhotos,
-                icon: Icons.photo_library_outlined,
+                icon: AppIcons.photo,
                 children: [
                   // Shared with the listing form
                   MediaPickerGrid(items: _mediaItems, onChanged: () => setState(() {})),
@@ -219,7 +248,7 @@ if (event['tags'] != null) {
               ),
               FormSection(
                 title: s.sectionDetails,
-                icon: Icons.edit_note,
+                icon: AppIcons.edit,
                 children: [
                   _label(s.eventTitle, topPad: 0),
                   _input(_titleController, s.eventTitleHint, validator: _required(s.title)),
@@ -228,7 +257,7 @@ if (event['tags'] != null) {
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surfaceContainer,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: KRadius.input,
                     ),
                     child: MentionInput(
                       controller: _descController,
@@ -240,7 +269,7 @@ if (event['tags'] != null) {
               ),
               FormSection(
                 title: s.sectionWhenWhere,
-                icon: Icons.event_outlined,
+                icon: AppIcons.calendar,
                 children: [
                   LayoutBuilder(builder: (context, c) {
                     // Side by side when there's room, stacked on small phones.
@@ -263,7 +292,7 @@ if (event['tags'] != null) {
                   _label(s.location),
                   _input(_locationController, s.locationHint, validator: _required(s.location)),
                   _label(s.registrationLinkOptional),
-                  _input(_linkController, "https://forms.gle/...", icon: Icons.link),
+                  _input(_linkController, "https://forms.gle/...", icon: AppIcons.link),
                 ],
               ),
             ],
@@ -290,11 +319,11 @@ if (event['tags'] != null) {
         _label(isStart ? s.starts : s.ends, topPad: 0),
         InkWell(
           onTap: () => _pickDateTime(isStart),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: KRadius.input,
           child: AbsorbPointer(
             child: _input(
               TextEditingController(text: date == null ? '' : formatEventDate(date)), s.select,
-              icon: Icons.calendar_today,
+              icon: AppIcons.calendar,
               readOnly: true,
               validator: isStart
                   ? (_) => _startDate == null ? s.fieldRequired.fill([s.starts]) : null
@@ -358,10 +387,10 @@ if (event['tags'] != null) {
     suffixIcon: icon != null ? Icon(icon) : null,
     filled: true,
     fillColor: t.colorScheme.surfaceContainer,
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+    border: OutlineInputBorder(borderRadius: KRadius.input, borderSide: BorderSide.none),
     // Visible focus ring for keyboard users on web.
     focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: KRadius.input,
         borderSide: BorderSide(color: t.colorScheme.primary, width: 2)),
   );
 }

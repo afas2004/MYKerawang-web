@@ -2,12 +2,15 @@
 ///
 ///   import 'package:mykerawang/widgets/brand/brand.dart';
 ///
-/// Tokens (KSpace, KRadius, KMotion, KTokens) and Responsive come with it.
+/// Tokens (KSpace, KRadius, KMotion, KTokens), AppIcons and Responsive
+/// come with it.
 library;
 
 export '../../theme/tokens.dart';
 export '../../utils/responsive.dart';
+export '../../theme/app_icons.dart';
 export 'adaptive_scaffold_body.dart';
+export 'app_illustration.dart';
 export 'brand_empty_state.dart';
 export 'k_card.dart';
 export 'k_skeleton.dart';

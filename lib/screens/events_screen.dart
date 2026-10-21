@@ -3,18 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:mykerawang/widgets/linear_refresher.dart';
-import 'create_event_screen.dart';
 import 'events_cubit.dart';
 import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
-import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
+import '../widgets/shell_actions.dart';
 import '../utils/categories.dart';
 import '../utils/formatters.dart';
 import '../utils/roles.dart';
 import '../widgets/error_state.dart';
-import '../widgets/status_badge.dart';
 import '../widgets/brand/brand.dart';
 
 /// "Today" / "Tomorrow" / "In 3 days" for upcoming events less than a
@@ -69,9 +67,13 @@ class EventsView extends StatefulWidget {
   State<EventsView> createState() => _EventsViewState();
 }
 
-class _EventsViewState extends State<EventsView> {
+class _EventsViewState extends State<EventsView>
+    with RefreshOnContentChange {
   final TextEditingController _searchCtrl = TextEditingController();
   final List<String> _tags = ['All', ...kEventTags];
+
+  /// Past (ended / cancelled) events start collapsed at the bottom.
+  bool _showPast = false;
 
   @override
   void dispose() {
@@ -79,13 +81,13 @@ class _EventsViewState extends State<EventsView> {
     super.dispose();
   }
 
-  Future<void> _openCreate(BuildContext context) async {
-    final result = await Navigator.push(
-        context, MaterialPageRoute(builder: (_) => const CreateEventScreen()));
-    if (result == true && context.mounted) {
-      context.read<EventsCubit>().loadData();
-    }
-  }
+  /// Used by the empty state only; the one general Create entry is the
+  /// shell's (centre button / rail / sidebar).
+  void _openCreate(BuildContext context) => context.goCreateEvent();
+
+  // Lists refresh after something is published, edited or deleted.
+  @override
+  void onContentChanged() => context.read<EventsCubit>().loadData();
 
   @override
   Widget build(BuildContext context) {
@@ -97,29 +99,7 @@ class _EventsViewState extends State<EventsView> {
           return Scaffold(
             appBar: AppBar(
               title: Text(s.navEvents),
-              // Desktop has no FAB, so creation lives here instead (H1.1).
-              actions: [
-                if (isWide(context))
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilledButton.icon(
-                      onPressed: () => _openCreate(context),
-                      icon: const Icon(Icons.add, size: 18),
-                      label: Text(s.createEvent),
-                    ),
-                  ),
-              ],
-              bottom: withFilterColumn
-                  ? LatticeBand.preferred()
-                  : PreferredSize(
-                      preferredSize: const Size.fromHeight(52 + 9),
-                      child: Column(
-                        children: [
-                          _TagChipRow(tags: _tags, selected: state.selectedTag),
-                          const LatticeBand(),
-                        ],
-                      ),
-                    ),
+              actions: const [ShellSearchButton()],
             ),
             body: LinearRefresher(
               offset: 0.0,
@@ -137,21 +117,22 @@ class _EventsViewState extends State<EventsView> {
                           ),
                         ),
                         const VerticalDivider(width: 1),
-                        Expanded(child: _content(context, state, withSearch: false)),
+                        Expanded(child: _content(context, state)),
                       ],
                     )
-                  : _content(context, state, withSearch: true),
+                  : Column(
+                      children: [
+                        // Sticky: search, then the tag chips.
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                              KSpace.l, KSpace.s, KSpace.l, KSpace.s),
+                          child: _searchField(context),
+                        ),
+                        _TagChipRow(tags: _tags, selected: state.selectedTag),
+                        Expanded(child: _content(context, state)),
+                      ],
+                    ),
             ),
-            // Desktop creates from the header — a FAB floating in the
-            // far corner of a wide window is a phone pattern (G5).
-            floatingActionButton: isWide(context)
-                ? null
-                : FloatingActionButton(
-                    heroTag: 'events_fab',
-                    tooltip: s.createEvent,
-                    onPressed: () => _openCreate(context),
-                    child: const Icon(Icons.add),
-                  ),
           );
         });
       },
@@ -170,12 +151,12 @@ class _EventsViewState extends State<EventsView> {
       textInputAction: TextInputAction.search,
       decoration: InputDecoration(
         hintText: s.searchEvents,
-        prefixIcon: Icon(Icons.search, color: scheme.onSurfaceVariant),
+        prefixIcon: Icon(AppIcons.search, color: scheme.onSurfaceVariant),
         suffixIcon: _searchCtrl.text.isEmpty
             ? null
             : IconButton(
                 tooltip: s.clearSearch,
-                icon: const Icon(Icons.close),
+                icon: const Icon(AppIcons.close),
                 onPressed: () {
                   _searchCtrl.clear();
                   context.read<EventsCubit>().updateSearch('');
@@ -184,25 +165,14 @@ class _EventsViewState extends State<EventsView> {
               ),
         filled: true,
         fillColor: scheme.surfaceContainerHighest,
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        isDense: true,
+        border: const OutlineInputBorder(
+            borderRadius: KRadius.pill, borderSide: BorderSide.none),
       ),
     );
   }
 
-  Widget _emptyState(BuildContext context, EventsState state) {
-    final s = context.l10n;
-    final filtered = state.searchQuery.isNotEmpty || state.selectedTag != 'All';
-    return BrandEmptyState(
-      icon: Icons.event_outlined,
-      title: s.noEventsFound,
-      message: filtered ? null : s.noEventsYetHint,
-      actionLabel: filtered ? null : s.createEvent,
-      onAction: filtered ? null : () => _openCreate(context),
-    );
-  }
-
-  Widget _content(BuildContext context, EventsState state, {required bool withSearch}) {
+  Widget _content(BuildContext context, EventsState state) {
     final s = context.l10n;
     final cubit = context.read<EventsCubit>();
 
@@ -214,76 +184,86 @@ class _EventsViewState extends State<EventsView> {
     }
 
     final now = DateTime.now();
-    final bySection = <EventSection, List<Map<String, dynamic>>>{
-      for (final sec in EventSection.values) sec: [],
-    };
+    // Already sorted: upcoming soonest first, then past most recent first.
+    final upcoming = <Map<String, dynamic>>[];
+    final past = <Map<String, dynamic>>[];
     for (final e in state.displayedEvents) {
-      bySection[eventSectionOf(e, now: now)]!.add(e);
+      (eventSectionOf(e, now: now) == EventSection.ended ? past : upcoming).add(e);
     }
+    final filtered = state.searchQuery.isNotEmpty || state.selectedTag != 'All';
 
     return LayoutBuilder(builder: (context, constraints) {
       final width = constraints.maxWidth;
       final columns = width >= 1000 ? 3 : (width >= Responsive.mediumBreakpoint ? 2 : 1);
-      const gap = KSpace.l;
+      final extent = EventCard.heightFor(MediaQuery.textScalerOf(context));
 
-      List<Widget> section(EventSection sec, String title) {
-        final events = bySection[sec]!;
-        if (events.isEmpty) return const [];
+      Widget cards(List<Map<String, dynamic>> events) {
         Widget card(Map<String, dynamic> e) => EventCard(
               event: e,
               goingCount: state.goingCounts[e['id']],
               organiser: state.organisers[e['organizer_id']],
               onTap: () => context.goEvent(e),
             );
-        return [
-          SliverToBoxAdapter(
-            child: SectionHeader(
-              title: title,
-              padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.xl, KSpace.l, KSpace.m),
-              trailing: Text('${events.length}',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant)),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: KSpace.l),
-            sliver: columns == 1
-                ? SliverList.separated(
-                    itemCount: events.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: gap),
-                    itemBuilder: (_, i) => card(events[i]),
-                  )
-                : SliverGrid.builder(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: columns,
-                      crossAxisSpacing: gap,
-                      mainAxisSpacing: gap,
-                      mainAxisExtent: EventCard.gridExtent,
-                    ),
-                    itemCount: events.length,
-                    itemBuilder: (_, i) => card(events[i]),
+        return SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: KSpace.l),
+          sliver: columns == 1
+              ? SliverList.separated(
+                  itemCount: events.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: KSpace.m),
+                  itemBuilder: (_, i) => card(events[i]),
+                )
+              : SliverGrid.builder(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    crossAxisSpacing: KSpace.m,
+                    mainAxisSpacing: KSpace.m,
+                    mainAxisExtent: extent,
                   ),
-          ),
-        ];
+                  itemCount: events.length,
+                  itemBuilder: (_, i) => card(events[i]),
+                ),
+        );
       }
 
       return CustomScrollView(
         slivers: [
-          if (withSearch)
+          const SliverToBoxAdapter(child: SizedBox(height: KSpace.s)),
+          if (upcoming.isEmpty)
+            SliverToBoxAdapter(
+              child: BrandEmptyState(
+                icon: AppIcons.events,
+                illo: AppIllo.noEvents,
+                compact: past.isNotEmpty,
+                title: s.noEventsFound,
+                message: filtered ? null : s.noEventsYetHint,
+                actionLabel: filtered ? null : s.createEvent,
+                onAction: filtered ? null : () => _openCreate(context),
+              ),
+            )
+          else
+            cards(upcoming),
+
+          // Past events: collapsed at the bottom, never the first thing.
+          if (past.isNotEmpty) ...[
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: _searchField(context),
+                padding: const EdgeInsets.fromLTRB(KSpace.s, KSpace.xl, KSpace.s, KSpace.s),
+                child: ListTile(
+                  shape: const RoundedRectangleBorder(borderRadius: KRadius.input),
+                  leading: const Icon(AppIcons.history),
+                  title: Text(s.pastEvents),
+                  subtitle: Text(s.pastEventsCount.fill([past.length])),
+                  trailing: AnimatedRotation(
+                    turns: _showPast ? 0.25 : 0,
+                    duration: KMotion.of(context).fast,
+                    child: const Icon(AppIcons.chevronRight),
+                  ),
+                  onTap: () => setState(() => _showPast = !_showPast),
+                ),
               ),
             ),
-          if (state.displayedEvents.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: _emptyState(context, state),
-            ),
-          ...section(EventSection.thisWeek, s.sectionThisWeek),
-          ...section(EventSection.later, s.sectionLater),
-          ...section(EventSection.ended, s.sectionEnded),
+            if (_showPast) cards(past),
+          ],
           const SliverToBoxAdapter(child: SizedBox(height: 96)),
         ],
       );
@@ -295,9 +275,9 @@ class _EventsViewState extends State<EventsView> {
 // Event card
 // ---------------------------------------------------------------------------
 
-/// Date-led event card: a calendar block (day number in the display face)
-/// beside the title, time, place, countdown, going count and organiser.
-/// Used in the events list; sized to [gridExtent] in multi-column grids.
+/// Event list card: a date block (month + day number) beside the title,
+/// time, place and going count, with the cover as a small thumbnail.
+/// Ended / cancelled events are muted and say so.
 class EventCard extends StatelessWidget {
   final Map<String, dynamic> event;
   final int? goingCount;
@@ -314,8 +294,9 @@ class EventCard extends StatelessWidget {
     this.onTap,
   });
 
-  /// Fixed tile height for grid layouts.
-  static const double gridExtent = 340;
+  /// Tile height for multi-column grids, scaled with the text size.
+  /// (Two-line title, time, place, status row, organiser.)
+  static double heightFor(TextScaler textScaler) => textScaler.scale(158) + KSpace.m * 2 + 4;
 
   static final _time = DateFormat('h:mm a');
 
@@ -336,94 +317,72 @@ class EventCard extends StatelessWidget {
         : formatEventRange(start, end);
     final meta = theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant);
     final title = (event['title'] ?? '').toString();
+    final image = event['image_url'] as String?;
 
-    return Opacity(
-      // Ended / cancelled stay visible but recede (spec §6)
-      opacity: closed ? 0.6 : 1,
-      child: KCard(
-        onTap: onTap,
-        padding: EdgeInsets.zero,
-        // Official organisers get the gold frame + corner lattice.
-        official: isOfficialProfile(organiser) && !closed,
-        borderRadius: KRadius.cut,
-        semanticLabel: title,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
+    return KCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(KSpace.m),
+      semanticLabel: title,
+      child: Opacity(
+        // Ended / cancelled stay visible but recede (spec §6)
+        opacity: closed ? 0.65 : 1,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ---- cover ----
-            SizedBox(
-              height: 140,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  CachedNetworkImage(
-                    imageUrl: event['image_url'] ?? '',
-                    memCacheWidth: 900, // decode at card size, not camera size
-                    fadeInDuration: Duration.zero,
-                    fadeOutDuration: Duration.zero,
-                    fit: BoxFit.cover,
-                    placeholder: (_, __) => ColoredBox(color: scheme.surfaceContainerHighest),
-                    errorWidget: (_, __, ___) => ColoredBox(
-                      color: scheme.surfaceContainerHighest,
-                      child: Center(
-                        child: Icon(Icons.event, color: scheme.onSurfaceVariant, size: 36),
-                      ),
-                    ),
-                  ),
-                  if (closed)
-                    Positioned(
-                      top: 10,
-                      left: 10,
-                      child: StatusBadge(cancelled ? s.cancelled : s.ended),
-                    )
-                  else if (countdown != null)
-                    Positioned(top: 10, left: 10, child: CountdownChip(countdown)),
-                ],
-              ),
-            ),
-
-            // ---- date block + details ----
-            Padding(
-              padding: const EdgeInsets.all(KSpace.m),
-              child: Row(
+            DateBlock(date: start, muted: closed),
+            const SizedBox(width: KSpace.m),
+            Expanded(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  DateBlock(date: start, muted: closed),
-                  const SizedBox(width: KSpace.m),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w700)),
-                        const SizedBox(height: 4),
-                        _iconLine(Icons.schedule, timeText, meta, scheme),
-                        const SizedBox(height: 2),
-                        _iconLine(Icons.location_on_outlined,
-                            (event['location'] ?? s.locationTba).toString(), meta, scheme),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 4,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            if (goingCount != null && goingCount! > 0)
-                              _iconLine(Icons.group_outlined,
-                                  s.goingCount.fill([goingCount]), meta, scheme,
-                                  shrink: true),
-                            if (organiser != null) _OrganiserLine(profile: organiser!),
-                          ],
-                        ),
-                      ],
-                    ),
+                  Text(title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: KSpace.xs),
+                  _iconLine(AppIcons.clock, timeText, meta, scheme),
+                  const SizedBox(height: 2),
+                  _iconLine(AppIcons.location,
+                      (event['location'] ?? s.locationTba).toString(), meta, scheme),
+                  const SizedBox(height: KSpace.s),
+                  Wrap(
+                    spacing: KSpace.s,
+                    runSpacing: KSpace.xs,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      if (closed)
+                        _Pill(cancelled ? s.cancelled : s.ended, muted: true)
+                      else if (countdown != null)
+                        CountdownChip(countdown),
+                      if (goingCount != null && goingCount! > 0)
+                        _iconLine(AppIcons.people, s.goingCount.fill([goingCount]), meta, scheme,
+                            shrink: true),
+                    ],
                   ),
+                  if (organiser != null) ...[
+                    const SizedBox(height: KSpace.xs),
+                    _OrganiserLine(profile: organiser!),
+                  ],
                 ],
               ),
             ),
+            if (image != null && image.isNotEmpty) ...[
+              const SizedBox(width: KSpace.m),
+              ClipRRect(
+                borderRadius: KRadius.small,
+                child: CachedNetworkImage(
+                  imageUrl: image,
+                  width: 72,
+                  height: 72,
+                  memCacheWidth: 216,
+                  fit: BoxFit.cover,
+                  fadeInDuration: Duration.zero,
+                  placeholder: (_, __) => ColoredBox(color: scheme.surfaceContainerHighest),
+                  errorWidget: (_, __, ___) => const SizedBox(width: 72, height: 72),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -437,15 +396,15 @@ class EventCard extends StatelessWidget {
       mainAxisSize: shrink ? MainAxisSize.min : MainAxisSize.max,
       children: [
         Icon(icon, size: 14, color: scheme.onSurfaceVariant),
-        const SizedBox(width: 4),
+        const SizedBox(width: KSpace.xs),
         shrink ? Flexible(child: label) : Expanded(child: label),
       ],
     );
   }
 }
 
-/// Calendar block: weekday, big day number, month. Shared by the list
-/// card and the event page.
+/// Date block: short month over the day number. Shared by the list card
+/// and the event page.
 class DateBlock extends StatelessWidget {
   final DateTime date;
   final bool muted;
@@ -454,7 +413,6 @@ class DateBlock extends StatelessWidget {
   const DateBlock({super.key, required this.date, this.muted = false, this.size = 56});
 
   static final _month = DateFormat('MMM');
-  static final _weekday = DateFormat('EEE');
 
   @override
   Widget build(BuildContext context) {
@@ -464,28 +422,25 @@ class DateBlock extends StatelessWidget {
     final fg = muted ? scheme.onSurfaceVariant : scheme.onPrimaryContainer;
     return Container(
       width: size,
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      decoration: BoxDecoration(color: bg, borderRadius: KRadius.cut),
+      padding: const EdgeInsets.symmetric(vertical: KSpace.s),
+      decoration: BoxDecoration(color: bg, borderRadius: KRadius.input),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(_weekday.format(date).toUpperCase(),
-              style: theme.textTheme.labelSmall
-                  ?.copyWith(color: fg, letterSpacing: 1, fontWeight: FontWeight.w600)),
-          Text('${date.day}',
-              style: theme.textTheme.headlineMedium
-                  ?.copyWith(color: fg, fontWeight: FontWeight.w700, height: 1.1)),
           Text(_month.format(date).toUpperCase(),
               style: theme.textTheme.labelSmall
-                  ?.copyWith(color: fg, letterSpacing: 1, fontWeight: FontWeight.w600)),
+                  ?.copyWith(color: fg, letterSpacing: 0.8, fontWeight: FontWeight.w600)),
+          Text('${date.day}',
+              style: theme.textTheme.headlineSmall
+                  ?.copyWith(color: fg, fontWeight: FontWeight.w700, height: 1.15)),
         ],
       ),
     );
   }
 }
 
-/// Organiser name with a gold "official" mark for clubs, staff and
-/// verified accounts.
+/// Organiser name; clubs, staff and verified accounts get the verified
+/// mark in the accent colour.
 class _OrganiserLine extends StatelessWidget {
   final Map<String, dynamic> profile;
   const _OrganiserLine({required this.profile});
@@ -504,16 +459,14 @@ class _OrganiserLine extends StatelessWidget {
             s.byOrganiser.fill([displayNameFor(s, profile)]),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-                color: official ? scheme.onSurface : scheme.onSurfaceVariant,
-                fontWeight: official ? FontWeight.w600 : null),
+            style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ),
         if (official) ...[
-          const SizedBox(width: 4),
+          const SizedBox(width: KSpace.xs),
           Tooltip(
             message: s.officialAccount,
-            child: Icon(Icons.verified, size: 14, color: scheme.tertiary),
+            child: Icon(AppIcons.verified, size: 14, color: scheme.tertiary),
           ),
         ],
       ],
@@ -526,29 +479,41 @@ bool isOfficialProfile(Map<String, dynamic>? p) =>
     p != null &&
     (p['is_verified'] == true || const {'club', 'admin', 'owner'}.contains(p['role']));
 
-/// Upcoming-soon marker on an event cover. Primary container rather than
-/// the dark StatusBadge scrim, so "soon" never reads like "ended".
+/// Small tonal pill for "Today" / "In 3 days" / "Happening now".
 class CountdownChip extends StatelessWidget {
   final String label;
   const CountdownChip(this.label, {super.key});
 
   @override
+  Widget build(BuildContext context) => _Pill(label, icon: AppIcons.clock);
+}
+
+class _Pill extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final bool muted;
+  const _Pill(this.label, {this.icon, this.muted = false});
+
+  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final bg = muted ? scheme.surfaceContainerHighest : scheme.primaryContainer;
+    final fg = muted ? scheme.onSurfaceVariant : scheme.onPrimaryContainer;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: scheme.primaryContainer,
-        borderRadius: BorderRadius.circular(20),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: KSpace.s, vertical: 3),
+      decoration: BoxDecoration(color: bg, borderRadius: KRadius.pill),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.schedule, size: 14, color: scheme.onPrimaryContainer),
-          const SizedBox(width: 4),
+          if (icon != null) ...[
+            Icon(icon, size: 12, color: fg),
+            const SizedBox(width: KSpace.xs),
+          ],
           Text(label,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: scheme.onPrimaryContainer, fontWeight: FontWeight.w700)),
+              style: Theme.of(context)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(color: fg, fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -556,7 +521,7 @@ class CountdownChip extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Filters, headers, empty and loading states
+// Filters and loading
 // ---------------------------------------------------------------------------
 
 class _TagChipRow extends StatelessWidget {
@@ -567,12 +532,12 @@ class _TagChipRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 52,
+      height: 48,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: KSpace.l, vertical: KSpace.xs),
         itemCount: tags.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, __) => const SizedBox(width: KSpace.s),
         itemBuilder: (context, i) => _tagChip(context, tags[i], selected),
       ),
     );
@@ -580,18 +545,11 @@ class _TagChipRow extends StatelessWidget {
 }
 
 Widget _tagChip(BuildContext context, String tag, String selected) {
-  final scheme = Theme.of(context).colorScheme;
-  final isSelected = selected == tag;
   return FilterChip(
     label: Text(tag == 'All' ? context.l10n.all : tag),
-    selected: isSelected,
+    selected: selected == tag,
+    showCheckmark: false,
     onSelected: (_) => context.read<EventsCubit>().updateTag(tag),
-    selectedColor: scheme.secondaryContainer,
-    checkmarkColor: scheme.onSecondaryContainer,
-    labelStyle: TextStyle(
-      color: isSelected ? scheme.onSecondaryContainer : scheme.onSurface,
-      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-    ),
   );
 }
 
@@ -606,15 +564,15 @@ class _FilterColumn extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.l10n;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(KSpace.l),
       children: [
         search,
-        const SizedBox(height: 24),
+        const SizedBox(height: KSpace.xl),
         Text(s.filters, style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 12),
+        const SizedBox(height: KSpace.m),
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: KSpace.s,
+          runSpacing: KSpace.s,
           children: [for (final t in tags) _tagChip(context, t, selected)],
         ),
       ],
@@ -632,25 +590,15 @@ class _EventListSkeleton extends StatelessWidget {
       child: ListView.separated(
         padding: const EdgeInsets.all(KSpace.l),
         physics: const NeverScrollableScrollPhysics(),
-        itemCount: 3,
-        separatorBuilder: (_, __) => const SizedBox(height: KSpace.l),
+        itemCount: 4,
+        separatorBuilder: (_, __) => const SizedBox(height: KSpace.m),
         itemBuilder: (_, __) => KCard(
-          padding: EdgeInsets.zero,
-          borderRadius: KRadius.cut,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.all(KSpace.m),
+          child: Row(
             children: [
-              const KSkeleton(height: 140, borderRadius: BorderRadius.zero),
-              Padding(
-                padding: const EdgeInsets.all(KSpace.m),
-                child: Row(
-                  children: [
-                    const KSkeleton(width: 56, height: 64),
-                    const SizedBox(width: KSpace.m),
-                    Expanded(child: KSkeleton.lines(2)),
-                  ],
-                ),
-              ),
+              const KSkeleton(width: 56, height: 60, borderRadius: KRadius.input),
+              const SizedBox(width: KSpace.m),
+              Expanded(child: KSkeleton.lines(3)),
             ],
           ),
         ),

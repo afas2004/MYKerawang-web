@@ -78,7 +78,9 @@ void main() {
 
   testWidgets('anonymous comment shows no name or handle', (tester) async {
     await pumpAt(tester, kCompact, layout());
-    expect(find.textContaining('Name hidden'), findsOneWidget);
+    // Two named comments carry the handle; the anonymous one doesn't.
+    expect(find.textContaining('@siti_kolej_kerawang_panjang'), findsNWidgets(2));
+    expect(find.textContaining('Name hidden'), findsNothing);
     expect(find.text('Anonymous'), findsOneWidget);
   });
 }

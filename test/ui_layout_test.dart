@@ -36,8 +36,9 @@ Future<void> pumpAt(WidgetTester tester, double width, Widget child,
 
 /// Column width the events list gives one card at a screen width.
 double eventColumnWidth(double width) {
-  if (width >= 1000) return (width - 32 - 32) / 3;
-  if (width >= 600) return (width - 32 - 16) / 2;
+  // 1280: the filter column (240 + divider) takes its share first.
+  if (width >= 900) return (width - 241 - 32 - 24) / 3 < 300 ? (width - 241 - 32 - 12) / 2 : (width - 241 - 32 - 24) / 3;
+  if (width >= 600) return (width - 32 - 12) / 2;
   return width - 32;
 }
 
@@ -73,7 +74,7 @@ void main() {
             alignment: Alignment.topLeft,
             child: SizedBox(
               width: columnWidth,
-              height: inGrid ? EventCard.gridExtent : null,
+              height: inGrid ? EventCard.heightFor(TextScaler.linear(scale)) : null,
               child: EventCard(event: event, goingCount: 42, organiser: organiser),
             ),
           ),
@@ -82,7 +83,7 @@ void main() {
         expect(tester.takeException(), isNull);
         expect(find.textContaining('Malam Kebudayaan'), findsOneWidget);
         expect(find.text('42 going'), findsOneWidget);
-        expect(find.byIcon(Icons.verified), findsOneWidget);
+        expect(find.byIcon(AppIcons.verified), findsOneWidget);
       });
     }
   }
@@ -95,7 +96,7 @@ void main() {
         child: EventCard(event: {...event, 'cancelled_at': '2026-10-19T00:00:00Z'}),
       ),
     );
-    expect(find.text('CANCELLED'), findsOneWidget);
+    expect(find.text('Cancelled'), findsOneWidget);
     expect(find.byType(CountdownChip), findsNothing);
   });
 
@@ -103,8 +104,9 @@ void main() {
   /// Width the market grid gives one tile at a screen width (side panel
   /// from 900).
   double marketTileWidth(double width) {
-    final grid = (width >= 900 ? width - 281 : width) - 32;
-    final cols = Responsive.gridColumnsFor(grid + 32);
+    // Side panel from 900; 16px gutters each side.
+    final grid = (width >= 900 ? width - 281 : width) - 2 * KSpace.l;
+    final cols = Responsive.gridColumnsFor(grid + 2 * KSpace.l);
     return (grid - KSpace.m * (cols - 1)) / cols;
   }
 
@@ -127,14 +129,14 @@ void main() {
             alignment: Alignment.topLeft,
             child: SizedBox(
               width: w,
-              height: w / MarketCard.aspectRatio,
+              height: MarketCard.heightFor(w, TextScaler.linear(scale)),
               child: MarketCard(item: listing),
             ),
           ),
           textScale: scale,
         );
         expect(tester.takeException(), isNull);
-        expect(find.text('RESERVED'), findsOneWidget);
+        expect(find.text('Reserved'), findsOneWidget);
         expect(find.textContaining('12345.50'), findsOneWidget);
       });
     }

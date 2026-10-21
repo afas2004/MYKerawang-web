@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../l10n/app_strings.dart';
 import '../l10n/moderation_strings.dart';
@@ -10,6 +11,56 @@ import 'brand/brand.dart';
 /// Shared moderation feedback: error text, snackbars, confirm and
 /// reason dialogs, empty states. Every moderation interaction goes
 /// through these so it always acknowledges itself the same way.
+
+/// Moderation icons by meaning. Built on [AppIcons]; the few meanings
+/// AppIcons doesn't cover yet use Lucide directly, here and nowhere
+/// else, so they can move into AppIcons later in one step.
+abstract final class ModIcons {
+  // From AppIcons
+  static const IconData comment = AppIcons.comment;
+  static const IconData event = AppIcons.events;
+  static const IconData listing = AppIcons.market;
+  static const IconData person = AppIcons.person;
+  static const IconData hidden = AppIcons.anonymous;
+  static const IconData visible = AppIcons.visible;
+  static const IconData verified = AppIcons.verified;
+  static const IconData official = AppIcons.official;
+  static const IconData moderation = AppIcons.moderation;
+  static const IconData check = AppIcons.check;
+  static const IconData success = AppIcons.success;
+  static const IconData warning = AppIcons.warning;
+  static const IconData info = AppIcons.info;
+  static const IconData error = AppIcons.error;
+  static const IconData urgent = AppIcons.error;
+  static const IconData lock = AppIcons.lock;
+  static const IconData refresh = AppIcons.refresh;
+  static const IconData search = AppIcons.search;
+  static const IconData download = AppIcons.download;
+  static const IconData more = AppIcons.more;
+  static const IconData externalLink = AppIcons.externalLink;
+  static const IconData report = AppIcons.report;
+  static const IconData clock = AppIcons.clock;
+  static const IconData settings = AppIcons.settings;
+  static const IconData history = AppIcons.history;
+  // Not in AppIcons yet
+  static const IconData post = LucideIcons.fileText;
+  static const IconData appeal = LucideIcons.gavel;
+  static const IconData ban = LucideIcons.ban;
+  static const IconData inbox = LucideIcons.inbox;
+  static const IconData restore = LucideIcons.rotateCcw;
+  static const IconData keyboard = LucideIcons.keyboard;
+  static const IconData log = LucideIcons.scrollText;
+  static const IconData bot = LucideIcons.bot;
+  static const IconData unlock = LucideIcons.lockOpen;
+  static const IconData userX = LucideIcons.userX;
+  static const IconData pause = LucideIcons.circlePause;
+  static const IconData pending = LucideIcons.hourglass;
+  static const IconData offline = LucideIcons.wifiOff;
+  static const IconData searchOff = LucideIcons.searchX;
+  static const IconData pointer = LucideIcons.mousePointerClick;
+  static const IconData flagOff = LucideIcons.flagOff;
+  static const IconData saveFile = LucideIcons.save;
+}
 
 ModerationStrings modStrings(BuildContext context) => context.l10nRead.mod;
 
@@ -266,9 +317,16 @@ class ModEmptyState extends StatelessWidget {
   final String? body;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final AppIllo? illo;
 
   const ModEmptyState(
-      {super.key, required this.icon, required this.title, this.body, this.actionLabel, this.onAction});
+      {super.key,
+      required this.icon,
+      required this.title,
+      this.body,
+      this.actionLabel,
+      this.onAction,
+      this.illo});
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -278,6 +336,7 @@ class ModEmptyState extends StatelessWidget {
             child: Center(
               child: BrandEmptyState(
                 icon: icon,
+                illo: illo,
                 title: title,
                 message: body,
                 actionLabel: actionLabel,
@@ -310,7 +369,7 @@ class ModChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: KSpace.s, vertical: 3),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: KRadius.small,
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
