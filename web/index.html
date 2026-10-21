@@ -107,6 +107,48 @@
       setTimeout(function () { s.remove(); }, 300);
     });
   </script>
+  <script>
+    // Last-resort recovery from a lost GPU context ("white screen on
+    // return"). Android Chrome reclaims a background tab's WebGL context —
+    // typically while the camera / photo picker is open. CanvasKit (used on
+    // Android, see flutter_bootstrap.js) rebuilds itself when the context
+    // is restored; if it never is, or the renderer can't recover (skwasm),
+    // reload once. Create forms autosave their text, so a reload there
+    // doesn't lose the typing. Rate-limited so it can never loop.
+    (function () {
+      var lost = false;
+      function recover() {
+        try {
+          var last = +sessionStorage.getItem('mk.recoveredAt') || 0;
+          if (Date.now() - last < 20000) return;
+          sessionStorage.setItem('mk.recoveredAt', String(Date.now()));
+        } catch (e) {}
+        location.reload();
+      }
+      function checkSoon() {
+        // Give the renderer a moment to get its context back first.
+        setTimeout(function () {
+          if (lost && document.visibilityState === 'visible') recover();
+        }, 2000);
+      }
+      // Capture phase: the events don't bubble, but reach window first.
+      window.addEventListener('webglcontextlost', function () {
+        lost = true;
+        if (document.visibilityState === 'visible') checkSoon();
+      }, true);
+      window.addEventListener('webglcontextrestored', function () {
+        // Only CanvasKit redraws after a restore.
+        if (window.__mkRenderer === 'canvaskit') lost = false;
+      }, true);
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible' && lost) checkSoon();
+      });
+      // Back/forward cache restore with a dead context.
+      window.addEventListener('pageshow', function (e) {
+        if (e.persisted && lost) checkSoon();
+      });
+    })();
+  </script>
   <script>{{flutter_bootstrap_js}}</script>
 </body>
 </html>

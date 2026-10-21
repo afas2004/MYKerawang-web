@@ -194,4 +194,6 @@ extension AccessStrings on AppStrings {
   String get pastEventsCount =>
       _t("{0} ended or cancelled", "{0} dah tamat atau dibatalkan", "{0}件 終了・中止");
   String get postedOn => _t("Posted", "Dipos", "投稿日");
+  String get draftRestored => _t("Restored what you were writing.",
+      "Draf yang belum siap dipulihkan.", "書きかけの内容を復元しました。");
 }
