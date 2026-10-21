@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'language_cubit.dart';
+import 'screens/announcements/announcements_screen.dart';
 import 'screens/create_event_screen.dart';
 import 'screens/create_listing_screen.dart';
 import 'screens/create_post_screen.dart';
@@ -58,9 +59,61 @@ class AuthChangeNotifier extends ChangeNotifier {
 
 final _rootKey = GlobalKey<NavigatorState>();
 
-/// Pages a shared link may open without logging in (read-only).
-final _publicPath = RegExp(r'^/(event|item|post|u)/[^/]+/?$');
 final _shellKey = GlobalKey<NavigatorState>();
+
+/// Guest mode: what a logged-out visitor may open (read-only).
+/// Browse tabs, detail pages, public profiles, tag feeds and the privacy
+/// policy. Everything else — create / edit forms, notifications, saved,
+/// settings, own profile (/profile), admin, standing, follower lists —
+/// needs an account.
+final List<RegExp> _guestPaths = [
+  RegExp(r'^/(home|announcements|market|events|search)/?$'),
+  RegExp(r'^/(event|item|post|u)/[^/]+/?$'),
+  RegExp(r'^/tag/[^/]+/?$'),
+  RegExp(r'^/settings/privacy/?$'),
+];
+
+/// True when [path] is open to guests.
+bool isGuestPath(String path) => _guestPaths.any((r) => r.hasMatch(path));
+
+/// The router's auth gate, as a pure function so it can be tested.
+///
+/// * Guests stay on guest paths; anything else goes to /login with
+///   ?from= so login brings them back.
+/// * Signed-in users leave /login for ?from= (or /home).
+/// * The OAuth `code` query parameter is dropped from the address bar.
+String? authRedirect(Uri uri, {required bool loggedIn}) {
+  final path = uri.path;
+  final atLogin = path == '/login';
+
+  if (!loggedIn) {
+    if (atLogin || isGuestPath(path)) {
+      // Strip a stale OAuth code from guest pages too.
+      if (!atLogin && uri.queryParameters.containsKey('code')) {
+        final query = Map.of(uri.queryParameters)..remove('code');
+        return Uri(path: path, queryParameters: query.isEmpty ? null : query)
+            .toString();
+      }
+      return null;
+    }
+    final query = Map.of(uri.queryParameters)..remove('code');
+    return loginPathFor(Uri(
+      path: path,
+      queryParameters: query.isEmpty ? null : query,
+    ).toString());
+  }
+
+  // Logged in: leave the login page for wherever the visitor came from
+  // (email and Google sign-in both land here), and strip any leftover
+  // OAuth query parameters.
+  if (atLogin) {
+    return safeReturnPath(uri.queryParameters['from']) ?? '/home';
+  }
+  if (uri.queryParameters.containsKey('code') && path != '/onboarding') {
+    return path == '/' ? '/home' : path;
+  }
+  return null;
+}
 
 GoRouter buildRouter() {
   // Pushed pages (details, forms) get their own URL in the address bar:
@@ -74,37 +127,11 @@ GoRouter buildRouter() {
     initialLocation: '/home',
     refreshListenable: authNotifier,
 
-    // Auth gate. Shared detail pages stay readable when logged out;
-    // everything else sends the visitor to /login, remembering where
-    // they were headed in ?from= so login can bring them back.
-    // Also drops the OAuth "?code=..." from the address bar, because
-    // redirecting rewrites the location without the query.
-    redirect: (context, state) {
-      final loggedIn = Supabase.instance.client.auth.currentSession != null;
-      final path = state.uri.path;
-      final atLogin = path == '/login';
-      final atOnboarding = path == '/onboarding';
-
-      if (!loggedIn) {
-        if (atLogin || _publicPath.hasMatch(path)) return null;
-        final query = Map.of(state.uri.queryParameters)..remove('code');
-        return loginPathFor(Uri(
-          path: path,
-          queryParameters: query.isEmpty ? null : query,
-        ).toString());
-      }
-
-      // Logged in: leave the login page for wherever the visitor came
-      // from (email and Google sign-in both land here), and strip any
-      // leftover OAuth query parameters.
-      if (atLogin) {
-        return safeReturnPath(state.uri.queryParameters['from']) ?? '/home';
-      }
-      if (state.uri.queryParameters.containsKey('code') && !atOnboarding) {
-        return path == '/' ? '/home' : path;
-      }
-      return null;
-    },
+    // Auth gate with guest mode — see [authRedirect].
+    redirect: (context, state) => authRedirect(
+      state.uri,
+      loggedIn: Supabase.instance.client.auth.currentSession != null,
+    ),
 
     routes: [
       GoRoute(path: '/', redirect: (_, __) => '/home'),
@@ -137,6 +164,12 @@ GoRouter buildRouter() {
           ),
           StatefulShellBranch(routes: [
             GoRoute(
+              path: '/announcements',
+              builder: (context, state) => const AnnouncementsScreen(),
+            ),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(
               path: '/search',
               builder: (context, state) => const SearchScreen(),
             ),
@@ -153,13 +186,17 @@ GoRouter buildRouter() {
               builder: (context, state) => const EventsScreen(),
             ),
           ]),
-          StatefulShellBranch(routes: [
-            GoRoute(
-              path: '/profile',
-              builder: (context, state) => const ProfileScreen(),
-            ),
-          ]),
         ],
+      ),
+
+      // Own profile: no longer a tab — opened from ProfileAvatarAction.
+      // Members only (guests are sent to login by [authRedirect]).
+      GoRoute(
+        path: '/profile',
+        parentNavigatorKey: _rootKey,
+        onExit: historyAwareExit,
+        builder: (context, state) =>
+            const DesktopChrome(child: ProfileScreen()),
       ),
 
       // --- SHAREABLE DETAIL ROUTES ---
