@@ -2,18 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../l10n/shell_strings.dart';
 import '../language_cubit.dart';
+import '../screens/announcements/hub_strings.dart';
 import '../services/unread_notifications.dart';
 import '../utils/app_nav.dart';
 import 'admin_nav_entry.dart';
 import 'brand/brand.dart';
+import 'profile_avatar_action.dart';
 import 'shell_actions.dart';
 
 /// Desktop sidebar (≥ 900), shared by the tab shell and by pushed pages
 /// (detail/profile/settings) so the chrome never disappears mid-session
 /// — UI_UX_AUDIT H1.2.
 ///
-/// Top to bottom: lattice band, wordmark, the five tabs, notifications
-/// (with unread badge), settings, admin (admins only), Create, motif.
+/// Top to bottom: wordmark, the tabs (Home, Announcements, Search, Market,
+/// Events), then for members notifications (unread badge), settings,
+/// admin (admins only), profile and Create; for guests Create (asks to log
+/// in) and Sign in / Join with student email.
 class AppSidebar extends StatelessWidget {
   static const double width = Responsive.sidebarWidth;
 
@@ -25,18 +29,31 @@ class AppSidebar extends StatelessWidget {
 
   const AppSidebar({super.key, required this.selectedIndex, this.onSelect});
 
-  static const routes = ['/home', '/search', '/market', '/events', '/profile'];
+  /// Tab routes in branch order (see ShellBranch in main_scaffold.dart).
+  static const routes = [
+    '/home',
+    '/announcements',
+    '/search',
+    '/market',
+    '/events',
+  ];
 
   /// (icon, selected icon, label) per tab, in branch order. Single source
-  /// for the bottom bar, the rail and this sidebar.
-  static List<(IconData, IconData, String)> navItems(BuildContext context) {
+  /// for the bottom bar, the rail and this sidebar. [short] gives the
+  /// compact Announcements label for the five-slot bottom bar / rail.
+  static List<(IconData, IconData, String)> navItems(BuildContext context,
+      {bool short = false}) {
     final s = context.l10n;
     return [
       (AppIcons.home, AppIcons.homeFilled, s.navHome),
+      (
+        AppIcons.announcement,
+        AppIcons.announcement,
+        short ? s.hub.navLabel : s.hub.title,
+      ),
       (AppIcons.search, AppIcons.searchFilled, s.navSearch),
       (AppIcons.market, AppIcons.marketFilled, s.navMarket),
       (AppIcons.events, AppIcons.eventsFilled, s.navEvents),
-      (AppIcons.profile, AppIcons.profileFilled, s.navProfile),
     ];
   }
 
@@ -48,6 +65,7 @@ class AppSidebar extends StatelessWidget {
     final path = _currentPath(context);
     final onNotifications = path.startsWith('/notifications');
     final onSettings = path.startsWith('/settings');
+    final loggedIn = ShellAuth.of(context);
 
     return Semantics(
       container: true,
@@ -94,26 +112,29 @@ class AppSidebar extends StatelessWidget {
                     ),
                   const SizedBox(height: KSpace.s),
                   Divider(height: 16, color: scheme.outlineVariant),
-                  SideNavTile(
-                    icon: onNotifications
-                        ? AppIcons.notificationsActive
-                        : AppIcons.notifications,
-                    label: s.notifications,
-                    selected: onNotifications,
-                    showUnread: true,
-                    onTap: () {
-                      if (!onNotifications) context.goNotifications();
-                    },
-                  ),
-                  SideNavTile(
-                    icon: AppIcons.settings,
-                    label: s.settings,
-                    selected: onSettings,
-                    onTap: () {
-                      if (!onSettings) context.goSettings();
-                    },
-                  ),
-                  const AdminNavEntry(),
+                  if (loggedIn) ...[
+                    SideNavTile(
+                      icon: onNotifications
+                          ? AppIcons.notificationsActive
+                          : AppIcons.notifications,
+                      label: s.notifications,
+                      selected: onNotifications,
+                      showUnread: true,
+                      onTap: () {
+                        if (!onNotifications) context.goNotifications();
+                      },
+                    ),
+                    SideNavTile(
+                      icon: AppIcons.settings,
+                      label: s.settings,
+                      selected: onSettings,
+                      onTap: () {
+                        if (!onSettings) context.goSettings();
+                      },
+                    ),
+                    const AdminNavEntry(),
+                    const ProfileAvatarAction(extended: true),
+                  ],
                   const SizedBox(height: KSpace.l),
                   FilledButton.icon(
                     onPressed: () => showCreateSheet(context),
@@ -123,6 +144,10 @@ class AppSidebar extends StatelessWidget {
                       minimumSize: const Size.fromHeight(48),
                     ),
                   ),
+                  if (!loggedIn) ...[
+                    const SizedBox(height: KSpace.xl),
+                    const ProfileAvatarAction(extended: true),
+                  ],
                 ],
               ),
             ),
