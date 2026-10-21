@@ -269,14 +269,19 @@ class ShellFrame extends StatelessWidget {
   }
 }
 
-/// Phone bottom bar: Home, Market, a raised centre Create, Events,
-/// Profile. Search has no slot here — it is in the tab app bars.
+/// Phone bottom bar in the Material 3 NavigationBar style: Home, Market,
+/// Create, Events, Profile. Each slot is the same height — icon in a pill
+/// indicator over a label. Create is a filled accent pill in the middle
+/// slot (it opens the create sheet, it isn't a tab). Search has no slot;
+/// it's in the tab app bars.
 class CompactNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onSelect;
 
   const CompactNavBar(
       {super.key, required this.currentIndex, required this.onSelect});
+
+  static const double height = 72;
 
   @override
   Widget build(BuildContext context) {
@@ -299,23 +304,27 @@ class CompactNavBar extends StatelessWidget {
       label: s.shell.mainNavigation,
       child: Material(
         color: scheme.surfaceContainer,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border(top: BorderSide(color: scheme.outlineVariant)),
-          ),
-          child: SafeArea(
-            top: false,
-            child: SizedBox(
-              height: 72,
-              child: Row(
-                children: [
-                  tab(ShellBranch.home),
-                  tab(ShellBranch.market),
-                  Expanded(child: _CreateBarButton(label: s.shell.create)),
-                  tab(ShellBranch.events),
-                  tab(ShellBranch.profile),
-                ],
-              ),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: height,
+            child: Row(
+              children: [
+                tab(ShellBranch.home),
+                tab(ShellBranch.market),
+                Expanded(
+                  child: _BarItem(
+                    icon: AppIcons.create,
+                    selectedIcon: AppIcons.create,
+                    label: s.shell.create,
+                    selected: false,
+                    accent: true,
+                    onTap: () => showCreateSheet(context),
+                  ),
+                ),
+                tab(ShellBranch.events),
+                tab(ShellBranch.profile),
+              ],
             ),
           ),
         ),
@@ -329,6 +338,9 @@ class _BarItem extends StatelessWidget {
   final IconData selectedIcon;
   final String label;
   final bool selected;
+
+  /// The Create slot: always-filled primary pill, not a tab.
+  final bool accent;
   final VoidCallback onTap;
 
   const _BarItem({
@@ -337,81 +349,61 @@ class _BarItem extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.accent = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final fg = selected ? scheme.onSecondaryContainer : scheme.onSurfaceVariant;
+    final Color? pill = accent
+        ? scheme.primary
+        : (selected ? scheme.primaryContainer : null);
+    final Color fg = accent
+        ? scheme.onPrimary
+        : (selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant);
 
     return Semantics(
       button: true,
-      selected: selected,
+      selected: accent ? null : selected,
       label: label,
       excludeSemantics: true,
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AnimatedContainer(
-              duration: KMotion.of(context).medium,
-              curve: KMotion.curve,
-              width: 56,
-              height: 32,
-              decoration: BoxDecoration(
-                color: selected ? scheme.secondaryContainer : null,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(selected ? selectedIcon : icon, color: fg, size: 24),
-            ),
-            const SizedBox(height: KSpace.xs),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: selected ? scheme.onSurface : scheme.onSurfaceVariant,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// The prominent centre action: a primary, kerawang-cut tile.
-class _CreateBarButton extends StatelessWidget {
-  final String label;
-  const _CreateBarButton({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Center(
       child: Tooltip(
         message: label,
-        child: Semantics(
-          button: true,
-          label: label,
-          excludeSemantics: true,
-          child: Material(
-            color: scheme.primary,
-            elevation: 2,
-            shape: const RoundedRectangleBorder(borderRadius: KRadius.cut),
-            child: InkWell(
-              customBorder:
-                  const RoundedRectangleBorder(borderRadius: KRadius.cut),
-              onTap: () => showCreateSheet(context),
-              child: SizedBox(
-                width: 56,
-                height: 48,
-                child: Icon(Icons.add, color: scheme.onPrimary, size: 28),
+        excludeFromSemantics: true,
+        child: InkWell(
+          onTap: onTap,
+          // Splash only on the pill area, like NavigationBar.
+          splashFactory: NoSplash.splashFactory,
+          highlightColor: Colors.transparent,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedContainer(
+                duration: KMotion.of(context).medium,
+                curve: KMotion.curve,
+                width: 64,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: pill,
+                  borderRadius: KRadius.pill,
+                ),
+                child: Icon(selected ? selectedIcon : icon, color: fg, size: 22),
               ),
-            ),
+              const SizedBox(height: KSpace.xs),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: selected || accent
+                      ? scheme.onSurface
+                      : scheme.onSurfaceVariant,
+                  fontWeight:
+                      selected || accent ? FontWeight.w600 : FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ),
       ),
