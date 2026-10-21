@@ -1,0 +1,371 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+/// Clubs: pages run by student officers (supabase/migrations/20261022002*).
+/// The database decides who may do what (can_act_as_club, RPC checks);
+/// this file calls it, holds the models and the small pure rules the UI
+/// uses to explain itself before a round trip.
+
+// ---------------------------------------------------------------- models
+class Club {
+  final String id;
+  final String handle;
+  final String name;
+  final String? description;
+  final String? logoUrl;
+  final String? coverUrl;
+  final String? category;
+  final String? faculty;
+  final String? contactEmail;
+  final Map<String, String> socials;
+  final bool isVerified;
+  final String status; // pending | active | rejected | suspended
+  final DateTime? createdAt;
+
+  const Club({
+    required this.id,
+    required this.handle,
+    required this.name,
+    this.description,
+    this.logoUrl,
+    this.coverUrl,
+    this.category,
+    this.faculty,
+    this.contactEmail,
+    this.socials = const {},
+    this.isVerified = false,
+    this.status = 'active',
+    this.createdAt,
+  });
+
+  bool get isActive => status == 'active';
+
+  factory Club.fromJson(Map<String, dynamic> j) => Club(
+        id: '${j['id']}',
+        handle: '${j['handle'] ?? ''}',
+        name: '${j['name'] ?? ''}',
+        description: j['description'] as String?,
+        logoUrl: j['logo_url'] as String?,
+        coverUrl: j['cover_url'] as String?,
+        category: j['category'] as String?,
+        faculty: j['faculty'] as String?,
+        contactEmail: j['contact_email'] as String?,
+        socials: {
+          for (final e in ((j['socials'] as Map?) ?? const {}).entries)
+            if ('${e.value}'.trim().isNotEmpty) '${e.key}': '${e.value}',
+        },
+        isVerified: j['is_verified'] == true,
+        status: '${j['status'] ?? 'active'}',
+        createdAt: DateTime.tryParse('${j['created_at']}'),
+      );
+}
+
+class ClubMember {
+  final String userId;
+  final String role; // president | officer | member
+  final DateTime? joinedAt;
+  final String? username;
+  final String? displayName;
+  final String? avatarUrl;
+
+  const ClubMember({
+    required this.userId,
+    required this.role,
+    this.joinedAt,
+    this.username,
+    this.displayName,
+    this.avatarUrl,
+  });
+
+  bool get isOfficer => role == 'president' || role == 'officer';
+  String get name => (displayName?.trim().isNotEmpty ?? false) ? displayName! : (username ?? '');
+}
+
+/// One entry of the "Post as" choice: yourself (clubId null) or a club
+/// you are an officer of.
+class PostAsOption {
+  final String? clubId;
+  final String label;
+  final String? handle;
+  final String? avatarUrl;
+  final bool verified;
+
+  const PostAsOption.self(this.label, {this.avatarUrl})
+      : clubId = null,
+        handle = null,
+        verified = false;
+
+  const PostAsOption.club({
+    required String this.clubId,
+    required this.label,
+    required String this.handle,
+    this.avatarUrl,
+    this.verified = false,
+  });
+
+  bool get isClub => clubId != null;
+
+  /// Adds/clears `club_id` on a row about to be inserted into posts,
+  /// events or listings. RLS rejects it unless you're an officer.
+  Map<String, dynamic> applyTo(Map<String, dynamic> row) =>
+      {...row, 'club_id': clubId, if (isClub) 'is_anonymous': false};
+}
+
+// ---------------------------------------------------------------- pure rules
+enum HandleIssue { empty, tooShort, tooLong, badChars }
+
+final _handleChars = RegExp(r'^[A-Za-z0-9_]+$');
+
+/// Mirrors the DB check `^[A-Za-z0-9_]{3,30}$`.
+HandleIssue? validateHandle(String raw) {
+  final h = raw.trim();
+  if (h.isEmpty) return HandleIssue.empty;
+  if (!_handleChars.hasMatch(h)) return HandleIssue.badChars;
+  if (h.length < 3) return HandleIssue.tooShort;
+  if (h.length > 30) return HandleIssue.tooLong;
+  return null;
+}
+
+/// A handle suggestion from a club name: "Debate Society UiTM" →
+/// "DebateSocietyUiTM" (kept readable, trimmed to 30).
+String suggestHandle(String name) {
+  final words = name
+      .replaceAll(RegExp(r'[^A-Za-z0-9 _]'), ' ')
+      .split(RegExp(r'\s+'))
+      .where((w) => w.isNotEmpty);
+  final joined = words.map((w) => w[0].toUpperCase() + w.substring(1)).join();
+  return joined.length > 30 ? joined.substring(0, 30) : joined;
+}
+
+/// President first, then officers, then members; each by join date.
+List<ClubMember> sortMembers(Iterable<ClubMember> members) {
+  int rank(String r) => switch (r) { 'president' => 0, 'officer' => 1, _ => 2 };
+  final list = [...members];
+  list.sort((a, b) {
+    final r = rank(a.role).compareTo(rank(b.role));
+    if (r != 0) return r;
+    return (a.joinedAt ?? DateTime(0)).compareTo(b.joinedAt ?? DateTime(0));
+  });
+  return list;
+}
+
+bool canManageClub(String? myRole) => myRole == 'president' || myRole == 'officer';
+bool isPresident(String? myRole) => myRole == 'president';
+
+/// `CLUB:<code>` from a failed call, e.g. `handle_taken`, or null.
+String? clubErrorCode(Object? e) {
+  final text = e is PostgrestException ? e.message : '$e';
+  final m = RegExp(r'CLUB:([a-z_]+)').firstMatch(text);
+  return m?.group(1);
+}
+
+/// Normalises "@Name " → "Name".
+String cleanUsername(String raw) => raw.trim().replaceFirst(RegExp(r'^@+'), '');
+
+/// Socials the page shows, in display order, from the edit form values.
+Map<String, String> buildSocials({String? instagram, String? tiktok, String? website}) => {
+      if ((instagram ?? '').trim().isNotEmpty) 'instagram': cleanUsername(instagram!),
+      if ((tiktok ?? '').trim().isNotEmpty) 'tiktok': cleanUsername(tiktok!),
+      if ((website ?? '').trim().isNotEmpty) 'website': website!.trim(),
+    };
+
+// ---------------------------------------------------------------- service
+class ClubService {
+  ClubService._();
+
+  static SupabaseClient get _db => Supabase.instance.client;
+
+  /// Test hook: widget tests run without a Supabase instance.
+  static String? Function()? debugCurrentUserId;
+  static String? get currentUserId =>
+      debugCurrentUserId != null ? debugCurrentUserId!() : _db.auth.currentUser?.id;
+
+  static const _clubColumns =
+      'id, handle, name, description, logo_url, cover_url, category, faculty, '
+      'contact_email, socials, is_verified, status, created_at';
+
+  // ---- reading
+  static Future<Club?> byHandle(String handle) async {
+    final row = await _db
+        .from('clubs')
+        .select(_clubColumns)
+        .ilike('handle', handle.replaceAll('%', '').replaceAll('_', r'\_'))
+        .maybeSingle();
+    return row == null ? null : Club.fromJson(row);
+  }
+
+  static Future<List<Club>> directory({String? search, String? category}) async {
+    var q = _db.from('clubs').select(_clubColumns).eq('status', 'active');
+    if (category != null) q = q.eq('category', category);
+    final s = search?.trim().replaceAll(RegExp(r'[%,()]'), '');
+    if (s != null && s.isNotEmpty) q = q.or('name.ilike.%$s%,handle.ilike.%$s%');
+    final rows = await q.order('name').limit(200);
+    return [for (final r in rows) Club.fromJson(r)];
+  }
+
+  static Future<Map<String, int>> followerCounts(List<String> clubIds) async {
+    if (clubIds.isEmpty) return {};
+    final rows = await _db.from('club_follower_counts').select().inFilter('club_id', clubIds);
+    return {for (final r in rows) '${r['club_id']}': (r['followers'] as num).toInt()};
+  }
+
+  static Future<List<ClubMember>> members(String clubId) async {
+    final rows = await _db.from('club_members').select('user_id, role, joined_at').eq('club_id', clubId);
+    final ids = [for (final r in rows) '${r['user_id']}'];
+    final profiles = ids.isEmpty
+        ? const <dynamic>[]
+        : await _db
+            .from('profiles_public')
+            .select('id, username, display_name, avatar_url')
+            .inFilter('id', ids);
+    final byId = {for (final p in profiles) '${p['id']}': p};
+    return sortMembers([
+      for (final r in rows)
+        ClubMember(
+          userId: '${r['user_id']}',
+          role: '${r['role']}',
+          joinedAt: DateTime.tryParse('${r['joined_at']}'),
+          username: byId['${r['user_id']}']?['username'] as String?,
+          displayName: byId['${r['user_id']}']?['display_name'] as String?,
+          avatarUrl: byId['${r['user_id']}']?['avatar_url'] as String?,
+        ),
+    ]);
+  }
+
+  /// The caller's role in [clubId] (null when none / signed out).
+  static Future<String?> myRole(String clubId) async {
+    if (currentUserId == null) return null;
+    final r = await _db.rpc('club_role', params: {'p_club_id': clubId});
+    return r as String?;
+  }
+
+  static Future<List<Map<String, dynamic>>> myClubs() async {
+    if (currentUserId == null) return const [];
+    return List<Map<String, dynamic>>.from(await _db.rpc('my_clubs') as List);
+  }
+
+  /// "Post as" choices: yourself, then every ACTIVE club you're an
+  /// officer of. Pass [selfLabel] (e.g. your display name).
+  static Future<List<PostAsOption>> postAsOptions(String selfLabel, {String? selfAvatar}) async {
+    final clubs = await myClubs();
+    return [
+      PostAsOption.self(selfLabel, avatarUrl: selfAvatar),
+      for (final c in clubs)
+        if (c['status'] == 'active')
+          PostAsOption.club(
+            clubId: '${c['id']}',
+            label: '${c['name']}',
+            handle: '${c['handle']}',
+            avatarUrl: c['logo_url'] as String?,
+            verified: c['is_verified'] == true,
+          ),
+    ];
+  }
+
+  // ---- content of a club page
+  static Future<List<Map<String, dynamic>>> posts(String clubId, {int limit = 30}) async =>
+      List<Map<String, dynamic>>.from(await _db
+          .from('posts_public')
+          .select('*')
+          .eq('club_id', clubId)
+          .order('is_pinned')
+          .order('created_at', ascending: false)
+          .limit(limit));
+
+  static Future<List<Map<String, dynamic>>> events(String clubId) async =>
+      List<Map<String, dynamic>>.from(await _db
+          .from('events')
+          .select()
+          .eq('club_id', clubId)
+          .order('start_datetime', ascending: false)
+          .limit(50));
+
+  static Future<List<Map<String, dynamic>>> listings(String clubId) async =>
+      List<Map<String, dynamic>>.from(await _db
+          .from('listings')
+          .select()
+          .eq('club_id', clubId)
+          .order('created_at', ascending: false)
+          .limit(50));
+
+  // ---- following
+  static Future<bool> isFollowing(String clubId) async {
+    final uid = currentUserId;
+    if (uid == null) return false;
+    final r = await _db
+        .from('club_followers')
+        .select('club_id')
+        .eq('club_id', clubId)
+        .eq('user_id', uid)
+        .maybeSingle();
+    return r != null;
+  }
+
+  static Future<void> setFollowing(String clubId, bool follow) async {
+    final uid = currentUserId!;
+    if (follow) {
+      await _db.from('club_followers').upsert({'club_id': clubId, 'user_id': uid});
+    } else {
+      await _db.from('club_followers').delete().eq('club_id', clubId).eq('user_id', uid);
+    }
+  }
+
+  // ---- registration & management
+  static Future<String> register({
+    required String name,
+    required String handle,
+    String? description,
+    String? category,
+    required String proofNote,
+  }) async =>
+      '${await _db.rpc('register_club', params: {
+            'p_name': name,
+            'p_handle': handle.trim(),
+            'p_description': description,
+            'p_category': category,
+            'p_proof_note': proofNote,
+          })}';
+
+  static Future<void> update(
+    String clubId, {
+    required String name,
+    String? description,
+    String? logoUrl,
+    String? coverUrl,
+    String? category,
+    String? faculty,
+    String? contactEmail,
+    Map<String, String> socials = const {},
+  }) =>
+      _db.rpc('update_club', params: {
+        'p_club_id': clubId,
+        'p_name': name,
+        'p_description': description,
+        'p_logo_url': logoUrl,
+        'p_cover_url': coverUrl,
+        'p_category': category,
+        'p_faculty': faculty,
+        'p_contact_email': contactEmail,
+        'p_socials': socials,
+      });
+
+  static Future<String> inviteOfficer(String clubId, String username) async =>
+      '${await _db.rpc('invite_officer', params: {'p_club_id': clubId, 'p_username': cleanUsername(username)})}';
+
+  static Future<void> removeOfficer(String clubId, String userId) =>
+      _db.rpc('remove_officer', params: {'p_club_id': clubId, 'p_user_id': userId});
+
+  static Future<void> transferPresidency(String clubId, String userId) =>
+      _db.rpc('transfer_presidency', params: {'p_club_id': clubId, 'p_user_id': userId});
+
+  // ---- admin
+  static Future<List<Map<String, dynamic>>> pendingRequests() async =>
+      List<Map<String, dynamic>>.from(await _db.rpc('admin_pending_clubs') as List);
+
+  static Future<void> decideRequest(String clubId, bool approve, String? reason) =>
+      _db.rpc('admin_decide_club_request',
+          params: {'p_club_id': clubId, 'p_approve': approve, 'p_reason': reason});
+
+  static Future<void> setStatus(String clubId, String status, String reason) =>
+      _db.rpc('admin_set_club_status',
+          params: {'p_club_id': clubId, 'p_status': status, 'p_reason': reason});
+}
