@@ -1,50 +1,36 @@
 import 'package:flutter/material.dart';
 import '../theme/app_themes.dart';
 
-/// "ENDED" / "SOLD" marker laid over a cover photo. One look everywhere:
-/// the corner pill on cards and grid tiles, [StatusBadge.stamp] centred
-/// over a detail-page hero.
+/// "Ended" / "Sold" / "Reserved" / "Cancelled" marker laid over a photo:
+/// a dark pill, so it reads on any image. [StatusBadge.stamp] is the
+/// larger version centred over a detail-page hero.
 ///
-/// Pass the sentence-case label (`s.ended`, `s.sold`); it's uppercased here.
+/// Pass the sentence-case label (`s.ended`, `s.sold`).
 class StatusBadge extends StatelessWidget {
   final String label;
   final bool _stamp;
 
   const StatusBadge(this.label, {super.key}) : _stamp = false;
 
-  /// Large bordered variant for a full-bleed hero image.
+  /// Larger pill for a full-bleed hero image.
   const StatusBadge.stamp(this.label, {super.key}) : _stamp = true;
 
   @override
   Widget build(BuildContext context) {
-    final text = Text(
-      label.toUpperCase(),
-      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: kOnPhoto,
-            fontWeight: FontWeight.w700,
-            letterSpacing: _stamp ? 3 : 1,
-            fontSize: _stamp ? 20 : 11,
-          ),
-    );
-
-    if (!_stamp) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: photoScrim(0.75),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: text,
-      );
-    }
-
+    final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      padding: _stamp
+          ? const EdgeInsets.symmetric(horizontal: KSpace.l, vertical: KSpace.s)
+          : const EdgeInsets.symmetric(horizontal: KSpace.s + 2, vertical: KSpace.xs),
       decoration: BoxDecoration(
-        color: photoScrim(0.6),
-        border: Border.all(color: kOnPhoto, width: 2),
+        color: photoScrim(_stamp ? 0.65 : 0.7),
+        borderRadius: KRadius.pill,
       ),
-      child: text,
+      child: Text(
+        label,
+        style: (_stamp ? theme.textTheme.titleSmall : theme.textTheme.labelSmall)
+            ?.copyWith(color: kOnPhoto, fontWeight: FontWeight.w600),
+      ),
     );
   }
 }

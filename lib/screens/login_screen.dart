@@ -7,7 +7,6 @@ import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/brand/brand.dart';
-import '../widgets/kerawang_motif.dart';
 import '../utils/guest_access.dart';
 import 'login_cubit.dart'; // This looks in the SAME folder
 
@@ -169,8 +168,10 @@ class _LoginScreenState extends State<LoginScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (showLogo) ...[
-              const _LatticeBand(child: Center(child: AppLogo(size: 88))),
-              const SizedBox(height: 16),
+              const Center(child: AppLogo(size: 64)),
+              const SizedBox(height: KSpace.m),
+              const Center(child: AppIllustration(AppIllo.login, size: 160)),
+              const SizedBox(height: KSpace.l),
             ],
             Text(
               signUp ? s.joinApp : s.welcomeBack,
@@ -197,7 +198,7 @@ class _LoginScreenState extends State<LoginScreen> {
               keyboardType: TextInputType.emailAddress,
               decoration: InputDecoration(
                 labelText: s.email,
-                prefixIcon: const Icon(Icons.email_outlined),
+                prefixIcon: const Icon(AppIcons.email),
                 // New accounts need a student address; say so up front.
                 helperText: signUp ? s.studentEmailHint : null,
                 helperMaxLines: 2,
@@ -220,12 +221,12 @@ class _LoginScreenState extends State<LoginScreen> {
               onFieldSubmitted: (_) => _submit(context, state),
               decoration: InputDecoration(
                 labelText: s.password,
-                prefixIcon: const Icon(Icons.lock_outline),
+                prefixIcon: const Icon(AppIcons.lock),
                 suffixIcon: IconButton(
                   tooltip: _obscurePassword ? s.showPassword : s.hidePassword,
                   icon: Icon(_obscurePassword
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined),
+                      ? AppIcons.visible
+                      : AppIcons.anonymous),
                   onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                 ),
               ),
@@ -263,16 +264,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: const TextStyle(fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                const Expanded(child: Divider()),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: KerawangDivider(size: 6, color: scheme.outline),
-                ),
-                const Expanded(child: Divider()),
-              ],
-            ),
+            const Divider(),
             const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: state.isLoading
@@ -327,7 +319,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         child: Row(
           children: [
-            Icon(Icons.error_outline, color: scheme.onErrorContainer),
+            Icon(AppIcons.error, color: scheme.onErrorContainer),
             const SizedBox(width: 12),
             Expanded(
               child: Text(_errorText(context.l10n, code),
@@ -349,43 +341,34 @@ class _BrandPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return Container(
-      color: scheme.primary,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Lattice field in the on-brand colour (never hardcoded white:
-          // Songket Noir's onPrimary is dark).
-          KerawangLattice(tileSize: 28, color: scheme.onPrimary, opacity: 0.10),
-          Positioned(
-            right: 0,
-            bottom: 0,
-            child: KerawangLattice.corner(
-                corner: Alignment.bottomRight, extent: 160, tileSize: 16, color: KTokens.of(context).gold),
-          ),
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(48),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 440),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+    return ColoredBox(
+      color: scheme.primaryContainer,
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(KSpace.xxl + KSpace.l),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
                   children: [
-                    const AppLogo(size: 96),
-                    const SizedBox(height: 24),
+                    const AppLogo(size: 48),
+                    const SizedBox(width: KSpace.m),
                     Text(AppStrings.appName,
-                        style: theme.textTheme.displaySmall?.copyWith(color: scheme.onPrimary)),
-                    const SizedBox(height: 8),
-                    KerawangDivider(size: 9, color: KTokens.of(context).gold),
-                    const SizedBox(height: 24),
-                    _ValuePoints(onBrand: true),
+                        style: theme.textTheme.headlineSmall
+                            ?.copyWith(color: scheme.onPrimaryContainer, fontWeight: FontWeight.w700)),
                   ],
                 ),
-              ),
+                const SizedBox(height: KSpace.xl),
+                const Center(child: AppIllustration(AppIllo.welcome, size: 240)),
+                const SizedBox(height: KSpace.xl),
+                const _ValuePoints(onBrand: true),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -401,8 +384,8 @@ class _ValuePoints extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final s = context.l10n;
-    final fg = onBrand ? scheme.onPrimary : scheme.onSurface;
-    final accent = onBrand ? scheme.onPrimary : scheme.primary;
+    final fg = onBrand ? scheme.onPrimaryContainer : scheme.onSurface;
+    final accent = onBrand ? scheme.onPrimaryContainer : scheme.primary;
     Widget point(IconData icon, String text) => Padding(
           padding: const EdgeInsets.only(top: KSpace.m),
           child: Row(
@@ -419,35 +402,10 @@ class _ValuePoints extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(s.loginValueTitle, style: theme.textTheme.titleLarge?.copyWith(color: fg)),
-        point(Icons.event_outlined, s.loginValueEvents),
-        point(Icons.storefront_outlined, s.loginValueMarket),
-        point(Icons.forum_outlined, s.loginValueCommunity),
+        point(AppIcons.events, s.loginValueEvents),
+        point(AppIcons.market, s.loginValueMarket),
+        point(AppIcons.comment, s.loginValueCommunity),
       ],
-    );
-  }
-}
-
-/// Lattice panel behind the logo on compact layouts.
-class _LatticeBand extends StatelessWidget {
-  final Widget child;
-  const _LatticeBand({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 112,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Positioned.fill(
-            child: ClipRRect(
-              borderRadius: KRadius.cut,
-              child: const KerawangLattice(tileSize: 22),
-            ),
-          ),
-          child,
-        ],
-      ),
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show DateUtils;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mykerawang/l10n/app_strings.dart';
 import 'package:mykerawang/screens/events_screen.dart';
@@ -58,21 +59,24 @@ void main() {
 
   group('eventCountdown', () {
     const s = AppStrings.en;
-    final now = DateTime(2026, 10, 19, 9);
+    // Relative to the real clock: isEventEnded (inside eventCountdown)
+    // compares against DateTime.now(), so the events must be in the future.
+    final day = DateUtils.dateOnly(DateTime.now()).add(const Duration(days: 1));
+    final now = day.add(const Duration(hours: 9));
     String? at(DateTime start) =>
         eventCountdown(s, {'start_datetime': start.toUtc().toIso8601String()}, now: now);
 
     test('today / tomorrow / in N days / none', () {
-      expect(at(DateTime(2026, 10, 19, 23)), 'Today');
-      expect(at(DateTime(2026, 10, 20, 1)), 'Tomorrow');
-      expect(at(DateTime(2026, 10, 22, 9)), 'In 3 days');
-      expect(at(DateTime(2026, 10, 26, 9)), isNull);
+      expect(at(day.add(const Duration(hours: 23))), 'Today');
+      expect(at(day.add(const Duration(days: 1, hours: 1))), 'Tomorrow');
+      expect(at(day.add(const Duration(days: 3, hours: 9))), 'In 3 days');
+      expect(at(day.add(const Duration(days: 7, hours: 9))), isNull);
     });
 
     test('cancelled events get no countdown', () {
       expect(
           eventCountdown(s, {
-            'start_datetime': DateTime(2026, 10, 20).toUtc().toIso8601String(),
+            'start_datetime': day.add(const Duration(days: 1)).toUtc().toIso8601String(),
             'cancelled_at': '2026-10-19T00:00:00Z',
           }, now: now),
           isNull);
