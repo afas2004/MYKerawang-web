@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show kIsWeb, listEquals;
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -13,7 +13,6 @@ import '../l10n/post_strings.dart';
 import '../language_cubit.dart';
 import '../services/mention_service.dart';
 import '../services/post_service.dart';
-import '../theme/app_themes.dart';
 import '../utils/app_nav.dart';
 import '../utils/tags.dart';
 import '../widgets/media_picker_grid.dart';
@@ -330,6 +329,24 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
   }
 
+  Future<void> _showAnonInfo() {
+    final fs = context.feedL10nRead;
+    return showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(AppIcons.anonymous),
+        title: Text(fs.anonInfo),
+        content: Text(fs.anonExplain),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -337,97 +354,92 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     final s = context.l10n;
     final ps = context.postL10n;
     final fs = context.feedL10n;
-    final isDialog = MediaQuery.sizeOf(context).width >= kComposerDialogBreakpoint;
     final bodyLen = _bodyCtrl.text.length;
     final overLimit = bodyLen > _bodyMax;
+    final nearLimit = bodyLen > _bodyMax * 0.8;
 
     final submit = Padding(
-      padding: const EdgeInsets.only(right: 12),
+      padding: const EdgeInsets.only(right: KSpace.m),
       child: FilledButton(
         onPressed: _isLoading ? null : _submit,
         child: _isLoading
-            ? const SizedBox(
-                width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-            : Text(_isEdit ? s.saveChanges : s.publish),
+            ? SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: scheme.onPrimary))
+            : Text(_isEdit ? s.saveChanges : fs.postAction),
       ),
     );
 
+    Widget sectionLabel(String text) => Padding(
+          padding: const EdgeInsets.only(bottom: KSpace.s),
+          child: Text(text, style: theme.textTheme.titleSmall),
+        );
+
     final editor = ListView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      padding: const EdgeInsets.fromLTRB(
+          KSpace.l, KSpace.s, KSpace.l, KSpace.xxl),
       children: [
-        _IdentityLine(anonymous: _isAnon, profile: _profile(context)),
+        _AuthorRow(anonymous: _isAnon, profile: _profile(context)),
         if (_sharedEvent != null || _sharedListing != null) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: KSpace.m),
           _SharedRef(event: _sharedEvent, listing: _sharedListing),
         ],
-        const SizedBox(height: 8),
+        const SizedBox(height: KSpace.s),
         TextField(
           controller: _titleCtrl,
-          autofocus: isDialog,
           maxLength: _titleMax,
           textInputAction: TextInputAction.next,
-          style: theme.textTheme.titleLarge,
+          style: theme.textTheme.titleMedium
+              ?.copyWith(fontSize: 18, fontWeight: FontWeight.w600),
           decoration: InputDecoration(
             hintText: ps.titleOptionalHint,
-            hintStyle: theme.textTheme.titleLarge
-                ?.copyWith(color: scheme.onSurfaceVariant),
+            hintStyle: theme.textTheme.titleMedium?.copyWith(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: scheme.onSurfaceVariant),
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
             filled: false,
             counterText: '',
-            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            contentPadding: const EdgeInsets.symmetric(vertical: KSpace.s),
           ),
         ),
         MentionInput(
           controller: _bodyCtrl,
           hintText: fs.bodyHint,
           isMultiLine: true,
-          minLines: 4,
+          minLines: 5,
           maxLines: 14,
-          style: theme.textTheme.bodyLarge,
+          style: theme.textTheme.bodyLarge?.copyWith(height: 1.45),
         ),
-        // Live character hint (+ shortcut on web keyboards).
-        Padding(
-          padding: const EdgeInsets.only(top: 4, bottom: 16),
-          child: Row(
-            children: [
-              if (kIsWeb && isDialog)
-                Expanded(
-                  child: Text(fs.shortcutHint,
-                      style: theme.textTheme.labelSmall
-                          ?.copyWith(color: scheme.onSurfaceVariant)),
-                )
-              else
-                const Spacer(),
-              Semantics(
-                liveRegion: overLimit,
-                child: Text(
-                  fs.charCount.fill([bodyLen, _bodyMax]),
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: overLimit
-                        ? scheme.error
-                        : (bodyLen > _bodyMax * 0.9
-                            ? scheme.onSurface
-                            : scheme.onSurfaceVariant),
-                    fontWeight: overLimit ? FontWeight.w700 : null,
-                  ),
+        // Character count — quiet until you get close to the limit.
+        Align(
+          alignment: Alignment.centerRight,
+          child: AnimatedOpacity(
+            opacity: nearLimit ? 1 : 0,
+            duration: KMotion.of(context).fast,
+            child: Semantics(
+              liveRegion: overLimit,
+              child: Text(
+                fs.charCount.fill([bodyLen, _bodyMax]),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: overLimit ? scheme.error : scheme.onSurfaceVariant,
+                  fontWeight: overLimit ? FontWeight.w700 : null,
                 ),
               ),
-            ],
+            ),
           ),
         ),
+        const SizedBox(height: KSpace.m),
 
-        // Photos
-        Text(s.photosCount.fill([_photos.length, PostService.maxPhotos]),
-            style: theme.textTheme.titleSmall),
-        const SizedBox(height: 8),
+        sectionLabel(s.photosCount.fill([_photos.length, PostService.maxPhotos])),
         MediaPickerGrid(items: _photos, onChanged: _onPhotosChanged),
-        const SizedBox(height: 20),
+        const SizedBox(height: KSpace.xl),
 
-        // Tags: chips inside the field
-        Text(s.addTags, style: theme.textTheme.titleSmall),
-        const SizedBox(height: 8),
+        sectionLabel(s.addTags),
         _TagField(
           tags: _tags,
           controller: _tagCtrl,
@@ -437,15 +449,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           onKey: _onTagKey,
           onRemove: (t) => setState(() => _tags.remove(t)),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: KSpace.s),
         Wrap(
-          spacing: 8,
-          runSpacing: 4,
-          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: KSpace.s,
+          runSpacing: KSpace.xs,
           children: [
-            Text(fs.suggestedTags,
-                style: theme.textTheme.labelMedium
-                    ?.copyWith(color: scheme.onSurfaceVariant)),
             for (final tag in _suggested)
               FilterChip(
                 label: Text(displayTag(tag)),
@@ -454,64 +462,74 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: KSpace.l),
+        const Divider(height: 1),
 
-        // Anonymity, explained. Fixed once posted: flipping it later
-        // would expose (or re-attribute) what was already said under it.
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: kerawangCut,
-            border: Border.all(
-                color: _isAnon ? scheme.primary : scheme.outlineVariant),
+        // Anonymity: one line here, the full explanation behind (i).
+        // Fixed once posted: flipping it later would expose (or
+        // re-attribute) what was already said under it.
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(AppIcons.anonymous,
+              color: _isAnon ? scheme.primary : scheme.onSurfaceVariant),
+          title: Row(
+            children: [
+              Flexible(child: Text(s.postAnonymously)),
+              IconButton(
+                tooltip: fs.anonInfo,
+                icon: Icon(AppIcons.info, size: 18, color: scheme.onSurfaceVariant),
+                onPressed: _showAnonInfo,
+              ),
+            ],
           ),
-          child: SwitchListTile(
-            secondary: Icon(
-                _isAnon ? Icons.visibility_off : Icons.visibility_outlined),
-            title: Text(s.postAnonymously),
-            subtitle: Text(_isEdit ? ps.anonymityLocked : fs.anonExplain),
+          subtitle: Text(_isEdit ? ps.anonymityLocked : fs.anonShort,
+              maxLines: 1, overflow: TextOverflow.ellipsis),
+          trailing: Switch(
             value: _isAnon,
             onChanged: _isEdit ? null : (val) => setState(() => _isAnon = val),
           ),
+          onTap: _isEdit ? null : () => setState(() => _isAnon = !_isAnon),
         ),
       ],
     );
 
     return CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.enter, control: true): _submit,
-          const SingleActivator(LogicalKeyboardKey.enter, meta: true): _submit,
-          const SingleActivator(LogicalKeyboardKey.escape): _close,
-        },
-        child: Focus(
-          autofocus: true,
-          child: Scaffold(
-            appBar: AppBar(
-              leading: IconButton(
-                tooltip: s.close,
-                icon: const Icon(Icons.close),
-                onPressed: _close,
-              ),
-              title: Text(_isEdit ? ps.editPost : s.createPostTitle),
-              actions: [submit],
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.enter, control: true): _submit,
+        const SingleActivator(LogicalKeyboardKey.enter, meta: true): _submit,
+        const SingleActivator(LogicalKeyboardKey.escape): _close,
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          appBar: AppBar(
+            leading: IconButton(
+              tooltip: s.close,
+              icon: const Icon(AppIcons.close),
+              onPressed: _close,
             ),
-            body: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 680),
-                child: editor,
-              ),
+            title: Text(_isEdit ? ps.editPost : s.createPostTitle),
+            actions: [submit],
+          ),
+          body: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: Responsive.feedMaxWidth),
+              child: editor,
             ),
           ),
         ),
+      ),
     );
   }
 }
 
-/// "Posting as @you" or the masked anonymous identity.
-class _IdentityLine extends StatelessWidget {
+/// Who the post will appear from: avatar 40, name, @handle — or the
+/// neutral anonymous identity.
+class _AuthorRow extends StatelessWidget {
   final bool anonymous;
   final Map<String, dynamic>? profile;
 
-  const _IdentityLine({required this.anonymous, required this.profile});
+  const _AuthorRow({required this.anonymous, required this.profile});
 
   @override
   Widget build(BuildContext context) {
@@ -519,39 +537,47 @@ class _IdentityLine extends StatelessWidget {
     final scheme = theme.colorScheme;
     final s = context.l10n;
     final avatar = anonymous ? null : profile?['avatar_url'] as String?;
-    final who = anonymous
+    final name = anonymous
         ? s.anonymous
-        : (profile?['username'] != null
-            ? '@${profile!['username']}'
-            : (profile?['display_name'] as String? ?? s.roleStudent));
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 16,
-          backgroundColor:
-              anonymous ? scheme.surfaceContainerHighest : scheme.primaryContainer,
-          backgroundImage: avatar != null ? NetworkImage(avatar) : null,
-          child: avatar == null
-              ? Icon(anonymous ? Icons.visibility_off : Icons.person,
-                  size: 16,
-                  color: anonymous
-                      ? scheme.onSurfaceVariant
-                      : scheme.onPrimaryContainer)
-              : null,
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: Text(
-              context.feedL10n.postingAs.fill([who]),
-              key: ValueKey(who),
-              style: theme.textTheme.labelLarge
-                  ?.copyWith(color: scheme.onSurfaceVariant),
+        : (profile?['display_name'] as String? ?? s.roleStudent);
+    final handle = anonymous ? null : profile?['username'] as String?;
+    return AnimatedSwitcher(
+      duration: KMotion.of(context).fast,
+      child: Row(
+        key: ValueKey(anonymous),
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor:
+                anonymous ? scheme.surfaceContainerHighest : scheme.primaryContainer,
+            backgroundImage: avatar != null ? NetworkImage(avatar) : null,
+            child: avatar == null
+                ? Icon(anonymous ? AppIcons.anonymous : AppIcons.person,
+                    size: 20,
+                    color: anonymous
+                        ? scheme.onSurfaceVariant
+                        : scheme.onPrimaryContainer)
+                : null,
+          ),
+          const SizedBox(width: KSpace.m),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w600)),
+                if (handle != null)
+                  Text('@$handle',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: scheme.onSurfaceVariant)),
+              ],
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -570,16 +596,17 @@ class _SharedRef extends StatelessWidget {
     final s = context.l10n;
     final isEvent = event != null;
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(KSpace.m),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: kerawangCut,
+        color: scheme.surfaceContainerLow,
+        borderRadius: KRadius.input,
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Row(
         children: [
-          Icon(isEvent ? Icons.event : Icons.shopping_bag,
+          Icon(isEvent ? AppIcons.events : AppIcons.market,
               size: 20, color: scheme.primary),
-          const SizedBox(width: 12),
+          const SizedBox(width: KSpace.m),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -633,23 +660,24 @@ class _TagField extends StatelessWidget {
       child: ListenableBuilder(
         listenable: focusNode,
         builder: (context, _) => Container(
-          padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+          padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.xs, KSpace.s, KSpace.xs),
           decoration: BoxDecoration(
-            borderRadius: kerawangCut,
+            borderRadius: KRadius.input,
             border: Border.all(
               color: focusNode.hasFocus ? scheme.primary : scheme.outline,
               width: focusNode.hasFocus ? 2 : 1,
             ),
           ),
           child: Wrap(
-            spacing: 6,
-            runSpacing: 4,
+            spacing: KSpace.s - 2,
+            runSpacing: KSpace.xs,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Icon(Icons.tag, size: 20, color: scheme.onSurfaceVariant),
+              Icon(AppIcons.hashtag, size: 20, color: scheme.onSurfaceVariant),
               for (final t in tags)
                 InputChip(
                   label: Text(displayTag(t)),
+                  deleteIcon: const Icon(AppIcons.close, size: 16),
                   onDeleted: () => onRemove(t),
                   deleteButtonTooltipMessage: fs.removeTag.fill([displayTag(t)]),
                 ),
@@ -672,7 +700,7 @@ class _TagField extends StatelessWidget {
                         focusedBorder: InputBorder.none,
                         filled: false,
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                        contentPadding: const EdgeInsets.symmetric(vertical: KSpace.m - 2),
                       ),
                     ),
                   ),

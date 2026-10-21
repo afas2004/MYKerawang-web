@@ -26,6 +26,9 @@ class FeedStrings {
   final String addPhotoAction;
   final String postingAs; // "Posting as {0}"
   final String anonExplain;
+  final String anonShort;
+  final String anonInfo;
+  final String postAction;
   final String bodyHint;
   final String charCount; // "{0}/{1}"
   final String tooLong;
@@ -62,6 +65,9 @@ class FeedStrings {
     required this.addPhotoAction,
     required this.postingAs,
     required this.anonExplain,
+    required this.anonShort,
+    required this.anonInfo,
+    required this.postAction,
     required this.bodyHint,
     required this.charCount,
     required this.tooLong,
@@ -94,6 +100,9 @@ class FeedStrings {
     postingAs: "Posting as {0}",
     anonExplain:
         "Your name and photo are hidden from everyone, including people you mention. Admins can still see who posted if it's reported.",
+    anonShort: "Your name and photo are hidden",
+    anonInfo: "About anonymous posts",
+    postAction: "Post",
     bodyHint: "What's on your mind? Use @ to mention someone",
     charCount: "{0}/{1}",
     tooLong: "A bit too long — trim it to {0} characters",
@@ -126,6 +135,9 @@ class FeedStrings {
     postingAs: "Post sebagai {0}",
     anonExplain:
         "Nama dan gambar kau disembunyikan daripada semua orang, termasuk yang kau mention. Admin masih boleh tengok siapa yang post kalau ia dilaporkan.",
+    anonShort: "Nama dan gambar kau disembunyikan",
+    anonInfo: "Tentang post tanpa nama",
+    postAction: "Post",
     bodyHint: "Apa cerita? Guna @ untuk mention orang",
     charCount: "{0}/{1}",
     tooLong: "Panjang sangat — pendekkan ke {0} aksara",
