@@ -36,7 +36,6 @@ void main() {
         onRefresh: () async {},
         onLoadMore: () {},
         onCompose: () {},
-        onPosted: () {},
 
       );
 
