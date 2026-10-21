@@ -9,6 +9,8 @@ import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../utils/app_nav.dart';
 import '../utils/guest_access.dart';
+import '../services/unread_notifications.dart';
+import '../widgets/profile_avatar_action.dart';
 import '../widgets/shell_actions.dart';
 import '../utils/categories.dart';
 import '../utils/formatters.dart';
@@ -103,11 +105,18 @@ class _EventsViewState extends State<EventsView>
           return Scaffold(
             appBar: AppBar(
               title: Text(s.navEvents),
-              actions: const [
-                ShellSearchButton(),
-                // TODO(v1.3): add ProfileAvatarAction here (lib/widgets/
-                // profile_avatar_action.dart from the hub session) once it
-                // is on main — not on any branch yet.
+              actions: [
+                const ShellSearchButton(),
+                // Notifications only mean something when signed in.
+                if (ShellAuth.of(context))
+                  IconButton(
+                    tooltip: s.notifications,
+                    icon: const UnreadBadge(child: Icon(AppIcons.notifications)),
+                    onPressed: () => context.goNotifications(),
+                  ),
+                // Avatar → your profile; guests get "Sign in".
+                const ProfileAvatarAction(),
+                const SizedBox(width: KSpace.s),
               ],
             ),
             body: LinearRefresher(

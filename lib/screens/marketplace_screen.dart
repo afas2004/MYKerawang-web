@@ -6,6 +6,8 @@ import 'package:mykerawang/widgets/linear_refresher.dart';
 import '../l10n/access_strings.dart';
 import '../utils/app_nav.dart';
 import '../utils/guest_access.dart';
+import '../services/unread_notifications.dart';
+import '../widgets/profile_avatar_action.dart';
 import '../utils/categories.dart';
 import '../utils/formatters.dart';
 import '../utils/listing_status.dart';
@@ -91,9 +93,18 @@ class _MarketplaceViewState extends State<MarketplaceView>
           return Scaffold(
             appBar: AppBar(
               title: Text(s.marketplaceTitle),
-              // TODO(v1.3): add ProfileAvatarAction here (lib/widgets/
-              // profile_avatar_action.dart from the hub session) once it is
-              // on main — not on any branch yet.
+              actions: [
+                // Notifications only mean something when signed in.
+                if (ShellAuth.of(context))
+                  IconButton(
+                    tooltip: s.notifications,
+                    icon: const UnreadBadge(child: Icon(AppIcons.notifications)),
+                    onPressed: () => context.goNotifications(),
+                  ),
+                // Avatar → your profile; guests get "Sign in".
+                const ProfileAvatarAction(),
+                const SizedBox(width: KSpace.s),
+              ],
             ),
             body: LinearRefresher(
               offset: 0.0,
