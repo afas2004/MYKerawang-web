@@ -49,6 +49,7 @@ class ShellStrings {
 
   // Onboarding
   final String stepOf;
+  final String registerClubLater;
 
   const ShellStrings({
     required this.create,
@@ -80,6 +81,7 @@ class ShellStrings {
     required this.noResultsFor,
     required this.tryDifferent,
     required this.stepOf,
+    required this.registerClubLater,
   });
 
   static const en = ShellStrings(
@@ -112,6 +114,7 @@ class ShellStrings {
     noResultsFor: "Nothing found for “{0}”",
     tryDifferent: "Try another word or a different filter.",
     stepOf: "Step {0} of {1}",
+    registerClubLater: "Registering a club? Do it after sign-up",
   );
 
   static const ms = ShellStrings(
@@ -144,6 +147,7 @@ class ShellStrings {
     noResultsFor: "Tiada hasil untuk “{0}”",
     tryDifferent: "Cuba perkataan lain atau tapis yang berbeza.",
     stepOf: "Langkah {0} daripada {1}",
+    registerClubLater: "Daftar kelab? Buat selepas pendaftaran",
   );
 }
 
