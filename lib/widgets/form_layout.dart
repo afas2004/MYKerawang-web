@@ -31,7 +31,7 @@ class FormPageBody extends StatelessWidget {
                 ? Container(
                     decoration: BoxDecoration(
                       color: scheme.surfaceContainerLow,
-                      borderRadius: KRadius.cut,
+                      borderRadius: KRadius.card,
                       border: Border.all(color: scheme.outlineVariant),
                     ),
                     child: content,
@@ -130,7 +130,7 @@ class PublishBar extends StatelessWidget {
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onPrimary))
-                  : Icon(editing ? Icons.check : Icons.publish),
+                  : Icon(editing ? AppIcons.check : AppIcons.send),
               label: Text(busy ? busyLabel : label),
             ),
           ),

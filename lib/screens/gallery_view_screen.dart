@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/gestures.dart'; // PointerScrollEvent
 import 'package:flutter/material.dart';
+// Zoom in/out and chevron-left aren't in AppIcons yet (lib/theme is
+// shared); swap to AppIcons once they're added there.
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
@@ -194,17 +197,17 @@ class _GalleryViewScreenState extends State<GalleryViewScreen> {
         actions: [
           IconButton(
             tooltip: s.zoomOut,
-            icon: const Icon(Icons.zoom_out, color: kOnPhoto),
+            icon: const Icon(LucideIcons.zoomOut, color: kOnPhoto),
             onPressed: () => _zoomBy(1 / _zoomStep),
           ),
           IconButton(
             tooltip: s.zoomIn,
-            icon: const Icon(Icons.zoom_in, color: kOnPhoto),
+            icon: const Icon(LucideIcons.zoomIn, color: kOnPhoto),
             onPressed: () => _zoomBy(_zoomStep),
           ),
           IconButton(
             tooltip: s.closeGallery,
-            icon: const Icon(Icons.close, color: kOnPhoto),
+            icon: const Icon(AppIcons.close, color: kOnPhoto),
             onPressed: () => Navigator.of(context).maybePop(),
           ),
         ],
@@ -285,7 +288,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen> {
                             color: i == _index
                                 ? kOnPhoto
                                 : kOnPhoto.withValues(alpha: 0.4),
-                            borderRadius: BorderRadius.circular(99),
+                            borderRadius: KRadius.pill,
                           ),
                         ),
                       ),
@@ -317,7 +320,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen> {
               child: Padding(
               padding: const EdgeInsets.all(12),
               child: Icon(
-                alignLeft ? Icons.chevron_left : Icons.chevron_right,
+                alignLeft ? LucideIcons.chevronLeft : AppIcons.chevronRight,
                 color: kOnPhoto,
                 size: 30,
               ),

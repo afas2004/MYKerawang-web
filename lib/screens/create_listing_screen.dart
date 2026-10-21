@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/brand/brand.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/image_compressor.dart';
 import '../utils/local_image.dart';
@@ -116,7 +117,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     final goEdit = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.phone),
+        icon: const Icon(AppIcons.phone),
         title: Text(s.social.whatsappNeededTitle),
         content: Text(s.social.whatsappNeededBody),
         actions: [
@@ -246,7 +247,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
             children: [
               FormSection(
                 title: s.sectionPhotos,
-                icon: Icons.photo_library_outlined,
+                icon: AppIcons.photo,
                 children: [
                   // Shared with the event form
                   MediaPickerGrid(items: _mediaItems, onChanged: () => setState(() {})),
@@ -254,7 +255,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
               ),
               FormSection(
                 title: s.sectionDetails,
-                icon: Icons.edit_note,
+                icon: AppIcons.edit,
                 children: [
                   TextFormField(
                     controller: _titleController,
@@ -274,7 +275,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
               ),
               FormSection(
                 title: s.sectionPricing,
-                icon: Icons.sell_outlined,
+                icon: AppIcons.price,
                 children: [
                   LayoutBuilder(builder: (context, c) {
                     final price = TextFormField(

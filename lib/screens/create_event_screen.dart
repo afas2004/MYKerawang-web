@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/brand/brand.dart';
 import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/image_compressor.dart';
@@ -239,7 +240,7 @@ if (event['tags'] != null) {
             children: [
               FormSection(
                 title: s.sectionPhotos,
-                icon: Icons.photo_library_outlined,
+                icon: AppIcons.photo,
                 children: [
                   // Shared with the listing form
                   MediaPickerGrid(items: _mediaItems, onChanged: () => setState(() {})),
@@ -247,7 +248,7 @@ if (event['tags'] != null) {
               ),
               FormSection(
                 title: s.sectionDetails,
-                icon: Icons.edit_note,
+                icon: AppIcons.edit,
                 children: [
                   _label(s.eventTitle, topPad: 0),
                   _input(_titleController, s.eventTitleHint, validator: _required(s.title)),
@@ -256,7 +257,7 @@ if (event['tags'] != null) {
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surfaceContainer,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: KRadius.input,
                     ),
                     child: MentionInput(
                       controller: _descController,
@@ -268,7 +269,7 @@ if (event['tags'] != null) {
               ),
               FormSection(
                 title: s.sectionWhenWhere,
-                icon: Icons.event_outlined,
+                icon: AppIcons.calendar,
                 children: [
                   LayoutBuilder(builder: (context, c) {
                     // Side by side when there's room, stacked on small phones.
@@ -291,7 +292,7 @@ if (event['tags'] != null) {
                   _label(s.location),
                   _input(_locationController, s.locationHint, validator: _required(s.location)),
                   _label(s.registrationLinkOptional),
-                  _input(_linkController, "https://forms.gle/...", icon: Icons.link),
+                  _input(_linkController, "https://forms.gle/...", icon: AppIcons.link),
                 ],
               ),
             ],
@@ -318,11 +319,11 @@ if (event['tags'] != null) {
         _label(isStart ? s.starts : s.ends, topPad: 0),
         InkWell(
           onTap: () => _pickDateTime(isStart),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: KRadius.input,
           child: AbsorbPointer(
             child: _input(
               TextEditingController(text: date == null ? '' : formatEventDate(date)), s.select,
-              icon: Icons.calendar_today,
+              icon: AppIcons.calendar,
               readOnly: true,
               validator: isStart
                   ? (_) => _startDate == null ? s.fieldRequired.fill([s.starts]) : null
@@ -386,10 +387,10 @@ if (event['tags'] != null) {
     suffixIcon: icon != null ? Icon(icon) : null,
     filled: true,
     fillColor: t.colorScheme.surfaceContainer,
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+    border: OutlineInputBorder(borderRadius: KRadius.input, borderSide: BorderSide.none),
     // Visible focus ring for keyboard users on web.
     focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: KRadius.input,
         borderSide: BorderSide(color: t.colorScheme.primary, width: 2)),
   );
 }
