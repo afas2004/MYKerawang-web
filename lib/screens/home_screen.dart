@@ -9,6 +9,7 @@ import '../language_cubit.dart';
 import '../l10n/social_strings.dart';
 import '../services/unread_notifications.dart';
 import '../utils/app_nav.dart';
+import '../utils/guest_access.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/embed_card.dart';
 import '../widgets/error_state.dart';
@@ -170,7 +171,11 @@ class _HomeScreenState extends State<HomeScreen>
 
   /// The editor is a route (/create/post); publishing lands on the new
   /// post and the feed refreshes through [onContentChanged].
-  void _openComposer() => context.goCreatePost();
+  void _openComposer() {
+    // Guests see the feed read-only; posting asks them to sign in.
+    if (!requireLogin(context)) return;
+    context.goCreatePost();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -203,6 +208,10 @@ class _HomeScreenState extends State<HomeScreen>
           icon: const UnreadBadge(child: Icon(AppIcons.notifications)),
           onPressed: () => context.goNotifications(),
         ),
+        // TODO(v1.3): ProfileAvatarAction (lib/widgets/profile_avatar_action.dart)
+        // lives on origin/v13/hub-shell; replace this placeholder with
+        // `const ProfileAvatarAction()` once that branch is on main.
+        const SizedBox.shrink(),
         const SizedBox(width: KSpace.s),
       ],
     );
