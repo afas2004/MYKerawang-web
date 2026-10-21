@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mykerawang/utils/app_nav.dart';
 import 'package:mykerawang/utils/report_helper.dart';
 import 'package:mykerawang/widgets/embed_card.dart';
 import 'package:mykerawang/theme/app_themes.dart';
 import 'package:mykerawang/widgets/brand/brand.dart';
+import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/feed_strings.dart';
 import '../l10n/moderation_strings.dart';
@@ -34,7 +36,18 @@ import 'save_button.dart';
 /// with @mentions, hashtags as plain links, photos, a shared event/listing,
 /// and one action row: comment · save · share. Pinned posts are an
 /// official [KCard] with a "Pinned" label.
+/// Route of a post's page — what every share / copy-link points at.
+String postSharePath(Object id) => '/post/$id';
+
+/// Absolute URL of a post (origin of the running app on web).
+String postShareUrl(Object id) => ShareService.absoluteUrl(postSharePath(id));
+
 class PostCard extends StatefulWidget {
+  /// Lets widget tests see what Share would send.
+  @visibleForTesting
+  static Future<void> Function(BuildContext context, String title, String body,
+      dynamic images, {String? link})? debugShare;
+
   final Map<String, dynamic> post;
   final VoidCallback? onTap;
   final bool showProfileHeader;
@@ -151,13 +164,23 @@ class _PostCardState extends State<PostCard> {
     final post = _post;
     final title = (post['title'] as String?)?.trim();
     final body = (post['body'] as String? ?? '').trim();
-    ShareService.shareContent(
+    final share = PostCard.debugShare ?? ShareService.shareContent;
+    share(
       context,
       (title == null || title.isEmpty) ? AppStrings.appName : title,
       body,
       PostService.photoUrlsOf(post),
-      link: '/post/${post['id']}',
+      // The route; the sheet makes it absolute (ShareService.absoluteUrl)
+      // and appends it to the message.
+      link: postSharePath(post['id']),
     );
+  }
+
+  Future<void> _copyLink() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final s = context.l10nRead;
+    await Clipboard.setData(ClipboardData(text: postShareUrl(_post['id'])));
+    messenger.showSnackBar(SnackBar(content: Text(s.linkCopied)));
   }
 
   @override
@@ -181,6 +204,7 @@ class _PostCardState extends State<PostCard> {
       onEdit: () => openPostEditor(context, post),
       onDelete: _delete,
       onTogglePin: _togglePin,
+      onCopyLink: _copyLink,
     );
 
     final content = Column(
@@ -399,6 +423,7 @@ class _MoreMenu extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onTogglePin;
+  final VoidCallback onCopyLink;
 
   const _MoreMenu({
     required this.post,
@@ -406,6 +431,7 @@ class _MoreMenu extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onTogglePin,
+    required this.onCopyLink,
   });
 
   void _report(BuildContext context) {
@@ -445,9 +471,11 @@ class _MoreMenu extends StatelessWidget {
             'edit' => onEdit(),
             'delete' => onDelete(),
             'pin' => onTogglePin(),
+            'link' => onCopyLink(),
             _ => _report(context),
           },
           itemBuilder: (_) => [
+            item('link', AppIcons.link, s.copyLink),
             if (canPin) item('pin', AppIcons.pin, pinned ? m.unpin : m.pin),
             if (mine) ...[
               item('edit', AppIcons.edit, s.edit),
