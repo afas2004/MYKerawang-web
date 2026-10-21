@@ -51,16 +51,66 @@ void main() {
     final picked = <int>[];
     await pumpScreen(tester, frame(onSelect: picked.add));
 
+    await tester.tap(find.text('News'));
     await tester.tap(find.text('Market'));
     await tester.tap(find.text('Events'));
-    await tester.tap(find.text('Profile'));
     await tester.tap(find.text('Home'));
     expect(picked, [
+      ShellBranch.announcements,
       ShellBranch.market,
       ShellBranch.events,
-      ShellBranch.profile,
       ShellBranch.home,
     ]);
+    // Profile is no longer a tab.
+    expect(find.text('Profile'), findsNothing);
+  });
+
+  testWidgets('bottom bar order: Home · Announcements · Create · Market · Events',
+      (tester) async {
+    await initTestSupabase(tester);
+    await setWidth(tester, 375);
+    await pumpScreen(tester, frame());
+
+    final xs = [
+      for (final label in ['Home', 'News', 'Create', 'Market', 'Events'])
+        tester.getCenter(find.text(label)).dx,
+    ];
+    expect(xs, orderedEquals([...xs]..sort()));
+  });
+
+  testWidgets('rail and sidebar list tabs in the same order', (tester) async {
+    await initTestSupabase(tester);
+    await setWidth(tester, 768);
+    await pumpScreen(tester, frame());
+    final railYs = [
+      for (final label in ['Home', 'News', 'Market', 'Events'])
+        tester.getCenter(find.text(label)).dy,
+    ];
+    expect(railYs, orderedEquals([...railYs]..sort()));
+
+    await setWidth(tester, 1280);
+    await pumpScreen(tester, frame());
+    final sideYs = [
+      for (final label in ['Home', 'Announcements', 'Search', 'Market', 'Events'])
+        tester.getCenter(find.text(label)).dy,
+    ];
+    expect(sideYs, orderedEquals([...sideYs]..sort()));
+  });
+
+  testWidgets('guests get Sign in instead of notifications / settings',
+      (tester) async {
+    await initTestSupabase(tester); // signed out
+    await setWidth(tester, 1280);
+    await pumpScreen(tester, frame());
+    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Join with student email'), findsOneWidget);
+    expect(find.text('Notifications'), findsNothing);
+    expect(find.text('Settings'), findsNothing);
+
+    await setWidth(tester, 768);
+    await pumpScreen(tester, frame());
+    expect(find.byTooltip('Sign in'), findsOneWidget);
+    expect(find.byTooltip('Notifications'), findsNothing);
   });
 
   testWidgets('no right rail between 900 and 1199', (tester) async {

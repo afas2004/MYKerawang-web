@@ -101,7 +101,9 @@ String backFallbackFor(String path) {
         _ => '/home',
       },
     'settings' when segments.length > 1 => '/settings',
-    'profile' => '/profile',
+    // /profile/edit backs out to the profile; /profile itself (no longer
+    // a tab) to Home.
+    'profile' when segments.length > 1 => '/profile',
     _ => '/home', // post, u, tag, notifications, settings, …
   };
 }
