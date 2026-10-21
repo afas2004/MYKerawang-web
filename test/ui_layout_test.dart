@@ -36,8 +36,9 @@ Future<void> pumpAt(WidgetTester tester, double width, Widget child,
 
 /// Column width the events list gives one card at a screen width.
 double eventColumnWidth(double width) {
-  if (width >= 1000) return (width - 32 - 32) / 3;
-  if (width >= 600) return (width - 32 - 16) / 2;
+  // 1280: the filter column (240 + divider) takes its share first.
+  if (width >= 900) return (width - 241 - 32 - 24) / 3 < 300 ? (width - 241 - 32 - 12) / 2 : (width - 241 - 32 - 24) / 3;
+  if (width >= 600) return (width - 32 - 12) / 2;
   return width - 32;
 }
 
@@ -73,7 +74,7 @@ void main() {
             alignment: Alignment.topLeft,
             child: SizedBox(
               width: columnWidth,
-              height: inGrid ? EventCard.gridExtent : null,
+              height: inGrid ? EventCard.heightFor(TextScaler.linear(scale)) : null,
               child: EventCard(event: event, goingCount: 42, organiser: organiser),
             ),
           ),
@@ -82,7 +83,7 @@ void main() {
         expect(tester.takeException(), isNull);
         expect(find.textContaining('Malam Kebudayaan'), findsOneWidget);
         expect(find.text('42 going'), findsOneWidget);
-        expect(find.byIcon(Icons.verified), findsOneWidget);
+        expect(find.byIcon(AppIcons.verified), findsOneWidget);
       });
     }
   }

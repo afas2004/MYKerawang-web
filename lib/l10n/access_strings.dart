@@ -188,4 +188,9 @@ extension AccessStrings on AppStrings {
   // ---- navigation ----
   String get eventPublished => _t("Event published", "Acara diterbitkan", "イベントを公開しました");
   String get eventUpdated => _t("Event updated", "Acara dikemas kini", "イベントを更新しました");
+
+  // ---- events list ----
+  String get pastEvents => _t("Past events", "Acara lepas", "過去のイベント");
+  String get pastEventsCount =>
+      _t("{0} ended or cancelled", "{0} dah tamat atau dibatalkan", "{0}件 終了・中止");
 }
