@@ -6,7 +6,6 @@ import '../services/unread_notifications.dart';
 import '../utils/app_nav.dart';
 import 'admin_nav_entry.dart';
 import 'brand/brand.dart';
-import 'kerawang_motif.dart';
 import 'shell_actions.dart';
 
 /// Desktop sidebar (≥ 900), shared by the tab shell and by pushed pages
@@ -33,11 +32,11 @@ class AppSidebar extends StatelessWidget {
   static List<(IconData, IconData, String)> navItems(BuildContext context) {
     final s = context.l10n;
     return [
-      (Icons.home_outlined, Icons.home, s.navHome),
-      (Icons.search, Icons.saved_search, s.navSearch),
-      (Icons.storefront_outlined, Icons.storefront, s.navMarket),
-      (Icons.calendar_today_outlined, Icons.calendar_month, s.navEvents),
-      (Icons.person_outline, Icons.person, s.navProfile),
+      (AppIcons.home, AppIcons.homeFilled, s.navHome),
+      (AppIcons.search, AppIcons.searchFilled, s.navSearch),
+      (AppIcons.market, AppIcons.marketFilled, s.navMarket),
+      (AppIcons.events, AppIcons.eventsFilled, s.navEvents),
+      (AppIcons.profile, AppIcons.profileFilled, s.navProfile),
     ];
   }
 
@@ -62,9 +61,6 @@ class AppSidebar extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Thin lattice band along the top edge (structure, not
-            // wallpaper).
-            const LatticeBand(),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.l, KSpace.m, KSpace.s),
@@ -78,7 +74,7 @@ class AppSidebar extends StatelessWidget {
                         onTap: () => context.go('/home'),
                         child: const Padding(
                           padding: EdgeInsets.symmetric(horizontal: KSpace.s, vertical: KSpace.xs),
-                          child: Wordmark(fontSize: 24),
+                          child: Wordmark(fontSize: 20),
                         ),
                       ),
                     ),
@@ -100,8 +96,8 @@ class AppSidebar extends StatelessWidget {
                   Divider(height: 16, color: scheme.outlineVariant),
                   SideNavTile(
                     icon: onNotifications
-                        ? Icons.notifications
-                        : Icons.notifications_outlined,
+                        ? AppIcons.notificationsActive
+                        : AppIcons.notifications,
                     label: s.notifications,
                     selected: onNotifications,
                     showUnread: true,
@@ -110,7 +106,7 @@ class AppSidebar extends StatelessWidget {
                     },
                   ),
                   SideNavTile(
-                    icon: onSettings ? Icons.settings : Icons.settings_outlined,
+                    icon: AppIcons.settings,
                     label: s.settings,
                     selected: onSettings,
                     onTap: () {
@@ -121,21 +117,16 @@ class AppSidebar extends StatelessWidget {
                   const SizedBox(height: KSpace.l),
                   FilledButton.icon(
                     onPressed: () => showCreateSheet(context),
-                    icon: const Icon(Icons.add),
+                    icon: const Icon(AppIcons.create),
                     label: Text(s.shell.create),
                     style: FilledButton.styleFrom(
                       minimumSize: const Size.fromHeight(48),
-                      shape: const RoundedRectangleBorder(
-                          borderRadius: KRadius.cut),
                     ),
                   ),
                 ],
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.only(bottom: 16, top: 8),
-              child: KerawangDivider(),
-            ),
+            const SizedBox(height: KSpace.l),
           ],
         ),
       ),
@@ -184,7 +175,7 @@ class _SideNavTileState extends State<SideNavTile> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final fg =
-        widget.selected ? scheme.onSecondaryContainer : scheme.onSurfaceVariant;
+        widget.selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
     final icon = Icon(widget.icon, size: 22, color: fg);
     const radius = BorderRadius.all(Radius.circular(12));
 
@@ -203,7 +194,7 @@ class _SideNavTileState extends State<SideNavTile> {
             constraints: const BoxConstraints(minHeight: 48),
             padding: const EdgeInsets.symmetric(horizontal: KSpace.m),
             decoration: BoxDecoration(
-              color: widget.selected ? scheme.secondaryContainer : null,
+              color: widget.selected ? scheme.primaryContainer : null,
               borderRadius: radius,
               border: Border.all(
                 color: _focused ? KTokens.of(context).focusRing : Colors.transparent,

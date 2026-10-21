@@ -6,6 +6,7 @@ import '../l10n/moderation_strings.dart';
 import '../language_cubit.dart';
 import '../services/moderation_service.dart';
 import 'app_sidebar.dart';
+import 'brand/brand.dart';
 
 /// Sidebar link to /admin, rendered only for admins and the owner.
 class AdminNavEntry extends StatelessWidget {
@@ -28,7 +29,7 @@ class AdminNavEntry extends StatelessWidget {
             '';
         final selected = path.startsWith('/admin');
         return SideNavTile(
-          icon: selected ? Icons.shield : Icons.shield_outlined,
+          icon: AppIcons.moderation,
           label: context.l10n.mod.moderation,
           selected: selected,
           onTap: () => context.go('/admin'),

@@ -8,6 +8,8 @@ import '../utils/app_nav.dart';
 import '../utils/browser_history_stub.dart'
     if (dart.library.js_interop) '../utils/browser_history_web.dart';
 import '../widgets/brand/brand.dart';
+import '../l10n/app_strings.dart';
+import '../widgets/app_logo.dart';
 import '../widgets/app_sidebar.dart';
 import '../widgets/right_rail.dart';
 import '../widgets/shell_actions.dart';
@@ -180,27 +182,31 @@ class ShellFrame extends StatelessWidget {
             selectedIndex: railIndex < 0 ? null : railIndex,
             onDestinationSelected: (i) => onSelect(branches[i]),
             labelType: NavigationRailLabelType.all,
-            indicatorColor: scheme.secondaryContainer,
+            indicatorColor: scheme.primaryContainer,
             groupAlignment: -0.6,
             leading: Column(
               children: [
                 const SizedBox(height: KSpace.s),
+                Semantics(
+                  label: AppStrings.appName,
+                  child: const AppLogo(size: 36),
+                ),
+                const SizedBox(height: KSpace.l),
                 FloatingActionButton(
                   heroTag: 'shell-create',
                   tooltip: s.shell.create,
                   elevation: 0,
-                  shape: const RoundedRectangleBorder(borderRadius: KRadius.cut),
                   backgroundColor: scheme.primary,
                   foregroundColor: scheme.onPrimary,
                   onPressed: () => showCreateSheet(context),
-                  child: const Icon(Icons.add),
+                  child: const Icon(AppIcons.create),
                 ),
                 const SizedBox(height: KSpace.m),
                 IconButton(
                   tooltip: s.navSearch,
                   isSelected: currentIndex == ShellBranch.search,
-                  icon: const Icon(Icons.search),
-                  selectedIcon: const Icon(Icons.saved_search),
+                  icon: const Icon(AppIcons.search),
+                  selectedIcon: const Icon(AppIcons.searchFilled),
                   onPressed: () => onSelect(ShellBranch.search),
                 ),
               ],
@@ -211,12 +217,12 @@ class ShellFrame extends StatelessWidget {
                 IconButton(
                   tooltip: s.notifications,
                   icon: const UnreadBadge(
-                      child: Icon(Icons.notifications_outlined)),
+                      child: Icon(AppIcons.notifications)),
                   onPressed: () => context.goNotifications(),
                 ),
                 IconButton(
                   tooltip: s.settings,
-                  icon: const Icon(Icons.settings_outlined),
+                  icon: const Icon(AppIcons.settings),
                   onPressed: () => context.goSettings(),
                 ),
               ],
