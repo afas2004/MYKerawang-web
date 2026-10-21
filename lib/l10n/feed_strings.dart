@@ -29,6 +29,12 @@ class FeedStrings {
   final String anonShort;
   final String anonInfo;
   final String postAction;
+  final String pinComment;
+  final String unpinComment;
+  final String commentPinnedToast;
+  final String commentUnpinnedToast;
+  final String commentPinLimit; // "{0}" = max
+  final String signInToComment;
   final String bodyHint;
   final String charCount; // "{0}/{1}"
   final String tooLong;
@@ -68,6 +74,12 @@ class FeedStrings {
     required this.anonShort,
     required this.anonInfo,
     required this.postAction,
+    required this.pinComment,
+    required this.unpinComment,
+    required this.commentPinnedToast,
+    required this.commentUnpinnedToast,
+    required this.commentPinLimit,
+    required this.signInToComment,
     required this.bodyHint,
     required this.charCount,
     required this.tooLong,
@@ -103,6 +115,12 @@ class FeedStrings {
     anonShort: "Your name and photo are hidden",
     anonInfo: "About anonymous posts",
     postAction: "Post",
+    pinComment: "Pin comment",
+    unpinComment: "Unpin comment",
+    commentPinnedToast: "Comment pinned",
+    commentUnpinnedToast: "Comment unpinned",
+    commentPinLimit: "You can pin up to {0} comments. Unpin one first.",
+    signInToComment: "Sign in to comment",
     bodyHint: "What's on your mind? Use @ to mention someone",
     charCount: "{0}/{1}",
     tooLong: "A bit too long — trim it to {0} characters",
@@ -138,6 +156,12 @@ class FeedStrings {
     anonShort: "Nama dan gambar kau disembunyikan",
     anonInfo: "Tentang post tanpa nama",
     postAction: "Post",
+    pinComment: "Semat komen",
+    unpinComment: "Nyahsemat komen",
+    commentPinnedToast: "Komen disemat",
+    commentUnpinnedToast: "Komen dinyahsemat",
+    commentPinLimit: "Maksimum {0} komen boleh disemat. Nyahsemat satu dulu.",
+    signInToComment: "Log masuk untuk komen",
     bodyHint: "Apa cerita? Guna @ untuk mention orang",
     charCount: "{0}/{1}",
     tooLong: "Panjang sangat — pendekkan ke {0} aksara",

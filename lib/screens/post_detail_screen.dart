@@ -3,6 +3,8 @@ import 'package:mykerawang/utils/app_nav.dart';
 import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/mention_service.dart';
+import '../services/comment_pins.dart';
+import '../services/moderation_service.dart';
 import '../services/post_service.dart';
 import '../widgets/linear_refresher.dart';
 import '../widgets/comment_tile.dart';
@@ -57,6 +59,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     _postData = widget.post;
     _commentCtrl.addListener(_onTextChanged);
     _loadComments();
+    _checkCanPin();
     // Realtime only signals; rows are re-read from comments_public so
     // anonymous authors stay hidden.
     _channel = _supabase
@@ -108,21 +111,62 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
+  /// Post author or admin may pin comments (the RPC re-checks).
+  bool _canPinComments = false;
+
+  Future<void> _checkCanPin() async {
+    final mine = await PostService.isMine(_postData);
+    final role = mine ? null : await ModerationService.myRole();
+    final can = mine || role == 'admin' || role == 'owner';
+    if (mounted && can != _canPinComments) setState(() => _canPinComments = can);
+  }
+
+  Future<void> _togglePin(Map<String, dynamic> c) async {
+    final now = await CommentPins.toggle(context, c);
+    if (now != null) await _loadComments();
+  }
+
+  /// Pinned comments of this post (always shown, above the paged list).
+  /// Empty if the pins migration isn't applied yet.
+  Future<List<Map<String, dynamic>>> _fetchPinned() async {
+    try {
+      final rows = await _supabase
+          .from('comments_public')
+          .select('*')
+          .eq('post_id', _postId)
+          .not('pinned_at', 'is', null)
+          .order('pinned_at', ascending: true);
+      return List<Map<String, dynamic>>.from(rows);
+    } catch (e) {
+      debugPrint('Pinned comments unavailable: $e');
+      return const [];
+    }
+  }
+
   Future<void> _loadComments() async {
     final seq = ++_loadSeq;
     final limit = _commentLimit;
     try {
       // Newest first so the limit keeps the latest; one extra row tells
       // whether there are earlier ones.
-      final response = await _supabase
-          .from('comments_public') // anonymity-safe view
-          .select('*')
-          .eq('post_id', _postId)
-          .order('created_at', ascending: false)
-          .limit(limit + 1);
-      final rows = List<Map<String, dynamic>>.from(response);
+      final results = await Future.wait([
+        _supabase
+            .from('comments_public') // anonymity-safe view
+            .select('*')
+            .eq('post_id', _postId)
+            .order('created_at', ascending: false)
+            .limit(limit + 1),
+        _fetchPinned(),
+      ]);
+      final rows = List<Map<String, dynamic>>.from(results[0]);
+      final pinned = results[1];
       final hasEarlier = rows.length > limit;
-      final comments = rows.take(limit).toList().reversed.toList();
+      // Pinned first, then the newest page without repeating them.
+      final pinnedIds = {for (final p in pinned) p['id']};
+      final comments = pinnedFirst([
+        ...pinned,
+        ...rows.take(limit).toList().reversed.where((c) => !pinnedIds.contains(c['id'])),
+      ]);
 
       // Anonymous comments arrive without user_id; only the author's own
       // ids come back from the RPC, so it reveals nobody else's.
@@ -338,6 +382,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             onDelete: _myCommentIds.contains(_comments[i]['id'])
                 ? () => _deleteComment(_comments[i])
                 : null,
+            onTogglePin:
+                _canPinComments ? () => _togglePin(_comments[i]) : null,
           ),
       ],
     );

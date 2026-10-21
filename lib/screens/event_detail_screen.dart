@@ -1,6 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import '../services/comment_pins.dart';
+import '../services/moderation_service.dart';
 import 'package:mykerawang/services/share_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -216,7 +218,15 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         .select('*')
         .eq('event_id', _event['id'])
         .order('created_at', ascending: true);
-    return List<Map<String, dynamic>>.from(rows);
+    // Pinned comments (organiser / admin, up to 3) lead the thread.
+    return pinnedFirst(List<Map<String, dynamic>>.from(rows));
+  }
+
+  Future<void> _toggleCommentPin(Map<String, dynamic> c) async {
+    final now = await CommentPins.toggle(context, c);
+    if (now != null && mounted) {
+      setState(() => _commentsStream = _fetchCommentsStream());
+    }
   }
 
   Future<void> _postComment() async {
@@ -1096,16 +1106,28 @@ class _EventDetailScreenState extends State<EventDetailScreen>
               );
             }
             final comments = snapshot.data!;
-            return Column(
-              children: [
-                for (var i = 0; i < comments.length; i++)
-                  CommentTile(
-                    comment: comments[i],
-                    threadLine: i < comments.length - 1,
-                    highlightUserId: _event['organizer_id'],
-                    highlightLabel: s.organiserBadge,
-                  ),
-              ],
+            // Organiser or admin may pin (the RPC re-checks).
+            return FutureBuilder<String?>(
+              future: ModerationService.myRole(),
+              builder: (context, role) {
+                final canPin = _isOwner ||
+                    role.data == 'admin' ||
+                    role.data == 'owner';
+                return Column(
+                  children: [
+                    for (var i = 0; i < comments.length; i++)
+                      CommentTile(
+                        comment: comments[i],
+                        threadLine: i < comments.length - 1,
+                        highlightUserId: _event['organizer_id'],
+                        highlightLabel: s.organiserBadge,
+                        onTogglePin: canPin
+                            ? () => _toggleCommentPin(comments[i])
+                            : null,
+                      ),
+                  ],
+                );
+              },
             );
           },
         ),
