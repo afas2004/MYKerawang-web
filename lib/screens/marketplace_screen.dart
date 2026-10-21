@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mykerawang/widgets/linear_refresher.dart';
 import '../l10n/access_strings.dart';
 import '../utils/app_nav.dart';
+import '../utils/guest_access.dart';
 import '../utils/categories.dart';
 import '../utils/formatters.dart';
 import '../utils/listing_status.dart';
@@ -52,7 +53,10 @@ class _MarketplaceViewState extends State<MarketplaceView>
 
   /// Used by the empty state only; the one general Create entry is the
   /// shell's (centre button / rail / sidebar).
-  void _openCreate(BuildContext context) => context.goCreateListing();
+  /// Guests (if they ever reach this tab) are asked to sign in first.
+  void _openCreate(BuildContext context) {
+    if (requireLogin(context)) context.goCreateListing();
+  }
 
   // Lists refresh after something is published, edited or deleted.
   @override
@@ -85,7 +89,12 @@ class _MarketplaceViewState extends State<MarketplaceView>
         return LayoutBuilder(builder: (context, constraints) {
           final sidePanel = constraints.maxWidth >= _kSidePanelFrom;
           return Scaffold(
-            appBar: AppBar(title: Text(s.marketplaceTitle)),
+            appBar: AppBar(
+              title: Text(s.marketplaceTitle),
+              // TODO(v1.3): add ProfileAvatarAction here (lib/widgets/
+              // profile_avatar_action.dart from the hub session) once it is
+              // on main — not on any branch yet.
+            ),
             body: LinearRefresher(
               offset: 0.0,
               onRefresh: () => cubit.loadData(),

@@ -8,6 +8,7 @@ import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../utils/app_nav.dart';
+import '../utils/guest_access.dart';
 import '../widgets/shell_actions.dart';
 import '../utils/categories.dart';
 import '../utils/formatters.dart';
@@ -83,7 +84,10 @@ class _EventsViewState extends State<EventsView>
 
   /// Used by the empty state only; the one general Create entry is the
   /// shell's (centre button / rail / sidebar).
-  void _openCreate(BuildContext context) => context.goCreateEvent();
+  /// Guests (if they ever reach this tab) are asked to sign in first.
+  void _openCreate(BuildContext context) {
+    if (requireLogin(context)) context.goCreateEvent();
+  }
 
   // Lists refresh after something is published, edited or deleted.
   @override
@@ -99,7 +103,12 @@ class _EventsViewState extends State<EventsView>
           return Scaffold(
             appBar: AppBar(
               title: Text(s.navEvents),
-              actions: const [ShellSearchButton()],
+              actions: const [
+                ShellSearchButton(),
+                // TODO(v1.3): add ProfileAvatarAction here (lib/widgets/
+                // profile_avatar_action.dart from the hub session) once it
+                // is on main — not on any branch yet.
+              ],
             ),
             body: LinearRefresher(
               offset: 0.0,

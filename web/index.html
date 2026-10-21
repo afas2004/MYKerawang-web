@@ -131,15 +131,42 @@
           if (lost && document.visibilityState === 'visible') recover();
         }, 2000);
       }
-      // Capture phase: the events don't bubble, but reach window first.
-      window.addEventListener('webglcontextlost', function () {
+      // Each real render surface is tracked on its own: the page counts as
+      // broken while any of them is lost and not yet restored.
+      var lostCanvases = typeof Set === 'function' ? new Set() : null;
+      function onLost(e) {
+        if (!lostCanvases) return;
+        lostCanvases.add(e.target);
         lost = true;
         if (document.visibilityState === 'visible') checkSoon();
-      }, true);
-      window.addEventListener('webglcontextrestored', function () {
-        // Only CanvasKit redraws after a restore.
-        if (window.__mkRenderer === 'canvaskit') lost = false;
-      }, true);
+      }
+      function onRestored(e) {
+        // Only CanvasKit redraws after a restore; skwasm stays blank.
+        if (!lostCanvases || window.__mkRenderer !== 'canvaskit') return;
+        lostCanvases.delete(e.target);
+        lost = lostCanvases.size > 0;
+      }
+      // CanvasKit draws through an OffscreenCanvas that is never in the
+      // DOM, so its events can't be heard on window. Instead every WebGL
+      // context, on- or off-screen, reports here as it is created — except
+      // the engine's 1x1 capability probe, which nobody ever restores.
+      var watched = typeof WeakSet === 'function' ? new WeakSet() : null;
+      function watch(proto) {
+        if (!proto || !proto.getContext || !watched) return;
+        var original = proto.getContext;
+        proto.getContext = function (type) {
+          var ctx = original.apply(this, arguments);
+          if (ctx && /^(webgl|experimental-webgl)/.test(String(type)) &&
+              this.width * this.height > 1 && !watched.has(this)) {
+            watched.add(this);
+            this.addEventListener('webglcontextlost', onLost);
+            this.addEventListener('webglcontextrestored', onRestored);
+          }
+          return ctx;
+        };
+      }
+      watch(window.HTMLCanvasElement && HTMLCanvasElement.prototype);
+      watch(window.OffscreenCanvas && OffscreenCanvas.prototype);
       document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'visible' && lost) checkSoon();
       });
