@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mykerawang/l10n/app_strings.dart';
 import 'package:mykerawang/language_cubit.dart';
 import 'package:mykerawang/theme/app_themes.dart';
@@ -10,6 +11,7 @@ import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../utils/roles.dart';
+import '../l10n/access_strings.dart';
 import '../l10n/feed_strings.dart';
 import '../l10n/social_strings.dart';
 import '../widgets/post_card.dart';
@@ -303,15 +305,28 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     final s = context.l10n;
     if (_isLoading && _profile == null) {
       return Scaffold(
-        appBar: AppBar(leading: widget.userId != null ? const AppBackButton() : null),
+        appBar: AppBar(leading: _inShell(context) ? null : const AppBackButton()),
         body: _loadError
             ? _ErrorRetry(onRetry: _retry)
             : const _ProfileSkeleton(),
       );
     }
+    if (_profile == null && !isLoggedIn && widget.userId == null) {
+      // "My profile" while signed out: offer login instead of "not found".
+      return Scaffold(
+        appBar: AppBar(leading: _inShell(context) ? null : const AppBackButton()),
+        body: BrandEmptyState(
+          icon: AppIcons.profile,
+          title: s.guestPromptTitle,
+          message: s.guestPromptBody,
+          actionLabel: s.loginOrSignUp,
+          onAction: () => goToLogin(context),
+        ),
+      );
+    }
     if (_profile == null) {
       return Scaffold(
-        appBar: AppBar(leading: widget.userId != null ? const AppBackButton() : null),
+        appBar: AppBar(leading: _inShell(context) ? null : const AppBackButton()),
         body: BrandEmptyState(icon: AppIcons.person, title: s.userNotFound),
       );
     }
@@ -322,11 +337,20 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
     return Scaffold(
       appBar: AppBar(
-        // Someone else's profile is a pushed page (/u/:id); also works cold.
-        leading: widget.userId != null ? const AppBackButton() : null,
+        // A pushed page (own or someone else's, also opened cold) gets a
+        // back button; only the legacy shell tab goes without.
+        leading: _inShell(context) ? null : const AppBackButton(),
         title: Text(p['username'] != null ? "@${p['username']}" : s.profileTitle),
         actions: [
-          if (_isMe && widget.userId == null) const ShellSearchButton(),
+          if (_isMe && _inShell(context)) const ShellSearchButton(),
+          // Own profile is reached from an avatar now, so Settings is a
+          // visible action rather than buried in the menu.
+          if (_isMe)
+            IconButton(
+              tooltip: s.settings,
+              icon: const Icon(AppIcons.settings),
+              onPressed: () => context.goSettings(),
+            ),
           _overflowMenu(context),
         ],
       ),
@@ -391,19 +415,16 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             _showQRCode();
           case 'refresh':
             _fetchProfileData();
-          case 'settings':
-            context.goSettings();
           case 'report':
-            showReportDialog(context, widget.userId!, 'user');
+            if (requireLogin(context)) {
+              showReportDialog(context, widget.userId!, 'user');
+            }
         }
       },
       itemBuilder: (_) => [
         _menuItem('qr', AppIcons.qrCode, s.qrCode),
         _menuItem('refresh', AppIcons.refresh, s.refresh),
-        if (_isMe)
-          _menuItem('settings', AppIcons.settings, s.settings)
-        else
-          _menuItem('report', AppIcons.report, s.reportUser),
+        if (!_isMe) _menuItem('report', AppIcons.report, s.reportUser),
       ],
     );
   }
@@ -419,6 +440,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           ],
         ),
       );
+
+  /// True only when rendered as a tab inside the shell's branch navigator.
+  /// Profile is normally a pushed page (from the avatar action or /u/:id).
+  bool _inShell(BuildContext context) =>
+      StatefulNavigationShell.maybeOf(context) != null;
 
   void _retry() {
     setState(() {
