@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../utils/tags.dart';
-import '../utils/guest_access.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -149,16 +148,12 @@ class _SearchScreenState extends State<SearchScreen> {
     try {
       // 1. Search PROFILES
       if (_activeFilter == 'All' || _activeFilter == 'People') {
-        // Guests can't read profiles; profiles_public is the anon-safe view.
-        final people = isLoggedIn
-            ? await _supabase.from('profiles')
-                .select('id, full_name, display_name, username, avatar_url, role')
-                .or('full_name.ilike.$q,display_name.ilike.$q,username.ilike.$q')
-                .limit(limitPerCategory)
-            : await _supabase.from('profiles_public')
-                .select('id, display_name, username, avatar_url, role')
-                .or('display_name.ilike.$q,username.ilike.$q')
-                .limit(limitPerCategory);
+        // profiles_public for everyone: guests can't read profiles, and the
+        // view exposes only public columns (no full_name to match on).
+        final people = await _supabase.from('profiles_public')
+            .select('id, username, display_name, avatar_url, role, is_verified')
+            .or('display_name.ilike.$q,username.ilike.$q')
+            .limit(limitPerCategory);
             
         for (var p in people) {
           tempResults.add({...p, 'type': 'person'});
