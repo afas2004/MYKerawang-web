@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mykerawang/screens/main_scaffold.dart';
-import 'package:mykerawang/utils/responsive.dart';
 import 'package:mykerawang/widgets/app_sidebar.dart';
+import 'package:mykerawang/widgets/brand/brand.dart';
 import 'package:mykerawang/widgets/right_rail.dart';
 
 import 'helpers/pump_app.dart';
@@ -69,5 +69,37 @@ void main() {
     await pumpScreen(tester, frame());
     expect(find.byType(AppSidebar), findsOneWidget);
     expect(find.byType(RightRail), findsNothing);
+  });
+
+  testWidgets('Create sits in the bar at the same height as the tabs',
+      (tester) async {
+    await initTestSupabase(tester);
+    await setWidth(tester, 375);
+    await pumpScreen(tester, frame());
+
+    final bar = tester.getRect(find.byType(CompactNavBar));
+    final create = tester.getRect(find.text('Create'));
+    final home = tester.getRect(find.text('Home'));
+    // Inside the bar (doesn't stick up) and on the same label baseline.
+    expect(create.top, greaterThanOrEqualTo(bar.top));
+    expect(create.center.dy, closeTo(home.center.dy, 0.5));
+  });
+
+  testWidgets('Create asks guests to log in first', (tester) async {
+    await initTestSupabase(tester);
+    await setWidth(tester, 375);
+    await pumpScreen(tester, frame());
+
+    await tester.tap(find.text('Create'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+  });
+
+  testWidgets('no lattice or motif in the sidebar', (tester) async {
+    await initTestSupabase(tester);
+    await setWidth(tester, 1280);
+    await pumpScreen(tester, frame());
+    expect(find.byType(LatticeBand), findsNothing);
+    expect(find.byType(KerawangLattice), findsNothing);
   });
 }
