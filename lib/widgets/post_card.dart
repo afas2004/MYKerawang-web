@@ -197,6 +197,9 @@ class _PostCardState extends State<PostCard> {
         .where((t) => t.isNotEmpty)
         .toSet();
     final pinned = post['is_pinned'] == true;
+    final sharedIsEvent = post['events'] != null;
+    final Map<String, dynamic>? shared =
+        (post['events'] ?? post['listings']) as Map<String, dynamic>?;
 
     final more = _MoreMenu(
       post: post,
@@ -258,25 +261,28 @@ class _PostCardState extends State<PostCard> {
                     ],
                   ),
                 ),
-              if (photos.isNotEmpty)
+              // A shared event / listing is the hero, right under the
+              // text; the post's own photos shrink to a thumbnail strip.
+              if (shared != null) ...[
+                Padding(
+                  padding: const EdgeInsets.only(top: KSpace.m),
+                  child: SharedItemHero(
+                    data: shared,
+                    isEvent: sharedIsEvent,
+                    onTap: () => sharedIsEvent
+                        ? context.goEvent(shared)
+                        : context.goItem(shared),
+                  ),
+                ),
+                if (photos.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: KSpace.s),
+                    child: PostPhotoStrip(urls: photos),
+                  ),
+              ] else if (photos.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: KSpace.m),
                   child: PostPhotoLayout(urls: photos),
-                ),
-              // Shared event / listing — compact, supports the post.
-              if (post['events'] != null)
-                EmbedCard(
-                  data: post['events'],
-                  isEvent: true,
-                  compact: true,
-                  onTap: () => context.goEvent(post['events']),
-                )
-              else if (post['listings'] != null)
-                EmbedCard(
-                  data: post['listings'],
-                  isEvent: false,
-                  compact: true,
-                  onTap: () => context.goItem(post['listings']),
                 ),
             ],
           ),
@@ -701,6 +707,33 @@ class _PhotoTile extends StatelessWidget {
               child: InkWell(onTap: open),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The post's own photos when a shared event/listing is the hero: a row
+/// of small thumbnails, each opening the gallery.
+class PostPhotoStrip extends StatelessWidget {
+  final List<String> urls;
+
+  const PostPhotoStrip({super.key, required this.urls});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 64,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: urls.length,
+        separatorBuilder: (_, __) => const SizedBox(width: KSpace.s),
+        itemBuilder: (context, i) => ClipRRect(
+          borderRadius: KRadius.small,
+          child: SizedBox.square(
+            dimension: 64,
+            child: _PhotoTile(urls: urls, index: i),
+          ),
         ),
       ),
     );

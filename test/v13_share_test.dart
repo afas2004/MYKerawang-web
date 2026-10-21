@@ -6,7 +6,7 @@ import 'package:mykerawang/widgets/post_card.dart';
 
 import 'helpers/feed_fixtures.dart';
 
-/// v1.3 #4: sharing a post always carries that post's exact /post/<id>.
+/// v1.3 #4: sharing a post always carries that post's exact `/post/<id>`.
 void main() {
   setUp(installFeedHooks);
   tearDown(() {
