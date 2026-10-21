@@ -5,6 +5,8 @@ import '../../widgets/app_sidebar.dart';
 import '../standing_screen.dart';
 import 'admin_screen.dart';
 
+export '../clubs/club_routes.dart' show clubRoutes;
+
 /// Moderation routes, spread into the router's list so router.dart only
 /// needs one line: `...moderationRoutes(_rootKey)`.
 ///   /admin     console (the screen checks is_admin; so does the DB)
