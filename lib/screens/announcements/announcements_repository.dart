@@ -43,7 +43,7 @@ class AnnouncementLink {
 /// Who an announcement is from: a club (posts_public.club) or, for
 /// kolej/JPK/general notices, the author's profile.
 class AnnouncementChannel {
-  /// 'club:<id>' or 'user:<id>' — stable key for the chip filter.
+  /// `club:<id>` or `user:<id>`: stable key for the chip filter.
   final String key;
   final String name;
   final String? avatarUrl;

@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../theme/app_themes.dart' show kOnPhoto, photoScrim;
 import '../../language_cubit.dart';
 import '../../utils/app_nav.dart';
 import '../../utils/formatters.dart';
-import '../../utils/roles.dart';
 import '../../widgets/brand/brand.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/profile_avatar_action.dart';
@@ -18,14 +18,18 @@ import '../../widgets/tap_card.dart';
 import 'announcements_repository.dart';
 import 'hub_strings.dart';
 
-/// Official news hub (tab 2): a hero carousel of pinned / featured posts,
-/// official channel chips, category tabs, upcoming official events and the
-/// announcement list. Readable by guests.
+/// Official news hub: a hero carousel (featured → pinned → newest),
+/// channel chips (clubs and staff), category tabs, upcoming official
+/// events and the announcement list. Readable by guests; people allowed
+/// to post announcements get a "New announcement" action.
 class AnnouncementsScreen extends StatefulWidget {
   /// Injected in tests; defaults to the Supabase-backed repository.
   final AnnouncementsRepository? repository;
 
-  const AnnouncementsScreen({super.key, this.repository});
+  /// Injected in tests; defaults to the `can_post_announcement()` RPC.
+  final Future<bool> Function()? canPost;
+
+  const AnnouncementsScreen({super.key, this.repository, this.canPost});
 
   @override
   State<AnnouncementsScreen> createState() => _AnnouncementsScreenState();
@@ -38,11 +42,12 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   AnnouncementsData? _data;
   bool _loading = true;
   bool _failed = false;
+  bool _canPost = false;
 
   /// null = All.
   AnnouncementCategory? _category;
 
-  /// Selected channel (author id); null = all channels.
+  /// Selected channel key ('club:…' / 'user:…'); null = all.
   String? _channel;
 
   @override
@@ -56,6 +61,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
       _loading = _data == null;
       _failed = false;
     });
+    unawaited(_checkCanPost());
     try {
       final data = await _repo.load();
       if (!mounted) return;
@@ -73,10 +79,20 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
     }
   }
 
+  Future<void> _checkCanPost() async {
+    final ok = await (widget.canPost ?? canPostAnnouncement)();
+    if (mounted && ok != _canPost) setState(() => _canPost = ok);
+  }
+
+  Future<void> _newAnnouncement() async {
+    await context.push('/create/announcement');
+    if (mounted) _load();
+  }
+
   List<Announcement> _visible(AnnouncementsData d) => [
         for (final a in d.items)
           if ((_category == null || a.category == _category) &&
-              (_channel == null || a.author['id'] == _channel))
+              (_channel == null || a.channel?.key == _channel))
             a,
       ];
 
@@ -88,6 +104,12 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
         title: Text(s.hub.title),
         actions: [
           const ShellSearchButton(),
+          if (_canPost)
+            IconButton(
+              tooltip: s.hub.newAnnouncement,
+              icon: const Icon(AppIcons.compose),
+              onPressed: _newAnnouncement,
+            ),
           IconButton(
             tooltip: s.refresh,
             icon: const Icon(AppIcons.refresh),
@@ -119,6 +141,8 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                 illo: AppIllo.emptyFeed,
                 title: s.hub.emptyTitle,
                 message: s.hub.emptyBody,
+                actionLabel: _canPost ? s.hub.newAnnouncement : null,
+                onAction: _canPost ? _newAnnouncement : null,
               ),
             ),
           ),
@@ -128,9 +152,10 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
 
     final visible = _visible(data);
     final filtering = _category != null || _channel != null;
+    final channels = data.channels;
     final showEvents = data.upcomingEvents.isNotEmpty &&
         _channel == null &&
-        (_category == null || _category == AnnouncementCategory.events);
+        (_category == null || _category == AnnouncementCategory.event);
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -139,12 +164,12 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
         slivers: [
           if (!filtering && data.featured.isNotEmpty)
             SliverToBoxAdapter(child: _HeroCarousel(items: data.featured)),
-          if (data.channels.isNotEmpty)
+          if (channels.isNotEmpty)
             SliverToBoxAdapter(
               child: _ChannelRow(
-                channels: data.channels,
+                channels: channels,
                 selected: _channel,
-                onSelect: (id) => setState(() => _channel = id),
+                onSelect: (key) => setState(() => _channel = key),
               ),
             ),
           SliverToBoxAdapter(
@@ -157,16 +182,20 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
             SliverToBoxAdapter(
               child: _UpcomingEvents(events: data.upcomingEvents),
             ),
+          if (data.legacy && visible.isNotEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    KSpace.gutter, KSpace.m, KSpace.gutter, 0),
+                child: Text(s.hub.earlierPosts,
+                    style: Theme.of(context).textTheme.bodySmall),
+              ),
+            ),
           if (visible.isEmpty)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.only(top: KSpace.xl),
-                child: BrandEmptyState(
-                  compact: true,
-                  icon: AppIcons.announcement,
-                  title: s.hub.emptyFilterTitle,
-                  message: s.hub.emptyFilterBody,
-                ),
+                padding: const EdgeInsets.only(top: KSpace.l),
+                child: _CategoryEmpty(category: _category),
               ),
             )
           else
@@ -190,9 +219,46 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
 String categoryLabel(AppStrings s, AnnouncementCategory c) => switch (c) {
       AnnouncementCategory.kolej => s.hub.catKolej,
       AnnouncementCategory.jpk => s.hub.catJpk,
-      AnnouncementCategory.clubs => s.hub.catClubs,
-      AnnouncementCategory.events => s.hub.catEvents,
+      AnnouncementCategory.club => s.hub.catClubs,
+      AnnouncementCategory.event => s.hub.catEvents,
+      AnnouncementCategory.general => s.hub.catGeneral,
     };
+
+IconData categoryIcon(AnnouncementCategory c) => switch (c) {
+      AnnouncementCategory.kolej => AppIcons.official,
+      AnnouncementCategory.jpk => AppIcons.people,
+      AnnouncementCategory.club => AppIcons.sparkle,
+      AnnouncementCategory.event => AppIcons.events,
+      AnnouncementCategory.general => AppIcons.announcement,
+    };
+
+/// Opens an announcement's action link in a new tab / the browser app.
+Future<void> openAnnouncementLink(Uri url) =>
+    launchUrl(url, mode: LaunchMode.externalApplication, webOnlyWindowName: '_blank');
+
+class _CategoryEmpty extends StatelessWidget {
+  final AnnouncementCategory? category;
+  const _CategoryEmpty({required this.category});
+
+  @override
+  Widget build(BuildContext context) {
+    final h = context.l10n.hub;
+    final title = switch (category) {
+      null => h.emptyFilterTitle,
+      AnnouncementCategory.kolej => h.emptyKolej,
+      AnnouncementCategory.jpk => h.emptyJpk,
+      AnnouncementCategory.club => h.emptyClub,
+      AnnouncementCategory.event => h.emptyEvent,
+      AnnouncementCategory.general => h.emptyGeneral,
+    };
+    return BrandEmptyState(
+      compact: true,
+      icon: category == null ? AppIcons.announcement : categoryIcon(category!),
+      title: title,
+      message: category == null ? h.emptyFilterBody : h.emptyCategoryBody,
+    );
+  }
+}
 
 // ---------------------------------------------------------------- hero
 
@@ -239,7 +305,7 @@ class _HeroCarouselState extends State<_HeroCarousel> {
       child: Column(
         children: [
           AspectRatio(
-            aspectRatio: 16 / 8,
+            aspectRatio: 16 / 9,
             child: PageView.builder(
               controller: _controller,
               itemCount: widget.items.length,
@@ -283,12 +349,14 @@ class _HeroSlide extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final s = context.l10n;
-    final image = item.imageUrl;
-    final title = (item.post['title'] as String?)?.trim().isNotEmpty == true
-        ? item.post['title'] as String
-        : (item.post['body'] as String? ?? '');
+    final cover = item.coverUrl;
+    final title = item.title.isNotEmpty ? item.title : item.body;
+    final badge = item.featured
+        ? (s.hub.featured, AppIcons.sparkle)
+        : item.pinned
+            ? (s.hub.pinned, AppIcons.pin)
+            : null;
 
     return TapCard(
       borderRadius: KRadius.card,
@@ -297,15 +365,15 @@ class _HeroSlide extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (image != null)
+          if (cover != null)
             CachedNetworkImage(
-              imageUrl: image,
+              imageUrl: cover,
               fit: BoxFit.cover,
-              memCacheWidth: 1000,
-              errorWidget: (_, __, ___) => _HeroFallback(scheme: scheme),
+              memCacheWidth: 1200,
+              errorWidget: (_, __, ___) => _CategoryCover(category: item.category),
             )
           else
-            _HeroFallback(scheme: scheme),
+            _CategoryCover(category: item.category),
           // Legibility wash for the text sitting on the photo.
           DecoratedBox(
             decoration: BoxDecoration(
@@ -325,11 +393,10 @@ class _HeroSlide extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(children: [
-                  _Pill(
-                    label: item.pinned ? s.hub.pinned : s.hub.featured,
-                    icon: item.pinned ? AppIcons.pin : AppIcons.sparkle,
-                  ),
-                  const SizedBox(width: KSpace.s),
+                  if (badge != null) ...[
+                    _Pill(label: badge.$1, icon: badge.$2),
+                    const SizedBox(width: KSpace.s),
+                  ],
                   _Pill(label: categoryLabel(s, item.category)),
                 ]),
                 const SizedBox(height: KSpace.s),
@@ -342,7 +409,10 @@ class _HeroSlide extends StatelessWidget {
                 ),
                 const SizedBox(height: KSpace.xs),
                 Text(
-                  '${displayNameFor(s, item.author)} · ${formatRelative(context, item.createdAt)}',
+                  [
+                    if (item.channel != null) item.channel!.name,
+                    formatRelative(context, item.publishedAt),
+                  ].join(' · '),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodySmall
@@ -357,25 +427,29 @@ class _HeroSlide extends StatelessWidget {
   }
 }
 
-class _HeroFallback extends StatelessWidget {
-  final ColorScheme scheme;
-  const _HeroFallback({required this.scheme});
+/// No cover photo: a tinted card with the category's icon.
+class _CategoryCover extends StatelessWidget {
+  final AnnouncementCategory category;
+  const _CategoryCover({required this.category});
 
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [scheme.primary, Color.lerp(scheme.primary, Colors.black, 0.35)!],
-          ),
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [scheme.primary, Color.lerp(scheme.primary, Colors.black, 0.35)!],
         ),
-        child: Align(
-          alignment: const Alignment(0.85, -0.6),
-          child: Icon(AppIcons.announcement,
-              size: 56, color: kOnPhoto.withValues(alpha: 0.25)),
-        ),
-      );
+      ),
+      child: Align(
+        alignment: const Alignment(0.85, -0.6),
+        child: Icon(categoryIcon(category),
+            size: 56, color: kOnPhoto.withValues(alpha: 0.25)),
+      ),
+    );
+  }
 }
 
 /// Small translucent label on the hero photo.
@@ -408,7 +482,7 @@ class _Pill extends StatelessWidget {
 // ------------------------------------------------------------ channels
 
 class _ChannelRow extends StatelessWidget {
-  final List<Map<String, dynamic>> channels;
+  final List<AnnouncementChannel> channels;
   final String? selected;
   final ValueChanged<String?> onSelect;
 
@@ -421,7 +495,6 @@ class _ChannelRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = context.l10n;
-    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -444,32 +517,45 @@ class _ChannelRow extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(right: KSpace.s),
                   child: ChoiceChip(
-                    avatar: CircleAvatar(
-                      backgroundColor: theme.colorScheme.primaryContainer,
-                      backgroundImage: c['avatar_url'] != null
-                          ? CachedNetworkImageProvider(c['avatar_url'] as String)
-                          : null,
-                      child: c['avatar_url'] == null
-                          ? Icon(AppIcons.people,
-                              size: 12, color: theme.colorScheme.onPrimaryContainer)
-                          : null,
-                    ),
+                    avatar: _ChannelAvatar(channel: c, radius: 12),
                     label: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Text(displayNameFor(s, c)),
-                      if (c['is_verified'] == true) ...[
+                      Text(c.name),
+                      if (c.verified) ...[
                         const SizedBox(width: 4),
                         Icon(AppIcons.verified,
                             size: 14, color: KTokens.of(context).accent),
                       ],
                     ]),
-                    selected: selected == c['id'],
-                    onSelected: (on) => onSelect(on ? c['id'] as String : null),
+                    selected: selected == c.key,
+                    onSelected: (on) => onSelect(on ? c.key : null),
                   ),
                 ),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ChannelAvatar extends StatelessWidget {
+  final AnnouncementChannel channel;
+  final double radius;
+  const _ChannelAvatar({required this.channel, required this.radius});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final url = channel.avatarUrl;
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: scheme.primaryContainer,
+      backgroundImage:
+          url != null && url.isNotEmpty ? CachedNetworkImageProvider(url) : null,
+      child: url == null || url.isEmpty
+          ? Icon(channel.isClub ? AppIcons.people : AppIcons.official,
+              size: radius, color: scheme.onPrimaryContainer)
+          : null,
     );
   }
 }
@@ -606,11 +692,20 @@ class _EventTile extends StatelessWidget {
 
 // ------------------------------------------------------------ list card
 
-/// One announcement in the list: category label, official badge, author,
-/// date, title and a two-line preview; pinned ones carry the accent frame.
+/// One announcement: category, club/author (verified badge), date, title,
+/// two-line preview, cover thumbnail and the first action link as a small
+/// CTA. Pinned ones carry the accent frame.
 class AnnouncementCard extends StatelessWidget {
   final Announcement announcement;
-  const AnnouncementCard({super.key, required this.announcement});
+
+  /// Opens a CTA link; tests inject a recorder.
+  final Future<void> Function(Uri url) openLink;
+
+  const AnnouncementCard({
+    super.key,
+    required this.announcement,
+    this.openLink = openAnnouncementLink,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -618,87 +713,106 @@ class AnnouncementCard extends StatelessWidget {
     final scheme = theme.colorScheme;
     final s = context.l10n;
     final a = announcement;
-    final title = (a.post['title'] as String?)?.trim() ?? '';
-    final body = (a.post['body'] as String?)?.trim() ?? '';
-    final image = a.imageUrl;
+    final cover = a.coverUrl;
+    final cta = a.links.isEmpty ? null : a.links.first;
+    final channel = a.channel;
 
     return KCard(
       official: a.pinned,
       officialLabel: a.pinned ? s.hub.pinned : null,
       onTap: () => context.goPost(a.post),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Text(categoryLabel(s, a.category).toUpperCase(),
-                      style: theme.textTheme.labelSmall
-                          ?.copyWith(color: scheme.tertiary)),
-                  const SizedBox(width: KSpace.s),
-                  Flexible(
-                    child: Text(formatRelative(context, a.createdAt),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall),
-                  ),
-                ]),
-                const SizedBox(height: KSpace.xs + 2),
-                if (title.isNotEmpty)
-                  Text(title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium),
-                if (body.isNotEmpty) ...[
-                  const SizedBox(height: KSpace.xs),
-                  Text(body,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(color: scheme.onSurfaceVariant)),
-                ],
-                const SizedBox(height: KSpace.s),
-                Row(children: [
-                  CircleAvatar(
-                    radius: 10,
-                    backgroundColor: scheme.primaryContainer,
-                    backgroundImage: a.author['avatar_url'] != null
-                        ? CachedNetworkImageProvider(a.author['avatar_url'] as String)
-                        : null,
-                  ),
-                  const SizedBox(width: KSpace.s),
-                  Flexible(
-                    child: Text(displayNameFor(s, a.author),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelMedium),
-                  ),
-                  const SizedBox(width: KSpace.xs),
-                  Tooltip(
-                    message: s.hub.official,
-                    child: Icon(AppIcons.verified,
-                        size: 14, color: KTokens.of(context).accent),
-                  ),
-                ]),
-              ],
-            ),
-          ),
-          if (image != null) ...[
-            const SizedBox(width: KSpace.m),
-            ClipRRect(
-              borderRadius: KRadius.small,
-              child: CachedNetworkImage(
-                imageUrl: image,
-                width: 76,
-                height: 76,
-                fit: BoxFit.cover,
-                memCacheWidth: 228,
-                errorWidget: (_, __, ___) => const SizedBox(width: 76, height: 76),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Text(categoryLabel(s, a.category).toUpperCase(),
+                          style: theme.textTheme.labelSmall
+                              ?.copyWith(color: scheme.tertiary)),
+                      const SizedBox(width: KSpace.s),
+                      Flexible(
+                        child: Text(formatRelative(context, a.publishedAt),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall),
+                      ),
+                    ]),
+                    const SizedBox(height: KSpace.xs + 2),
+                    if (a.title.isNotEmpty)
+                      Text(a.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium),
+                    if (a.body.isNotEmpty) ...[
+                      const SizedBox(height: KSpace.xs),
+                      Text(a.body,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(color: scheme.onSurfaceVariant)),
+                    ],
+                  ],
+                ),
               ),
-            ),
-          ],
+              if (cover != null) ...[
+                const SizedBox(width: KSpace.m),
+                ClipRRect(
+                  borderRadius: KRadius.small,
+                  child: CachedNetworkImage(
+                    imageUrl: cover,
+                    width: 76,
+                    height: 76,
+                    fit: BoxFit.cover,
+                    memCacheWidth: 228,
+                    errorWidget: (_, __, ___) =>
+                        const SizedBox(width: 76, height: 76),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: KSpace.s),
+          Row(children: [
+            if (channel != null) ...[
+              _ChannelAvatar(channel: channel, radius: 10),
+              const SizedBox(width: KSpace.s),
+              Flexible(
+                child: Text(channel.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelMedium),
+              ),
+              if (channel.verified) ...[
+                const SizedBox(width: KSpace.xs),
+                Tooltip(
+                  message: s.hub.official,
+                  child: Icon(AppIcons.verified,
+                      size: 14, color: KTokens.of(context).accent),
+                ),
+              ],
+            ] else
+              const Spacer(),
+            if (cta != null) ...[
+              const SizedBox(width: KSpace.s),
+              if (channel != null) const Spacer(),
+              OutlinedButton.icon(
+                onPressed: () => openLink(cta.url),
+                icon: const Icon(AppIcons.externalLink, size: 14),
+                label: Text(cta.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 36),
+                  padding: const EdgeInsets.symmetric(horizontal: KSpace.m),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ]),
         ],
       ),
     );
@@ -721,7 +835,7 @@ class _HubSkeleton extends StatelessWidget {
           padding: const EdgeInsets.all(KSpace.gutter),
           children: [
             const AspectRatio(
-              aspectRatio: 16 / 8,
+              aspectRatio: 16 / 9,
               child: KSkeleton(borderRadius: KRadius.card),
             ),
             const SizedBox(height: KSpace.xl),
