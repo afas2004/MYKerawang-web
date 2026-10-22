@@ -11,6 +11,7 @@ import '../language_cubit.dart';
 import '../utils/adaptive.dart';
 import '../utils/formatters.dart';
 import '../utils/app_nav.dart';
+import '../utils/form_draft.dart';
 import '../widgets/form_layout.dart';
 import '../widgets/media_picker_grid.dart';
 import '../widgets/restriction_gate.dart';
@@ -74,6 +75,51 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     // Leaving with unsaved input asks first (router onExit).
     _initialSnapshot = _snapshot();
     FormGuard.register(() => !_isLoading && _snapshot() != _initialSnapshot);
+    if (item == null) _restoreDraft();
+  }
+
+  /// New listings autosave their text (see FormDraft): a reload while the
+  /// camera / photo picker is open doesn't lose it.
+  final _draft = FormDraft('create_listing');
+
+  Map<String, dynamic> _draftData() => {
+        'title': _titleController.text,
+        'price': _priceController.text,
+        'description': _descriptionController.text,
+        'category': _category,
+      };
+
+  Future<void> _restoreDraft() async {
+    final d = await _draft.load();
+    // Only into an untouched form.
+    if (d == null || !mounted || _snapshot() != _initialSnapshot) return;
+    setState(() {
+      _titleController.text = d['title'] ?? '';
+      _priceController.text = d['price'] ?? '';
+      _descriptionController.text = d['description'] ?? '';
+      final cat = d['category'];
+      if (cat is String && kListingCategories.contains(cat)) _category = cat;
+    });
+    _showDraftRestored();
+  }
+
+  void _showDraftRestored() {
+    final s = context.l10nRead;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+      content: Text(s.draftRestored),
+      action: SnackBarAction(
+        label: s.discard,
+        onPressed: () {
+          if (!mounted) return;
+          setState(() {
+            _titleController.clear();
+            _priceController.clear();
+            _descriptionController.clear();
+          });
+          _draft.clear();
+        },
+      ),
+    ));
   }
 
   late final String _initialSnapshot;
@@ -94,6 +140,9 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     _priceController.dispose();
     _descriptionController.dispose();
     FormGuard.clear();
+    // Leaving on purpose (publish / discard / close) drops the draft; a
+    // page reload never gets here, so the draft survives that.
+    _draft.clear();
     super.dispose();
   }
 
@@ -230,6 +279,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.itemToEdit == null) _draft.save(_draftData());
     final isEditing = widget.itemToEdit != null;
     final s = context.l10n;
 
@@ -250,7 +300,13 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                 icon: AppIcons.photo,
                 children: [
                   // Shared with the event form
-                  MediaPickerGrid(items: _mediaItems, onChanged: () => setState(() {})),
+                  // The picker returns after an await (camera / file dialog);
+                  // the form may be gone by then.
+                  MediaPickerGrid(
+                      items: _mediaItems,
+                      onChanged: () {
+                        if (mounted) setState(() {});
+                      }),
                 ],
               ),
               FormSection(
@@ -289,6 +345,8 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                       },
                     );
                     final category = DropdownButtonFormField<String>(
+                      // Keyed so a restored draft's category shows.
+                      key: ValueKey(_category),
                       initialValue: _category,
                       decoration: InputDecoration(labelText: s.category),
                       items: kListingCategories

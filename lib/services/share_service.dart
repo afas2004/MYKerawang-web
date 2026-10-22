@@ -73,6 +73,11 @@ class ShareService {
     return '$origin$path';
   }
 
+  /// [text] followed by the page's absolute URL on its own line, so the
+  /// person receiving a chat message can open the exact listing / event.
+  static String withPageLink(String text, String path) =>
+      '$text\n${absoluteUrl(path)}';
+
   /// Share sheet.
   ///
   /// [link] is a route such as `/item/<id>`. When present, the default on

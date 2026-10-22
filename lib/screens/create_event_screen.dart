@@ -10,6 +10,7 @@ import '../language_cubit.dart';
 import '../utils/adaptive.dart';
 import '../utils/formatters.dart';
 import '../utils/app_nav.dart';
+import '../utils/form_draft.dart';
 import '../widgets/form_layout.dart';
 import '../widgets/media_picker_grid.dart';
 import '../widgets/restriction_gate.dart';
@@ -77,6 +78,55 @@ if (event['tags'] != null) {
     // Leaving with unsaved input asks first (router onExit).
     _initialSnapshot = _snapshot();
     FormGuard.register(() => !_isLoading && _snapshot() != _initialSnapshot);
+    if (event == null) _restoreDraft();
+  }
+
+  /// New events autosave their text (see FormDraft): a reload while the
+  /// camera / photo picker is open doesn't lose it.
+  final _draft = FormDraft('create_event');
+
+  Map<String, dynamic> _draftData() => {
+        'title': _titleController.text,
+        'location': _locationController.text,
+        'description': _descController.text,
+        'link': _linkController.text,
+        'tags': _selectedTags,
+      };
+
+  Future<void> _restoreDraft() async {
+    final d = await _draft.load();
+    // Only into an untouched form.
+    if (d == null || !mounted || _snapshot() != _initialSnapshot) return;
+    setState(() {
+      _titleController.text = d['title'] ?? '';
+      _locationController.text = d['location'] ?? '';
+      _descController.text = d['description'] ?? '';
+      _linkController.text = d['link'] ?? '';
+      final tags = d['tags'];
+      if (tags is List) _selectedTags = tags.whereType<String>().toList();
+    });
+    _showDraftRestored();
+  }
+
+  void _showDraftRestored() {
+    final s = context.l10nRead;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+      content: Text(s.draftRestored),
+      action: SnackBarAction(
+        label: s.discard,
+        onPressed: () {
+          if (!mounted) return;
+          setState(() {
+            _titleController.clear();
+            _locationController.clear();
+            _descController.clear();
+            _linkController.clear();
+            _selectedTags = [];
+          });
+          _draft.clear();
+        },
+      ),
+    ));
   }
 
   late final String _initialSnapshot;
@@ -101,6 +151,9 @@ if (event['tags'] != null) {
     _descController.dispose();
     _linkController.dispose();
     FormGuard.clear();
+    // Leaving on purpose (publish / discard / close) drops the draft; a
+    // page reload never gets here, so the draft survives that.
+    _draft.clear();
     super.dispose();
   }
 
@@ -222,6 +275,7 @@ if (event['tags'] != null) {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.eventToEdit == null) _draft.save(_draftData());
     final theme = Theme.of(context);
     final isEditing = widget.eventToEdit != null;
     final s = context.l10n;
@@ -243,7 +297,13 @@ if (event['tags'] != null) {
                 icon: AppIcons.photo,
                 children: [
                   // Shared with the listing form
-                  MediaPickerGrid(items: _mediaItems, onChanged: () => setState(() {})),
+                  // The picker returns after an await (camera / file dialog);
+                  // the form may be gone by then.
+                  MediaPickerGrid(
+                      items: _mediaItems,
+                      onChanged: () {
+                        if (mounted) setState(() {});
+                      }),
                 ],
               ),
               FormSection(

@@ -242,7 +242,11 @@ int _currentImageIndex = 0;
                       ShareService.openWhatsApp(
                         context,
                         raw,
-                        s.whatsAppInterest.fill([_itemData['title'], formatPrice(_itemData['price'])]),
+                        // The seller gets a link to the exact listing.
+                        ShareService.withPageLink(
+                          s.whatsAppInterest.fill([_itemData['title'], formatPrice(_itemData['price'])]),
+                          '/item/${_itemData['id']}',
+                        ),
                       );
                     },
                   ),
