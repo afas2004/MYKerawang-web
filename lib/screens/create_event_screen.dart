@@ -14,6 +14,9 @@ import '../utils/form_draft.dart';
 import '../widgets/form_layout.dart';
 import '../widgets/media_picker_grid.dart';
 import '../widgets/restriction_gate.dart';
+import '../l10n/create_strings.dart';
+import '../services/club_service.dart';
+import '../widgets/post_as_selector.dart';
 
 class CreateEventScreen extends StatefulWidget {
   final Map<String, dynamic>? eventToEdit; 
@@ -35,6 +38,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   DateTime? _startDate;
   DateTime? _endDate;
   bool _isLoading = false;
+
+  /// Yourself (null) or one of your clubs: club events are official.
+  PostAsOption? _hostAs;
 
   // UNIFIED MEDIA LIST (Stores both Strings (URLs) and Files)
   // Index 0 is ALWAYS the Cover Photo.
@@ -224,7 +230,8 @@ if (event['tags'] != null) {
         // Back to the event page, which refreshes.
         if (mounted) completeEdit(context, message: s.eventUpdated);
       } else {
-        final newEvent = await supabase.from('events').insert(data).select().single();
+        final insert = (_hostAs ?? const PostAsOption.self('')).applyTo(data, hasAnonymous: false);
+        final newEvent = await supabase.from('events').insert(insert).select().single();
         await _processMentions(_descController.text, newEvent['id']);
         // The form is replaced by the new event's page, so back from
         // there returns to where the user started, not to this form.
@@ -310,6 +317,29 @@ if (event['tags'] != null) {
                 title: s.sectionDetails,
                 icon: AppIcons.edit,
                 children: [
+                  if (!isEditing) ...[
+                    PostAsSelector(
+                      selfLabel: s.create.yourself,
+                      label: s.create.hostedBy,
+                      value: _hostAs,
+                      onChanged: (o) => setState(() => _hostAs = o),
+                    ),
+                    if (_hostAs?.isClub ?? false) ...[
+                      const SizedBox(height: KSpace.s),
+                      Row(
+                        children: [
+                          Icon(AppIcons.official, size: 16, color: theme.colorScheme.tertiary),
+                          const SizedBox(width: KSpace.xs),
+                          Expanded(
+                            child: Text(s.create.clubEventNote,
+                                style: theme.textTheme.bodySmall
+                                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: KSpace.l),
+                  ],
                   _label(s.eventTitle, topPad: 0),
                   _input(_titleController, s.eventTitleHint, validator: _required(s.title)),
                   _label(s.description),
