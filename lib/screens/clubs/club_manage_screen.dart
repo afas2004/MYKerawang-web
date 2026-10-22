@@ -1,6 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import '../../utils/app_nav.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../l10n/app_strings.dart';
@@ -125,7 +125,9 @@ class _ClubManageScreenState extends State<ClubManageScreen> {
             removeOfficer: (id) async {
               await ClubService.removeOfficer(club.id, id);
               if (id == ClubService.currentUserId) {
-                if (context.mounted) context.go('/c/${club.handle}');
+                // No longer an officer: back to the club page (or up to
+                // it when this page was opened cold).
+                if (context.mounted) appBack(context);
               } else {
                 _reload();
               }

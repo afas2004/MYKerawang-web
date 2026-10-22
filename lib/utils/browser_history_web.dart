@@ -6,3 +6,10 @@ bool browserHistoryBack() {
   web.window.history.back();
   return true;
 }
+
+/// Steps the browser forward one entry — used to undo a browser back that
+/// only closed a dialog or sheet, so the address bar matches the page.
+bool browserHistoryForward() {
+  web.window.history.forward();
+  return true;
+}

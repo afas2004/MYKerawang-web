@@ -16,6 +16,18 @@ class HubStrings {
   final String catJpk;
   final String catClubs;
   final String catEvents;
+  final String catGeneral;
+
+  /// Per-category empty states (All uses emptyTitle / emptyBody).
+  final String emptyKolej;
+  final String emptyJpk;
+  final String emptyClub;
+  final String emptyEvent;
+  final String emptyGeneral;
+  final String emptyCategoryBody;
+
+  final String newAnnouncement;
+  final String earlierPosts;
 
   final String featured;
   final String pinned;
@@ -42,6 +54,15 @@ class HubStrings {
     required this.catJpk,
     required this.catClubs,
     required this.catEvents,
+    required this.catGeneral,
+    required this.emptyKolej,
+    required this.emptyJpk,
+    required this.emptyClub,
+    required this.emptyEvent,
+    required this.emptyGeneral,
+    required this.emptyCategoryBody,
+    required this.newAnnouncement,
+    required this.earlierPosts,
     required this.featured,
     required this.pinned,
     required this.official,
@@ -66,6 +87,15 @@ class HubStrings {
     catJpk: "JPK",
     catClubs: "Clubs",
     catEvents: "Events",
+    catGeneral: "General",
+    emptyKolej: "No Kolej announcements yet",
+    emptyJpk: "No JPK announcements yet",
+    emptyClub: "No club announcements yet",
+    emptyEvent: "No event announcements yet",
+    emptyGeneral: "No general notices yet",
+    emptyCategoryBody: "New ones will show up here. Check All for everything else.",
+    newAnnouncement: "New announcement",
+    earlierPosts: "Recent posts from official accounts",
     featured: "Featured",
     pinned: "Pinned",
     official: "Official",
@@ -90,6 +120,15 @@ class HubStrings {
     catJpk: "JPK",
     catClubs: "Kelab",
     catEvents: "Acara",
+    catGeneral: "Umum",
+    emptyKolej: "Belum ada pengumuman Kolej",
+    emptyJpk: "Belum ada pengumuman JPK",
+    emptyClub: "Belum ada pengumuman kelab",
+    emptyEvent: "Belum ada pengumuman acara",
+    emptyGeneral: "Belum ada notis umum",
+    emptyCategoryBody: "Yang baru akan keluar di sini. Tengok Semua untuk yang lain.",
+    newAnnouncement: "Pengumuman baru",
+    earlierPosts: "Post terkini daripada akaun rasmi",
     featured: "Pilihan",
     pinned: "Dipin",
     official: "Rasmi",

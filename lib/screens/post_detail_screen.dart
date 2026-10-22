@@ -5,7 +5,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/mention_service.dart';
 import '../services/comment_pins.dart';
 import '../services/moderation_service.dart';
+import '../services/announcement_service.dart';
 import '../services/post_service.dart';
+import '../services/share_service.dart';
+import '../utils/announcement_rules.dart';
+import '../widgets/announcement_view.dart';
+import '../l10n/announce_strings.dart';
+import 'create_post_screen.dart';
 import '../widgets/linear_refresher.dart';
 import '../widgets/comment_tile.dart';
 import '../widgets/owner_menu.dart';
@@ -61,6 +67,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     _commentCtrl.addListener(_onTextChanged);
     _loadComments();
     _checkCanPin();
+    _loadLinkedEvent();
     // Realtime only signals; rows are re-read from comments_public so
     // anonymous authors stay hidden.
     _channel = _supabase
@@ -115,8 +122,47 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   /// Post author or admin may pin comments (the RPC re-checks).
   bool _canPinComments = false;
 
+  /// The viewer wrote this post (anonymous ones included).
+  bool _mine = false;
+
+  /// The event an announcement links to (linked_event_id).
+  Map<String, dynamic>? _linkedEvent;
+
+  bool get _isAnnouncement => _postData['is_announcement'] == true;
+
+  Future<void> _loadLinkedEvent() async {
+    final id = _postData['linked_event_id'];
+    if (id == null) return;
+    final ev = await AnnouncementService.event('$id');
+    if (mounted && ev != null) setState(() => _linkedEvent = ev);
+  }
+
+  Future<void> _deleteAnnouncement() async {
+    final ps = context.postL10nRead;
+    final ok = await confirmDelete(
+      context,
+      title: ps.deletePost,
+      message: ps.deletePostConfirm,
+    );
+    if (!ok || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await PostService.deletePost(_postData);
+      messenger.showSnackBar(SnackBar(content: Text(ps.postDeleted)));
+      notifyContentChanged();
+      if (mounted) _leave();
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text(describeWriteError(context, e))),
+        );
+      }
+    }
+  }
+
   Future<void> _checkCanPin() async {
     final mine = await PostService.isMine(_postData);
+    if (mounted && mine != _mine) setState(() => _mine = mine);
     final role = mine ? null : await ModerationService.myRole();
     final can = mine || role == 'admin' || role == 'owner';
     if (mounted && can != _canPinComments) {
@@ -442,13 +488,22 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       body: LinearRefresher(
         onRefresh: _refreshData,
         child: PostDetailLayout(
-          post: PostCard(
-            post: _postData,
-            onTap: null,
-            expanded: true,
-            onDeleted: _leave,
-            onCommentTap: _composerFocus.requestFocus,
-          ),
+          // Announcements use their own template; posts use the card.
+          post: _isAnnouncement
+              ? AnnouncementDetailHead(
+                  post: _postData,
+                  linkedEvent: _linkedEvent,
+                  canManage: _mine || _canPinComments,
+                  onEdit: () => openPostEditor(context, _postData),
+                  onDelete: _deleteAnnouncement,
+                )
+              : PostCard(
+                  post: _postData,
+                  onTap: null,
+                  expanded: true,
+                  onDeleted: _leave,
+                  onCommentTap: _composerFocus.requestFocus,
+                ),
           commentsHeader: Semantics(
             header: true,
             child: Text(
@@ -457,19 +512,22 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             ),
           ),
           comments: _buildComments(context),
-          // Guests read; the composer becomes a sign-in prompt.
-          composer: GuestableComposer(
-            loggedIn: isLoggedIn,
-            composer: CommentComposer(
-              controller: _commentCtrl,
-              focusNode: _composerFocus,
-              anonymous: _isAnon,
-              sending: _isSending,
-              canSend: _hasText && !_isSending,
-              onToggleAnonymous: () => setState(() => _isAnon = !_isAnon),
-              onSend: _submitComment,
-            ),
-          ),
+          // Comments can be turned off on announcements; guests read
+          // and get a sign-in prompt instead of the composer.
+          composer: !commentsEnabled(_postData)
+              ? const CommentsOffNotice()
+              : GuestableComposer(
+                  loggedIn: isLoggedIn,
+                  composer: CommentComposer(
+                    controller: _commentCtrl,
+                    focusNode: _composerFocus,
+                    anonymous: _isAnon,
+                    sending: _isSending,
+                    canSend: _hasText && !_isSending,
+                    onToggleAnonymous: () => setState(() => _isAnon = !_isAnon),
+                    onSend: _submitComment,
+                  ),
+                ),
         ),
       ),
     );
@@ -698,6 +756,106 @@ class CommentComposer extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Shown in place of the comment box when an announcement has comments off.
+class CommentsOffNotice extends StatelessWidget {
+  const CommentsOffNotice({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.all(KSpace.l),
+        child: Row(
+          children: [
+            Icon(AppIcons.lock, size: 18, color: scheme.onSurfaceVariant),
+            const SizedBox(width: KSpace.s),
+            Expanded(
+              child: Text(
+                context.announceL10n.commentsOff,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Top of an announcement's page: the reader template plus Share and,
+/// for the author / club officers / admins, Edit and Delete.
+class AnnouncementDetailHead extends StatelessWidget {
+  final Map<String, dynamic> post;
+  final Map<String, dynamic>? linkedEvent;
+  final bool canManage;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const AnnouncementDetailHead({
+    super.key,
+    required this.post,
+    required this.linkedEvent,
+    required this.canManage,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final fs = context.feedL10n;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: KSpace.xs),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AnnouncementView(
+            data: AnnouncementData.fromPost(post, linkedEvent: linkedEvent),
+          ),
+          const SizedBox(height: KSpace.s),
+          Row(
+            children: [
+              IconButton(
+                tooltip: fs.shareAction,
+                icon: const Icon(AppIcons.share, size: 20),
+                onPressed: () => ShareService.shareContent(
+                  context,
+                  (post['title'] as String?) ?? AppStrings.appName,
+                  (post['body'] as String?) ?? '',
+                  [if (post['cover_url'] != null) post['cover_url']],
+                  link: postSharePath(post['id']),
+                ),
+              ),
+              const Spacer(),
+              if (canManage) ...[
+                TextButton.icon(
+                  onPressed: onEdit,
+                  icon: const Icon(AppIcons.edit, size: 18),
+                  label: Text(s.edit),
+                ),
+                IconButton(
+                  tooltip: s.delete,
+                  icon: Icon(
+                    AppIcons.delete,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  onPressed: onDelete,
+                ),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }

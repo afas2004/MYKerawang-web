@@ -17,6 +17,8 @@ import '../widgets/feed_composer.dart';
 import '../widgets/hover_carousel.dart';
 import '../widgets/shell_actions.dart';
 import '../widgets/universal_card.dart';
+import '../utils/announcement_rules.dart';
+import '../widgets/announcement_view.dart';
 import '../widgets/post_card.dart';
 import '../widgets/profile_avatar_action.dart';
 import '../widgets/post_card_skeleton.dart';
@@ -32,8 +34,11 @@ List<Map<String, dynamic>> buildFeedItems(
 }) {
   final out = <Map<String, dynamic>>[];
   var next = 0;
-  for (var i = 0; i < posts.length; i++) {
-    out.add({...posts[i], 'type': 'post'});
+  // Announcements may opt out of Home (show_in_feed = false); scheduled
+  // ones wait for publish_at (the view hides them too).
+  final shown = posts.where((p) => showInHomeFeed(p)).toList();
+  for (var i = 0; i < shown.length; i++) {
+    out.add({...shown[i], 'type': 'post'});
     if (inject && (i + 1) % every == 0 && next < injectables.length) {
       out.add(injectables[next++]);
     }
@@ -369,6 +374,13 @@ class FeedView extends StatelessWidget {
                             onTap: () => isEvent
                                 ? context.goEvent(item)
                                 : context.goItem(item),
+                          );
+                        }
+                        if (item['is_announcement'] == true) {
+                          return AnnouncementCard(
+                            key: ValueKey(item['id']),
+                            post: item,
+                            onTap: () => context.goPost(item),
                           );
                         }
                         return PostCard(

@@ -32,7 +32,10 @@ class AdminNavEntry extends StatelessWidget {
           icon: AppIcons.moderation,
           label: context.l10n.mod.moderation,
           selected: selected,
-          onTap: () => context.go('/admin'),
+          // Pushed like Settings, so back returns to where you were.
+          onTap: () {
+            if (!selected) context.push('/admin');
+          },
         );
       },
     );

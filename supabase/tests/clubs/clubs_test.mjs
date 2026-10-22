@@ -36,8 +36,8 @@ for (const f of before) await db.exec(read(path.join(mig, f)));
 legacy.robotics = await user('robotics', 'club');
 legacy.pending = await user('chess', 'club_pending', 'Club Verification: Registered with HEP, ref 123');
 await db.exec(`insert into public.posts (user_id, title) values ('${legacy.robotics}', 'Old club post')`);
-for (const pass of [1, 2]) {
-  for (const f of clubFiles) {
+for (const f of clubFiles) {
+  for (const pass of [1, 2]) {
     try { await db.exec(read(path.join(mig, f))); }
     catch (e) { console.error(`FAIL pass ${pass} ${f}: ${e.message}`); process.exit(1); }
   }

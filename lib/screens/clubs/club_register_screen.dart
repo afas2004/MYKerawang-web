@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import '../../utils/app_nav.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../language_cubit.dart';
@@ -101,7 +101,9 @@ class _ClubRegisterScreenState extends State<ClubRegisterScreen> {
       title: c.requestSent,
       message: c.requestSentBody.fill([_name.text.trim()]),
       actionLabel: c.viewPage,
-      onAction: () => context.go('/c/$handle'),
+      // The finished form is replaced by the club page, so back doesn't
+      // return to it.
+      onAction: () => completePublish(context, '/c/$handle'),
     );
   }
 
