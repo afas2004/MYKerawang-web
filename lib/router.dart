@@ -8,6 +8,7 @@ import 'language_cubit.dart';
 import 'screens/announcements/announcements_screen.dart';
 import 'screens/create_event_screen.dart';
 import 'screens/create_listing_screen.dart';
+import 'screens/create_announcement_screen.dart';
 import 'screens/create_post_screen.dart';
 import 'screens/edit_profile_screen.dart';
 import 'screens/event_detail_screen.dart';
@@ -334,6 +335,30 @@ GoRouter buildRouter() {
             id: state.pathParameters['id']!,
             initial: state.extra as Map<String, dynamic>?,
             build: (data) => CreatePostScreen(editPost: data),
+          ),
+        ),
+      ),
+      // v1.4 announcements: own composer (officers / admins only; the
+      // screen checks can_post_announcement and the DB enforces it).
+      GoRoute(
+        path: '/create/announcement',
+        parentNavigatorKey: _rootKey,
+        onExit: leaveFormRoute,
+        pageBuilder: (context, state) =>
+            formPage(context, state, const CreateAnnouncementScreen()),
+      ),
+      GoRoute(
+        path: '/post/:id/edit-announcement',
+        parentNavigatorKey: _rootKey,
+        onExit: leaveFormRoute,
+        pageBuilder: (context, state) => formPage(
+          context,
+          state,
+          _DetailLoader(
+            table: 'posts_public',
+            id: state.pathParameters['id']!,
+            initial: state.extra as Map<String, dynamic>?,
+            build: (data) => CreateAnnouncementScreen(editPost: data),
           ),
         ),
       ),

@@ -18,7 +18,9 @@ import '../utils/tags.dart';
 import '../widgets/media_picker_grid.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/restriction_gate.dart';
+import 'clubs/post_as_selector.dart';
 import 'profile_cubit.dart';
+import '../services/club_service.dart';
 
 /// Width at or above which the editor opens as a dialog over the feed;
 /// below it is a full-screen page.
@@ -42,15 +44,24 @@ Future<bool> openPostComposer(
 
   contentChanges.addListener(onChange);
   final Future<Object?> route = post != null
-      ? context.push('/post/${post['id']}/edit', extra: post)
-      : context.push('/create/post', extra: {
-          if (sharedEvent != null) 'sharedEvent': sharedEvent,
-          if (sharedListing != null) 'sharedListing': sharedListing,
-        });
+      ? context.push(
+          post['is_announcement'] == true
+              ? '/post/${post['id']}/edit-announcement'
+              : '/post/${post['id']}/edit',
+          extra: post)
+      : context.push(
+          '/create/post',
+          extra: {
+            if (sharedEvent != null) 'sharedEvent': sharedEvent,
+            if (sharedListing != null) 'sharedListing': sharedListing,
+          },
+        );
   route.then((_) {
     if (!done.isCompleted) done.complete(false);
   });
-  return done.future.whenComplete(() => contentChanges.removeListener(onChange));
+  return done.future.whenComplete(
+    () => contentChanges.removeListener(onChange),
+  );
 }
 
 /// Edit [post] in the composer.
@@ -64,8 +75,17 @@ class CreatePostScreen extends StatefulWidget {
   /// When set, the form edits this post instead of creating one.
   final Map<String, dynamic>? editPost;
 
-  const CreatePostScreen(
-      {super.key, this.sharedEvent, this.sharedListing, this.editPost});
+  /// Tests: the "Post as" choices without a club lookup.
+  @visibleForTesting
+  final List<PostAsOption>? postAsOptions;
+
+  const CreatePostScreen({
+    super.key,
+    this.sharedEvent,
+    this.sharedListing,
+    this.editPost,
+    this.postAsOptions,
+  });
 
   @override
   State<CreatePostScreen> createState() => _CreatePostScreenState();
@@ -82,6 +102,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _tagCtrl = TextEditingController();
   final _tagFocus = FocusNode();
   bool _isAnon = false;
+
+  /// "Post as" (club officers only); null = yourself. Club posts are
+  /// never anonymous — the club is the speaker.
+  PostAsOption? _postAs;
+  bool get _asClub => _postAs?.isClub == true;
   bool _isLoading = false;
   String? _newPostId;
 
@@ -104,7 +129,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       widget.sharedListing ?? widget.editPost?['listings'];
 
   /// Suggested shortcuts — users can also type anything they like.
-  static const _suggested = ['question', 'confession', kLostFoundTag, 'rant', 'academic'];
+  static const _suggested = [
+    'question',
+    'confession',
+    kLostFoundTag,
+    'rant',
+    'academic',
+  ];
 
   @override
   void initState() {
@@ -113,10 +144,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     if (post != null) {
       _titleCtrl.text = post['title'] ?? '';
       _bodyCtrl.text = post['body'] ?? '';
-      _tags.addAll(List<String>.from(post['tags'] ?? const [])
-          .map(normalizeTag)
-          .where((t) => t.isNotEmpty)
-          .toSet());
+      _tags.addAll(
+        List<String>.from(
+          post['tags'] ?? const [],
+        ).map(normalizeTag).where((t) => t.isNotEmpty).toSet(),
+      );
       _isAnon = post['is_anonymous'] ?? false;
       _photos.addAll(PostService.photoUrlsOf(post));
     }
@@ -128,7 +160,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     _titleCtrl.addListener(_rebuild);
     // Leaving with unsaved input asks first, with this form's own wording
     // (router onExit: close button, Android back, browser back alike).
-    FormGuard.register(() => _dirty && !_isLoading, confirm: (_) => _confirmDiscard());
+    FormGuard.register(
+      () => _dirty && !_isLoading,
+      confirm: (_) => _confirmDiscard(),
+    );
   }
 
   @override
@@ -188,9 +223,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   void _onPhotosChanged() {
     if (_photos.length > PostService.maxPhotos) {
       _photos.removeRange(PostService.maxPhotos, _photos.length);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(context.postL10nRead.photoLimit
-              .fill([PostService.maxPhotos]))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.postL10nRead.photoLimit.fill([PostService.maxPhotos]),
+          ),
+        ),
+      );
     }
     setState(() {});
   }
@@ -207,12 +246,16 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         content: Text(fs.discardPostBody),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(s.keepEditing)),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(s.keepEditing),
+          ),
           TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(s.discard,
-                  style: TextStyle(color: Theme.of(ctx).colorScheme.error))),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              s.discard,
+              style: TextStyle(color: Theme.of(ctx).colorScheme.error),
+            ),
+          ),
         ],
       ),
     );
@@ -233,12 +276,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     final body = _bodyCtrl.text.trim();
     final messenger = ScaffoldMessenger.of(context);
     if (title.isEmpty && body.isEmpty && _photos.isEmpty) {
-      messenger.showSnackBar(SnackBar(content: Text(context.postL10nRead.postEmpty)));
+      messenger.showSnackBar(
+        SnackBar(content: Text(context.postL10nRead.postEmpty)),
+      );
       return;
     }
     if (_bodyCtrl.text.length > _bodyMax) {
-      messenger.showSnackBar(SnackBar(
-          content: Text(context.feedL10nRead.tooLong.fill([_bodyMax]))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(context.feedL10nRead.tooLong.fill([_bodyMax]))),
+      );
       return;
     }
     if (!await ensureCanWrite(context, ModScope.post) || !mounted) return;
@@ -258,9 +304,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           body: _bodyCtrl.text,
           tags: _tags,
           photoUrls: photoUrls,
-          removedPhotoUrls: PostService.photoUrlsOf(edit)
-              .where((u) => !photoUrls.contains(u))
-              .toList(),
+          removedPhotoUrls: PostService.photoUrlsOf(
+            edit,
+          ).where((u) => !photoUrls.contains(u)).toList(),
         );
         // Only people the edit newly mentions.
         await MentionService.notify(
@@ -270,7 +316,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           alreadyNotified: MentionService.usernamesIn(edit['body'] ?? ''),
         );
       } else {
-        final newPost = await Supabase.instance.client.from('posts').insert({
+        final row = (_postAs ?? const PostAsOption.self('')).applyTo({
           'user_id': Supabase.instance.client.auth.currentUser!.id,
           'title': title.isEmpty ? null : title,
           'body': _bodyCtrl.text,
@@ -280,14 +326,19 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           'tags': _tags,
           'image_url': photoUrls.firstOrNull,
           'gallery_urls': photoUrls.skip(1).toList(),
-        }).select('id').single();
+        });
+        final newPost = await Supabase.instance.client
+            .from('posts')
+            .insert(row)
+            .select('id')
+            .single();
         _newPostId = newPost['id'];
         PostService.rememberMine(newPost['id']);
 
         await MentionService.notify(
           text: _bodyCtrl.text,
           postId: newPost['id'],
-          anonymous: _isAnon,
+          anonymous: _isAnon && !_asClub,
         );
       }
 
@@ -297,20 +348,26 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         } else {
           // The editor is replaced by the new post, so back from there
           // returns to where the user started, not to this form.
-          completePublish(context, '/post/$_newPostId', message: s.postedSuccess);
+          completePublish(
+            context,
+            '/post/$_newPostId',
+            message: s.postedSuccess,
+          );
         }
       }
     } catch (e) {
       if (mounted) {
-        messenger.showSnackBar(SnackBar(
-          content: Text(describeWriteError(context, e)),
-          action: SnackBarAction(
-            label: s.tryAgain,
-            onPressed: () {
-              if (mounted) _submit();
-            },
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(describeWriteError(context, e)),
+            action: SnackBarAction(
+              label: s.tryAgain,
+              onPressed: () {
+                if (mounted) _submit();
+              },
+            ),
           ),
-        ));
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -323,7 +380,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   Map<String, dynamic>? _profile(BuildContext context) {
     try {
       return context.select<ProfileCubit, Map<String, dynamic>?>(
-          (c) => c.state.profile);
+        (c) => c.state.profile,
+      );
     } catch (_) {
       return null; // no ProfileCubit above (tests, isolated use)
     }
@@ -367,21 +425,45 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 width: 18,
                 height: 18,
                 child: CircularProgressIndicator(
-                    strokeWidth: 2, color: scheme.onPrimary))
+                  strokeWidth: 2,
+                  color: scheme.onPrimary,
+                ),
+              )
             : Text(_isEdit ? s.saveChanges : fs.postAction),
       ),
     );
 
     Widget sectionLabel(String text) => Padding(
-          padding: const EdgeInsets.only(bottom: KSpace.s),
-          child: Text(text, style: theme.textTheme.titleSmall),
-        );
+      padding: const EdgeInsets.only(bottom: KSpace.s),
+      child: Text(text, style: theme.textTheme.titleSmall),
+    );
 
     final editor = ListView(
       padding: const EdgeInsets.fromLTRB(
-          KSpace.l, KSpace.s, KSpace.l, KSpace.xxl),
+        KSpace.l,
+        KSpace.s,
+        KSpace.l,
+        KSpace.xxl,
+      ),
       children: [
-        _AuthorRow(anonymous: _isAnon, profile: _profile(context)),
+        _AuthorRow(
+          anonymous: _isAnon && !_asClub,
+          profile: _profile(context),
+          club: _postAs,
+        ),
+        if (!_isEdit) ...[
+          const SizedBox(height: KSpace.m),
+          PostAsSelector(
+            selfLabel: (_profile(context)?['display_name'] as String?) ?? '',
+            selfAvatar: _profile(context)?['avatar_url'] as String?,
+            value: _postAs,
+            options: widget.postAsOptions,
+            onChanged: (o) => setState(() {
+              _postAs = o.isClub ? o : null;
+              if (o.isClub) _isAnon = false;
+            }),
+          ),
+        ],
         if (_sharedEvent != null || _sharedListing != null) ...[
           const SizedBox(height: KSpace.m),
           _SharedRef(event: _sharedEvent, listing: _sharedListing),
@@ -391,14 +473,17 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           controller: _titleCtrl,
           maxLength: _titleMax,
           textInputAction: TextInputAction.next,
-          style: theme.textTheme.titleMedium
-              ?.copyWith(fontSize: 18, fontWeight: FontWeight.w600),
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
           decoration: InputDecoration(
             hintText: ps.titleOptionalHint,
             hintStyle: theme.textTheme.titleMedium?.copyWith(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: scheme.onSurfaceVariant),
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: scheme.onSurfaceVariant,
+            ),
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
@@ -435,7 +520,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         ),
         const SizedBox(height: KSpace.m),
 
-        sectionLabel(s.photosCount.fill([_photos.length, PostService.maxPhotos])),
+        sectionLabel(
+          s.photosCount.fill([_photos.length, PostService.maxPhotos]),
+        ),
         MediaPickerGrid(items: _photos, onChanged: _onPhotosChanged),
         const SizedBox(height: KSpace.xl),
 
@@ -462,34 +549,48 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               ),
           ],
         ),
-        const SizedBox(height: KSpace.l),
-        const Divider(height: 1),
+        // Anonymity isn't offered when posting as a club.
+        if (!_asClub) ...[
+          const SizedBox(height: KSpace.l),
+          const Divider(height: 1),
 
-        // Anonymity: one line here, the full explanation behind (i).
-        // Fixed once posted: flipping it later would expose (or
-        // re-attribute) what was already said under it.
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(AppIcons.anonymous,
-              color: _isAnon ? scheme.primary : scheme.onSurfaceVariant),
-          title: Row(
-            children: [
-              Flexible(child: Text(s.postAnonymously)),
-              IconButton(
-                tooltip: fs.anonInfo,
-                icon: Icon(AppIcons.info, size: 18, color: scheme.onSurfaceVariant),
-                onPressed: _showAnonInfo,
-              ),
-            ],
+          // Anonymity: one line here, the full explanation behind (i).
+          // Fixed once posted: flipping it later would expose (or
+          // re-attribute) what was already said under it.
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              AppIcons.anonymous,
+              color: _isAnon ? scheme.primary : scheme.onSurfaceVariant,
+            ),
+            title: Row(
+              children: [
+                Flexible(child: Text(s.postAnonymously)),
+                IconButton(
+                  tooltip: fs.anonInfo,
+                  icon: Icon(
+                    AppIcons.info,
+                    size: 18,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  onPressed: _showAnonInfo,
+                ),
+              ],
+            ),
+            subtitle: Text(
+              _isEdit ? ps.anonymityLocked : fs.anonShort,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: Switch(
+              value: _isAnon,
+              onChanged: _isEdit
+                  ? null
+                  : (val) => setState(() => _isAnon = val),
+            ),
+            onTap: _isEdit ? null : () => setState(() => _isAnon = !_isAnon),
           ),
-          subtitle: Text(_isEdit ? ps.anonymityLocked : fs.anonShort,
-              maxLines: 1, overflow: TextOverflow.ellipsis),
-          trailing: Switch(
-            value: _isAnon,
-            onChanged: _isEdit ? null : (val) => setState(() => _isAnon = val),
-          ),
-          onTap: _isEdit ? null : () => setState(() => _isAnon = !_isAnon),
-        ),
+        ],
       ],
     );
 
@@ -513,7 +614,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           ),
           body: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: Responsive.feedMaxWidth),
+              constraints: const BoxConstraints(
+                maxWidth: Responsive.feedMaxWidth,
+              ),
               child: editor,
             ),
           ),
@@ -529,34 +632,47 @@ class _AuthorRow extends StatelessWidget {
   final bool anonymous;
   final Map<String, dynamic>? profile;
 
-  const _AuthorRow({required this.anonymous, required this.profile});
+  /// Posting as a club: its logo, name and handle.
+  final PostAsOption? club;
+
+  const _AuthorRow({required this.anonymous, required this.profile, this.club});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final s = context.l10n;
-    final avatar = anonymous ? null : profile?['avatar_url'] as String?;
-    final name = anonymous
-        ? s.anonymous
-        : (profile?['display_name'] as String? ?? s.roleStudent);
-    final handle = anonymous ? null : profile?['username'] as String?;
+    final asClub = club?.isClub == true;
+    final avatar = asClub
+        ? club!.avatarUrl
+        : (anonymous ? null : profile?['avatar_url'] as String?);
+    final name = asClub
+        ? club!.label
+        : (anonymous
+              ? s.anonymous
+              : (profile?['display_name'] as String? ?? s.roleStudent));
+    final handle = asClub
+        ? club!.handle
+        : (anonymous ? null : profile?['username'] as String?);
     return AnimatedSwitcher(
       duration: KMotion.of(context).fast,
       child: Row(
-        key: ValueKey(anonymous),
+        key: ValueKey('$anonymous${club?.clubId}'),
         children: [
           CircleAvatar(
             radius: 20,
-            backgroundColor:
-                anonymous ? scheme.surfaceContainerHighest : scheme.primaryContainer,
+            backgroundColor: anonymous
+                ? scheme.surfaceContainerHighest
+                : scheme.primaryContainer,
             backgroundImage: avatar != null ? NetworkImage(avatar) : null,
             child: avatar == null
-                ? Icon(anonymous ? AppIcons.anonymous : AppIcons.person,
+                ? Icon(
+                    anonymous ? AppIcons.anonymous : AppIcons.person,
                     size: 20,
                     color: anonymous
                         ? scheme.onSurfaceVariant
-                        : scheme.onPrimaryContainer)
+                        : scheme.onPrimaryContainer,
+                  )
                 : null,
           ),
           const SizedBox(width: KSpace.m),
@@ -564,15 +680,21 @@ class _AuthorRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w600)),
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 if (handle != null)
-                  Text('@$handle',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: scheme.onSurfaceVariant)),
+                  Text(
+                    '@$handle',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -604,16 +726,22 @@ class _SharedRef extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(isEvent ? AppIcons.events : AppIcons.market,
-              size: 20, color: scheme.primary),
+          Icon(
+            isEvent ? AppIcons.events : AppIcons.market,
+            size: 20,
+            color: scheme.primary,
+          ),
           const SizedBox(width: KSpace.m),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(isEvent ? s.referencingEvent : s.referencingItem,
-                    style: theme.textTheme.labelSmall
-                        ?.copyWith(color: scheme.onSurfaceVariant)),
+                Text(
+                  isEvent ? s.referencingEvent : s.referencingItem,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
                 Text(
                   ((isEvent ? event : listing)!['title'] as String?) ?? '',
                   style: theme.textTheme.titleSmall,
@@ -660,7 +788,12 @@ class _TagField extends StatelessWidget {
       child: ListenableBuilder(
         listenable: focusNode,
         builder: (context, _) => Container(
-          padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.xs, KSpace.s, KSpace.xs),
+          padding: const EdgeInsets.fromLTRB(
+            KSpace.m,
+            KSpace.xs,
+            KSpace.s,
+            KSpace.xs,
+          ),
           decoration: BoxDecoration(
             borderRadius: KRadius.input,
             border: Border.all(
@@ -679,7 +812,9 @@ class _TagField extends StatelessWidget {
                   label: Text(displayTag(t)),
                   deleteIcon: const Icon(AppIcons.close, size: 16),
                   onDeleted: () => onRemove(t),
-                  deleteButtonTooltipMessage: fs.removeTag.fill([displayTag(t)]),
+                  deleteButtonTooltipMessage: fs.removeTag.fill([
+                    displayTag(t),
+                  ]),
                 ),
               ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 160, maxWidth: 320),
@@ -700,7 +835,9 @@ class _TagField extends StatelessWidget {
                         focusedBorder: InputBorder.none,
                         filled: false,
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(vertical: KSpace.m - 2),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: KSpace.m - 2,
+                        ),
                       ),
                     ),
                   ),
