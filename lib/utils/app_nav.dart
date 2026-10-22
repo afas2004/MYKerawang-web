@@ -83,29 +83,58 @@ extension AppNav on BuildContext {
 // Back
 // ---------------------------------------------------------------------------
 
-/// Where "back" goes when there's nothing to go back to (a page opened
-/// cold from a shared link, a refresh, a bookmark).
-String backFallbackFor(String path) {
-  final segments = Uri.parse(path).pathSegments;
-  if (segments.isEmpty) return '/home';
-  // An edit form backs out to the thing being edited.
-  if (segments.length >= 3 && segments.last == 'edit') {
-    return '/${segments[0]}/${segments[1]}';
-  }
-  return switch (segments.first) {
-    'item' => '/market',
-    'event' => '/events',
-    'create' => switch (segments.length > 1 ? segments[1] : '') {
+/// The shell's tab roots.
+const kTabPaths = {'/home', '/announcements', '/search', '/market', '/events'};
+
+/// The logical parent of a page: where the back arrow goes ("up") when
+/// the page was opened cold — a shared link, a refresh, a bookmark, a new
+/// tab — so there is no in-app page underneath. With history, back always
+/// returns to the page actually seen before; this is only the fallback.
+///
+/// A create form opened from a tab carries `?from=<tab>` and goes back up
+/// to that tab.
+String backFallbackFor(String location) {
+  final uri = Uri.parse(location);
+  final seg = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+  if (seg.isEmpty) return '/home';
+
+  // Edit forms → the thing being edited (/post|event|item/:id/edit).
+  if (seg.length == 3 && seg.last == 'edit') return '/${seg[0]}/${seg[1]}';
+
+  switch (seg.first) {
+    case 'settings':
+      return seg.length > 1 ? '/settings' : '/profile';
+    case 'profile':
+      return seg.length > 1 ? '/profile' : '/home';
+    case 'notifications':
+    case 'post':
+    case 'tag':
+      return '/home';
+    case 'u':
+      // /u/:id/followers|following → that profile.
+      return seg.length > 2 ? '/u/${seg[1]}' : '/home';
+    case 'item':
+      return '/market';
+    case 'event':
+      return '/events';
+    case 'clubs':
+      return seg.length > 1 ? '/clubs' : '/announcements';
+    case 'c':
+      // /c/:handle/manage → the club page; /c/:handle → the directory.
+      return seg.length > 2 ? '/c/${seg[1]}' : '/clubs';
+    case 'admin':
+    case 'standing':
+      return '/profile';
+    case 'create':
+      final from = uri.queryParameters['from'];
+      if (from != null && kTabPaths.contains(from)) return from;
+      return switch (seg.length > 1 ? seg[1] : '') {
         'listing' => '/market',
         'event' => '/events',
         _ => '/home',
-      },
-    'settings' when segments.length > 1 => '/settings',
-    // /profile/edit backs out to the profile; /profile itself (no longer
-    // a tab) to Home.
-    'profile' when segments.length > 1 => '/profile',
-    _ => '/home', // post, u, tag, notifications, settings, …
-  };
+      };
+  }
+  return '/home';
 }
 
 /// The current location as go_router sees it.
@@ -154,6 +183,52 @@ class AppCloseButton extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // History-aware exits (GoRoute.onExit)
 // ---------------------------------------------------------------------------
+
+/// Tracks pageless routes — dialogs, bottom sheets, menus, the photo
+/// viewer — on every navigator, so a browser / system back can close the
+/// topmost one first instead of leaving the page under it (rule: overlays
+/// first). Each navigator needs its own instance; they share the list.
+class OverlayTracker extends NavigatorObserver {
+  static final List<Route<dynamic>> _open = [];
+
+  static bool get hasOverlay => _open.any((r) => r.navigator != null);
+
+  /// Closes the topmost overlay. Returns false if there was none.
+  static bool closeTopmost() {
+    _open.removeWhere((r) => r.navigator == null);
+    if (_open.isEmpty) return false;
+    final route = _open.removeLast();
+    final navigator = route.navigator!;
+    if (route.isCurrent) {
+      navigator.pop();
+    } else {
+      navigator.removeRoute(route);
+    }
+    return true;
+  }
+
+  @visibleForTesting
+  static void debugReset() => _open.clear();
+
+  static bool _isOverlay(Route<dynamic> route) => route.settings is! Page;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (_isOverlay(route)) _open.add(route);
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) => _open.remove(route);
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) => _open.remove(route);
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    if (oldRoute != null) _open.remove(oldRoute);
+    if (newRoute != null && _isOverlay(newRoute)) _open.add(newRoute);
+  }
+}
 
 /// `onExit` for routes pushed above the shell.
 ///
