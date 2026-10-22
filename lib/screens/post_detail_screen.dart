@@ -69,7 +69,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     _checkCanPin();
     _loadLinkedEvent();
     // Realtime only signals; rows are re-read from comments_public so
-    // anonymous authors stay hidden.
+    // anonymous authors stay hidden. Guests read once: no realtime
+    // connections for logged-out visitors (Supabase connection limits).
+    if (_supabase.auth.currentSession == null) return;
     _channel = _supabase
         .channel('post-comments-$_postId')
         .onPostgresChanges(

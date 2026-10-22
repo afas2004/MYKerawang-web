@@ -252,9 +252,9 @@ GoRouter buildRouter() {
             initial: state.extra as Map<String, dynamic>?,
             // Logged-out visitors get a read-only view; the full screen
             // assumes a signed-in user for commenting and reporting.
-            build: (data) => isLoggedIn
-                ? PostDetailScreen(post: data)
-                : GuestPostScreen(post: data),
+            // Same page for guests: read, share and see comments; actions
+            // that need an account prompt sign-in (requireLogin).
+            build: (data) => PostDetailScreen(post: data),
           ),
         ),
       ),
