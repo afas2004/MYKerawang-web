@@ -18,22 +18,47 @@ enum AnnouncementCategory {
 }
 
 /// A call-to-action link on an announcement (`action_links`, max 2).
+///
+/// Either an external web link ([url], opened in the browser) or an
+/// in-app path ([path], e.g. `/event/<id>`, `/c/<handle>`,
+/// `/clubs/register`, opened with `context.push`).
 class AnnouncementLink {
   final String label;
-  final Uri url;
-  const AnnouncementLink(this.label, this.url);
 
-  /// Only http(s) links with a label are shown.
+  /// External http(s) link; null for an in-app path.
+  final Uri? url;
+
+  /// In-app route path; null for an external link.
+  final String? path;
+
+  const AnnouncementLink.external(this.label, Uri this.url) : path = null;
+  const AnnouncementLink.internal(this.label, String this.path) : url = null;
+
+  bool get isInternal => path != null;
+
+  /// A same-app path: one leading '/', not '//' (protocol-relative URL)
+  /// and no backslashes (some browsers treat '/\' like '//').
+  static bool isAppPath(String v) =>
+      v.startsWith('/') && !v.startsWith('//') && !v.contains(r'\');
+
+  /// Keeps labelled http(s) links and in-app paths; max two.
   static List<AnnouncementLink> parse(dynamic raw) {
     if (raw is! List) return const [];
     final out = <AnnouncementLink>[];
     for (final e in raw) {
       if (e is! Map) continue;
       final label = (e['label'] ?? '').toString().trim();
-      final uri = Uri.tryParse((e['url'] ?? '').toString().trim());
-      if (label.isEmpty || uri == null) continue;
-      if (uri.scheme != 'https' && uri.scheme != 'http') continue;
-      out.add(AnnouncementLink(label, uri));
+      final value = (e['url'] ?? '').toString().trim();
+      if (label.isEmpty || value.isEmpty) continue;
+      if (isAppPath(value)) {
+        out.add(AnnouncementLink.internal(label, value));
+      } else {
+        final uri = Uri.tryParse(value);
+        if (uri == null || (uri.scheme != 'https' && uri.scheme != 'http')) {
+          continue;
+        }
+        out.add(AnnouncementLink.external(label, uri));
+      }
       if (out.length == 2) break;
     }
     return out;

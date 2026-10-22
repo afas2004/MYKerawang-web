@@ -698,14 +698,26 @@ class _EventTile extends StatelessWidget {
 class AnnouncementCard extends StatelessWidget {
   final Announcement announcement;
 
-  /// Opens a CTA link; tests inject a recorder.
+  /// Opens an external CTA link; tests inject a recorder.
   final Future<void> Function(Uri url) openLink;
+
+  /// Opens an in-app CTA path; defaults to `context.push(path)`.
+  final void Function(BuildContext context, String path)? openPath;
 
   const AnnouncementCard({
     super.key,
     required this.announcement,
     this.openLink = openAnnouncementLink,
+    this.openPath,
   });
+
+  void _open(BuildContext context, AnnouncementLink link) {
+    if (link.isInternal) {
+      (openPath ?? (c, p) => c.push(p))(context, link.path!);
+    } else {
+      openLink(link.url!);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -802,8 +814,10 @@ class AnnouncementCard extends StatelessWidget {
               const SizedBox(width: KSpace.s),
               if (channel != null) const Spacer(),
               OutlinedButton.icon(
-                onPressed: () => openLink(cta.url),
-                icon: const Icon(AppIcons.externalLink, size: 14),
+                onPressed: () => _open(context, cta),
+                icon: Icon(
+                    cta.isInternal ? AppIcons.forward : AppIcons.externalLink,
+                    size: 14),
                 label: Text(cta.label, maxLines: 1, overflow: TextOverflow.ellipsis),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(0, 36),

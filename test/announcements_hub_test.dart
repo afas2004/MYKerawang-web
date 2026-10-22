@@ -65,6 +65,24 @@ void main() {
       expect(a.links.map((l) => l.label), ['Register', 'Third']);
     });
 
+    test('links: https external, single-slash app paths internal', () {
+      final links = AnnouncementLink.parse([
+        {'label': 'Event', 'url': '/event/e1'},
+        {'label': 'Form', 'url': 'https://forms.gle/x'},
+      ]);
+      expect(links.map((l) => l.isInternal), [true, false]);
+      expect(links[0].path, '/event/e1');
+      expect(links[1].url.toString(), 'https://forms.gle/x');
+
+      // Protocol-relative, backslash tricks and other schemes are dropped.
+      for (final bad in ['//evil.com/x', r'/\evil.com', 'javascript:x', 'mailto:a@b']) {
+        expect(AnnouncementLink.parse([{'label': 'X', 'url': bad}]), isEmpty,
+            reason: bad);
+      }
+      expect(AnnouncementLink.isAppPath('/clubs/register'), isTrue);
+      expect(AnnouncementLink.isAppPath('/c/robotics'), isTrue);
+    });
+
     test('unknown category → general; author channel without a club', () {
       final a = Announcement.fromRow(row(category: 'weird'), now: _now);
       expect(a.category, AnnouncementCategory.general);
@@ -164,6 +182,31 @@ void main() {
       await tester.pump();
       expect(find.byType(AnnouncementCard), findsNothing);
       expect(find.text('No JPK announcements yet'), findsOneWidget);
+    });
+
+    testWidgets('CTA: app paths open in-app, https opens externally',
+        (tester) async {
+      await initTestSupabase(tester);
+      await setWidth(tester, 375, height: 900);
+      final pushed = <String>[];
+      final launched = <Uri>[];
+      Widget card(String url) => AnnouncementCard(
+            announcement: Announcement.fromRow(row(links: [
+              {'label': 'Open', 'url': url}
+            ])),
+            openPath: (_, p) => pushed.add(p),
+            openLink: (u) async => launched.add(u),
+          );
+
+      await pumpScreen(tester, card('/event/e1'));
+      await tester.tap(find.text('Open'));
+      expect(pushed, ['/event/e1']);
+      expect(launched, isEmpty);
+
+      await pumpScreen(tester, card('https://forms.gle/x'));
+      await tester.tap(find.text('Open'));
+      expect(launched.map((u) => u.toString()), ['https://forms.gle/x']);
+      expect(pushed, ['/event/e1']);
     });
 
     testWidgets('New announcement shows only when allowed', (tester) async {
