@@ -44,7 +44,11 @@ Future<bool> openPostComposer(
 
   contentChanges.addListener(onChange);
   final Future<Object?> route = post != null
-      ? context.push('/post/${post['id']}/edit', extra: post)
+      ? context.push(
+          post['is_announcement'] == true
+              ? '/post/${post['id']}/edit-announcement'
+              : '/post/${post['id']}/edit',
+          extra: post)
       : context.push(
           '/create/post',
           extra: {
