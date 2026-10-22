@@ -60,14 +60,14 @@ extension AppNav on BuildContext {
 
   /// New post. [sharedEvent] / [sharedListing] attach a repost.
   void goCreatePost({Map<String, dynamic>? sharedEvent, Map<String, dynamic>? sharedListing}) =>
-      push('/create/post', extra: {
+      push(_withOrigin(this, '/create/post'), extra: {
         if (sharedEvent != null) 'sharedEvent': sharedEvent,
         if (sharedListing != null) 'sharedListing': sharedListing,
       });
 
-  void goCreateEvent() => push('/create/event');
+  void goCreateEvent() => push(_withOrigin(this, '/create/event'));
 
-  void goCreateListing() => push('/create/listing');
+  void goCreateListing() => push(_withOrigin(this, '/create/listing'));
 
   void goEditPost(Map<String, dynamic> post) =>
       push('/post/${post['id']}/edit', extra: post);
@@ -77,6 +77,15 @@ extension AppNav on BuildContext {
 
   void goEditListing(Map<String, dynamic> item) =>
       push('/item/${item['id']}/edit', extra: item);
+}
+
+/// `/create/...?from=<tab>` when a form is opened from a tab, so a
+/// refreshed form still knows which tab it belongs to.
+String _withOrigin(BuildContext context, String path) {
+  final here = GoRouter.of(context).routeInformationProvider.value.uri.path;
+  return kTabPaths.contains(here)
+      ? Uri(path: path, queryParameters: {'from': here}).toString()
+      : path;
 }
 
 // ---------------------------------------------------------------------------
@@ -150,7 +159,8 @@ void appBack(BuildContext context) {
     navigator.maybePop();
     return;
   }
-  final fallback = backFallbackFor(currentPath(context));
+  final fallback = backFallbackFor(
+      GoRouter.of(context).routeInformationProvider.value.uri.toString());
   Router.neglect(context, () => context.go(fallback));
 }
 
@@ -230,23 +240,76 @@ class OverlayTracker extends NavigatorObserver {
   }
 }
 
+/// The browser's history, behind hooks so tests can stand in a fake.
+abstract final class WebHistory {
+  static bool Function() isWeb = () => kIsWeb;
+  static bool Function() back = browserHistoryBack;
+  static bool Function() forward = browserHistoryForward;
+
+  @visibleForTesting
+  static void debugReset() {
+    isWeb = () => kIsWeb;
+    back = browserHistoryBack;
+    forward = browserHistoryForward;
+  }
+}
+
 /// `onExit` for routes pushed above the shell.
 ///
 /// go_router calls onExit both for an in-app pop and for a navigation that
-/// replaces the route (browser back, `go`, `pushReplacement`). On the web
-/// an in-app pop would otherwise *add* a browser history entry — which is
-/// why back used to walk through every earlier step. Instead, an in-app
-/// pop steps the browser back; go_router then restores the page beneath
-/// from that history entry (calling onExit again, this time letting it go).
+/// replaces the route (browser back / forward, `go`, `pushReplacement`).
 ///
-/// An in-app pop is recognisable because the location hasn't changed yet.
+/// * In-app pop on the web (app-bar back, close, code calling pop): a pop
+///   would otherwise *add* a history entry, so it steps the browser back
+///   instead; go_router then restores the page beneath from that entry.
+///   Recognised by: the exiting page is the top of the current stack AND
+///   the address bar still shows it.
+///
+///   Both conditions matter. When the browser restores an entry, go_router
+///   rebuilds the restored stack, so pages *under* the one being left exit
+///   and re-enter too — and the address bar already shows them. Checking
+///   only the address bar (as before) made such a page step back a second
+///   time: Home → Profile → Settings, back, landed on Home.
+///
+/// * Browser / system back with a dialog, sheet, menu or the photo viewer
+///   open: that overlay closes and the page stays; the history step is
+///   undone so the address bar keeps matching the page.
 FutureOr<bool> historyAwareExit(BuildContext context, GoRouterState state) {
-  if (!kIsWeb) return true;
-  final provider = GoRouter.of(context).routeInformationProvider;
-  final stillHere = provider.value.uri.path == state.matchedLocation;
-  if (stillHere && browserHistoryBack()) return false;
+  if (!WebHistory.isWeb()) return true;
+  // Our own forward step after closing an overlay: the browser comes back
+  // to this same page; let go_router settle without treating it as a pop.
+  if (_restoringAfterOverlay) {
+    _restoringAfterOverlay = false;
+    return true;
+  }
+  final router = GoRouter.of(context);
+  final top = router.routerDelegate.currentConfiguration.last;
+  final isTopPage = top.pageKey == state.pageKey;
+  if (!isTopPage) return true; // rebuilt as part of a restored stack
+
+  final shownInBar = router.routeInformationProvider.value.uri.path == state.matchedLocation;
+  if (shownInBar) {
+    // In-app pop: let the browser do it, so history stays in step.
+    return !WebHistory.back();
+  }
+
+  // Browser back / forward / go away from this page.
+  if (_fromBrowser(router) && OverlayTracker.closeTopmost()) {
+    _restoringAfterOverlay = true;
+    // Safety: never let the flag outlive the step it is for.
+    Future<void>.delayed(const Duration(seconds: 2), () => _restoringAfterOverlay = false);
+    WebHistory.forward(); // put the address bar back on this page
+    return false;
+  }
   return true;
 }
+
+bool _restoringAfterOverlay = false;
+
+/// Whether the pending location came from the browser (back / forward)
+/// rather than from the app (go / push / pop).
+bool _fromBrowser(GoRouter router) =>
+    router.routeInformationProvider.value.state is! RouteInformationState;
 
 // ---------------------------------------------------------------------------
 // Unsaved forms

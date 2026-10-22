@@ -125,6 +125,7 @@ GoRouter buildRouter() {
   return GoRouter(
     navigatorKey: _rootKey,
     initialLocation: '/home',
+    observers: [OverlayTracker()],
     refreshListenable: authNotifier,
 
     // Auth gate with guest mode — see [authRedirect].
@@ -155,6 +156,9 @@ GoRouter buildRouter() {
         branches: [
           StatefulShellBranch(
             navigatorKey: _shellKey,
+            // Each navigator reports its dialogs / sheets / menus, so a
+            // browser back closes them before leaving the page.
+            observers: [OverlayTracker()],
             routes: [
               GoRoute(
                 path: '/home',
@@ -162,25 +166,25 @@ GoRouter buildRouter() {
               ),
             ],
           ),
-          StatefulShellBranch(routes: [
+          StatefulShellBranch(observers: [OverlayTracker()], routes: [
             GoRoute(
               path: '/announcements',
               builder: (context, state) => const AnnouncementsScreen(),
             ),
           ]),
-          StatefulShellBranch(routes: [
+          StatefulShellBranch(observers: [OverlayTracker()], routes: [
             GoRoute(
               path: '/search',
               builder: (context, state) => const SearchScreen(),
             ),
           ]),
-          StatefulShellBranch(routes: [
+          StatefulShellBranch(observers: [OverlayTracker()], routes: [
             GoRoute(
               path: '/market',
               builder: (context, state) => const MarketplaceScreen(),
             ),
           ]),
-          StatefulShellBranch(routes: [
+          StatefulShellBranch(observers: [OverlayTracker()], routes: [
             GoRoute(
               path: '/events',
               builder: (context, state) => const EventsScreen(),
