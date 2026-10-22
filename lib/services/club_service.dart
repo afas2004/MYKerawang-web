@@ -106,8 +106,10 @@ class PostAsOption {
 
   /// Adds/clears `club_id` on a row about to be inserted into posts,
   /// events or listings. RLS rejects it unless you're an officer.
-  Map<String, dynamic> applyTo(Map<String, dynamic> row) =>
-      {...row, 'club_id': clubId, if (isClub) 'is_anonymous': false};
+  /// Pass `hasAnonymous: false` for tables without is_anonymous (events,
+  /// listings).
+  Map<String, dynamic> applyTo(Map<String, dynamic> row, {bool hasAnonymous = true}) =>
+      {...row, 'club_id': clubId, if (isClub && hasAnonymous) 'is_anonymous': false};
 }
 
 /// What the caller may announce (can_post_announcement(), 20261023001100).

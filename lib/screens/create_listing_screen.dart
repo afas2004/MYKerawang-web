@@ -15,6 +15,9 @@ import '../utils/form_draft.dart';
 import '../widgets/form_layout.dart';
 import '../widgets/media_picker_grid.dart';
 import '../widgets/restriction_gate.dart';
+import '../l10n/create_strings.dart';
+import '../services/club_service.dart';
+import '../widgets/post_as_selector.dart';
 
 class CreateListingScreen extends StatefulWidget {
   final Map<String, dynamic>? itemToEdit; 
@@ -34,10 +37,17 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   late TextEditingController _titleController;
   late TextEditingController _priceController;
   late TextEditingController _descriptionController;
+  late TextEditingController _meetupController;
+  late TextEditingController _quantityController;
   
   // State
   String _category = 'Books';
   bool _isLoading = false;
+
+  /// Yourself (null) or one of your clubs. Fixed once published.
+  PostAsOption? _postAs;
+  bool get _asClub => _postAs?.isClub ?? (widget.itemToEdit?['club_id'] != null);
+  String? _condition;
 
   // UNIFIED MEDIA LIST (Stores both Strings/URLs and LocalImages)
   // Index 0 is ALWAYS the Cover Photo.
@@ -51,6 +61,10 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     _titleController = TextEditingController(text: item?['title'] ?? '');
     _priceController = TextEditingController(text: item?['price']?.toString() ?? '');
     _descriptionController = TextEditingController(text: item?['description'] ?? '');
+    _meetupController = TextEditingController(text: item?['meetup'] ?? '');
+    _quantityController = TextEditingController(text: item?['quantity']?.toString() ?? '');
+    final cond = item?['condition'];
+    _condition = CreateStrings.conditions.contains(cond) ? cond as String : null;
     
     if (item != null) {
       // Older/seeded listings may carry a category no longer offered
@@ -87,6 +101,8 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         'price': _priceController.text,
         'description': _descriptionController.text,
         'category': _category,
+        'meetup': _meetupController.text,
+        'condition': _condition,
       };
 
   Future<void> _restoreDraft() async {
@@ -99,6 +115,9 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
       _descriptionController.text = d['description'] ?? '';
       final cat = d['category'];
       if (cat is String && kListingCategories.contains(cat)) _category = cat;
+      _meetupController.text = d['meetup'] ?? '';
+      final cond = d['condition'];
+      if (CreateStrings.conditions.contains(cond)) _condition = cond as String;
     });
     _showDraftRestored();
   }
@@ -130,6 +149,10 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         _priceController.text,
         _descriptionController.text,
         _category,
+        _meetupController.text,
+        _quantityController.text,
+        _condition,
+        _postAs?.clubId,
         _mediaItems.length,
         _mediaItems.map((m) => m is String ? m : identityHashCode(m)).join(','),
       ].join('|');
@@ -139,6 +162,8 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     _titleController.dispose();
     _priceController.dispose();
     _descriptionController.dispose();
+    _meetupController.dispose();
+    _quantityController.dispose();
     FormGuard.clear();
     // Leaving on purpose (publish / discard / close) drops the draft; a
     // page reload never gets here, so the draft survives that.
@@ -202,7 +227,8 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
     setState(() => _isLoading = true);
     try {
-      if (!await _ensurePhone(user.id)) {
+      // Club listings use the club's contact (get_listing_contact).
+      if (!_asClub && !await _ensurePhone(user.id)) {
         if (mounted) setState(() => _isLoading = false);
         return;
       }
@@ -254,6 +280,9 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         'image_url': finalCoverUrl,      // Index 0
         'gallery_urls': finalGalleryUrls, // Index 1+
         'fulfillment_type': 'Pickup',
+        'condition': _condition,
+        'meetup': _meetupController.text.trim().isEmpty ? null : _meetupController.text.trim(),
+        'quantity': _asClub ? int.tryParse(_quantityController.text.trim()) : null,
       };
 
       if (widget.itemToEdit != null) {
@@ -261,7 +290,8 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         // Back to the listing page, which refreshes.
         if (mounted) completeEdit(context, message: s.listingUpdated);
       } else {
-        final row = await _supabase.from('listings').insert(data).select().single();
+        final insert = (_postAs ?? const PostAsOption.self('')).applyTo(data, hasAnonymous: false);
+        final row = await _supabase.from('listings').insert(insert).select().single();
         // The form is replaced by the new listing's page, so back from
         // there returns to where the user started, not to this form.
         if (mounted) {
@@ -313,6 +343,20 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                 title: s.sectionDetails,
                 icon: AppIcons.edit,
                 children: [
+                  if (!isEditing)
+                    PostAsSelector(
+                      selfLabel: s.create.yourself,
+                      label: s.create.sellingAs,
+                      value: _postAs,
+                      onChanged: (o) => setState(() => _postAs = o),
+                    ),
+                  if (_asClub) ...[
+                    const SizedBox(height: KSpace.s),
+                    Text(s.create.clubContactNote,
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                  ],
+                  if (!isEditing) const SizedBox(height: KSpace.l),
                   TextFormField(
                     controller: _titleController,
                     textInputAction: TextInputAction.next,
@@ -326,6 +370,31 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                     maxLines: 6,
                     decoration: InputDecoration(labelText: s.description, alignLabelWithHint: true),
                     validator: (v) => (v == null || v.trim().isEmpty) ? s.required : null,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(s.create.condition, style: Theme.of(context).textTheme.labelLarge),
+                  const SizedBox(height: KSpace.s),
+                  Wrap(
+                    spacing: KSpace.s,
+                    runSpacing: KSpace.s,
+                    children: [
+                      for (final c in CreateStrings.conditions)
+                        ChoiceChip(
+                          label: Text(s.create.conditionLabel(c)),
+                          selected: _condition == c,
+                          onSelected: (on) => setState(() => _condition = on ? c : null),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _meetupController,
+                    maxLength: 200,
+                    decoration: InputDecoration(
+                      labelText: s.create.meetup,
+                      hintText: s.create.meetupHint,
+                      prefixIcon: const Icon(AppIcons.location),
+                    ),
                   ),
                 ],
               ),
@@ -354,8 +423,39 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                           .toList(),
                       onChanged: (v) => setState(() => _category = v!),
                     );
+                    final quantity = TextFormField(
+                      controller: _quantityController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                          labelText: s.create.quantity, helperText: s.create.quantityHelp, helperMaxLines: 2),
+                      validator: (v) {
+                        final t = (v ?? '').trim();
+                        if (t.isEmpty) return null;
+                        final n = int.tryParse(t);
+                        return n == null || n < 1 ? s.create.quantityInvalid : null;
+                      },
+                    );
                     if (c.maxWidth < 420) {
-                      return Column(children: [price, const SizedBox(height: 16), category]);
+                      return Column(children: [
+                        price,
+                        const SizedBox(height: 16),
+                        category,
+                        if (_asClub) ...[const SizedBox(height: 16), quantity],
+                      ]);
+                    }
+                    if (_asClub) {
+                      return Column(children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: price),
+                            const SizedBox(width: 16),
+                            Expanded(child: category),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        quantity,
+                      ]);
                     }
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
