@@ -265,6 +265,7 @@ class ClubService {
   /// "Post as" choices: yourself, then every ACTIVE club you're an
   /// officer of. Pass [selfLabel] (e.g. your display name).
   static Future<List<PostAsOption>> postAsOptions(String selfLabel, {String? selfAvatar}) async {
+    if (debugPostAsOptions != null) return debugPostAsOptions!();
     final clubs = await myClubs();
     return [
       PostAsOption.self(selfLabel, avatarUrl: selfAvatar),
@@ -300,6 +301,9 @@ class ClubService {
     }
     return _ability!;
   }
+
+  /// Test hook for [postAsOptions].
+  static Future<List<PostAsOption>> Function()? debugPostAsOptions;
 
   /// Test hook for [canPostAnnouncement].
   static Future<AnnouncementAbility> Function()? debugAnnouncementAbility;
