@@ -168,7 +168,10 @@ abstract final class AnnouncementService {
     final images = await PostService.uploadPhotos(d.images);
     final row = d.toRow(coverUrl: cover.firstOrNull, imageUrls: images);
     if (editId != null) {
-      await _db.from('posts').update(row).eq('id', editId);
+      // posts has no author UPDATE policy; this RPC (20261023003100) lets
+      // the author, the club's officers or an admin edit these fields.
+      await _db.rpc('update_my_announcement',
+          params: {'p_post_id': editId, 'p_fields': row});
       return editId;
     }
     final inserted = await _db
