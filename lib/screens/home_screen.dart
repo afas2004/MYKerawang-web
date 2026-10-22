@@ -18,6 +18,7 @@ import '../widgets/hover_carousel.dart';
 import '../widgets/shell_actions.dart';
 import '../widgets/universal_card.dart';
 import '../widgets/post_card.dart';
+import '../widgets/profile_avatar_action.dart';
 import '../widgets/post_card_skeleton.dart';
 
 /// Posts with one discovery embed (alternating event / listing) after
@@ -38,6 +39,38 @@ List<Map<String, dynamic>> buildFeedItems(
     }
   }
   return out;
+}
+
+/// Home's app bar actions: search, a refresh button only for mouse users
+/// on desktop web (phones pull to refresh), notifications for signed-in
+/// users, then the profile avatar (or "Sign in" for guests). Settings
+/// live behind the avatar / in Profile.
+///
+/// [unreadBadge] false draws a plain bell (tests: the live count needs
+/// Supabase).
+List<Widget> homeAppBarActions(BuildContext context,
+    {required VoidCallback onRefresh, bool unreadBadge = true}) {
+  final s = context.l10n;
+  final signedIn = ShellAuth.of(context);
+  return [
+    const ShellSearchButton(),
+    if (kIsWeb && Responsive.isDesktop(context))
+      IconButton(
+        tooltip: s.refresh,
+        icon: const Icon(AppIcons.refresh),
+        onPressed: onRefresh,
+      ),
+    if (signedIn)
+      IconButton(
+        tooltip: s.notifications,
+        icon: unreadBadge
+            ? const UnreadBadge(child: Icon(AppIcons.notifications))
+            : const Icon(AppIcons.notifications),
+        onPressed: () => context.goNotifications(),
+      ),
+    const ProfileAvatarAction(),
+    const SizedBox(width: KSpace.s),
+  ];
 }
 
 class HomeScreen extends StatefulWidget {
@@ -179,7 +212,6 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final s = context.l10n;
     return FeedView(
       posts: _posts,
       injectables: _injectables,
@@ -195,25 +227,7 @@ class _HomeScreenState extends State<HomeScreen>
       onCompose: _openComposer,
       // Search and notifications only. Settings live in Profile; refresh
       // is pull-to-refresh, with a button only for mouse users on desktop.
-      actions: [
-        const ShellSearchButton(),
-        if (kIsWeb && Responsive.isDesktop(context))
-          IconButton(
-            tooltip: s.refresh,
-            icon: const Icon(AppIcons.refresh),
-            onPressed: _fetchFeedData,
-          ),
-        IconButton(
-          tooltip: s.notifications,
-          icon: const UnreadBadge(child: Icon(AppIcons.notifications)),
-          onPressed: () => context.goNotifications(),
-        ),
-        // TODO(v1.3): ProfileAvatarAction (lib/widgets/profile_avatar_action.dart)
-        // lives on origin/v13/hub-shell; replace this placeholder with
-        // `const ProfileAvatarAction()` once that branch is on main.
-        const SizedBox.shrink(),
-        const SizedBox(width: KSpace.s),
-      ],
+      actions: homeAppBarActions(context, onRefresh: _fetchFeedData),
     );
   }
 
