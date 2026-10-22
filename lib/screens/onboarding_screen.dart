@@ -27,12 +27,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _usernameCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController(); // <--- NEW: Phone
-  final _clubReasonCtrl = TextEditingController(); // <--- NEW: For Club verification
   
   // State
   int _step = 0; // 0 = Identity, 1 = Contact & Role
   bool _isLoading = false;
-  bool _isClub = false; 
 
   // Username Logic
   String? _usernameError;
@@ -87,7 +85,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _usernameCtrl.dispose();
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
-    _clubReasonCtrl.dispose();
     super.dispose();
   }
 
@@ -110,12 +107,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (_usernameError != null) return;
     
-    // Club Verification Check
-    if (_isClub && _clubReasonCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.clubDetailsNeeded)));
-      return;
-    }
-
     setState(() => _isLoading = true);
     final user = _supabase.auth.currentUser;
 
@@ -125,9 +116,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         'id': user!.id,
         'username': _usernameCtrl.text.trim().toLowerCase(),
         'display_name': _nameCtrl.text.trim(),
-        'role': _isClub ? 'club_pending' : 'student',
-        // We save the club justification in 'bio' or a separate column for admin review
-        'bio': _isClub ? "Club Verification: ${_clubReasonCtrl.text}" : null,
+        // Clubs register separately after sign-up (/clubs/register);
+        // onboarding no longer writes club proof into the bio.
+        'role': 'student',
         'updated_at': DateTime.now().toIso8601String(),
       });
 
@@ -260,37 +251,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           const Divider(),
                           const SizedBox(height: KSpace.l),
 
-                          // CLUB TOGGLE
-                          Container(
-                            padding: const EdgeInsets.all(KSpace.l),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: _isClub ? scheme.primary : scheme.outlineVariant),
-                              borderRadius: BorderRadius.circular(12),
-                              color: _isClub ? scheme.primary.withValues(alpha: 0.05) : null,
-                            ),
-                            child: Column(
-                              children: [
-                                SwitchListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  title: Text(s.registeringClub),
-                                  subtitle: Text(s.registeringClubSub),
-                                  value: _isClub,
-                                  onChanged: (val) => setState(() => _isClub = val),
-                                  secondary: const Icon(AppIcons.people),
-                                ),
-                                
-                                // Verification Field (Only if Club is ON)
-                                if (_isClub) ...[
-                                  const SizedBox(height: KSpace.m),
-                                  TextFormField(
-                                    controller: _clubReasonCtrl,
-                                    decoration: InputDecoration(
-                                      labelText: s.clubReference,
-                                      helperText: s.clubReferenceHelper,
-                                    ),
-                                  ),
-                                ]
-                              ],
+                          // Clubs: a separate flow after sign-up.
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: () => context.push('/clubs/register'),
+                              icon: const Icon(AppIcons.people, size: 18),
+                              label: Text(s.shell.registerClubLater),
                             ),
                           ),
                         ],

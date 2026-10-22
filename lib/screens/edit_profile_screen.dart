@@ -423,11 +423,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                     ),
                     const SizedBox(width: KSpace.l),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
-                      onPressed: () => _pickImage(true),
-                      icon: const Icon(AppIcons.photo),
-                      label: Text(s.changePhoto),
+                    // Flexible: long labels (or large text) must not push
+                    // the row past a 375 px screen.
+                    Flexible(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+                        onPressed: () => _pickImage(true),
+                        icon: const Icon(AppIcons.photo),
+                        label: Text(s.changePhoto,
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ),
                     ),
                   ],
                 ),
@@ -560,13 +565,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // Text fields save themselves; this commits the username and picked
       // images, and is always in reach.
       bottomNavigationBar: SafeArea(
+        top: false,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.s, KSpace.l, KSpace.m),
           decoration: BoxDecoration(
             color: theme.scaffoldBackgroundColor,
             border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
           ),
+          // heightFactor: 1 — a bare Center expands to the full height the
+          // Scaffold offers bottomNavigationBar, which put Save mid-screen.
           child: Center(
+            heightFactor: 1,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 648),
               child: FilledButton.icon(

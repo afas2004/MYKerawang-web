@@ -68,4 +68,17 @@ void main() {
     expect(notificationBucket(DateTime(2026, 10, 13), now), NotifBucket.thisWeek);
     expect(notificationBucket(DateTime(2026, 10, 12), now), NotifBucket.earlier);
   });
+
+  testWidgets('#tag search offers the tag feed instead of querying',
+      (tester) async {
+    await initTestSupabase(tester);
+    await setWidth(tester, 375);
+    await pumpScreen(tester, const SearchScreen());
+
+    await tester.enterText(find.byType(TextField), '#Futsal');
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump();
+    expect(find.text('See posts tagged #futsal'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
