@@ -20,8 +20,9 @@ const read = (f) => fs.readFileSync(f, 'utf8');
 
 await db.exec(read(path.join(path.dirname(process.argv[1]), 'stub.sql')));
 const files = fs.readdirSync(mig).filter((f) => f.endsWith('.sql')).sort();
-for (const pass of [1, 2]) {
-  for (const f of files) {
+// Each file twice in a row: every migration must be re-runnable.
+for (const f of files) {
+  for (const pass of [1, 2]) {
     try { await db.exec(read(path.join(mig, f))); }
     catch (e) { console.error(`FAIL pass ${pass} ${f}: ${e.message}`); process.exit(1); }
   }
