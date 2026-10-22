@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../l10n/app_strings.dart';
+import '../l10n/create_strings.dart';
+import '../services/club_service.dart';
 import '../l10n/shell_strings.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
@@ -16,6 +18,8 @@ import 'brand/brand.dart';
 Future<void> showCreateSheet(BuildContext context) async {
   if (!requireLogin(context)) return;
   final s = context.l10nRead;
+  // Officers and admins also get Announcement (cached per user).
+  final ability = ClubService.canPostAnnouncement();
 
   // Each form is a route (/create/...), so back and the browser behave.
   void open(BuildContext ctx, void Function() go) {
@@ -38,23 +42,12 @@ Future<void> showCreateSheet(BuildContext context) async {
                   KSpace.l, 0, KSpace.l, KSpace.s),
               child: Text(s.shell.createWhat, style: theme.textTheme.titleMedium),
             ),
-            _CreateOption(
-              icon: AppIcons.compose,
-              title: s.createPostTitle,
-              subtitle: s.shell.createPostSub,
-              onTap: () => open(ctx, context.goCreatePost),
-            ),
-            _CreateOption(
-              icon: AppIcons.calendarAdd,
-              title: s.createEvent,
-              subtitle: s.shell.createEventSub,
-              onTap: () => open(ctx, context.goCreateEvent),
-            ),
-            _CreateOption(
-              icon: AppIcons.price,
-              title: s.sellItem,
-              subtitle: s.shell.sellItemSub,
-              onTap: () => open(ctx, context.goCreateListing),
+            CreateOptionsList(
+              ability: ability,
+              onPost: () => open(ctx, context.goCreatePost),
+              onEvent: () => open(ctx, context.goCreateEvent),
+              onSell: () => open(ctx, context.goCreateListing),
+              onAnnouncement: () => open(ctx, () => context.push('/create/announcement')),
             ),
           ],
         ),
@@ -75,6 +68,69 @@ Future<void> showCreateSheet(BuildContext context) async {
     useSafeArea: true,
     builder: (ctx) => sheet(ctx, handle: true),
   );
+}
+
+/// The create choices by role (v1.4): everyone signed in gets Post, Event
+/// and Sell; club officers and admins also get Announcement once
+/// [ability] says so.
+class CreateOptionsList extends StatelessWidget {
+  final Future<AnnouncementAbility> ability;
+  final VoidCallback onPost;
+  final VoidCallback onEvent;
+  final VoidCallback onSell;
+  final VoidCallback onAnnouncement;
+
+  const CreateOptionsList({
+    super.key,
+    required this.ability,
+    required this.onPost,
+    required this.onEvent,
+    required this.onSell,
+    required this.onAnnouncement,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _CreateOption(
+          icon: AppIcons.compose,
+          title: s.createPostTitle,
+          subtitle: s.shell.createPostSub,
+          onTap: onPost,
+        ),
+        FutureBuilder<AnnouncementAbility>(
+          future: ability,
+          builder: (context, snap) => AnimatedSize(
+            duration: KMotion.of(context).fast,
+            child: snap.data?.allowed == true
+                ? _CreateOption(
+                    icon: AppIcons.announcement,
+                    title: s.create.announcement,
+                    subtitle: s.create.announcementSub,
+                    onTap: onAnnouncement,
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
+        ),
+        _CreateOption(
+          icon: AppIcons.calendarAdd,
+          title: s.createEvent,
+          subtitle: s.shell.createEventSub,
+          onTap: onEvent,
+        ),
+        _CreateOption(
+          icon: AppIcons.price,
+          title: s.sellItem,
+          subtitle: s.shell.sellItemSub,
+          onTap: onSell,
+        ),
+      ],
+    );
+  }
 }
 
 class _CreateOption extends StatelessWidget {
