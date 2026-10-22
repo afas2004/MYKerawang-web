@@ -401,6 +401,7 @@ GoRouter buildRouter() {
 
       // --- MODERATION (/admin, /standing) ---
       ...moderationRoutes(_rootKey).map(_withHistoryAwareExit),
+      ...clubRoutes(_rootKey).map(_withHistoryAwareExit),
     ],
 
     errorBuilder: (context, state) => Scaffold(
