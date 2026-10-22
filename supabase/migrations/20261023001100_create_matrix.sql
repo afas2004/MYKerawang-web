@@ -232,6 +232,21 @@ alter table public.listings
   add column if not exists meetup    text,
   add column if not exists quantity  int;
 
+-- The live table already had a free-text `condition` (and possibly
+-- quantity/meetup) from earlier versions. Map legacy values onto the new
+-- set before constraining; anything unrecognised becomes null (the
+-- listing's description still carries the seller's own words).
+update public.listings set condition = case
+    when lower(btrim(condition)) in ('new','brand new','brand-new','baru','sealed','bnib','bnwt') then 'new'
+    when lower(btrim(condition)) in ('like_new','like new','like-new','almost new','mint','excellent','very good','macam baru','seperti baru') then 'like_new'
+    when lower(btrim(condition)) in ('used','good','fair','ok','okay','second hand','second-hand','secondhand','preloved','pre-loved','pre loved','terpakai','poor','worn') then 'used'
+    else null
+  end
+where condition is not null
+  and condition not in ('new','like_new','used');
+update public.listings set quantity = null where quantity is not null and quantity <= 0;
+update public.listings set meetup = left(meetup, 200) where meetup is not null and length(meetup) > 200;
+
 alter table public.listings drop constraint if exists listings_condition_valid;
 alter table public.listings add constraint listings_condition_valid
   check (condition is null or condition in ('new','like_new','used'));
