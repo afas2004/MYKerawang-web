@@ -3,6 +3,8 @@ import 'package:mykerawang/utils/app_nav.dart';
 import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/mention_service.dart';
+import '../services/comment_pins.dart';
+import '../services/moderation_service.dart';
 import '../services/post_service.dart';
 import '../widgets/linear_refresher.dart';
 import '../widgets/comment_tile.dart';
@@ -14,6 +16,7 @@ import '../l10n/post_strings.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
 import '../widgets/brand/brand.dart';
+import '../utils/guest_access.dart';
 import '../widgets/restriction_gate.dart';
 
 class PostDetailScreen extends StatefulWidget {
@@ -57,6 +60,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     _postData = widget.post;
     _commentCtrl.addListener(_onTextChanged);
     _loadComments();
+    _checkCanPin();
     // Realtime only signals; rows are re-read from comments_public so
     // anonymous authors stay hidden.
     _channel = _supabase
@@ -108,21 +112,68 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
+  /// Post author or admin may pin comments (the RPC re-checks).
+  bool _canPinComments = false;
+
+  Future<void> _checkCanPin() async {
+    final mine = await PostService.isMine(_postData);
+    final role = mine ? null : await ModerationService.myRole();
+    final can = mine || role == 'admin' || role == 'owner';
+    if (mounted && can != _canPinComments) {
+      setState(() => _canPinComments = can);
+    }
+  }
+
+  Future<void> _togglePin(Map<String, dynamic> c) async {
+    final now = await CommentPins.toggle(context, c);
+    if (now != null) await _loadComments();
+  }
+
+  /// Pinned comments of this post (always shown, above the paged list).
+  /// Empty if the pins migration isn't applied yet.
+  Future<List<Map<String, dynamic>>> _fetchPinned() async {
+    try {
+      final rows = await _supabase
+          .from('comments_public')
+          .select('*')
+          .eq('post_id', _postId)
+          .not('pinned_at', 'is', null)
+          .order('pinned_at', ascending: true);
+      return List<Map<String, dynamic>>.from(rows);
+    } catch (e) {
+      debugPrint('Pinned comments unavailable: $e');
+      return const [];
+    }
+  }
+
   Future<void> _loadComments() async {
     final seq = ++_loadSeq;
     final limit = _commentLimit;
     try {
       // Newest first so the limit keeps the latest; one extra row tells
       // whether there are earlier ones.
-      final response = await _supabase
-          .from('comments_public') // anonymity-safe view
-          .select('*')
-          .eq('post_id', _postId)
-          .order('created_at', ascending: false)
-          .limit(limit + 1);
-      final rows = List<Map<String, dynamic>>.from(response);
+      final results = await Future.wait([
+        _supabase
+            .from('comments_public') // anonymity-safe view
+            .select('*')
+            .eq('post_id', _postId)
+            .order('created_at', ascending: false)
+            .limit(limit + 1),
+        _fetchPinned(),
+      ]);
+      final rows = List<Map<String, dynamic>>.from(results[0]);
+      final pinned = results[1];
       final hasEarlier = rows.length > limit;
-      final comments = rows.take(limit).toList().reversed.toList();
+      // Pinned first, then the newest page without repeating them.
+      final pinnedIds = {for (final p in pinned) p['id']};
+      final comments = pinnedFirst([
+        ...pinned,
+        ...rows
+            .take(limit)
+            .toList()
+            .reversed
+            .where((c) => !pinnedIds.contains(c['id'])),
+      ]);
 
       // Anonymous comments arrive without user_id; only the author's own
       // ids come back from the RPC, so it reveals nobody else's.
@@ -176,10 +227,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx), child: Text(s.cancel)),
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(s.cancel),
+          ),
           TextButton(
-              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-              child: Text(s.saveChanges)),
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: Text(s.saveChanges),
+          ),
         ],
       ),
     );
@@ -199,15 +253,20 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       messenger.showSnackBar(SnackBar(content: Text(ps.commentUpdated)));
       await _loadComments();
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(s.errorWithDetail.fill([e]))),
+      );
     }
   }
 
   Future<void> _deleteComment(Map<String, dynamic> c) async {
     final s = context.l10nRead;
     final ps = context.postL10nRead;
-    final ok = await confirmDelete(context,
-        title: ps.deleteComment, message: ps.deleteCommentConfirm);
+    final ok = await confirmDelete(
+      context,
+      title: ps.deleteComment,
+      message: ps.deleteCommentConfirm,
+    );
     if (!ok || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     try {
@@ -215,7 +274,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       messenger.showSnackBar(SnackBar(content: Text(ps.commentDeleted)));
       await _refreshData();
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(s.errorWithDetail.fill([e]))),
+      );
     }
   }
 
@@ -226,6 +287,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   Future<void> _submitComment() async {
     final text = _commentCtrl.text.trim();
     if (text.isEmpty || _isSending) return;
+    if (!requireLogin(context)) return;
     if (!await ensureCanWrite(context, ModScope.comment) || !mounted) return;
     final s = context.l10nRead;
     final ps = context.postL10nRead;
@@ -233,12 +295,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
     setState(() => _isSending = true);
     try {
-      final newComment = await _supabase.from('comments').insert({
-        'post_id': _postId,
-        'user_id': _supabase.auth.currentUser!.id,
-        'body': text,
-        'is_anonymous': _isAnon,
-      }).select('id').single();
+      final newComment = await _supabase
+          .from('comments')
+          .insert({
+            'post_id': _postId,
+            'user_id': _supabase.auth.currentUser!.id,
+            'body': text,
+            'is_anonymous': _isAnon,
+          })
+          .select('id')
+          .single();
 
       // Mentions (no author on anonymous comments); never throws.
       await MentionService.notify(
@@ -255,15 +321,17 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       await _refreshData();
     } catch (e) {
       debugPrint("Comment failed: $e");
-      messenger.showSnackBar(SnackBar(
-        content: Text(ps.commentFailed),
-        action: SnackBarAction(
-          label: s.tryAgain,
-          onPressed: () {
-            if (mounted) _submitComment();
-          },
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(ps.commentFailed),
+          action: SnackBarAction(
+            label: s.tryAgain,
+            onPressed: () {
+              if (mounted) _submitComment();
+            },
+          ),
         ),
-      ));
+      );
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
@@ -280,9 +348,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           padding: const EdgeInsets.all(KSpace.l),
           child: Column(
             children: [
-              Text(s.connectionError,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: scheme.onSurfaceVariant)),
+              Text(
+                s.connectionError,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: scheme.onSurfaceVariant),
+              ),
               TextButton.icon(
                 onPressed: _loadComments,
                 icon: const Icon(AppIcons.refresh),
@@ -293,8 +363,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         );
       }
       return const Padding(
-          padding: EdgeInsets.all(KSpace.xxl),
-          child: Center(child: CircularProgressIndicator()));
+        padding: EdgeInsets.all(KSpace.xxl),
+        child: Center(child: CircularProgressIndicator()),
+      );
     }
 
     if (_comments.isEmpty) {
@@ -316,14 +387,18 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     padding: EdgeInsets.all(KSpace.m),
                     child: Center(
                       child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2)),
-                    ))
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  )
                 : TextButton.icon(
                     onPressed: _showEarlier,
                     icon: const RotatedBox(
-                        quarterTurns: 3, child: Icon(AppIcons.chevronRight)),
+                      quarterTurns: 3,
+                      child: Icon(AppIcons.chevronRight),
+                    ),
                     label: Text(ps.showEarlierComments),
                   ),
           ),
@@ -338,6 +413,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             onDelete: _myCommentIds.contains(_comments[i]['id'])
                 ? () => _deleteComment(_comments[i])
                 : null,
+            onTogglePin: _canPinComments
+                ? () => _togglePin(_comments[i])
+                : null,
           ),
       ],
     );
@@ -347,7 +425,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   Widget build(BuildContext context) {
     final s = context.l10n;
     final fs = context.feedL10n;
-    final count = (_postData['comment_count'] as num?)?.toInt() ?? _comments.length;
+    final count =
+        (_postData['comment_count'] as num?)?.toInt() ?? _comments.length;
 
     return Scaffold(
       appBar: appBarConstrained(
@@ -378,16 +457,45 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             ),
           ),
           comments: _buildComments(context),
-          composer: CommentComposer(
-            controller: _commentCtrl,
-            focusNode: _composerFocus,
-            anonymous: _isAnon,
-            sending: _isSending,
-            canSend: _hasText && !_isSending,
-            onToggleAnonymous: () => setState(() => _isAnon = !_isAnon),
-            onSend: _submitComment,
+          // Guests read; the composer becomes a sign-in prompt.
+          composer: GuestableComposer(
+            loggedIn: isLoggedIn,
+            composer: CommentComposer(
+              controller: _commentCtrl,
+              focusNode: _composerFocus,
+              anonymous: _isAnon,
+              sending: _isSending,
+              canSend: _hasText && !_isSending,
+              onToggleAnonymous: () => setState(() => _isAnon = !_isAnon),
+              onSend: _submitComment,
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The comment box for members; for guests, a "Sign in to comment"
+/// button in its place (posts stay readable).
+class GuestableComposer extends StatelessWidget {
+  final bool loggedIn;
+  final Widget composer;
+
+  const GuestableComposer({
+    super.key,
+    required this.loggedIn,
+    required this.composer,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (loggedIn) return composer;
+    return Padding(
+      padding: const EdgeInsets.all(KSpace.m),
+      child: SafeArea(
+        top: false,
+        child: GuestActionBar(label: context.feedL10n.signInToComment),
       ),
     );
   }
@@ -414,7 +522,12 @@ class PostDetailLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final header = Padding(
-      padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.l, KSpace.l, KSpace.xs),
+      padding: const EdgeInsets.fromLTRB(
+        KSpace.l,
+        KSpace.l,
+        KSpace.l,
+        KSpace.xs,
+      ),
       child: commentsHeader,
     );
 
@@ -432,7 +545,11 @@ class PostDetailLayout extends StatelessWidget {
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(
-                          KSpace.m, KSpace.s, KSpace.m, 0),
+                        KSpace.m,
+                        KSpace.s,
+                        KSpace.m,
+                        0,
+                      ),
                       child: SelectionArea(child: post),
                     ),
                     header,
@@ -510,7 +627,12 @@ class CommentComposer extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border(top: BorderSide(color: scheme.outlineVariant)),
         ),
-        padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.s, KSpace.s, KSpace.s),
+        padding: const EdgeInsets.fromLTRB(
+          KSpace.m,
+          KSpace.s,
+          KSpace.s,
+          KSpace.s,
+        ),
         child: SafeArea(
           top: false,
           child: Column(
@@ -534,7 +656,10 @@ class CommentComposer extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: KSpace.l, vertical: KSpace.m - 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: KSpace.l,
+                        vertical: KSpace.m - 2,
+                      ),
                       decoration: BoxDecoration(
                         color: scheme.surfaceContainerHigh,
                         // Stadium field, like the app's buttons.
@@ -558,10 +683,15 @@ class CommentComposer extends StatelessWidget {
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2))
-                        : Icon(AppIcons.send,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(
+                            AppIcons.send,
                             size: 20,
-                            color: canSend ? scheme.primary : scheme.onSurfaceVariant),
+                            color: canSend
+                                ? scheme.primary
+                                : scheme.onSurfaceVariant,
+                          ),
                   ),
                 ],
               ),

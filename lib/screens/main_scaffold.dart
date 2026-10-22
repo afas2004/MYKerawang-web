@@ -11,12 +11,15 @@ import '../widgets/brand/brand.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/app_sidebar.dart';
+import '../widgets/profile_avatar_action.dart';
 import '../widgets/right_rail.dart';
 import '../widgets/shell_actions.dart';
 
 // Layout per Responsive size class (WindowSize):
-//  * compact  < 600   bottom bar (Home, Market, Create, Events, Profile);
-//                     Search lives in the tab app bars ([ShellSearchButton])
+//  * compact  < 600   bottom bar (Home, Announcements, Create, Market,
+//                     Events); Search lives in the tab app bars
+//                     ([ShellSearchButton]); Profile is a pushed page
+//                     opened from [ProfileAvatarAction]
 //  * medium   600–899 navigation rail + one 680 column
 //  * expanded 900–1199 240 sidebar + 680 feed
 //  * large    ≥ 1200  sidebar + feed + right rail
@@ -24,10 +27,14 @@ import '../widgets/shell_actions.dart';
 /// Branch order in the router's StatefulShellRoute.
 abstract final class ShellBranch {
   static const home = 0;
-  static const search = 1;
-  static const market = 2;
-  static const events = 3;
-  static const profile = 4;
+  static const announcements = 1;
+  static const search = 2;
+  static const market = 3;
+  static const events = 4;
+
+  /// Tabs in the order the bottom bar and the rail show them (Create sits
+  /// between Announcements and Market on the bar). Search has no slot.
+  static const navOrder = [home, announcements, market, events];
 }
 
 /// Shell around the five main tabs. The tab bodies and their state are
@@ -163,14 +170,10 @@ class ShellFrame extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     // Rail shows the same four tabs as the bottom bar; Search is in the
     // leading area (and the tab app bars), so it maps to no destination.
-    const branches = [
-      ShellBranch.home,
-      ShellBranch.market,
-      ShellBranch.events,
-      ShellBranch.profile,
-    ];
+    const branches = ShellBranch.navOrder;
     final railIndex = branches.indexOf(currentIndex);
-    final items = AppSidebar.navItems(context);
+    final items = AppSidebar.navItems(context, short: true);
+    final loggedIn = ShellAuth.of(context);
     (IconData, IconData, String) itemFor(int branch) => items[branch];
 
     return Scaffold(
@@ -211,20 +214,24 @@ class ShellFrame extends StatelessWidget {
                 ),
               ],
             ),
+            // Guests: one Sign in control instead of bell + settings.
             trailing: Column(
               children: [
                 const SizedBox(height: KSpace.l),
-                IconButton(
-                  tooltip: s.notifications,
-                  icon: const UnreadBadge(
-                      child: Icon(AppIcons.notifications)),
-                  onPressed: () => context.goNotifications(),
-                ),
-                IconButton(
-                  tooltip: s.settings,
-                  icon: const Icon(AppIcons.settings),
-                  onPressed: () => context.goSettings(),
-                ),
+                if (loggedIn) ...[
+                  IconButton(
+                    tooltip: s.notifications,
+                    icon: const UnreadBadge(
+                        child: Icon(AppIcons.notifications)),
+                    onPressed: () => context.goNotifications(),
+                  ),
+                  IconButton(
+                    tooltip: s.settings,
+                    icon: const Icon(AppIcons.settings),
+                    onPressed: () => context.goSettings(),
+                  ),
+                ],
+                const ProfileAvatarAction(compactGuest: true),
               ],
             ),
             destinations: [
@@ -275,11 +282,12 @@ class ShellFrame extends StatelessWidget {
   }
 }
 
-/// Phone bottom bar in the Material 3 NavigationBar style: Home, Market,
-/// Create, Events, Profile. Each slot is the same height — icon in a pill
-/// indicator over a label. Create is a filled accent pill in the middle
-/// slot (it opens the create sheet, it isn't a tab). Search has no slot;
-/// it's in the tab app bars.
+/// Phone bottom bar in the Material 3 NavigationBar style: Home,
+/// Announcements, Create, Market, Events. Each slot is the same height —
+/// icon in a pill indicator over a label. Create is a filled accent pill in
+/// the middle slot (it opens the create sheet; guests are asked to log in
+/// first). Search has no slot; it's in the tab app bars. Profile is
+/// reached from [ProfileAvatarAction] in the app bars.
 class CompactNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onSelect;
@@ -293,7 +301,7 @@ class CompactNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final s = context.l10n;
-    final items = AppSidebar.navItems(context);
+    final items = AppSidebar.navItems(context, short: true);
 
     Widget tab(int branch) => Expanded(
           child: _BarItem(
@@ -317,7 +325,7 @@ class CompactNavBar extends StatelessWidget {
             child: Row(
               children: [
                 tab(ShellBranch.home),
-                tab(ShellBranch.market),
+                tab(ShellBranch.announcements),
                 Expanded(
                   child: _BarItem(
                     icon: AppIcons.create,
@@ -328,8 +336,8 @@ class CompactNavBar extends StatelessWidget {
                     onTap: () => showCreateSheet(context),
                   ),
                 ),
+                tab(ShellBranch.market),
                 tab(ShellBranch.events),
-                tab(ShellBranch.profile),
               ],
             ),
           ),

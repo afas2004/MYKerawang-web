@@ -51,7 +51,34 @@ void main() {
 
   test('tagAliases covers the legacy lost&found spelling', () {
     expect(tagAliases('lostfound'), containsAll(['lostfound', 'lost&found']));
-    expect(tagAliases('#Rant'), ['rant']);
+    expect(tagAliases('#Rant'), containsAll(['rant', 'Rant', '#rant']));
+  });
+
+  group('v1.3: hashtag feed matched nothing for legacy rows', () {
+    // How the first editors stored tags (ChoiceChip label as typed).
+    final legacy = {'tags': ['Rant', 'Lost&Found']};
+    final hashed = {'tags': ['#rant']};
+
+    // PostgREST `ov` is exact element overlap — simulate it.
+    bool overlaps(Map<String, dynamic> row, List<String> values) =>
+        List<String>.from(row['tags']).any(values.contains);
+
+    test('the old query values missed them (the bug)', () {
+      expect(overlaps(legacy, ['rant']), isFalse);
+    });
+
+    test('tagAliases now matches every legacy spelling', () {
+      expect(overlaps(legacy, tagAliases('rant')), isTrue);
+      expect(overlaps(hashed, tagAliases('rant')), isTrue);
+      expect(overlaps(legacy, tagAliases('lostfound')), isTrue);
+    });
+
+    test('postHasTag / normalizeTags agree with the SQL backfill', () {
+      expect(postHasTag(legacy, '#RANT'), isTrue);
+      expect(postHasTag(legacy, 'lostfound'), isTrue);
+      expect(normalizeTags(['Rant', '#rant', ' Lost&Found ', 'Academic', '']),
+          ['rant', 'lostfound', 'academic']);
+    });
   });
 
   group('MentionService.usernamesIn', () {

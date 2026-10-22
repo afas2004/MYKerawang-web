@@ -1,8 +1,10 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../database_helper.dart'; // Import your DB Helper
+import '../database_helper.dart';
+import '../utils/guest_access.dart';
+import '../widgets/profile_avatar_action.dart' show ShellAuth;
 
 class EventsState {
   final List<Map<String, dynamic>> allEvents;
@@ -75,56 +77,107 @@ class EventsCubit extends Cubit<EventsState> {
   }
 
   StreamSubscription? _subscription;
-  final _supabase = Supabase.instance.client;
+
+  // Looked up on use, so tests can build the cubit without Supabase.
+  SupabaseClient get _supabase => Supabase.instance.client;
+
+  /// Tests: replace the network with canned rows. [debugFetchOnce] stands
+  /// in for the guest one-shot query, [debugStream] for the realtime
+  /// stream; [debugStreamOpened] records whether a stream was opened.
+  @visibleForTesting
+  static Future<List<Map<String, dynamic>>> Function()? debugFetchOnce;
+  @visibleForTesting
+  static Stream<List<Map<String, dynamic>>> Function()? debugStream;
+  @visibleForTesting
+  static bool debugStreamOpened = false;
+
+  /// Signed in? Guests get a one-shot read: they must not hold a realtime
+  /// connection open.
+  static bool get _signedIn {
+    // Same test switch the shell chrome uses.
+    // ignore: invalid_use_of_visible_for_testing_member
+    final forced = ShellAuth.debugLoggedIn;
+    if (forced != null) return forced;
+    try {
+      return isLoggedIn;
+    } catch (_) {
+      return false; // Supabase not initialised
+    }
+  }
 
   Future<void> loadData() async {
-   
     emit(state.copyWith(isLoading: true));
 
-    final cachedData = await DatabaseHelper.instance.getCachedEvents();
-
-    if (cachedData.isNotEmpty) {
-      final filtered = _applyFilters(cachedData, state.selectedTag, state.searchQuery);
-      emit(state.copyWith(
-        allEvents: cachedData,
-        displayedEvents: filtered,
-        isLoading: false, // UI appears instantly
-      ));
+    // 1. FAST: the offline cache (best-effort).
+    try {
+      final cachedData = await DatabaseHelper.instance.getCachedEvents();
+      if (cachedData.isNotEmpty && !isClosed) {
+        final filtered = _applyFilters(cachedData, state.selectedTag, state.searchQuery);
+        emit(state.copyWith(
+          allEvents: cachedData,
+          displayedEvents: filtered,
+          isLoading: false, // UI appears instantly
+        ));
+      }
+    } catch (e) {
+      debugPrint('Event cache unavailable: $e');
     }
 
-    // 3. SLOW: Subscribe to Supabase (Background Download)
-    // Ended events are kept and greyed out in the UI, not hidden.
     _subscription?.cancel(); // drop the previous stream before resubscribing
-    _subscription = _supabase
-        .from('events')
-        .stream(primaryKey: ['id'])
-        .order('created_at', ascending: false)
-        .limit(200) // newest 200 — not the whole table over mobile data
-        .listen((data) async {
-          final items = List<Map<String, dynamic>>.from(data);
-          
-          // 4. Update SQLite so next time is fast too
-          await DatabaseHelper.instance.cacheEvents(items);
+    _subscription = null;
 
-          // 5. Update UI with fresh data
-          final filtered = _applyFilters(items, state.selectedTag, state.searchQuery);
-          
-          if (!isClosed) {
-            emit(state.copyWith(
-              allEvents: items,
-              displayedEvents: filtered,
-              isLoading: false,
-            ));
-            _loadCardExtras(items);
-          }
-        }, onError: (error) {
-          // Must clear isLoading, otherwise the screen spins forever when
-          // offline (UI_UX_AUDIT 15.5).
-          if (!isClosed) {
-            emit(state.copyWith(
-                isLoading: false, errorMessage: error.toString()));
-          }
-        });
+    // 2a. GUEST: one read, no realtime connection.
+    if (!_signedIn) {
+      try {
+        final rows = await (debugFetchOnce?.call() ??
+            _supabase
+                .from('events')
+                .select()
+                .order('created_at', ascending: false)
+                .limit(200)
+                .then((r) => List<Map<String, dynamic>>.from(r)));
+        await _onRows(rows);
+      } catch (e) {
+        _onError(e);
+      }
+      return;
+    }
+
+    // 2b. SIGNED IN: live updates. Ended events are kept and greyed out in
+    // the UI, not hidden.
+    debugStreamOpened = true;
+    final stream = debugStream?.call() ??
+        _supabase
+            .from('events')
+            .stream(primaryKey: ['id'])
+            .order('created_at', ascending: false)
+            .limit(200); // newest 200 — not the whole table over mobile data
+    _subscription = stream.listen(
+      (data) => _onRows(List<Map<String, dynamic>>.from(data)),
+      onError: _onError,
+    );
+  }
+
+  Future<void> _onRows(List<Map<String, dynamic>> items) async {
+    // Update the cache so next time is fast too (best-effort).
+    try {
+      await DatabaseHelper.instance.cacheEvents(items);
+    } catch (_) {}
+    if (isClosed) return;
+    emit(state.copyWith(
+      allEvents: items,
+      displayedEvents: _applyFilters(items, state.selectedTag, state.searchQuery),
+      isLoading: false,
+    ));
+    _loadCardExtras(items);
+  }
+
+  void _onError(Object error) {
+    // Must clear isLoading, otherwise the screen spins forever when
+    // offline (UI_UX_AUDIT 15.5).
+    if (!isClosed) {
+      emit(state.copyWith(isLoading: false, errorMessage: error.toString()));
+    }
   }
 
   /// Going counts and organiser names for the cards. Best-effort: on

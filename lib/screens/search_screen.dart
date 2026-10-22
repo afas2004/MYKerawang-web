@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import '../utils/tags.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../l10n/app_strings.dart';
@@ -12,8 +14,18 @@ import '../utils/roles.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/status_badge.dart';
 
+/// Extra result source for "All" searches (e.g. clubs). Returns rows that
+/// [SearchScreen] renders like people: `title`, optional `subtitle`,
+/// `avatar_url`, and the `route` to push on tap.
+typedef SearchSource = Future<List<Map<String, dynamic>>> Function(
+    String term, int limit);
+
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
+
+  /// Hook for the clubs feature: set at startup to include clubs in
+  /// results (shown as a "Clubs" section). Null = no clubs section.
+  static SearchSource? clubSource;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -93,8 +105,25 @@ class _SearchScreenState extends State<SearchScreen> {
     return end != null && end.isBefore(DateTime.now());
   }
 
+  /// "#futsal" → "futsal"; null when the query isn't a hashtag.
+  static String? hashtagOf(String query) {
+    final q = query.trim();
+    if (!q.startsWith('#') || q.contains(' ')) return null;
+    final tag = normalizeTag(q.substring(1));
+    return tag.isEmpty ? null : tag;
+  }
+
   Future<void> _performSearch() async {
     if (_query.isEmpty) return;
+    if (hashtagOf(_query) != null) {
+      // Tags have their own feed; the body shows a row that opens it.
+      setState(() {
+        _results = [];
+        _isLoading = false;
+        _error = false;
+      });
+      return;
+    }
     final term = _filterSafe(_query);
     if (term.isEmpty) {
       setState(() => _results = []);
@@ -119,13 +148,27 @@ class _SearchScreenState extends State<SearchScreen> {
     try {
       // 1. Search PROFILES
       if (_activeFilter == 'All' || _activeFilter == 'People') {
-        final people = await _supabase.from('profiles')
-            .select('id, full_name, display_name, username, avatar_url, role')
-            .or('full_name.ilike.$q,display_name.ilike.$q,username.ilike.$q')
+        // profiles_public for everyone: guests can't read profiles, and the
+        // view exposes only public columns (no full_name to match on).
+        final people = await _supabase.from('profiles_public')
+            .select('id, username, display_name, avatar_url, role, is_verified')
+            .or('display_name.ilike.$q,username.ilike.$q')
             .limit(limitPerCategory);
             
         for (var p in people) {
           tempResults.add({...p, 'type': 'person'});
+        }
+      }
+
+      // 1b. Clubs, when the clubs feature registered a source.
+      final clubs = SearchScreen.clubSource;
+      if (clubs != null && _activeFilter == 'All') {
+        try {
+          for (final c in await clubs(term, limitPerCategory)) {
+            tempResults.add({...c, 'type': 'club'});
+          }
+        } catch (e) {
+          debugPrint("Club search error: $e");
         }
       }
 
@@ -333,6 +376,12 @@ class _SearchScreenState extends State<SearchScreen> {
             _onSearchChanged(v);
           },
           onSubmitted: (v) {
+            final tag = hashtagOf(v);
+            if (tag != null) {
+              _rememberQuery(v.trim());
+              context.goTag(tag);
+              return;
+            }
             if (v.trim().isNotEmpty) _useRecent(v.trim());
           },
         ),
@@ -405,6 +454,28 @@ class _SearchScreenState extends State<SearchScreen> {
       );
     }
 
+    final tag = hashtagOf(_query);
+    if (tag != null) {
+      return ListView(
+        padding: const EdgeInsets.symmetric(vertical: KSpace.s),
+        children: [
+          ListTile(
+            leading: CircleAvatar(
+              backgroundColor: scheme.primaryContainer,
+              child: Icon(AppIcons.hashtag, color: scheme.onPrimaryContainer),
+            ),
+            title: Text(displayTag(tag)),
+            subtitle: Text(s.shell.seePostsTagged.fill([displayTag(tag)])),
+            trailing: const Icon(AppIcons.chevronRight),
+            onTap: () {
+              _rememberQuery(_query.trim());
+              context.goTag(tag);
+            },
+          ),
+        ],
+      );
+    }
+
     if (_isLoading && _results.isEmpty) return const _SearchSkeleton();
 
     if (_error && _results.isEmpty) {
@@ -433,6 +504,7 @@ class _SearchScreenState extends State<SearchScreen> {
     if (_activeFilter == 'All') {
       for (final (type, label, filter) in [
         ('person', s.people, 'People'),
+        ('club', s.shell.clubs, null),
         ('post', s.posts, 'Posts'),
         ('event', s.navEvents, 'Events'),
         ('market', s.navMarket, 'Market'),
@@ -448,7 +520,9 @@ class _SearchScreenState extends State<SearchScreen> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
         for (final (label, filter, rows) in sections) ...[
-          if (label.isNotEmpty)
+          if (label.isNotEmpty && filter == null)
+            SectionHeader(title: label, padding: const EdgeInsets.fromLTRB(0, KSpace.m, 0, KSpace.s))
+          else if (label.isNotEmpty)
             _SectionTitle(
               title: label,
               action: s.seeAll,
@@ -458,9 +532,11 @@ class _SearchScreenState extends State<SearchScreen> {
           for (final item in rows)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: item['type'] == 'person'
-                  ? _buildPersonCard(item)
-                  : _buildContentCard(item, item['type']),
+              child: switch (item['type']) {
+                'person' => _buildPersonCard(item),
+                'club' => _buildClubCard(item),
+                _ => _buildContentCard(item, item['type']),
+              },
             ),
         ],
         // --- SHOW MORE (end of list) ---
@@ -502,6 +578,22 @@ class _SearchScreenState extends State<SearchScreen> {
       ].join(' · ')),
       trailing: const Icon(AppIcons.chevronRight),
       onTap: () => context.goUser(item['id']),
+    );
+  }
+
+  /// Row from [SearchScreen.clubSource]: title, subtitle, avatar, route.
+  Widget _buildClubCard(Map<String, dynamic> item) {
+    final avatar = item['avatar_url'] as String?;
+    return ListTile(
+      leading: CircleAvatar(
+        radius: 24,
+        backgroundImage: avatar != null ? CachedNetworkImageProvider(avatar) : null,
+        child: avatar == null ? const Icon(AppIcons.people) : null,
+      ),
+      title: Text('${item['title'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.bold)),
+      subtitle: item['subtitle'] == null ? null : Text('${item['subtitle']}'),
+      trailing: const Icon(AppIcons.chevronRight),
+      onTap: item['route'] == null ? null : () => context.push('${item['route']}'),
     );
   }
 

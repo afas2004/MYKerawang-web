@@ -9,12 +9,13 @@
 // stub.sql approximates the tables the app uses; it is not the real schema.
 
 import { PGlite } from '@electric-sql/pglite';
+import { citext } from '@electric-sql/pglite/contrib/citext';
 import fs from 'fs';
 import path from 'path';
 
 const repo = process.argv[2];
 const mig = path.join(repo, 'supabase', 'migrations');
-const db = new PGlite();
+const db = new PGlite({ extensions: { citext } });
 const read = (f) => fs.readFileSync(f, 'utf8');
 
 await db.exec(read(path.join(path.dirname(process.argv[1]), 'stub.sql')));

@@ -1,6 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../l10n/feed_strings.dart';
+import '../l10n/moderation_strings.dart';
 import '../l10n/post_strings.dart';
 import '../language_cubit.dart';
 import '../utils/app_nav.dart';
@@ -10,7 +12,6 @@ import '../utils/report_helper.dart';
 import '../utils/roles.dart';
 import 'brand/brand.dart';
 import 'mention_text.dart';
-import 'owner_menu.dart';
 
 /// One row from `comments_public`: avatar on a thread line, name (or
 /// "Anonymous · Name hidden"), @handle · time, body with @mentions, and
@@ -29,6 +30,9 @@ class CommentTile extends StatelessWidget {
   final String? highlightUserId;
   final String? highlightLabel;
 
+  /// Pin / unpin, offered to the post author, event organiser and admins.
+  final VoidCallback? onTogglePin;
+
   const CommentTile({
     super.key,
     required this.comment,
@@ -37,6 +41,7 @@ class CommentTile extends StatelessWidget {
     this.threadLine = false,
     this.highlightUserId,
     this.highlightLabel,
+    this.onTogglePin,
   });
 
   /// Lets widget tests skip the Supabase session check.
@@ -61,6 +66,7 @@ class CommentTile extends StatelessWidget {
     final created = DateTime.tryParse('${c['created_at']}') ?? DateTime.now();
     final meta = theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant);
     final mine = onEdit != null && onDelete != null;
+    final pinned = c['pinned_at'] != null;
 
     return Padding(
       padding: const EdgeInsets.only(left: KSpace.l, top: KSpace.m),
@@ -110,6 +116,18 @@ class CommentTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (pinned)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: Row(children: [
+                          Icon(AppIcons.pin, size: 12, color: scheme.primary),
+                          const SizedBox(width: KSpace.xs),
+                          Text(s.mod.pinned,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                  color: scheme.primary,
+                                  fontWeight: FontWeight.w600)),
+                        ]),
+                      ),
                     Row(
                       children: [
                         Flexible(
@@ -164,21 +182,86 @@ class CommentTile extends StatelessWidget {
                 ),
               ),
             ),
-            mine
-                ? OwnerMenuButton(
-                    iconSize: 18,
-                    tooltip: context.postL10n.commentOptions,
-                    onEdit: onEdit!,
-                    onDelete: onDelete!,
-                  )
-                : (debugLoggedIn ?? isLoggedIn)
-                    ? ReportMenuButton(
-                        targetId: c['id'], type: 'comment', iconSize: 18)
-                    : GuardedReportButton(
-                        targetId: c['id'], type: 'comment', iconSize: 18),
+            _CommentMenu(
+              comment: c,
+              mine: mine,
+              pinned: pinned,
+              onTogglePin: onTogglePin,
+              onEdit: onEdit,
+              onDelete: onDelete,
+              loggedIn: debugLoggedIn ?? isLoggedIn,
+            ),
           ],
         ),
       ),
     );
   }
 }
+
+/// ⋮ for a comment: Pin/Unpin (if allowed), Edit/Delete (yours) or
+/// Report (others'; guests are asked to sign in).
+class _CommentMenu extends StatelessWidget {
+  final Map<String, dynamic> comment;
+  final bool mine;
+  final bool pinned;
+  final bool loggedIn;
+  final VoidCallback? onTogglePin;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+
+  const _CommentMenu({
+    required this.comment,
+    required this.mine,
+    required this.pinned,
+    required this.loggedIn,
+    this.onTogglePin,
+    this.onEdit,
+    this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final s = context.l10n;
+    final fs = context.feedL10n;
+
+    PopupMenuItem<String> item(String v, IconData icon, String label, {bool danger = false}) =>
+        PopupMenuItem(
+          value: v,
+          child: Row(children: [
+            Icon(icon, size: 20, color: danger ? scheme.error : scheme.onSurface),
+            const SizedBox(width: KSpace.m),
+            Text(label, style: danger ? TextStyle(color: scheme.error) : null),
+          ]),
+        );
+
+    return PopupMenuButton<String>(
+      tooltip: context.postL10n.commentOptions,
+      icon: Icon(AppIcons.more, size: 18, color: scheme.onSurfaceVariant),
+      style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+      onSelected: (v) {
+        switch (v) {
+          case 'pin':
+            onTogglePin?.call();
+          case 'edit':
+            onEdit?.call();
+          case 'delete':
+            onDelete?.call();
+          default:
+            if (!loggedIn && !requireLogin(context)) return;
+            showReportDialog(context, '${comment['id']}', 'comment');
+        }
+      },
+      itemBuilder: (_) => [
+        if (onTogglePin != null)
+          item('pin', AppIcons.pin, pinned ? fs.unpinComment : fs.pinComment),
+        if (mine) ...[
+          item('edit', AppIcons.edit, s.edit),
+          item('delete', AppIcons.delete, s.delete, danger: true),
+        ] else
+          item('report', AppIcons.report, s.report, danger: true),
+      ],
+    );
+  }
+}
+

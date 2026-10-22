@@ -25,9 +25,32 @@ List<String> parseTags(String text) => _tagPattern
 /// How a stored tag is shown.
 String displayTag(String stored) => '#${normalizeTag(stored)}';
 
-/// Stored spellings to match when listing posts for [tag] — rows saved
-/// before normalisation may still hold `lost&found`.
+/// Spellings to match when listing posts for [tag].
+///
+/// Migration 20261022003100 normalises stored tags (and a trigger keeps
+/// them normalised), but until it runs older rows still hold what the
+/// first editors saved: "Rant", "#rant", "Lost&Found". Matching those
+/// too keeps the tag feed and its count right either way.
 List<String> tagAliases(String tag) {
   final t = normalizeTag(tag);
-  return t == kLostFoundTag ? const [kLostFoundTag, 'lost&found'] : [t];
+  if (t.isEmpty) return const [];
+  String cap(String s) => s[0].toUpperCase() + s.substring(1);
+  final forms = <String>{t, '#$t', cap(t), t.toUpperCase()};
+  if (t == kLostFoundTag) {
+    // No spaces: they'd need quoting inside PostgREST's {a,b} list.
+    forms.addAll(const ['lost&found', 'Lost&Found', 'LostFound', 'lost-found']);
+  }
+  return forms.toList();
 }
+
+/// Whether a posts row carries [tag], however it was stored.
+bool postHasTag(Map<String, dynamic> post, String tag) {
+  final want = normalizeTag(tag);
+  return List<String>.from(post['tags'] ?? const [])
+      .any((stored) => normalizeTag(stored) == want);
+}
+
+/// Stored form of a whole tag list: normalised, no blanks, no repeats,
+/// first spelling's position kept (mirrors SQL normalize_tags()).
+List<String> normalizeTags(Iterable<String> raw) =>
+    raw.map(normalizeTag).where((t) => t.isNotEmpty).toSet().toList();
