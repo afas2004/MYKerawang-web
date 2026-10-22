@@ -280,6 +280,7 @@ FutureOr<bool> historyAwareExit(BuildContext context, GoRouterState state) {
   // to this same page; let go_router settle without treating it as a pop.
   if (_restoringAfterOverlay) {
     _restoringAfterOverlay = false;
+    _restoreTimeout?.cancel();
     return true;
   }
   final router = GoRouter.of(context);
@@ -297,7 +298,8 @@ FutureOr<bool> historyAwareExit(BuildContext context, GoRouterState state) {
   if (_fromBrowser(router) && OverlayTracker.closeTopmost()) {
     _restoringAfterOverlay = true;
     // Safety: never let the flag outlive the step it is for.
-    Future<void>.delayed(const Duration(seconds: 2), () => _restoringAfterOverlay = false);
+    _restoreTimeout?.cancel();
+    _restoreTimeout = Timer(const Duration(seconds: 2), () => _restoringAfterOverlay = false);
     WebHistory.forward(); // put the address bar back on this page
     return false;
   }
@@ -305,6 +307,7 @@ FutureOr<bool> historyAwareExit(BuildContext context, GoRouterState state) {
 }
 
 bool _restoringAfterOverlay = false;
+Timer? _restoreTimeout;
 
 /// Whether the pending location came from the browser (back / forward)
 /// rather than from the app (go / push / pop).
