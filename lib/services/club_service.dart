@@ -110,6 +110,23 @@ class PostAsOption {
       {...row, 'club_id': clubId, if (isClub) 'is_anonymous': false};
 }
 
+/// What the caller may announce (can_post_announcement(), 20261023001100).
+class AnnouncementAbility {
+  final bool allowed;
+  final List<String> categories; // kolej, jpk, club, event, general
+  final List<Map<String, dynamic>> clubs; // {id, name, handle, logo_url}
+
+  const AnnouncementAbility({required this.allowed, this.categories = const [], this.clubs = const []});
+
+  static const none = AnnouncementAbility(allowed: false);
+
+  factory AnnouncementAbility.fromJson(Map<String, dynamic> j) => AnnouncementAbility(
+        allowed: j['allowed'] == true,
+        categories: List<String>.from((j['categories'] as List?) ?? const []),
+        clubs: [for (final c in (j['clubs'] as List?) ?? const []) Map<String, dynamic>.from(c as Map)],
+      );
+}
+
 // ---------------------------------------------------------------- pure rules
 enum HandleIssue { empty, tooShort, tooLong, badChars }
 
@@ -260,6 +277,35 @@ class ClubService {
           ),
     ];
   }
+
+  static String? _abilityFor;
+  static Future<AnnouncementAbility>? _ability;
+
+  /// Cached per signed-in user; the create sheet asks on every open.
+  static Future<AnnouncementAbility> canPostAnnouncement({bool refresh = false}) {
+    if (debugAnnouncementAbility != null) return debugAnnouncementAbility!();
+    final uid = currentUserId;
+    if (uid == null) return Future.value(AnnouncementAbility.none);
+    if (refresh || _abilityFor != uid || _ability == null) {
+      _abilityFor = uid;
+      _ability = _db
+          .rpc('can_post_announcement')
+          .then((r) => AnnouncementAbility.fromJson(Map<String, dynamic>.from(r as Map)))
+          .catchError((Object _) {
+        _ability = null;
+        return AnnouncementAbility.none;
+      });
+    }
+    return _ability!;
+  }
+
+  /// Test hook for [canPostAnnouncement].
+  static Future<AnnouncementAbility> Function()? debugAnnouncementAbility;
+
+  /// Club phone / payment QR used for club listings (officers only).
+  static Future<void> setContact(String clubId, {String? phone, String? paymentQrUrl}) =>
+      _db.rpc('set_club_contact',
+          params: {'p_club_id': clubId, 'p_phone': phone, 'p_payment_qr_url': paymentQrUrl});
 
   // ---- content of a club page
   static Future<List<Map<String, dynamic>>> posts(String clubId, {int limit = 30}) async =>
