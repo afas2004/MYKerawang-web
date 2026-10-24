@@ -107,6 +107,7 @@ class _EventsViewState extends State<EventsView>
               title: Text(s.navEvents),
               actions: [
                 const ShellSearchButton(),
+                const ShellClubsButton(),
                 // Notifications only mean something when signed in.
                 if (ShellAuth.of(context))
                   IconButton(

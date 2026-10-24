@@ -59,6 +59,7 @@ List<Widget> homeAppBarActions(BuildContext context,
   final signedIn = ShellAuth.of(context);
   return [
     const ShellSearchButton(),
+    const ShellClubsButton(),
     if (kIsWeb && Responsive.isDesktop(context))
       IconButton(
         tooltip: s.refresh,

@@ -8,6 +8,7 @@ import '../utils/app_nav.dart';
 import '../utils/guest_access.dart';
 import '../services/unread_notifications.dart';
 import '../widgets/profile_avatar_action.dart';
+import '../widgets/shell_actions.dart';
 import '../utils/categories.dart';
 import '../utils/formatters.dart';
 import '../utils/listing_status.dart';
@@ -94,6 +95,7 @@ class _MarketplaceViewState extends State<MarketplaceView>
             appBar: AppBar(
               title: Text(s.marketplaceTitle),
               actions: [
+                const ShellClubsButton(),
                 // Notifications only mean something when signed in.
                 if (ShellAuth.of(context))
                   IconButton(

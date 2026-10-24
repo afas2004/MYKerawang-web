@@ -59,6 +59,18 @@ class Club {
       );
 }
 
+/// A club's private contact for its listings (20261023001100): the phone
+/// and payment QR buyers get from `get_listing_contact` when they ask.
+/// Officers and admins only — RLS on `club_private` enforces it.
+class ClubContact {
+  final String? phone;
+  final String? paymentQrUrl;
+
+  const ClubContact({this.phone, this.paymentQrUrl});
+
+  static const empty = ClubContact();
+}
+
 class ClubMember {
   final String userId;
   final String role; // president | officer | member
@@ -180,6 +192,15 @@ String? clubErrorCode(Object? e) {
 /// Normalises "@Name " → "Name".
 String cleanUsername(String raw) => raw.trim().replaceFirst(RegExp(r'^@+'), '');
 
+/// One row for the search screen's Clubs section (title / subtitle /
+/// avatar / route). Pure, so the shape can be tested without Supabase.
+Map<String, dynamic> clubSearchRow(Club c) => {
+      'title': c.name,
+      'subtitle': '@${c.handle}',
+      'avatar_url': c.logoUrl,
+      'route': '/c/${c.handle}',
+    };
+
 /// Socials the page shows, in display order, from the edit form values.
 Map<String, String> buildSocials({String? instagram, String? tiktok, String? website}) => {
       if ((instagram ?? '').trim().isNotEmpty) 'instagram': cleanUsername(instagram!),
@@ -212,13 +233,19 @@ class ClubService {
     return row == null ? null : Club.fromJson(row);
   }
 
-  static Future<List<Club>> directory({String? search, String? category}) async {
+  static Future<List<Club>> directory({String? search, String? category, int limit = 200}) async {
     var q = _db.from('clubs').select(_clubColumns).eq('status', 'active');
     if (category != null) q = q.eq('category', category);
     final s = search?.trim().replaceAll(RegExp(r'[%,()]'), '');
     if (s != null && s.isNotEmpty) q = q.or('name.ilike.%$s%,handle.ilike.%$s%');
-    final rows = await q.order('name').limit(200);
+    final rows = await q.order('name').limit(limit);
     return [for (final r in rows) Club.fromJson(r)];
+  }
+
+  /// Search source for [SearchScreen.clubSource] (wired in main.dart).
+  static Future<List<Map<String, dynamic>>> searchRows(String term, int limit) async {
+    final clubs = await directory(search: term, limit: limit);
+    return [for (final c in clubs) clubSearchRow(c)];
   }
 
   static Future<Map<String, int>> followerCounts(List<String> clubIds) async {
@@ -312,6 +339,21 @@ class ClubService {
   static Future<void> setContact(String clubId, {String? phone, String? paymentQrUrl}) =>
       _db.rpc('set_club_contact',
           params: {'p_club_id': clubId, 'p_phone': phone, 'p_payment_qr_url': paymentQrUrl});
+
+  /// The club's saved phone / payment QR (officers and admins; RLS on
+  /// `club_private`). Empty when nothing is set yet.
+  static Future<ClubContact> contact(String clubId) async {
+    final row = await _db
+        .from('club_private')
+        .select('contact_phone, payment_qr_url')
+        .eq('club_id', clubId)
+        .maybeSingle();
+    if (row == null) return ClubContact.empty;
+    return ClubContact(
+      phone: row['contact_phone'] as String?,
+      paymentQrUrl: row['payment_qr_url'] as String?,
+    );
+  }
 
   // ---- content of a club page
   static Future<List<Map<String, dynamic>>> posts(String clubId, {int limit = 30}) async =>
@@ -412,6 +454,17 @@ class ClubService {
   // ---- admin
   static Future<List<Map<String, dynamic>>> pendingRequests() async =>
       List<Map<String, dynamic>>.from(await _db.rpc('admin_pending_clubs') as List);
+
+  /// Every club in one status, for the admin console (RLS lets admins read
+  /// all of them). Pending still goes through [pendingRequests], which also
+  /// carries the proof and the president.
+  static Future<List<Map<String, dynamic>>> adminClubs(String status) async =>
+      List<Map<String, dynamic>>.from(await _db
+          .from('clubs')
+          .select('id, handle, name, description, category, logo_url, is_verified, status, created_at')
+          .eq('status', status)
+          .order('name')
+          .limit(200));
 
   static Future<void> decideRequest(String clubId, bool approve, String? reason) =>
       _db.rpc('admin_decide_club_request',

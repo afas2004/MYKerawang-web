@@ -418,4 +418,123 @@ void main() {
     );
     expect(find.text('Fotografi'), findsOneWidget);
   });
+
+  test('clubSearchRow maps a club for the search section', () {
+    const club = Club(
+      id: 'c1',
+      handle: 'DebateUiTM',
+      name: 'Debate Society',
+      logoUrl: 'https://cdn/logo.png',
+    );
+    final row = clubSearchRow(club);
+    expect(row['title'], 'Debate Society');
+    expect(row['subtitle'], '@DebateUiTM');
+    expect(row['avatar_url'], 'https://cdn/logo.png');
+    expect(row['route'], '/c/DebateUiTM');
+  });
+
+  testWidgets('manage contact section saves the phone for listings', (tester) async {
+    String? savedPhone;
+    String? savedQr;
+    var qrPicks = 0;
+    await pumpAt(
+      tester,
+      375,
+      ClubManageView(
+        club: club,
+        myRole: 'president',
+        myUserId: 'u1',
+        members: members,
+        contact: const ClubContact(phone: '011-111 2222'),
+        actions: ClubManageActions(
+          save: (_) async {},
+          pickImage: () async => null,
+          addOfficer: (_) async {},
+          removeOfficer: (_) async {},
+          transfer: (_) async {},
+          saveContact: (p, q) async {
+            savedPhone = p;
+            savedQr = q;
+          },
+          pickQr: () async {
+            qrPicks++;
+            return null;
+          },
+        ),
+      ),
+      scaffold: false,
+    );
+
+    await tester.dragUntilVisible(
+      find.text(c.contactForListings),
+      find.byType(ListView).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    final phoneField = find.widgetWithText(TextField, c.phone);
+    expect(tester.widget<TextField>(phoneField).controller?.text, '011-111 2222');
+
+    await tester.tap(find.widgetWithText(OutlinedButton, c.uploadQr));
+    await tester.pumpAndSettle();
+    expect(qrPicks, 1);
+
+    await tester.enterText(phoneField, '019-888 7777');
+    final save = find.widgetWithText(FilledButton, c.saveContact);
+    await tester.ensureVisible(save);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(savedPhone, '019-888 7777');
+    expect(savedQr, isNull);
+    expect(find.text(c.contactSaved), findsOneWidget);
+  });
+
+  testWidgets('admin clubs tab filters and suspends with a reason', (tester) async {
+    final calls = <(String, String, String)>[];
+    Map<String, dynamic> row(String status) => {
+          'id': 'c1',
+          'handle': 'debate',
+          'name': 'Debate Society',
+          'status': status,
+          'is_verified': true,
+        };
+    await pumpAt(
+      tester,
+      375,
+      ClubApprovalsTab(
+        load: () async => [],
+        decide: (_, __, ___) async {},
+        loadClubs: (status) async => [row(status)],
+        setStatus: (id, status, reason) async => calls.add((id, status, reason)),
+      ),
+    );
+    expect(find.text(c.noClubRequests), findsOneWidget);
+
+    await tester.tap(find.text(c.statusActive));
+    await tester.pumpAndSettle();
+    expect(find.text('Debate Society'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(TextButton, c.suspend));
+    await tester.pumpAndSettle();
+    expect(find.text(c.suspendTitle.replaceAll('{0}', 'Debate Society')), findsOneWidget);
+    await tester.enterText(find.byType(TextField).last, 'spam listings');
+    await tester.tap(find.widgetWithText(FilledButton, c.suspend));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(calls, [('c1', 'suspended', 'spam listings')]);
+    expect(find.text(c.suspendedDone), findsOneWidget);
+
+    final suspendedChip = find.text(c.statusSuspended);
+    await tester.ensureVisible(suspendedChip);
+    await tester.tap(suspendedChip);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(c.reactivate));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, 'appeal accepted');
+    await tester.tap(find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.text(c.reactivate),
+    ));
+    await tester.pumpAndSettle();
+    expect(calls.last, ('c1', 'active', 'appeal accepted'));
+  });
 }

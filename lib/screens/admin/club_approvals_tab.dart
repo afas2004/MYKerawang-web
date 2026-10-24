@@ -11,28 +11,56 @@ import '../clubs/club_widgets.dart';
 import 'admin_overview.dart';
 import 'admin_screen.dart';
 
-/// Pending club pages (20261022002200): approve → active + verified, or
-/// reject with a reason. Both notify the club's president.
+/// Clubs in the admin console: pending requests (approve → active +
+/// verified, or reject with a reason) plus every active / suspended page
+/// (suspend ↔ reactivate). Every action needs a reason; the RPC logs it and
+/// notifies the club's president.
 class ClubApprovalsTab extends StatefulWidget {
   final Future<List<Map<String, dynamic>>> Function()? load;
   final Future<void> Function(String clubId, bool approve, String? reason)? decide;
 
-  const ClubApprovalsTab({super.key, this.load, this.decide});
+  /// Loads clubs in a status (active / suspended); injected for tests.
+  final Future<List<Map<String, dynamic>>> Function(String status)? loadClubs;
+
+  /// Suspends / reactivates a club; injected for tests.
+  final Future<void> Function(String clubId, String status, String reason)? setStatus;
+
+  const ClubApprovalsTab({
+    super.key,
+    this.load,
+    this.decide,
+    this.loadClubs,
+    this.setStatus,
+  });
 
   @override
   State<ClubApprovalsTab> createState() => _ClubApprovalsTabState();
 }
 
 class _ClubApprovalsTabState extends State<ClubApprovalsTab> with AutomaticKeepAliveClientMixin {
+  static const _pending = 'pending';
+  String _status = _pending;
   late Future<List<Map<String, dynamic>>> _future = _fetch();
   final Set<String> _busy = {};
 
   @override
   bool get wantKeepAlive => true;
 
-  Future<List<Map<String, dynamic>>> _fetch() => (widget.load ?? ClubService.pendingRequests)();
+  Future<List<Map<String, dynamic>>> _fetch() => _status == _pending
+      ? (widget.load ?? ClubService.pendingRequests)()
+      : (widget.loadClubs ?? ClubService.adminClubs)(_status);
 
-  void _reload() => setState(() => _future = _fetch());
+  void _reload() => setState(() {
+        _future = _fetch();
+      });
+
+  void _setFilter(String status) {
+    if (status == _status) return;
+    setState(() {
+      _status = status;
+      _future = _fetch();
+    });
+  }
 
   Future<void> _decide(Map<String, dynamic> r, bool approve) async {
     final c = context.l10nRead.club;
@@ -63,22 +91,187 @@ class _ClubApprovalsTabState extends State<ClubApprovalsTab> with AutomaticKeepA
     }
   }
 
+  Future<void> _changeStatus(Map<String, dynamic> r, String next) async {
+    final c = context.l10nRead.club;
+    final name = '${r['name']}';
+    final suspend = next == 'suspended';
+    final reason = await askReason(
+      context,
+      title: (suspend ? c.suspendTitle : c.reactivateTitle).fill([name]),
+      body: suspend ? c.suspendBody : c.reactivateBody,
+      confirmLabel: suspend ? c.suspend : c.reactivate,
+      destructive: suspend,
+    );
+    if (reason == null) return;
+    final id = '${r['id']}';
+    setState(() => _busy.add(id));
+    try {
+      await (widget.setStatus ?? ClubService.setStatus)(id, next, reason);
+      if (!mounted) return;
+      showModSnack(context, suspend ? c.suspendedDone : c.reactivatedDone);
+      adminSummaryRefresh.value++;
+      _reload();
+    } catch (e) {
+      if (mounted) showModSnack(context, clubErrorText(c, e, fallback: modErrorText(context, e)), error: true);
+      if (clubErrorCode(e) == 'not_found') _reload();
+    } finally {
+      if (mounted) setState(() => _busy.remove(id));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
     final c = context.l10n.club;
+    final empty = switch (_status) {
+      'suspended' => ModEmptyState(icon: AppIcons.warning, title: c.noSuspendedClubs),
+      'active' => ModEmptyState(icon: AppIcons.people, title: c.noActiveClubs),
+      _ => ModEmptyState(icon: AppIcons.verified, title: c.noClubRequests),
+    };
     return AdminAsyncList<Map<String, dynamic>>(
       future: _future,
       onRetry: _reload,
-      empty: ModEmptyState(icon: AppIcons.verified, title: c.noClubRequests),
-      itemBuilder: (context, r) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: KSpace.xs + 2),
-        child: ClubRequestCard(
-          request: r,
-          busy: _busy.contains('${r['id']}'),
-          onApprove: () => _decide(r, true),
-          onReject: () => _decide(r, false),
-        ),
+      header: _StatusFilter(value: _status, onChanged: _setFilter),
+      empty: empty,
+      itemBuilder: (context, r) {
+        final id = '${r['id']}';
+        final busy = _busy.contains(id);
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: KSpace.xs + 2),
+          child: _status == _pending
+              ? ClubRequestCard(
+                  request: r,
+                  busy: busy,
+                  onApprove: () => _decide(r, true),
+                  onReject: () => _decide(r, false),
+                )
+              : AdminClubCard(
+                  club: r,
+                  busy: busy,
+                  onOpen: () => context.push('/c/${r['handle']}'),
+                  onToggle: () =>
+                      _changeStatus(r, r['status'] == 'suspended' ? 'active' : 'suspended'),
+                ),
+        );
+      },
+    );
+  }
+}
+
+/// Pending / active / suspended filter for the tab.
+class _StatusFilter extends StatelessWidget {
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  const _StatusFilter({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.l10n.club;
+    final items = [
+      ('pending', c.statusPending),
+      ('active', c.statusActive),
+      ('suspended', c.statusSuspended),
+    ];
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, KSpace.xs),
+      child: Row(
+        children: [
+          for (final (key, label) in items) ...[
+            ChoiceChip(
+              label: Text(label),
+              selected: value == key,
+              showCheckmark: false,
+              onSelected: (_) => onChanged(key),
+            ),
+            const SizedBox(width: KSpace.s),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// One active or suspended club: tap to open the page, or change its status.
+class AdminClubCard extends StatelessWidget {
+  final Map<String, dynamic> club;
+  final bool busy;
+  final VoidCallback onOpen;
+  final VoidCallback onToggle;
+
+  const AdminClubCard({
+    super.key,
+    required this.club,
+    required this.busy,
+    required this.onOpen,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.l10n.club;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final suspended = club['status'] == 'suspended';
+    final muted = theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant);
+
+    return KCard(
+      onTap: onOpen,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (busy) const LinearProgressIndicator(minHeight: 2),
+          Row(
+            children: [
+              ClubLogo(url: club['logo_url'] as String?, name: '${club['name']}', size: 48),
+              const SizedBox(width: KSpace.m),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ClubNameLine(
+                      name: '${club['name']}',
+                      verified: club['is_verified'] == true,
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    Text('@${club['handle']}',
+                        style: muted, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+              ClubPill(
+                c.statusLabel(club['status'] as String?),
+                background: suspended ? scheme.errorContainer : scheme.primaryContainer,
+                foreground: suspended ? scheme.onErrorContainer : scheme.onPrimaryContainer,
+              ),
+            ],
+          ),
+          const SizedBox(height: KSpace.m),
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: KSpace.s,
+            runSpacing: KSpace.xs,
+            children: [
+              TextButton.icon(
+                onPressed: onOpen,
+                icon: const Icon(AppIcons.chevronRight, size: 18),
+                label: Text(c.viewPage),
+              ),
+              if (suspended)
+                FilledButton.tonalIcon(
+                  onPressed: busy ? null : onToggle,
+                  icon: const Icon(AppIcons.verified, size: 18),
+                  label: Text(c.reactivate),
+                )
+              else
+                TextButton(
+                  onPressed: busy ? null : onToggle,
+                  child: Text(c.suspend, style: TextStyle(color: scheme.error)),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

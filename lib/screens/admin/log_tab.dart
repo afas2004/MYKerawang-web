@@ -44,8 +44,9 @@ class _LogTabState extends State<LogTab> with AutomaticKeepAliveClientMixin {
     super.dispose();
   }
 
-  void _reload() =>
-      setState(() => _future = ModerationService.log(action: _action, actor: _actor));
+  void _reload() => setState(() {
+        _future = ModerationService.log(action: _action, actor: _actor);
+      });
 
   Future<void> _export() async {
     final m = modStrings(context);

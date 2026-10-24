@@ -54,7 +54,9 @@ class _ClubPageScreenState extends State<ClubPageScreen> {
         if (snap.hasError) {
           return Scaffold(
             appBar: AppBar(),
-            body: ErrorState(onRetry: () => setState(() => _future = _load())),
+            body: ErrorState(onRetry: () => setState(() {
+                  _future = _load();
+                })),
           );
         }
         final d = snap.data;
@@ -80,7 +82,11 @@ class _ClubPageScreenState extends State<ClubPageScreen> {
           onSetFollowing: (v) => ClubService.setFollowing(id, v),
           onManage: () async {
             await context.push('/c/${d.club.handle}/manage');
-            if (mounted) setState(() => _future = _load());
+            if (mounted) {
+              setState(() {
+                _future = _load();
+              });
+            }
           },
           loadPosts: () => ClubService.posts(id),
           loadEvents: () => ClubService.events(id),

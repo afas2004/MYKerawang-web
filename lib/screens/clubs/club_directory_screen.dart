@@ -33,7 +33,9 @@ class _ClubDirectoryScreenState extends State<ClubDirectoryScreen> {
     return _DirData(clubs, counts);
   }
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() => setState(() {
+        _future = _load();
+      });
 
   @override
   void dispose() {

@@ -236,14 +236,7 @@ class ModerationService {
         .maybeSingle();
   }
 
-  // ------------------------------------------------------------- admin: clubs, appeals
-  static Future<List<Map<String, dynamic>>> clubRequests() async =>
-      List<Map<String, dynamic>>.from(await _db.rpc('admin_club_requests') as List);
-
-  static Future<void> decideClub(String userId, bool approve, String? reason) =>
-      _db.rpc('admin_decide_club',
-          params: {'p_user_id': userId, 'p_approve': approve, 'p_reason': reason});
-
+  // ------------------------------------------------------------- admin: appeals
   static Future<List<Map<String, dynamic>>> appeals({bool pendingOnly = true}) async {
     var q = _db.from('moderation_appeals').select();
     if (pendingOnly) q = q.eq('status', 'pending');

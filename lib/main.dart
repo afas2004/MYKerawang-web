@@ -12,6 +12,7 @@ import 'language_cubit.dart';
 import 'router.dart';
 // --- IMPORT YOUR SERVICES ---
 import 'services/notification_service.dart';
+import 'services/club_service.dart';
 import 'services/saved_items.dart';
 import 'services/unread_notifications.dart';
 import 'services/update_service.dart';
@@ -20,6 +21,7 @@ import 'utils/responsive.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'screens/profile_cubit.dart';
+import 'screens/search_screen.dart';
 
 /// Lets mouse users drag-scroll lists (like touch), on top of the wheel.
 class AppScrollBehavior extends MaterialScrollBehavior {
@@ -46,6 +48,10 @@ void main() async {
   );
 
   await NotificationService.init();
+
+  // The Search tab's "All" results include a Clubs section; the hook is
+  // optional so SearchScreen keeps working without the clubs feature.
+  SearchScreen.clubSource = ClubService.searchRows;
 
   // Web: poll for newer deploys so phones don't sit on a stale build.
   UpdateService.instance.start();

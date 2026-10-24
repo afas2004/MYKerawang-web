@@ -21,12 +21,21 @@ class ClubManageActions {
   final Future<void> Function(String userId) removeOfficer;
   final Future<void> Function(String userId) transfer;
 
+  /// Saves the private contact used by the club's listings. Null hides the
+  /// section, so tests that only exercise the page details stay simple.
+  final Future<void> Function(String? phone, String? paymentQrUrl)? saveContact;
+
+  /// Uploads a payment QR image; defaults to [pickImage].
+  final Future<String?> Function()? pickQr;
+
   const ClubManageActions({
     required this.save,
     required this.pickImage,
     required this.addOfficer,
     required this.removeOfficer,
     required this.transfer,
+    this.saveContact,
+    this.pickQr,
   });
 }
 
@@ -57,17 +66,20 @@ class ClubManageScreen extends StatefulWidget {
 }
 
 class _ClubManageScreenState extends State<ClubManageScreen> {
-  late Future<(Club, String?, List<ClubMember>)?> _future = _load();
+  late Future<(Club, String?, List<ClubMember>, ClubContact)?> _future = _load();
 
-  Future<(Club, String?, List<ClubMember>)?> _load() async {
+  Future<(Club, String?, List<ClubMember>, ClubContact)?> _load() async {
     final club = await ClubService.byHandle(widget.handle);
     if (club == null) return null;
     final role = await ClubService.myRole(club.id);
     final members = await ClubService.members(club.id);
-    return (club, role, members);
+    final contact = await ClubService.contact(club.id);
+    return (club, role, members, contact);
   }
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() => setState(() {
+        _future = _load();
+      });
 
   Future<String?> _pickImage() async {
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1600, imageQuality: 85);
@@ -77,10 +89,19 @@ class _ClubManageScreenState extends State<ClubManageScreen> {
     return urls.first;
   }
 
+  /// Payment QRs must stay sharp to scan, so this keeps full quality.
+  Future<String?> _pickQr() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1200, imageQuality: 100);
+    if (picked == null) return null;
+    final img = await LocalImage.fromXFile(picked);
+    final urls = await PostService.uploadPhotos([img]);
+    return urls.first;
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.l10n.club;
-    return FutureBuilder<(Club, String?, List<ClubMember>)?>(
+    return FutureBuilder<(Club, String?, List<ClubMember>, ClubContact)?>(
       future: _future,
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
@@ -105,6 +126,7 @@ class _ClubManageScreenState extends State<ClubManageScreen> {
           myRole: d.$2!,
           myUserId: ClubService.currentUserId,
           members: d.$3,
+          contact: d.$4,
           actions: ClubManageActions(
             save: (e) => ClubService.update(
               club.id,
@@ -118,6 +140,9 @@ class _ClubManageScreenState extends State<ClubManageScreen> {
               socials: e.socials,
             ),
             pickImage: _pickImage,
+            saveContact: (phone, qr) =>
+                ClubService.setContact(club.id, phone: phone, paymentQrUrl: qr),
+            pickQr: _pickQr,
             addOfficer: (u) async {
               await ClubService.inviteOfficer(club.id, u);
               _reload();
@@ -151,6 +176,10 @@ class ClubManageView extends StatefulWidget {
   final List<ClubMember> members;
   final ClubManageActions actions;
 
+  /// Private phone / payment QR for the club's listings; null hides the
+  /// section.
+  final ClubContact? contact;
+
   const ClubManageView({
     super.key,
     required this.club,
@@ -158,6 +187,7 @@ class ClubManageView extends StatefulWidget {
     required this.myUserId,
     required this.members,
     required this.actions,
+    this.contact,
   });
 
   @override
@@ -174,17 +204,20 @@ class _ClubManageViewState extends State<ClubManageView> {
   late final _tiktok = TextEditingController(text: widget.club.socials['tiktok'] ?? '');
   late final _website = TextEditingController(text: widget.club.socials['website'] ?? '');
   late final _officer = TextEditingController();
+  late final _phone = TextEditingController(text: widget.contact?.phone ?? '');
   late String? _category = widget.club.category;
   late String? _logo = widget.club.logoUrl;
   late String? _cover = widget.club.coverUrl;
+  late String? _qr = widget.contact?.paymentQrUrl;
   bool _saving = false;
   bool _adding = false;
+  bool _savingContact = false;
 
   static final _email_ = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
   @override
   void dispose() {
-    for (final t in [_name, _description, _faculty, _email, _instagram, _tiktok, _website, _officer]) {
+    for (final t in [_name, _description, _faculty, _email, _instagram, _tiktok, _website, _officer, _phone]) {
       t.dispose();
     }
     super.dispose();
@@ -218,6 +251,31 @@ class _ClubManageViewState extends State<ClubManageView> {
     try {
       final url = await widget.actions.pickImage();
       if (url != null && mounted) setState(() => logo ? _logo = url : _cover = url);
+    } catch (e) {
+      if (mounted) showClubSnack(context, clubErrorText(c, e), error: true);
+    }
+  }
+
+  Future<void> _saveContact() async {
+    final save = widget.actions.saveContact;
+    if (save == null) return;
+    setState(() => _savingContact = true);
+    try {
+      final phone = _phone.text.trim();
+      await save(phone.isEmpty ? null : phone, _qr);
+      if (mounted) showClubSnack(context, c.contactSaved);
+    } catch (e) {
+      if (mounted) showClubSnack(context, clubErrorText(c, e), error: true);
+    } finally {
+      if (mounted) setState(() => _savingContact = false);
+    }
+  }
+
+  Future<void> _setQr() async {
+    try {
+      final pick = widget.actions.pickQr ?? widget.actions.pickImage;
+      final url = await pick();
+      if (url != null && mounted) setState(() => _qr = url);
     } catch (e) {
       if (mounted) showClubSnack(context, clubErrorText(c, e), error: true);
     }
@@ -427,6 +485,67 @@ class _ClubManageViewState extends State<ClubManageView> {
                   ),
                 ),
               ]),
+              if (widget.contact != null && widget.actions.saveContact != null)
+                section(c.contactForListings, help: c.contactForListingsHelp, [
+                  TextField(
+                    controller: _phone,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      labelText: c.phone,
+                      hintText: c.phoneHint,
+                      prefixIcon: const Icon(AppIcons.phone),
+                    ),
+                  ),
+                  const SizedBox(height: KSpace.m),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_qr == null)
+                        OutlinedButton.icon(
+                          onPressed: _setQr,
+                          icon: const Icon(AppIcons.qrCode, size: 18),
+                          label: Text(c.uploadQr),
+                        )
+                      else ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: CachedNetworkImage(
+                            imageUrl: _qr!,
+                            width: 88,
+                            height: 88,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => const SizedBox(width: 88, height: 88),
+                          ),
+                        ),
+                        const SizedBox(width: KSpace.m),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: _setQr,
+                              icon: const Icon(AppIcons.photo, size: 18),
+                              label: Text(c.replaceQr),
+                            ),
+                            TextButton(
+                              onPressed: () => setState(() => _qr = null),
+                              child: Text(c.removeQr),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: KSpace.m),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: FilledButton.tonal(
+                      onPressed: _savingContact ? null : _saveContact,
+                      child: _savingContact
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                          : Text(c.saveContact),
+                    ),
+                  ),
+                ]),
               section(c.officers, help: c.officersHelp, [
                 for (final m in officers)
                   ListTile(

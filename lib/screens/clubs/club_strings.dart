@@ -123,6 +123,25 @@ class ClubStrings {
   final String approved;
   final String rejected;
   final String notPending;
+  final String contactForListings;
+  final String contactForListingsHelp;
+  final String phone;
+  final String phoneHint;
+  final String uploadQr;
+  final String replaceQr;
+  final String removeQr;
+  final String saveContact;
+  final String contactSaved;
+  final String suspend;
+  final String reactivate;
+  final String suspendTitle;
+  final String suspendBody;
+  final String reactivateTitle;
+  final String reactivateBody;
+  final String suspendedDone;
+  final String reactivatedDone;
+  final String noActiveClubs;
+  final String noSuspendedClubs;
 
   const ClubStrings({
     required this.clubs,
@@ -243,6 +262,25 @@ class ClubStrings {
     required this.approved,
     required this.rejected,
     required this.notPending,
+    required this.contactForListings,
+    required this.contactForListingsHelp,
+    required this.phone,
+    required this.phoneHint,
+    required this.uploadQr,
+    required this.replaceQr,
+    required this.removeQr,
+    required this.saveContact,
+    required this.contactSaved,
+    required this.suspend,
+    required this.reactivate,
+    required this.suspendTitle,
+    required this.suspendBody,
+    required this.reactivateTitle,
+    required this.reactivateBody,
+    required this.suspendedDone,
+    required this.reactivatedDone,
+    required this.noActiveClubs,
+    required this.noSuspendedClubs,
   });
 
   static const en = ClubStrings(
@@ -364,6 +402,25 @@ class ClubStrings {
     approved: "Club approved — the president was notified",
     rejected: "Request rejected — the president was notified",
     notPending: "This request was already handled.",
+    contactForListings: "Contact for listings",
+    contactForListingsHelp: "Buyers who ask for contact on your club's listings get this phone and payment QR. It is never shown on the page.",
+    phone: "Phone (WhatsApp)",
+    phoneHint: "e.g. 012-345 6789",
+    uploadQr: "Upload payment QR",
+    replaceQr: "Replace QR",
+    removeQr: "Remove QR",
+    saveContact: "Save contact",
+    contactSaved: "Contact saved",
+    suspend: "Suspend",
+    reactivate: "Reactivate",
+    suspendTitle: "Suspend {0}?",
+    suspendBody: "The page and all club posts stop showing to visitors, and officers can no longer publish. The president is notified.",
+    reactivateTitle: "Reactivate {0}?",
+    reactivateBody: "The page and its posts become visible again, and officers can publish. The president is notified.",
+    suspendedDone: "Club suspended — the president was notified",
+    reactivatedDone: "Club is active again — the president was notified",
+    noActiveClubs: "No active clubs",
+    noSuspendedClubs: "No suspended clubs",
   );
 
   static const ms = ClubStrings(
@@ -485,6 +542,25 @@ class ClubStrings {
     approved: "Kelab diluluskan — presiden telah dimaklumkan",
     rejected: "Permohonan ditolak — presiden telah dimaklumkan",
     notPending: "Permohonan ini sudah diuruskan.",
+    contactForListings: "Hubungan untuk iklan",
+    contactForListingsHelp: "Pembeli yang meminta hubungan pada iklan kelab anda akan menerima telefon dan kod QR pembayaran ini. Ia tidak pernah dipaparkan pada halaman.",
+    phone: "Telefon (WhatsApp)",
+    phoneHint: "cth. 012-345 6789",
+    uploadQr: "Muat naik QR pembayaran",
+    replaceQr: "Tukar QR",
+    removeQr: "Buang QR",
+    saveContact: "Simpan hubungan",
+    contactSaved: "Hubungan disimpan",
+    suspend: "Gantung",
+    reactivate: "Aktifkan semula",
+    suspendTitle: "Gantung {0}?",
+    suspendBody: "Halaman dan semua siaran kelab tidak lagi dipaparkan kepada pelawat, dan pegawai tidak boleh menyiar. Presiden akan dimaklumkan.",
+    reactivateTitle: "Aktifkan semula {0}?",
+    reactivateBody: "Halaman dan siarannya kelihatan semula, dan pegawai boleh menyiar. Presiden akan dimaklumkan.",
+    suspendedDone: "Kelab digantung — presiden telah dimaklumkan",
+    reactivatedDone: "Kelab aktif semula — presiden telah dimaklumkan",
+    noActiveClubs: "Tiada kelab aktif",
+    noSuspendedClubs: "Tiada kelab digantung",
   );
 
   /// Category keys stored in clubs.category.
