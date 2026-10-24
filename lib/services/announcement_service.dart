@@ -192,11 +192,14 @@ abstract final class AnnouncementService {
   /// Events the user (or their club) organises, newest first, for the
   /// "link an event" picker.
   static Future<List<Map<String, dynamic>>> linkableEvents({String? clubId}) async {
-    final me = _db.auth.currentUser?.id;
-    var q = _db.from('events').select('id, title, start_datetime, location, image_url');
-    q = clubId != null ? q.eq('club_id', clubId) : q.eq('organizer_id', me ?? '');
+    var q = _db
+        .from('events')
+        .select('id, title, start_datetime, location, image_url');
+    // Any event can be linked, not only your own: a club announcement often
+    // points at a college event, and an admin at anything on the calendar.
+    if (clubId != null) q = q.eq('club_id', clubId);
     return List<Map<String, dynamic>>.from(
-        await q.order('start_datetime', ascending: false).limit(30));
+        await q.order('start_datetime', ascending: true).limit(50));
   }
 
   /// The event an announcement links to (detail page).
