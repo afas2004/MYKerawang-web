@@ -48,9 +48,14 @@ void main() async {
   usePathUrlStrategy();
 
   // 1. Initialize Supabase
+  //
+  // Publishable key, not the legacy anon JWT. It is safe in a browser:
+  // it only ever acts as `anon` and every table is behind RLS. The legacy
+  // service_role key leaked into this repo's history, so the project
+  // moves off JWT-based API keys entirely.
   await Supabase.initialize(
     url: 'https://zxjuqpqzyzmegdjttzyz.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp4anVxcHF6eXptZWdkanR0enl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0MzAxNzIsImV4cCI6MjA4MDAwNjE3Mn0.UD_aL16G55CFD6TAOutU4oiGsJCaU5wq-wqFf6OnW5c',
+    anonKey: 'sb_publishable_REqYNPrrJEIgmEjZjrJhtg_1JrLn_yO',
   );
 
   await NotificationService.init();

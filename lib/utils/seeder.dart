@@ -6,15 +6,16 @@ import 'dart:math';
 // ==========================================
 const String supabaseUrl = 'https://zxjuqpqzyzmegdjttzyz.supabase.co';
 
-// ⚠️ The service-role key must never be committed. Pass it at run time:
+// ⚠️ A privileged key must never be committed. Pass it at run time:
 //
 //   flutter run lib/utils/seeder.dart \
-//     --dart-define=SUPABASE_SERVICE_ROLE=eyJ...
+//     --dart-define=SUPABASE_SECRET_KEY=sb_secret_...
 //
-// The key that used to sit here is in git history and must be rotated in
-// the Supabase dashboard (Settings → API → service_role → Roll).
-const String serviceRoleKey =
-    String.fromEnvironment('SUPABASE_SERVICE_ROLE', defaultValue: '');
+// Accepts the new `sb_secret_…` key, or the legacy `service_role` JWT.
+// The legacy key that used to sit here is in git history; the project
+// moved to publishable/secret API keys to retire it.
+const String serviceRoleKey = String.fromEnvironment('SUPABASE_SECRET_KEY',
+    defaultValue: String.fromEnvironment('SUPABASE_SERVICE_ROLE', defaultValue: ''));
 
 // ==========================================
 // 2. DATA POOLS

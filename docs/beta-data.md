@@ -58,10 +58,11 @@ owner (same, after removing their own rows).
 
 ## Still yours to do
 
-- **Rotate the service-role key.** It was committed in
-  `lib/utils/seeder.dart` and is in git history; the file now reads it
-  from `--dart-define=SUPABASE_SERVICE_ROLE=…`. Rotate in Supabase →
-  Settings → API, then re-run nothing that depends on it.
+- **Disable the legacy JWT keys.** The app now initialises Supabase with a
+  publishable key (`sb_publishable_…`, 1.7.1, build 202610242323), so once
+  the deploy has settled, click *API Keys → Legacy anon, service_role →
+  Disable JWT-based API keys*. That retires the leaked `service_role`
+  without rotating the JWT secret, so user sessions survive.
 - Rotate the DB password (already on the list).
 - Add `club_registry` entries for clubs that will join the beta (not KMI —
   it has a page).
