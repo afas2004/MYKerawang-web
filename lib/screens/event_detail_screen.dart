@@ -994,6 +994,14 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             icon: const Icon(AppIcons.verified, size: 18),
             label: Text(s.evAttendance),
           ),
+          if (!_registrationClosed && !_isClosed) ...[
+            const SizedBox(height: KSpace.s),
+            TextButton.icon(
+              onPressed: _closeRegistration,
+              icon: const Icon(AppIcons.lock, size: 18),
+              label: Text(s.evCloseNow),
+            ),
+          ],
         ] else if (attendanceOn) ...[
           const SizedBox(height: KSpace.s),
           FilledButton.tonalIcon(
@@ -1092,8 +1100,39 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     }
   }
 
-  void _openAttendance() {
-    Navigator.of(context).push(MaterialPageRoute(
+  /// Organiser closes registration early: the deadline becomes now, which
+  /// the join guard already enforces server-side.
+  Future<void> _closeRegistration() async {
+    final s = context.l10nRead;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(s.evCloseNow),
+        content: Text(s.evCloseAtStartHint),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false), child: Text(s.cancel)),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(s.evCloseNow)),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final now = DateTime.now().toUtc();
+    try {
+      await Supabase.instance.client
+          .from('events')
+          .update({'join_deadline': now.toIso8601String()})
+          .eq('id', _event['id']);
+      if (!mounted) return;
+      setState(() => _event['join_deadline'] = now.toIso8601String());
+    } catch (e) {
+      if (mounted) showErrorWithRetry(context, e, onRetry: _closeRegistration);
+    }
+  }
+
+  void _openAttendance() {    Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => AttendanceScreen(
         eventId: '${_event['id']}',
         title: '${_event['title'] ?? ''}',
