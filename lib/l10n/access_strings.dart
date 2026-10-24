@@ -214,6 +214,19 @@ extension AccessStrings on AppStrings {
   String get evName => _t("Name", "Nama", "Name");
 
   // ---- club recruitment ----
+  String get signOutConfirmTitle => _t("Sign out?", "Log keluar?", "Sign out?");
+  String get signOutConfirmBody => _t(
+      "You can keep reading as a guest, or sign back in any time.",
+      "Anda boleh terus membaca sebagai tetamu, atau log masuk semula bila-bila masa.",
+      "You can keep reading as a guest.");
+  String get ownerDeleteBlocked => _t(
+      "The owner account can't delete itself — the app would be left without an owner. Hand the owner role to another account first.",
+      "Akaun pemilik tidak boleh memadam dirinya — aplikasi akan hilang pemilik. Pindahkan peranan pemilik kepada akaun lain dahulu.",
+      "The owner account can't delete itself.");
+  String get deleteNeedsUsername => _t(
+      "Finish setting up your profile (choose a username) before deleting the account.",
+      "Selesaikan profil anda (pilih nama pengguna) sebelum memadam akaun.",
+      "Finish your profile before deleting the account.");
   String get clubRecruitment =>
       _t("Membership", "Keahlian", "Membership");
   String get clubRecruitmentOpen =>
