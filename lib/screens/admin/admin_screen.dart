@@ -4,8 +4,10 @@ import 'package:mykerawang/utils/app_nav.dart';
 
 import '../../l10n/moderation_strings.dart';
 import '../../language_cubit.dart';
+import '../../services/admin_unlock.dart';
 import '../../services/moderation_service.dart';
 import '../../widgets/moderation_ui.dart';
+import 'admin_lock_screen.dart';
 import 'admin_overview.dart';
 import 'appeals_tab.dart';
 import 'cases_tab.dart';
@@ -26,15 +28,29 @@ class AdminScreen extends StatefulWidget {
 }
 
 class _AdminScreenState extends State<AdminScreen> {
-  late Future<(bool, bool)> _access = _load();
+  late Future<(bool, bool, bool)> _access = _load();
 
-  Future<(bool, bool)> _load() async =>
-      (await ModerationService.isAdmin(), await ModerationService.isOwner());
+  Future<(bool, bool, bool)> _load() async {
+    final admin = await ModerationService.isAdmin();
+    var owner = false;
+    var configured = false;
+    if (admin) {
+      owner = await ModerationService.isOwner();
+      try {
+        configured = await ModerationService.adminPinConfigured();
+      } catch (_) {
+        // A transient failure must not lock an admin out of the console.
+        configured = false;
+      }
+    }
+    AdminUnlock.instance.setConfigured(configured);
+    return (admin, owner, configured);
+  }
 
   @override
   Widget build(BuildContext context) {
     final m = context.l10n.mod;
-    return FutureBuilder<(bool, bool)>(
+    return FutureBuilder<(bool, bool, bool)>(
       future: _access,
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
@@ -43,7 +59,7 @@ class _AdminScreenState extends State<AdminScreen> {
             body: const Center(child: CircularProgressIndicator()),
           );
         }
-        final (admin, owner) = snap.data ?? (false, false);
+        final (admin, owner, _) = snap.data ?? (false, false, false);
         if (!admin) {
           return Scaffold(
             appBar: AppBar(leading: const AppBackButton(), title: Text(m.moderation)),
@@ -66,42 +82,91 @@ class _AdminScreenState extends State<AdminScreen> {
           );
         }
 
-        final tabs = <(String, IconData, Widget)>[
-          (m.tabCases, ModIcons.inbox, const CasesTab()),
-          (m.tabClubs, ModIcons.verified, const ClubApprovalsTab()),
-          (m.tabJoinRequests, ModIcons.person, const JoinRequestsTab()),
-          (m.tabAppeals, ModIcons.appeal, const AppealsTab()),
-          (m.tabRestrictions, ModIcons.ban, const RestrictionsTab()),
-          (m.tabLog, ModIcons.log, const LogTab()),
-          if (owner) (m.tabSettings, ModIcons.settings, const SettingsTab()),
-        ];
-
-        return DefaultTabController(
-          length: tabs.length,
-          child: Scaffold(
-            appBar: AppBar(
-              leading: const AppBackButton(),
-              title: Text(m.moderation),
-              bottom: TabBar(
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                tabs: [
-                  for (final t in tabs) Tab(icon: Icon(t.$2, size: 20), text: t.$1),
-                ],
-              ),
-            ),
-            body: Builder(
-              builder: (context) => Column(
-                children: [
-                  _OverviewLoader(
-                      onOpenTab: (i) => DefaultTabController.of(context).animateTo(i)),
-                  Expanded(child: TabBarView(children: [for (final t in tabs) t.$3])),
-                ],
-              ),
-            ),
-          ),
+        return ListenableBuilder(
+          listenable: AdminUnlock.instance,
+          builder: (context, _) {
+            if (AdminUnlock.instance.configured && !AdminUnlock.instance.unlocked) {
+              return Scaffold(
+                appBar: AppBar(leading: const AppBackButton(), title: Text(m.moderation)),
+                body: AdminLockScreen(
+                  unlock: AdminUnlock.instance.unlock,
+                  onUnlocked: () {},
+                ),
+              );
+            }
+            return _console(context, owner, AdminUnlock.instance.configured);
+          },
         );
       },
+    );
+  }
+
+  Widget _console(BuildContext context, bool owner, bool configured) {
+    final m = context.l10n.mod;
+    final scheme = Theme.of(context).colorScheme;
+    final tabs = <(String, IconData, Widget)>[
+      (m.tabCases, ModIcons.inbox, const CasesTab()),
+      (m.tabClubs, ModIcons.verified, const ClubApprovalsTab()),
+      (m.tabJoinRequests, ModIcons.person, const JoinRequestsTab()),
+      (m.tabAppeals, ModIcons.appeal, const AppealsTab()),
+      (m.tabRestrictions, ModIcons.ban, const RestrictionsTab()),
+      (m.tabLog, ModIcons.log, const LogTab()),
+      if (owner) (m.tabSettings, ModIcons.settings, const SettingsTab()),
+    ];
+
+    return DefaultTabController(
+      length: tabs.length,
+      child: Scaffold(
+        appBar: AppBar(
+          leading: const AppBackButton(),
+          title: Text(m.moderation),
+          actions: [
+            if (configured)
+              IconButton(
+                tooltip: m.lockNow,
+                icon: const Icon(ModIcons.lock),
+                onPressed: AdminUnlock.instance.lock,
+              ),
+          ],
+          bottom: TabBar(
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            tabs: [
+              for (final t in tabs) Tab(icon: Icon(t.$2, size: 20), text: t.$1),
+            ],
+          ),
+        ),
+        body: Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (_) => AdminUnlock.instance.touch(),
+          onPointerSignal: (_) => AdminUnlock.instance.touch(),
+          child: Builder(
+            builder: (context) => Column(
+              children: [
+                if (!configured && owner)
+                  Container(
+                    width: double.infinity,
+                    color: scheme.tertiaryContainer,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    child: Row(
+                      children: [
+                        Icon(ModIcons.info, size: 18, color: scheme.onTertiaryContainer),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(m.adminPinSetupHint,
+                              style: TextStyle(color: scheme.onTertiaryContainer)),
+                        ),
+                      ],
+                    ),
+                  ),
+                _OverviewLoader(
+                    onOpenTab: (i) => DefaultTabController.of(context).animateTo(i)),
+                Expanded(child: TabBarView(children: [for (final t in tabs) t.$3])),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

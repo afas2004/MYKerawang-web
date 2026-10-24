@@ -20,6 +20,7 @@ import '../widgets/status_badge.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../utils/formatters.dart';
 import '../utils/guest_access.dart';
+import '../widgets/admin_icon_button.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/shell_actions.dart';
 
@@ -345,12 +346,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           if (_isMe && _inShell(context)) const ShellSearchButton(),
           // Own profile is reached from an avatar now, so Settings is a
           // visible action rather than buried in the menu.
-          if (_isMe)
+          if (_isMe) ...[
+            const AdminIconButton(),
             IconButton(
               tooltip: s.settings,
               icon: const Icon(AppIcons.settings),
               onPressed: () => context.goSettings(),
             ),
+          ],
           _overflowMenu(context),
         ],
       ),

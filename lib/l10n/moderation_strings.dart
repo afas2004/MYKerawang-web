@@ -107,6 +107,23 @@ class ModerationStrings {
   final String tabCases;
   final String tabClubs;
   final String tabJoinRequests;
+  final String adminConsoleSub;
+  final String adminLocked;
+  final String adminLockedBody;
+  final String adminPin;
+  final String adminPinConfirm;
+  final String adminPinSetupHint;
+  final String adminPinSet;
+  final String adminPinChange;
+  final String adminPinConfigured;
+  final String adminPinNotConfigured;
+  final String adminPinSaved;
+  final String adminPinMismatch;
+  final String adminPinTooShort;
+  final String unlock;
+  final String wrongPin;
+  final String idleLockNote;
+  final String lockNow;
   final String tabAppeals;
   final String tabRestrictions;
   final String tabLog;
@@ -357,6 +374,23 @@ class ModerationStrings {
     required this.tabCases,
     required this.tabClubs,
     required this.tabJoinRequests,
+    required this.adminConsoleSub,
+    required this.adminLocked,
+    required this.adminLockedBody,
+    required this.adminPin,
+    required this.adminPinConfirm,
+    required this.adminPinSetupHint,
+    required this.adminPinSet,
+    required this.adminPinChange,
+    required this.adminPinConfigured,
+    required this.adminPinNotConfigured,
+    required this.adminPinSaved,
+    required this.adminPinMismatch,
+    required this.adminPinTooShort,
+    required this.unlock,
+    required this.wrongPin,
+    required this.idleLockNote,
+    required this.lockNow,
     required this.tabAppeals,
     required this.tabRestrictions,
     required this.tabLog,
@@ -594,6 +628,23 @@ class ModerationStrings {
     tabCases: "Cases",
     tabClubs: "Clubs",
     tabJoinRequests: "Join requests",
+    adminConsoleSub: "Open the moderation console",
+    adminLocked: "Admin console locked",
+    adminLockedBody: "Enter the admin PIN to continue.",
+    adminPin: "Admin PIN",
+    adminPinConfirm: "Confirm PIN",
+    adminPinSetupHint: "Set an admin PIN in Settings to lock this console.",
+    adminPinSet: "Set admin PIN",
+    adminPinChange: "Change admin PIN",
+    adminPinConfigured: "A PIN is set. The console locks after 15 minutes idle.",
+    adminPinNotConfigured: "No PIN yet. Set one to protect the console.",
+    adminPinSaved: "Admin PIN updated",
+    adminPinMismatch: "The PINs don't match.",
+    adminPinTooShort: "At least 4 characters.",
+    unlock: "Unlock",
+    wrongPin: "That PIN is wrong.",
+    idleLockNote: "Locks again after 15 minutes without activity.",
+    lockNow: "Lock now",
     tabAppeals: "Appeals",
     tabRestrictions: "Restrictions",
     tabLog: "Log",
@@ -831,6 +882,23 @@ class ModerationStrings {
     tabCases: "Kes",
     tabClubs: "Kelab",
     tabJoinRequests: "Permohonan sertai",
+    adminConsoleSub: "Buka konsol moderasi",
+    adminLocked: "Konsol admin dikunci",
+    adminLockedBody: "Masukkan PIN admin untuk meneruskan.",
+    adminPin: "PIN admin",
+    adminPinConfirm: "Sahkan PIN",
+    adminPinSetupHint: "Tetapkan PIN admin dalam Tetapan untuk mengunci konsol ini.",
+    adminPinSet: "Tetapkan PIN admin",
+    adminPinChange: "Tukar PIN admin",
+    adminPinConfigured: "PIN telah ditetapkan. Konsol dikunci selepas 15 minit tidak aktif.",
+    adminPinNotConfigured: "Belum ada PIN. Tetapkan satu untuk melindungi konsol.",
+    adminPinSaved: "PIN admin dikemas kini",
+    adminPinMismatch: "PIN tidak sepadan.",
+    adminPinTooShort: "Sekurang-kurangnya 4 aksara.",
+    unlock: "Buka kunci",
+    wrongPin: "PIN itu salah.",
+    idleLockNote: "Dikunci semula selepas 15 minit tanpa aktiviti.",
+    lockNow: "Kunci sekarang",
     tabAppeals: "Rayuan",
     tabRestrictions: "Sekatan",
     tabLog: "Log",

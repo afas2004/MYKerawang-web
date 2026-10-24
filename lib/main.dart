@@ -13,6 +13,7 @@ import 'router.dart';
 // --- IMPORT YOUR SERVICES ---
 import 'services/notification_service.dart';
 import 'services/club_service.dart';
+import 'services/admin_unlock.dart';
 import 'services/saved_items.dart';
 import 'services/unread_notifications.dart';
 import 'services/update_service.dart';
@@ -142,6 +143,7 @@ class _SessionWatcherState extends State<SessionWatcher> {
         _notificationSubscription = null;
         UnreadNotifications.instance.stop();
         SavedItems.instance.stop();
+        AdminUnlock.instance.reset();
         return;
       }
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_strings.dart';
 import '../../l10n/moderation_strings.dart';
 import '../../language_cubit.dart';
+import '../../services/admin_unlock.dart';
 import '../../services/moderation_service.dart';
 import '../../utils/moderation_logic.dart';
 import '../../widgets/moderation_ui.dart';
@@ -41,6 +42,8 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
   Set<String> _priority = {};
   late Future<void> _loading = _load();
   bool _saving = false;
+  bool _pinConfigured = false;
+  bool _pinSaving = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -51,6 +54,29 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
       e.value.text = '${s[e.key] ?? ''}';
     }
     _priority = {...((s['priority_categories'] as List?) ?? const []).cast<String>()};
+    _pinConfigured = await ModerationService.adminPinConfigured();
+  }
+
+  Future<void> _setPin() async {
+    final m = modStrings(context);
+    final pin = await showDialog<String>(
+      context: context,
+      builder: (_) => const _AdminPinDialog(),
+    );
+    if (pin == null) return;
+    setState(() => _pinSaving = true);
+    try {
+      await ModerationService.setAdminPin(pin);
+      AdminUnlock.instance.setConfigured(true);
+      AdminUnlock.instance.startSession();
+      if (!mounted) return;
+      setState(() => _pinConfigured = true);
+      showModSnack(context, m.adminPinSaved);
+    } catch (e) {
+      if (mounted) showModError(context, e);
+    } finally {
+      if (mounted) setState(() => _pinSaving = false);
+    }
   }
 
   @override
@@ -129,6 +155,34 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
             children: [
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(ModIcons.lock, size: 20),
+                          const SizedBox(width: 8),
+                          Text(m.adminPin, style: Theme.of(context).textTheme.titleSmall),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(_pinConfigured ? m.adminPinConfigured : m.adminPinNotConfigured,
+                          style: Theme.of(context).textTheme.bodySmall),
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        onPressed: _pinSaving ? null : _setPin,
+                        icon: const Icon(ModIcons.settings, size: 18),
+                        label: Text(_pinConfigured ? m.adminPinChange : m.adminPinSet),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
               for (final f in _intFields)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
@@ -183,6 +237,67 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
           ),
         );
       },
+    );
+  }
+}
+
+/// New admin PIN + confirmation. Pops the PIN when valid.
+class _AdminPinDialog extends StatefulWidget {
+  const _AdminPinDialog();
+
+  @override
+  State<_AdminPinDialog> createState() => _AdminPinDialogState();
+}
+
+class _AdminPinDialogState extends State<_AdminPinDialog> {
+  final _form = GlobalKey<FormState>();
+  final _pin = TextEditingController();
+  final _confirm = TextEditingController();
+
+  @override
+  void dispose() {
+    _pin.dispose();
+    _confirm.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (!_form.currentState!.validate()) return;
+    Navigator.pop(context, _pin.text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.l10n.mod;
+    return AlertDialog(
+      title: Text(m.adminPin),
+      content: Form(
+        key: _form,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _pin,
+              autofocus: true,
+              obscureText: true,
+              decoration: InputDecoration(labelText: m.adminPin),
+              validator: (v) => (v ?? '').length < 4 ? m.adminPinTooShort : null,
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _confirm,
+              obscureText: true,
+              decoration: InputDecoration(labelText: m.adminPinConfirm),
+              validator: (v) => v != _pin.text ? m.adminPinMismatch : null,
+              onFieldSubmitted: (_) => _save(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(m.cancel)),
+        FilledButton(onPressed: _save, child: Text(m.save)),
+      ],
     );
   }
 }

@@ -12,7 +12,9 @@ import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../l10n/shell_strings.dart';
 import '../l10n/social_strings.dart';
+import '../l10n/moderation_strings.dart';
 import '../services/account_data.dart';
+import '../services/moderation_service.dart';
 import '../utils/app_nav.dart';
 import 'profile_cubit.dart';
 import '../services/update_service.dart';
@@ -258,6 +260,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: _exportData,
                   ),
                 ],
+              ),
+
+              // --- MODERATION (admins and the owner only) ---
+              FutureBuilder<bool>(
+                future: ModerationService.isAdmin(),
+                builder: (context, snap) => snap.data == true
+                    ? _SettingsGroup(
+                        title: context.l10n.mod.moderation,
+                        children: [
+                          ListTile(
+                            leading: const Icon(AppIcons.moderation),
+                            title: Text(context.l10n.mod.moderation),
+                            subtitle: Text(context.l10n.mod.adminConsoleSub),
+                            trailing: const Icon(AppIcons.chevronRight),
+                            onTap: () => context.push('/admin'),
+                          ),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
               ),
 
               // --- ACCOUNT ---

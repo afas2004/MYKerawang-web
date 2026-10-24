@@ -53,6 +53,17 @@ class ModerationService {
 
   static Future<bool> isOwner() async => (await myRole()) == 'owner';
 
+  // ------------------------------------------------------------- admin lock
+  static Future<bool> adminPinConfigured() async =>
+      (Map<String, dynamic>.from(await _db.rpc('admin_pin_status') as Map)['configured'] == true);
+
+  static Future<bool> checkAdminPin(String pin) async =>
+      await _db.rpc('admin_check_pin', params: {'p_pin': pin}) == true;
+
+  /// Owner only; stores a bcrypt hash, never the PIN.
+  static Future<void> setAdminPin(String pin) =>
+      _db.rpc('admin_set_pin', params: {'p_pin': pin});
+
   // ------------------------------------------------------------- my status
   static ModerationStatus? _status;
   static String? _statusFor;
