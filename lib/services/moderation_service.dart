@@ -285,6 +285,28 @@ class ModerationService {
         .select('id');
     return (rows as List).isNotEmpty;
   }
+
+  // ------------------------------------------------------------- access: student verification
+  /// The owner's student-verification switch, readable by any signed-in
+  /// account so the app can gate its own UI before the server says no.
+  static Future<Map<String, dynamic>> accessPolicy() async =>
+      Map<String, dynamic>.from(await _db.rpc('access_policy') as Map);
+
+  /// Owner only; the database raises MOD:not_owner for anyone else.
+  static Future<void> setVerificationEnabled(bool enabled,
+          {String? reason}) =>
+      _db.rpc('set_verification_enabled',
+          params: {'p_enabled': enabled, 'p_reason': reason});
+
+  /// Admin/owner manual verification — the escape hatch before the
+  /// code-by-email flow exists.
+  static Future<void> setStudentVerification(String userId, String email,
+          {String status = 'verified'}) =>
+      _db.rpc('admin_set_student_verification', params: {
+        'p_user_id': userId,
+        'p_email': email,
+        'p_status': status,
+      });
 }
 
 class ModerationStatus {

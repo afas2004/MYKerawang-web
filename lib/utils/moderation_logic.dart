@@ -138,7 +138,7 @@ class ModError {
   String toString() => 'ModError($code${sub == null ? '' : ':$sub'})';
 }
 
-final _modPattern = RegExp(r'MOD:([a-z_]+)(?::([a-z_]+))?');
+final _modPattern = RegExp(r'(MOD|VERIFY):([a-z_]+)(?::([a-z_]+))?');
 
 ModError? parseModError(Object? e) {
   if (e == null) return null;
@@ -160,6 +160,11 @@ ModError? parseModError(Object? e) {
   final m = _modPattern.firstMatch(message);
   if (m == null) return null;
 
+  // VERIFY: is raised by the student-verification gate; one friendly code
+  // for the UI, with the capability as the sub-code.
+  final kind = m.group(1);
+  final kindCode = kind == 'VERIFY' ? 'verify_required' : m.group(2)!;
+
   Map<String, dynamic> detail = const {};
   if (details is Map<String, dynamic>) {
     detail = details;
@@ -169,7 +174,7 @@ ModError? parseModError(Object? e) {
       if (decoded is Map<String, dynamic>) detail = decoded;
     } catch (_) {}
   }
-  return ModError(m.group(1)!, sub: m.group(2), detail: detail);
+  return ModError(kindCode, sub: m.group(3), detail: detail);
 }
 
 /// Queue order: priority first (2 urgent, 1 high, 0 normal), then the

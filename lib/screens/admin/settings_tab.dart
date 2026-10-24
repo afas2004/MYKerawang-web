@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_strings.dart';
+import '../../l10n/access_strings.dart';
 import '../../l10n/moderation_strings.dart';
 import '../../language_cubit.dart';
 import '../../services/admin_unlock.dart';
@@ -45,6 +46,10 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
   bool _pinConfigured = false;
   bool _pinSaving = false;
 
+  /// Owner-only student-verification switch (off unless turned on).
+  bool _verification = false;
+  bool _verificationSaving = false;
+
   @override
   bool get wantKeepAlive => true;
 
@@ -55,6 +60,45 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
     }
     _priority = {...((s['priority_categories'] as List?) ?? const []).cast<String>()};
     _pinConfigured = await ModerationService.adminPinConfigured();
+    try {
+      final policy = await ModerationService.accessPolicy();
+      _verification = policy['verification_enabled'] == true;
+    } catch (_) {
+      // Fail closed: an unread policy must not look enabled.
+      _verification = false;
+    }
+  }
+
+  Future<void> _toggleVerification(bool value) async {
+    final s = context.l10n;
+    if (value) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(s.verifyConfirmTitle),
+          content: Text(s.verifyConfirmBody),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false), child: Text(s.cancel)),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(s.verifyConfirmAction)),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+    setState(() => _verificationSaving = true);
+    try {
+      await ModerationService.setVerificationEnabled(value);
+      if (!mounted) return;
+      setState(() => _verification = value);
+      showModSnack(context, value ? s.verifyOn : s.verifyOff);
+    } catch (e) {
+      if (mounted) showModError(context, e);
+    } finally {
+      if (mounted) setState(() => _verificationSaving = false);
+    }
   }
 
   Future<void> _setPin() async {
@@ -177,6 +221,38 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                         onPressed: _pinSaving ? null : _setPin,
                         icon: const Icon(ModIcons.settings, size: 18),
                         label: Text(_pinConfigured ? m.adminPinChange : m.adminPinSet),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // ---- student verification (the switch that gates joining,
+              // creating events and selling) ----
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(ModIcons.verified, size: 20),
+                          const SizedBox(width: 8),
+                          Text(context.l10n.verifySectionTitle,
+                              style: Theme.of(context).textTheme.titleSmall),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(context.l10n.verifySwitchBody,
+                          style: Theme.of(context).textTheme.bodySmall),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        value: _verification,
+                        onChanged:
+                            _verificationSaving ? null : _toggleVerification,
+                        title: Text(context.l10n.verifySwitchTitle),
                       ),
                     ],
                   ),

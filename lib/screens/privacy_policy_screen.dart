@@ -12,7 +12,7 @@ import '../utils/responsive.dart';
 const kPrivacyContactEmail = '';
 
 /// Last revision of the text below; bump it when the policy changes.
-const kPrivacyPolicyUpdated = '19 Oct 2026';
+const kPrivacyPolicyUpdated = '25 Oct 2026';
 
 /// Plain-language privacy notice (PDPA 2010). Describes what the app
 /// actually stores today — keep it in step with the schema.
@@ -75,6 +75,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
           '• Account: your email address and sign-in details (handled by our backend provider, Supabase).\n'
               '• Profile: username, display name, bio, website, avatar and role (student or club).\n'
               '• Contact details: your WhatsApp number and DuitNow payment QR, if you add them.\n'
+              '• Recovery: a backup email address, if you add one, so you can get back into your account after your student email stops working.\n'
+              '• Student verification, if the app asks students to verify: your student email address, whether it was verified, when, and how. It does not store your name or matric number.\n'
               '• What you create: posts, comments, Market listings, events and their photos.\n'
               '• Activity: who you follow, events you join, items you save, and your notifications.\n'
               '• Reports you file about content or users, for moderation.\n'
@@ -85,8 +87,14 @@ class PrivacyPolicyScreen extends StatelessWidget {
           '• Your profile, posts, comments, listings and events are visible to other users.\n'
               '• Anonymous posts and comments hide your name from everyone except you — but admins can see who wrote them, to handle abuse.\n'
               '• Your phone number and payment QR are private. A buyer only receives them when they tap Contact on one of your listings.\n'
+              '• Your backup email is private too. Only you can see it; if you ask for help recovering a lost account, one of the app owners can read that single address, and the read is recorded.\n'
+              '• A student verification record is visible to you and to admins. It is not shown on your profile as a public badge.\n'
               '• Saved items, notifications and your email are visible only to you.\n'
               '• Admins can see reports and can hide content that breaks the rules.',
+        ),
+        (
+          'Student verification',
+          'If the app asks students to verify, it only checks that you can open a UiTM student email address — nothing more. It is not a name badge, it does not prove who you are, and it is never shown to other users. It decides who may join or create events and who may sell. A false identity can be reported, and a verification can be revoked.',
         ),
         (
           'Why we use it',
@@ -94,7 +102,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
         ),
         (
           'How long we keep it',
-          'Until you delete it or delete your account. Deleting your account removes your profile, posts, comments, listings, events, follows, saved items and contact details. A minimal record (account id, date and item counts — no content) is kept to show the request was carried out. Uploaded image files may take longer to be cleared from storage.',
+          'Until you delete it or delete your account. Deleting your account removes your profile, posts, comments, listings, events, follows, saved items, contact details, backup email and student verification record. A minimal record (account id, date and item counts — no content) is kept to show the request was carried out. Uploaded image files may take longer to be cleared from storage.',
         ),
         (
           'Your rights',
@@ -113,6 +121,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
           '• Akaun: alamat e-mel dan butiran log masuk (diurus oleh penyedia backend kami, Supabase).\n'
               '• Profil: nama pengguna, nama paparan, bio, laman web, avatar dan peranan (pelajar atau kelab).\n'
               '• Maklumat hubungan: nombor WhatsApp dan QR DuitNow, jika anda menambahnya.\n'
+              '• Pemulihan: alamat e-mel sandaran, jika anda menambahnya, supaya anda boleh masuk semula selepas e-mel pelajar anda tidak lagi berfungsi.\n'
+              '• Pengesahan pelajar, jika aplikasi meminta pelajar mengesahkan diri: alamat e-mel pelajar anda, sama ada ia disahkan, bila, dan bagaimana. Ia tidak menyimpan nama atau nombor matrik anda.\n'
               '• Kandungan anda: post, komen, iklan Pasar, acara dan gambarnya.\n'
               '• Aktiviti: siapa anda ikut, acara yang anda sertai, item yang anda simpan dan notifikasi anda.\n'
               '• Laporan yang anda buat tentang kandungan atau pengguna, untuk moderasi.\n'
@@ -123,8 +133,14 @@ class PrivacyPolicyScreen extends StatelessWidget {
           '• Profil, post, komen, iklan dan acara anda boleh dilihat oleh pengguna lain.\n'
               '• Post dan komen tanpa nama menyembunyikan nama anda daripada semua orang kecuali anda — tetapi admin boleh melihat penulisnya untuk menangani penyalahgunaan.\n'
               '• Nombor telefon dan QR bayaran anda adalah peribadi. Pembeli hanya menerimanya apabila mereka menekan Hubungi pada iklan anda.\n'
+              '• E-mel sandaran anda juga peribadi. Hanya anda boleh melihatnya; jika anda meminta bantuan memulihkan akaun yang hilang, salah seorang pemilik aplikasi boleh membaca alamat itu sahaja, dan bacaan itu direkodkan.\n'
+              '• Rekod pengesahan pelajar boleh dilihat oleh anda dan admin. Ia tidak dipaparkan pada profil anda sebagai lencana awam.\n'
               '• Item disimpan, notifikasi dan e-mel anda hanya boleh dilihat oleh anda.\n'
               '• Admin boleh melihat laporan dan menyembunyikan kandungan yang melanggar peraturan.',
+        ),
+        (
+          'Pengesahan pelajar',
+          'Jika aplikasi meminta pelajar mengesahkan diri, ia hanya menyemak bahawa anda boleh membuka alamat e-mel pelajar UiTM — tidak lebih. Ia bukan lencana nama, ia tidak membuktikan siapa anda, dan ia tidak pernah dipaparkan kepada pengguna lain. Ia menentukan siapa boleh menyertai atau mencipta acara dan siapa boleh menjual. Identiti palsu boleh dilaporkan, dan pengesahan boleh ditarik balik.',
         ),
         (
           'Kenapa kami menggunakannya',
@@ -132,7 +148,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
         ),
         (
           'Berapa lama kami menyimpannya',
-          'Sehingga anda memadamnya atau memadam akaun anda. Memadam akaun akan membuang profil, post, komen, iklan, acara, ikutan, item disimpan dan maklumat hubungan anda. Rekod minimum (id akaun, tarikh dan bilangan item — tanpa kandungan) disimpan untuk menunjukkan permintaan telah dilaksanakan. Fail gambar yang dimuat naik mungkin mengambil masa lebih lama untuk dibuang dari storan.',
+          'Sehingga anda memadamnya atau memadam akaun anda. Memadam akaun akan membuang profil, post, komen, iklan, acara, ikutan, item disimpan, maklumat hubungan, e-mel sandaran dan rekod pengesahan pelajar anda. Rekod minimum (id akaun, tarikh dan bilangan item — tanpa kandungan) disimpan untuk menunjukkan permintaan telah dilaksanakan. Fail gambar yang dimuat naik mungkin mengambil masa lebih lama untuk dibuang dari storan.',
         ),
         (
           'Hak anda',

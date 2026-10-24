@@ -86,6 +86,14 @@ void main() {
       const e = PostgrestException(message: 'MOD:restricted:post', details: '{oops');
       expect(parseModError(e)!.detail, isEmpty);
     });
+
+    test('a VERIFY refusal becomes a friendly code', () {
+      const e = PostgrestException(
+          message: 'VERIFY:required:event_join', code: 'P0001');
+      final err = parseModError(e)!;
+      expect(err.code, 'verify_required');
+      expect(err.sub, 'event_join');
+    });
   });
 
   test('compareCases: priority first, then oldest', () {

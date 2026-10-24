@@ -35,6 +35,30 @@ extension AccessStrings on AppStrings {
       "Akaun baharu perlu guna emel pelajar UiTM (@student.uitm.edu.my).",
       "新規登録にはUiTMの学生用メール（@student.uitm.edu.my）が必要です。");
 
+  // ---- student verification ----
+  String get verifySectionTitle =>
+      _t("Student verification", "Pengesahan pelajar", "学生確認");
+  String get verifySwitchTitle =>
+      _t("Require verified students", "Wajibkan pelajar disahkan", "学生確認を必須にする");
+  String get verifySwitchBody => _t(
+      "Joining an event, creating an event and selling then need a verified student account. Posting and commenting stay open. Admins and owners are exempt.",
+      "Menyertai acara, mencipta acara dan menjual kemudiannya memerlukan akaun pelajar yang disahkan. Menyiar dan mengomen kekal terbuka. Admin dan pemilik dikecualikan.",
+      "イベント参加・作成・出品には学生確認済みのアカウントが必要になります。投稿とコメントは自由です。管理者は対象外です。");
+  String get verifyConfirmTitle =>
+      _t("Turn on student verification?", "Hidupkan pengesahan pelajar?", "学生確認を有効にしますか？");
+  String get verifyConfirmBody => _t(
+      "Accounts that are not verified yet will not be able to join events, create events or sell until an admin verifies them. Nobody can verify themselves yet — the email code flow is not built.",
+      "Akaun yang belum disahkan tidak boleh menyertai acara, mencipta acara atau menjual sehingga admin mengesahkannya. Buat masa ini tiada siapa boleh mengesahkan diri sendiri — aliran kod e-mel belum dibina.",
+      "未確認のアカウントは、管理者が確認するまでイベント参加・作成・出品ができなくなります。現在、自己確認の仕組みはまだありません。");
+  String get verifyConfirmAction =>
+      _t("Turn on", "Hidupkan", "有効にする");
+  String get verifyOn =>
+      _t("Student verification is on", "Pengesahan pelajar dihidupkan", "学生確認を有効にしました");
+  String get verifyOff =>
+      _t("Student verification is off", "Pengesahan pelajar dimatikan", "学生確認を無効にしました");
+  String get verifyRequired =>
+      _t("Verify your student status to do this.", "Sahkan status pelajar anda untuk melakukan ini.", "これを行うには学生確認が必要です。");
+
   // ---- sharing ----
   String get copyLink => _t("Copy link", "Salin pautan", "リンクをコピー");
   String get linkCopied =>
