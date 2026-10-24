@@ -44,18 +44,22 @@ abstract final class PinActions {
   /// Pins or unpins globally; completes with the new state (unchanged on
   /// failure).
   static Future<bool> toggle(BuildContext context, Map<String, dynamic> post,
-      {required bool pinned}) async {
+      {required bool pinned, void Function(bool pinned)? onChanged}) async {
     final id = '${post['id']}';
     try {
       if (pinned) {
         await ModerationService.unpin(id);
+        onChanged?.call(false);
         if (context.mounted) {
           showModSnack(context, modStrings(context).unpinnedDone,
-              onUndo: () => ModerationService.pin(id, replace: true));
+              onUndo: () async {
+            await ModerationService.pin(id, replace: true);
+            onChanged?.call(true);
+          });
         }
         return false;
       }
-      return await _pin(context, id, replace: false);
+      return await _pin(context, id, replace: false, onChanged: onChanged);
     } catch (e) {
       if (context.mounted) showModError(context, e);
       return pinned;
@@ -64,18 +68,22 @@ abstract final class PinActions {
 
   /// Pins or unpins on the club's own page; same contract as [toggle].
   static Future<bool> toggleClub(BuildContext context, Map<String, dynamic> post,
-      {required bool pinned}) async {
+      {required bool pinned, void Function(bool pinned)? onChanged}) async {
     final id = '${post['id']}';
     try {
       if (pinned) {
         await ClubService.clubUnpin(id);
+        onChanged?.call(false);
         if (context.mounted) {
           showModSnack(context, modStrings(context).unpinnedDone,
-              onUndo: () => ClubService.clubPin(id, replace: true));
+              onUndo: () async {
+            await ClubService.clubPin(id, replace: true);
+            onChanged?.call(true);
+          });
         }
         return false;
       }
-      return await _clubPin(context, id, replace: false);
+      return await _clubPin(context, id, replace: false, onChanged: onChanged);
     } catch (e) {
       if (context.mounted) showModError(context, e);
       return pinned;
@@ -83,16 +91,20 @@ abstract final class PinActions {
   }
 
   static Future<bool> _pin(BuildContext context, String id,
-      {required bool replace}) async {
+      {required bool replace, void Function(bool pinned)? onChanged}) async {
     try {
       final r = await ModerationService.pin(id, replace: replace);
+      onChanged?.call(true);
       if (!context.mounted) return true;
       final until = DateTime.tryParse('${r['pinned_until']}');
       final days = until == null
           ? 0
           : (until.difference(DateTime.now()).inHours / 24).round();
       showModSnack(context, modStrings(context).pinnedFor.fill([days]),
-          onUndo: () => ModerationService.unpin(id));
+          onUndo: () async {
+        await ModerationService.unpin(id);
+        onChanged?.call(false);
+      });
       return true;
     } catch (e) {
       final err = parseModError(e);
@@ -109,21 +121,25 @@ abstract final class PinActions {
         confirmLabel: m.replace,
       );
       if (!ok || !context.mounted) return false;
-      return _pin(context, id, replace: true);
+      return _pin(context, id, replace: true, onChanged: onChanged);
     }
   }
 
   static Future<bool> _clubPin(BuildContext context, String id,
-      {required bool replace}) async {
+      {required bool replace, void Function(bool pinned)? onChanged}) async {
     try {
       final r = await ClubService.clubPin(id, replace: replace);
+      onChanged?.call(true);
       if (!context.mounted) return true;
       final until = DateTime.tryParse('${r['club_pinned_until']}');
       final days = until == null
           ? 0
           : (until.difference(DateTime.now()).inHours / 24).round();
       showModSnack(context, modStrings(context).pinnedFor.fill([days]),
-          onUndo: () => ClubService.clubUnpin(id));
+          onUndo: () async {
+        await ClubService.clubUnpin(id);
+        onChanged?.call(false);
+      });
       return true;
     } catch (e) {
       final err = parseModError(e);
@@ -140,7 +156,7 @@ abstract final class PinActions {
         confirmLabel: m.replace,
       );
       if (!ok || !context.mounted) return false;
-      return _clubPin(context, id, replace: true);
+      return _clubPin(context, id, replace: true, onChanged: onChanged);
     }
   }
 }
