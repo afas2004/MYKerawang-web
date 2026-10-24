@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -9,6 +9,7 @@ import '../theme/app_themes.dart';
 import '../widgets/brand/brand.dart';
 import '../utils/adaptive.dart';
 import '../l10n/app_strings.dart';
+import '../l10n/account_strings.dart';
 import '../language_cubit.dart';
 import '../l10n/shell_strings.dart';
 import '../l10n/social_strings.dart';
@@ -17,6 +18,7 @@ import '../services/account_data.dart';
 import '../services/moderation_service.dart';
 import '../utils/app_nav.dart';
 import 'profile_cubit.dart';
+import 'login_cubit.dart';
 import '../services/update_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -33,7 +35,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _checkingUpdate = false;
   bool _exporting = false;
 
+  /// The account's recovery address, loaded from profile_contacts (the
+  /// owner's own row is the only one readable).
+  String? _backupEmail;
+  bool _backupLoaded = false;
+
   final _supabase = Supabase.instance.client;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBackupEmail();
+  }
+
+  Future<void> _loadBackupEmail() async {
+    final uid = _supabase.auth.currentUser?.id;
+    if (uid == null) return;
+    try {
+      final row = await _supabase
+          .from('profile_contacts')
+          .select('backup_email')
+          .eq('user_id', uid)
+          .maybeSingle();
+      if (!mounted) return;
+      setState(() {
+        _backupEmail = (row?['backup_email'] as String?)?.trim();
+        _backupLoaded = true;
+      });
+    } catch (e) {
+      debugPrint('Backup email load failed: $e');
+      if (mounted) setState(() => _backupLoaded = true);
+    }
+  }
 
   // ---- Privacy & data (PDPA) ------------------------------------------
 
@@ -161,6 +194,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final email = _supabase.auth.currentUser?.email;
+    // The student address stops working after graduation; without a
+    // backup the account is unrecoverable. Only nag about a real gap.
+    final needsBackup = _backupLoaded &&
+        isStudentEmail(email) &&
+        (_backupEmail == null || _backupEmail!.isEmpty);
 
     return Scaffold(
       appBar: appBarConstrained(context,
@@ -289,6 +327,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ListTile(
                       leading: const Icon(AppIcons.email),
                       title: Text(email),
+                    ),
+                  ListTile(
+                    leading: const Icon(AppIcons.lock),
+                    title: Text(s.account.backupEmail),
+                    subtitle: Text((_backupEmail == null || _backupEmail!.isEmpty)
+                        ? s.account.backupEmailNone
+                        : _backupEmail!),
+                    trailing: const Icon(AppIcons.chevronRight),
+                    onTap: () async {
+                      await context.push('/profile/edit');
+                      if (mounted) _loadBackupEmail();
+                    },
+                  ),
+                  if (needsBackup)
+                    ListTile(
+                      leading: Icon(AppIcons.warning, color: scheme.tertiary),
+                      title: Text(s.account.backupNudgeTitle,
+                          style: TextStyle(color: scheme.tertiary)),
+                      subtitle: Text(s.account.backupNudgeBody.fill([email ?? ''])),
+                      isThreeLine: true,
+                      onTap: () async {
+                        await context.push('/profile/edit');
+                        if (mounted) _loadBackupEmail();
+                      },
                     ),
                   ListTile(
                     leading: const Icon(AppIcons.info),

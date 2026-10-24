@@ -27,6 +27,7 @@ class ModerationStrings {
   final String catSpam;
   final String catScam;
   final String catHarassment;
+  final String catImpersonation;
   final String catInappropriate;
   final String catMinorSafety;
   final String catMisinformation;
@@ -304,6 +305,7 @@ class ModerationStrings {
     required this.catSpam,
     required this.catScam,
     required this.catHarassment,
+    required this.catImpersonation,
     required this.catInappropriate,
     required this.catMinorSafety,
     required this.catMisinformation,
@@ -558,6 +560,7 @@ class ModerationStrings {
     catSpam: "Spam",
     catScam: "Scam or fraud",
     catHarassment: "Hate speech or harassment",
+    catImpersonation: "Pretending to be someone else",
     catInappropriate: "Sexual or inappropriate content",
     catMinorSafety: "Puts a minor at risk",
     catMisinformation: "Misinformation",
@@ -812,6 +815,7 @@ class ModerationStrings {
     catSpam: "Spam",
     catScam: "Penipuan",
     catHarassment: "Ucapan kebencian atau gangguan",
+    catImpersonation: "Menyamar sebagai orang lain",
     catInappropriate: "Kandungan seksual atau tidak sesuai",
     catMinorSafety: "Membahayakan kanak-kanak",
     catMisinformation: "Maklumat palsu",
@@ -1067,6 +1071,7 @@ class ModerationStrings {
         'spam' => catSpam,
         'scam' => catScam,
         'harassment' => catHarassment,
+        'impersonation' => catImpersonation,
         'inappropriate' => catInappropriate,
         'minor_safety' => catMinorSafety,
         'misinformation' => catMisinformation,
@@ -1187,6 +1192,7 @@ class ModerationUiStrings {
   final String descSpam;
   final String descScam;
   final String descHarassment;
+  final String descImpersonation;
   final String descInappropriate;
   final String descMinorSafety;
   final String descMisinformation;
@@ -1251,6 +1257,7 @@ class ModerationUiStrings {
     required this.descSpam,
     required this.descScam,
     required this.descHarassment,
+    required this.descImpersonation,
     required this.descInappropriate,
     required this.descMinorSafety,
     required this.descMisinformation,
@@ -1316,6 +1323,7 @@ class ModerationUiStrings {
     descSpam: "Repeated, misleading or unwanted promotion",
     descScam: "Fake sales, phishing or asking for money",
     descHarassment: "Attacks or insults a person or group",
+    descImpersonation: "Uses someone else's name, photo or identity",
     descInappropriate: "Nudity, sexual or graphic content",
     descMinorSafety: "Anything that puts a child at risk",
     descMisinformation: "False information that could cause harm",
@@ -1381,6 +1389,7 @@ class ModerationUiStrings {
     descSpam: "Promosi berulang, mengelirukan atau tidak diingini",
     descScam: "Jualan palsu, pancingan data atau meminta wang",
     descHarassment: "Menyerang atau menghina seseorang atau kumpulan",
+    descImpersonation: "Menggunakan nama, gambar atau identiti orang lain",
     descInappropriate: "Kandungan bogel, seksual atau ganas",
     descMinorSafety: "Apa-apa yang membahayakan kanak-kanak",
     descMisinformation: "Maklumat palsu yang boleh membawa mudarat",
@@ -1394,6 +1403,7 @@ class ModerationUiStrings {
         'spam' => descSpam,
         'scam' => descScam,
         'harassment' => descHarassment,
+        'impersonation' => descImpersonation,
         'inappropriate' => descInappropriate,
         'minor_safety' => descMinorSafety,
         'misinformation' => descMisinformation,

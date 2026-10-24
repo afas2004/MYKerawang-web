@@ -60,6 +60,13 @@ class AuthChangeNotifier extends ChangeNotifier {
 
 final _rootKey = GlobalKey<NavigatorState>();
 
+/// The root navigator, for dialogs raised from above the router.
+///
+/// [SessionWatcher] wraps the router's output, so it has no Navigator in
+/// its own context; `showDialog` there would throw. Pushing on this state
+/// works from anywhere.
+NavigatorState? get rootNavigator => _rootKey.currentState;
+
 final _shellKey = GlobalKey<NavigatorState>();
 
 /// Guest mode: what a logged-out visitor may open (read-only).

@@ -34,6 +34,11 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     pendingLoginError.addListener(_showPendingError);
+    final prefill = pendingLoginEmail.value;
+    if (prefill != null && prefill.isNotEmpty) {
+      _emailCtrl.text = prefill;
+      pendingLoginEmail.value = null;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final oauthError = widget.oauthError;

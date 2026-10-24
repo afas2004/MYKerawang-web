@@ -29,6 +29,11 @@ bool isStudentEmail(String? email) =>
 /// redirect); the login screen shows it and clears it.
 final ValueNotifier<String?> pendingLoginError = ValueNotifier(null);
 
+/// Address to pre-fill on the login screen, set when the app sends someone
+/// here on purpose (e.g. "use the account this device already knows").
+/// The login screen consumes and clears it.
+final ValueNotifier<String?> pendingLoginEmail = ValueNotifier(null);
+
 /// Google sign-in can create an account without the student check the
 /// email form does. Call on every signedIn event: an account created by
 /// this sign-in whose address isn't a student one is signed out again.

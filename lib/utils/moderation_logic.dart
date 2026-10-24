@@ -27,6 +27,7 @@ const kReportCategories = [
   'spam',
   'scam',
   'harassment',
+  'impersonation',
   'inappropriate',
   'minor_safety',
   'misinformation',

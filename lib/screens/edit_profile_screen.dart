@@ -10,6 +10,7 @@ import '../utils/image_compressor.dart'; // Ensure you have this file from previ
 import '../utils/local_image.dart';
 import '../widgets/image_crop_dialog.dart';
 import '../l10n/app_strings.dart';
+import '../l10n/account_strings.dart';
 import '../l10n/shell_strings.dart';
 import '../l10n/social_strings.dart';
 import '../widgets/brand/brand.dart';
@@ -33,6 +34,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _bioCtrl = TextEditingController();
   final _websiteCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
+
+  /// Where to reach the account holder once the student address closes.
+  /// Private: stored in profile_contacts, like the phone number.
+  final _backupEmailCtrl = TextEditingController();
+  String? _backupEmailError;
 
   bool _isSaving = false;
   String? _originalUsername;
@@ -71,7 +77,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       try {
         contact = await supabase
             .from('profile_contacts')
-            .select('phone_number, payment_qr_url')
+            .select('phone_number, payment_qr_url, backup_email')
             .eq('user_id', user.id)
             .maybeSingle();
       } catch (e) {
@@ -86,12 +92,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           'bio': data['bio'] ?? '',
           'website': data['website'] ?? '',
           'phone_number': contact?['phone_number'] ?? '',
+          'backup_email': contact?['backup_email'] ?? '',
         };
         _nameCtrl.text = data['display_name'] ?? '';
         _usernameCtrl.text = data['username'] ?? ''; // <--- NEW
         _bioCtrl.text = data['bio'] ?? '';
         _websiteCtrl.text = data['website'] ?? '';
         _phoneCtrl.text = contact?['phone_number'] ?? '';
+        _backupEmailCtrl.text = contact?['backup_email'] ?? '';
         
         _currentAvatarUrl = data['avatar_url'];
         _currentQrUrl = contact?['payment_qr_url'];
@@ -285,9 +293,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final Map<String, String> _fieldState = {}; // 'saving' | 'saved'
 
   /// Private columns, stored in profile_contacts rather than profiles.
-  static const _contactColumns = {'phone_number', 'payment_qr_url'};
+  static const _contactColumns = {'phone_number', 'payment_qr_url', 'backup_email'};
 
   static String? _nullIfEmpty(String v) => v.trim().isEmpty ? null : v.trim();
+
+  /// Loose on purpose: an address must look usable, not be deliverable.
+  /// The database enforces the same shape.
+  static final _emailRe = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]{2,}$');
+  static bool _looksLikeEmail(String v) => _emailRe.hasMatch(v.trim());
 
   /// Upserts the user's own profile_contacts row.
   Future<void> _saveContact(String userId, Map<String, dynamic> values) =>
@@ -557,6 +570,34 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       label: Text(s.changeQr),
                     ),
                   ),
+              ],
+            ),
+
+            // --- ACCOUNT RECOVERY (private) ---
+            // The student address closes after graduation; this is the
+            // only way back in once it does.
+            _FormSection(
+              title: s.account.backupEmailSection,
+              subtitle: s.account.backupEmailHelp,
+              icon: AppIcons.email,
+              children: [
+                TextField(
+                  controller: _backupEmailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  autocorrect: false,
+                  decoration: _inputDeco(s.account.backupEmail).copyWith(
+                    hintText: s.account.backupEmailHint,
+                    errorText: _backupEmailError,
+                    suffixIcon: _statusIcon('backup_email'),
+                  ),
+                  onChanged: (v) {
+                    final t = v.trim();
+                    final invalid = t.isNotEmpty && !_looksLikeEmail(t);
+                    setState(() =>
+                        _backupEmailError = invalid ? s.account.backupEmailInvalid : null);
+                    if (!invalid) _autoSave('backup_email', t);
+                  },
+                ),
               ],
             ),
           ],
