@@ -106,6 +106,7 @@ class ModerationStrings {
   final String adminOnlyBody;
   final String tabCases;
   final String tabClubs;
+  final String tabJoinRequests;
   final String tabAppeals;
   final String tabRestrictions;
   final String tabLog;
@@ -355,6 +356,7 @@ class ModerationStrings {
     required this.adminOnlyBody,
     required this.tabCases,
     required this.tabClubs,
+    required this.tabJoinRequests,
     required this.tabAppeals,
     required this.tabRestrictions,
     required this.tabLog,
@@ -591,6 +593,7 @@ class ModerationStrings {
     adminOnlyBody: "This page is for MYKerawang moderators.",
     tabCases: "Cases",
     tabClubs: "Clubs",
+    tabJoinRequests: "Join requests",
     tabAppeals: "Appeals",
     tabRestrictions: "Restrictions",
     tabLog: "Log",
@@ -827,6 +830,7 @@ class ModerationStrings {
     adminOnlyBody: "Halaman ini untuk moderator MYKerawang.",
     tabCases: "Kes",
     tabClubs: "Kelab",
+    tabJoinRequests: "Permohonan sertai",
     tabAppeals: "Rayuan",
     tabRestrictions: "Sekatan",
     tabLog: "Log",

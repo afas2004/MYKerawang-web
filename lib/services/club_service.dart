@@ -145,6 +145,22 @@ const clubPositions = [
   'other',
 ];
 
+/// What the club page needs to know about the viewer: already a member, or
+/// a join request is waiting.
+class ClubJoinState {
+  final bool member;
+  final bool pending;
+
+  const ClubJoinState({this.member = false, this.pending = false});
+
+  static const none = ClubJoinState();
+
+  factory ClubJoinState.fromJson(Map<String, dynamic> j) => ClubJoinState(
+        member: j['member'] == true,
+        pending: j['pending'] == true,
+      );
+}
+
 /// One entry of the "Post as" choice: yourself (clubId null) or a club
 /// you are an officer of.
 class PostAsOption {
@@ -475,6 +491,31 @@ class ClubService {
       await _db.from('club_followers').delete().eq('club_id', clubId).eq('user_id', uid);
     }
   }
+
+  // ---- joining
+  /// Whether the viewer is a member and/or has a pending request.
+  static Future<ClubJoinState> myJoin(String clubId) async {
+    if (currentUserId == null) return ClubJoinState.none;
+    return ClubJoinState.fromJson(
+      Map<String, dynamic>.from(await _db.rpc('my_club_join', params: {'p_club_id': clubId}) as Map),
+    );
+  }
+
+  static Future<void> applyToClub(String clubId, {String? message}) =>
+      _db.rpc('apply_to_club', params: {'p_club_id': clubId, 'p_message': message});
+
+  /// Pending requests for a club (officers and admins).
+  static Future<List<Map<String, dynamic>>> joinRequests(String clubId) async =>
+      List<Map<String, dynamic>>.from(
+          await _db.rpc('club_join_requests', params: {'p_club_id': clubId}) as List);
+
+  static Future<void> decideJoin(String requestId, bool approve, {String? note}) =>
+      _db.rpc('decide_club_join_request',
+          params: {'p_request_id': requestId, 'p_approve': approve, 'p_note': note});
+
+  /// Pending requests across every club (admin console).
+  static Future<List<Map<String, dynamic>>> adminJoinRequests() async =>
+      List<Map<String, dynamic>>.from(await _db.rpc('admin_join_requests') as List);
 
   // ---- registration & management
   /// Select-only registration: the club name/ID come from the admin

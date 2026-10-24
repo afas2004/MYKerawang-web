@@ -10,6 +10,7 @@ import 'admin_overview.dart';
 import 'appeals_tab.dart';
 import 'cases_tab.dart';
 import 'club_approvals_tab.dart';
+import 'join_requests_tab.dart';
 import 'log_tab.dart';
 import 'restrictions_tab.dart';
 import 'settings_tab.dart';
@@ -68,6 +69,7 @@ class _AdminScreenState extends State<AdminScreen> {
         final tabs = <(String, IconData, Widget)>[
           (m.tabCases, ModIcons.inbox, const CasesTab()),
           (m.tabClubs, ModIcons.verified, const ClubApprovalsTab()),
+          (m.tabJoinRequests, ModIcons.person, const JoinRequestsTab()),
           (m.tabAppeals, ModIcons.appeal, const AppealsTab()),
           (m.tabRestrictions, ModIcons.ban, const RestrictionsTab()),
           (m.tabLog, ModIcons.log, const LogTab()),

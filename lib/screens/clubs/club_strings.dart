@@ -198,6 +198,23 @@ class ClubStrings {
   final String notMember;
   final String cannotChangePresident;
   final String roleInvalid;
+  final String joinClub;
+  final String joinPending;
+  final String joinRequested;
+  final String joinRequests;
+  final String joinRequestsHelp;
+  final String noJoinRequests;
+  final String approveJoin;
+  final String rejectJoin;
+  final String joinedClub;
+  final String requestRejected;
+  final String requestNotFound;
+  final String clubNotActive;
+  final String alreadyRequested;
+  final String approveJoinTitle;
+  final String approveJoinBody;
+  final String rejectJoinTitle;
+  final String rejectJoinBody;
 
   const ClubStrings({
     required this.clubs,
@@ -393,6 +410,23 @@ class ClubStrings {
     required this.notMember,
     required this.cannotChangePresident,
     required this.roleInvalid,
+    required this.joinClub,
+    required this.joinPending,
+    required this.joinRequested,
+    required this.joinRequests,
+    required this.joinRequestsHelp,
+    required this.noJoinRequests,
+    required this.approveJoin,
+    required this.rejectJoin,
+    required this.joinedClub,
+    required this.requestRejected,
+    required this.requestNotFound,
+    required this.clubNotActive,
+    required this.alreadyRequested,
+    required this.approveJoinTitle,
+    required this.approveJoinBody,
+    required this.rejectJoinTitle,
+    required this.rejectJoinBody,
   });
 
   static const en = ClubStrings(
@@ -589,6 +623,23 @@ class ClubStrings {
     notMember: "They're not in this club.",
     cannotChangePresident: "The president's role can't be changed here.",
     roleInvalid: "Choose a valid role.",
+    joinClub: "Request to join",
+    joinPending: "Request pending",
+    joinRequested: "Request sent — the club's officers will review it",
+    joinRequests: "Join requests",
+    joinRequestsHelp: "Students asking to join. Approving adds them to the roster as a member.",
+    noJoinRequests: "No pending requests",
+    approveJoin: "Approve",
+    rejectJoin: "Decline",
+    joinedClub: "{0} is now a member",
+    requestRejected: "Request declined",
+    requestNotFound: "This request was already handled.",
+    clubNotActive: "This club isn't accepting members right now.",
+    alreadyRequested: "You already asked to join this club.",
+    approveJoinTitle: "Add {0} to the club?",
+    approveJoinBody: "They become a member on the roster and can be given a position.",
+    rejectJoinTitle: "Decline {0}'s request?",
+    rejectJoinBody: "They're notified and can ask again later.",
   );
 
   static const ms = ClubStrings(
@@ -785,6 +836,23 @@ class ClubStrings {
     notMember: "Mereka bukan ahli kelab ini.",
     cannotChangePresident: "Peranan presiden tidak boleh diubah di sini.",
     roleInvalid: "Pilih peranan yang sah.",
+    joinClub: "Mohon sertai",
+    joinPending: "Permohonan menunggu",
+    joinRequested: "Permohonan dihantar — pegawai kelab akan menyemaknya",
+    joinRequests: "Permohonan sertai",
+    joinRequestsHelp: "Pelajar yang meminta untuk menyertai. Meluluskan akan menambah mereka sebagai ahli.",
+    noJoinRequests: "Tiada permohonan menunggu",
+    approveJoin: "Lulus",
+    rejectJoin: "Tolak",
+    joinedClub: "{0} kini ahli",
+    requestRejected: "Permohonan ditolak",
+    requestNotFound: "Permohonan ini sudah diuruskan.",
+    clubNotActive: "Kelab ini tidak menerima ahli buat masa ini.",
+    alreadyRequested: "Anda sudah memohon untuk menyertai kelab ini.",
+    approveJoinTitle: "Tambah {0} ke kelab?",
+    approveJoinBody: "Mereka menjadi ahli dalam senarai dan boleh diberi jawatan.",
+    rejectJoinTitle: "Tolak permohonan {0}?",
+    rejectJoinBody: "Mereka akan dimaklumkan dan boleh memohon lagi nanti.",
   );
 
   /// Category keys stored in clubs.category.

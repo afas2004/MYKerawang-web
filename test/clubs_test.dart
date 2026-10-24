@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mykerawang/language_cubit.dart';
 import 'package:mykerawang/screens/admin/club_approvals_tab.dart';
 import 'package:mykerawang/screens/admin/club_registry_screen.dart';
+import 'package:mykerawang/screens/admin/join_requests_tab.dart';
 import 'package:mykerawang/screens/clubs/club_directory_screen.dart';
 import 'package:mykerawang/screens/clubs/club_manage_screen.dart';
 import 'package:mykerawang/screens/clubs/club_page_screen.dart';
@@ -170,6 +171,34 @@ void main() {
       expect(find.text(c.rolePresident), findsOneWidget);
     });
 
+    testWidgets('club page join request at ${w.toInt()} px', (tester) async {
+      var joined = 0;
+      await pumpAt(
+        tester,
+        w,
+        ClubPageView(
+          club: club,
+          myRole: null,
+          followers: 0,
+          following: false,
+          signedIn: true,
+          onJoin: () async => joined++,
+          onSetFollowing: (_) async {},
+          onManage: () {},
+          loadPosts: () async => [],
+          loadEvents: () async => [],
+          loadListings: () async => [],
+          loadMembers: () async => [],
+        ),
+        scaffold: false,
+      );
+      expect(find.text(c.joinClub), findsOneWidget);
+      await tester.tap(find.text(c.joinClub));
+      await tester.pumpAndSettle();
+      expect(joined, 1);
+      expect(find.text(c.joinPending), findsOneWidget);
+    });
+
     testWidgets('pending club shows officer banner at ${w.toInt()} px', (tester) async {
       await pumpAt(
         tester,
@@ -316,6 +345,7 @@ void main() {
             removeMember: (_) async {},
             setPosition: (_, __) async {},
             setRole: (_, __) async {},
+            decideJoin: (_, __) async {},
             transfer: (_) async {},
           ),
         ),
@@ -356,6 +386,7 @@ void main() {
             removeMember: (_) async {},
             setPosition: (_, __) async {},
             setRole: (_, __) async {},
+            decideJoin: (_, __) async {},
             transfer: (_) async {},
           ),
         ),
@@ -366,6 +397,58 @@ void main() {
       expect(find.text(c.leave), findsOneWidget);
       expect(find.text(c.transfer, skipOffstage: false), findsNothing);
       expect(find.text(c.addMember, skipOffstage: false), findsNothing);
+    });
+
+    testWidgets('manage approves a join request at ${w.toInt()} px', (tester) async {
+      String? decided;
+      bool? approved;
+      await pumpAt(
+        tester,
+        w,
+        ClubManageView(
+          club: club,
+          myRole: 'president',
+          myUserId: 'u1',
+          members: members,
+          joinRequests: [
+            {
+              'id': 'j1',
+              'message': 'Can I join?',
+              'user': {'id': 'u9', 'username': 'farid', 'display_name': 'Farid'},
+            },
+          ],
+          actions: ClubManageActions(
+            save: (_) async {},
+            pickImage: () async => null,
+            addMember: (_) async {},
+            removeMember: (_) async {},
+            setPosition: (_, __) async {},
+            setRole: (_, __) async {},
+            decideJoin: (id, ok) async {
+              decided = id;
+              approved = ok;
+            },
+            transfer: (_) async {},
+          ),
+        ),
+        scaffold: false,
+      );
+      await tester.dragUntilVisible(
+        find.text(c.joinRequests),
+        find.byType(ListView).first,
+        const Offset(0, -400),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(c.approveJoin).first);
+      await tester.pumpAndSettle();
+      expect(find.text(c.approveJoinTitle.replaceAll('{0}', 'Farid')), findsOneWidget);
+      await tester.tap(find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text(c.approveJoin),
+      ));
+      await tester.pumpAndSettle();
+      expect(decided, 'j1');
+      expect(approved, isTrue);
     });
 
     testWidgets('admin club request card at ${w.toInt()} px', (tester) async {
@@ -431,6 +514,35 @@ void main() {
     expect(find.text(c.postAs), findsNothing);
   });
 
+  testWidgets('admin join requests tab approves', (tester) async {
+    bool? approved;
+    await pumpAt(
+      tester,
+      375,
+      JoinRequestsTab(
+        load: () async => [
+          {
+            'id': 'j1',
+            'club_name': 'Debate Society',
+            'club_handle': 'debate',
+            'message': 'Can I join?',
+            'user': {'id': 'u9', 'username': 'farid', 'display_name': 'Farid'},
+          },
+        ],
+        decide: (_, ok) async => approved = ok,
+      ),
+    );
+    expect(find.text('Farid'), findsOneWidget);
+    await tester.tap(find.text(c.approveJoin));
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.text(c.approveJoin),
+    ));
+    await tester.pumpAndSettle();
+    expect(approved, isTrue);
+  });
+
   testWidgets('admin tab lists injected requests', (tester) async {
     await pumpAt(
       tester,
@@ -479,6 +591,7 @@ void main() {
           removeMember: (_) async {},
           setPosition: (_, __) async {},
           setRole: (_, __) async {},
+          decideJoin: (_, __) async {},
           transfer: (_) async {},
           saveContact: (p, q) async {
             savedPhone = p;

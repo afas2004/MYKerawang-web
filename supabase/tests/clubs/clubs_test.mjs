@@ -74,6 +74,7 @@ const admin = await user('admin1', 'admin');
 const alice = await user('alice');
 const bob = await user('bob');
 const carol = await user('carol');
+const dave = await user('dave');
 
 // ---------------------------------------------------------- register
 let e;
@@ -162,6 +163,34 @@ e = await err(alice, `select remove_club_member($1,$2)`, [debate, alice]);
 ok(e?.includes('CLUB:president_must_transfer'), 'president cannot be removed');
 await as(carol, `select remove_club_member($1,$2)`, [debate, carol]);
 ok((await q(`select count(*)::int n from club_members where club_id=$1 and user_id=$2`, [debate, carol]))[0].n === 0, 'member can leave');
+
+// ---------------------------------------------------------- join requests
+e = await err(carol, `select apply_to_club($1,'Let me in')`, [debate]);
+ok(e === null, 'student can request to join');
+e = await err(carol, `select apply_to_club($1,'again')`, [debate]);
+ok(e?.includes('CLUB:already_requested'), 'one pending request per club');
+ok((await as(carol, `select my_club_join($1) j`, [debate]))[0].j.pending === true, 'applicant sees pending');
+e = await err(dave, `select club_join_requests($1)`, [debate]);
+ok(e?.includes('CLUB:not_officer'), 'only officers list requests');
+const jr = (await as(bob, `select club_join_requests($1) j`, [debate]))[0].j;
+ok(jr.length === 1 && jr[0].user.username === 'carol', 'officer sees the request');
+const adminJr = (await as(admin, `select admin_join_requests() j`))[0].j;
+ok(adminJr.some((r) => r.id === jr[0].id && r.club_handle === reg.handle), 'admin sees every request');
+await as(bob, `select decide_club_join_request($1,true,null)`, [jr[0].id]);
+ok((await q(`select role from club_members where club_id=$1 and user_id=$2`, [debate, carol]))[0].role === 'member', 'approval adds a member');
+ok((await q(`select status from club_join_requests where id=$1`, [jr[0].id]))[0].status === 'approved', 'request approved');
+ok((await q(`select count(*)::int n from notifications where user_id=$1 and data->>'kind'='club_join_approved'`, [carol]))[0].n === 1, 'applicant notified');
+
+e = await err(dave, `select apply_to_club($1,'Hello')`, [debate]);
+ok(e === null, 'second applicant can ask');
+const daveReq = (await as(dave, `select id from club_join_requests where club_id=$1 and user_id=$2 and status='pending'`, [debate, dave]))[0].id;
+await as(bob, `select decide_club_join_request($1,false,'Full')`, [daveReq]);
+ok((await as(dave, `select my_club_join($1) j`, [debate]))[0].j.member === false, 'rejection leaves them out');
+e = await err(dave, `select apply_to_club($1,'again')`, [debate]);
+ok(e === null, 'rejected applicant can ask again');
+const daveReq2 = (await as(dave, `select id from club_join_requests where club_id=$1 and user_id=$2 and status='pending'`, [debate, dave]))[0].id;
+await as(admin, `select decide_club_join_request($1,true,null)`, [daveReq2]);
+ok((await q(`select role from club_members where club_id=$1 and user_id=$2`, [debate, dave]))[0].role === 'member', 'admin can approve');
 
 // ---------------------------------------------------------- publishing
 const cp = (await as(bob, `insert into posts (user_id, title, club_id, is_announcement, announcement_category, is_anonymous) values ($1,'Meeting Friday',$2,true,'club',true) returning id, is_anonymous`, [bob, debate]))[0];

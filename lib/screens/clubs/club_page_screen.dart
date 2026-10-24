@@ -33,12 +33,14 @@ class _ClubPageScreenState extends State<ClubPageScreen> {
       ClubService.myRole(club.id),
       ClubService.followerCounts([club.id]),
       ClubService.isFollowing(club.id),
+      ClubService.myJoin(club.id),
     ]);
     return _Loaded(
       club,
       results[0] as String?,
       (results[1] as Map<String, int>)[club.id] ?? 0,
       results[2] as bool,
+      results[3] as ClubJoinState,
     );
   }
 
@@ -78,8 +80,10 @@ class _ClubPageScreenState extends State<ClubPageScreen> {
           myRole: d.role,
           followers: d.followers,
           following: d.following,
+          join: d.join,
           signedIn: ClubService.currentUserId != null,
           onSetFollowing: (v) => ClubService.setFollowing(id, v),
+          onJoin: () => ClubService.applyToClub(id),
           onManage: () async {
             await context.push('/c/${d.club.handle}/manage');
             if (mounted) {
@@ -103,7 +107,8 @@ class _Loaded {
   final String? role;
   final int followers;
   final bool following;
-  const _Loaded(this.club, this.role, this.followers, this.following);
+  final ClubJoinState join;
+  const _Loaded(this.club, this.role, this.followers, this.following, this.join);
 }
 
 /// The page itself: header (cover, logo, name, follow / manage), status
@@ -117,6 +122,8 @@ class ClubPageView extends StatefulWidget {
   final bool signedIn;
   final Future<void> Function(bool follow) onSetFollowing;
   final VoidCallback onManage;
+  final ClubJoinState join;
+  final Future<void> Function()? onJoin;
   final Future<List<Map<String, dynamic>>> Function() loadPosts;
   final Future<List<Map<String, dynamic>>> Function() loadEvents;
   final Future<List<Map<String, dynamic>>> Function() loadListings;
@@ -131,6 +138,8 @@ class ClubPageView extends StatefulWidget {
     required this.signedIn,
     required this.onSetFollowing,
     required this.onManage,
+    this.join = ClubJoinState.none,
+    this.onJoin,
     required this.loadPosts,
     required this.loadEvents,
     required this.loadListings,
@@ -144,7 +153,9 @@ class ClubPageView extends StatefulWidget {
 class _ClubPageViewState extends State<ClubPageView> {
   late bool _following = widget.following;
   late int _followers = widget.followers;
+  late bool _pending = widget.join.pending;
   bool _busy = false;
+  bool _joining = false;
 
   late Future<List<Map<String, dynamic>>> _posts = widget.loadPosts();
   late final Future<List<Map<String, dynamic>>> _events = widget.loadEvents();
@@ -169,6 +180,23 @@ class _ClubPageViewState extends State<ClubPageView> {
       showClubSnack(context, context.l10nRead.club.genericError, error: true);
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _join() async {
+    final cb = widget.onJoin;
+    if (cb == null) return;
+    final c = context.l10nRead.club;
+    setState(() => _joining = true);
+    try {
+      await cb();
+      if (!mounted) return;
+      setState(() => _pending = true);
+      showClubSnack(context, c.joinRequested);
+    } catch (e) {
+      if (mounted) showClubSnack(context, clubErrorText(c, e), error: true);
+    } finally {
+      if (mounted) setState(() => _joining = false);
     }
   }
 
@@ -324,6 +352,23 @@ class _ClubPageViewState extends State<ClubPageView> {
                       ],
                     ],
                   ),
+                  if (widget.signedIn && club.isActive && widget.myRole == null) ...[
+                    const SizedBox(height: KSpace.s),
+                    SizedBox(
+                      width: double.infinity,
+                      child: _pending
+                          ? OutlinedButton.icon(
+                              onPressed: null,
+                              icon: const Icon(AppIcons.clock, size: 18),
+                              label: Text(c.joinPending),
+                            )
+                          : FilledButton.tonalIcon(
+                              onPressed: _joining ? null : _join,
+                              icon: const Icon(AppIcons.person, size: 18),
+                              label: Text(c.joinClub),
+                            ),
+                    ),
+                  ],
                   if (officer && !club.isActive) ...[
                     const SizedBox(height: KSpace.m),
                     ClubStatusBanner(status: club.status),

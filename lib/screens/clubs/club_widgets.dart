@@ -160,6 +160,9 @@ String clubErrorText(ClubStrings c, Object e, {String? fallback}) => switch (clu
       'not_member' => c.notMember,
       'cannot_change_president' => c.cannotChangePresident,
       'role_invalid' => c.roleInvalid,
+      'not_active' => c.clubNotActive,
+      'already_requested' => c.alreadyRequested,
+      'request_not_found' => c.requestNotFound,
       _ => fallback ?? c.genericError,
     };
 
