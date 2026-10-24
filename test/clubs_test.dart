@@ -192,6 +192,13 @@ void main() {
         ),
         scaffold: false,
       );
+      // The request entry point is a footer on the Members tab now, not a
+      // header button. Scroll the tab strip first: on a 375 px screen the
+      // Members tab sits off the right edge.
+      await tester.ensureVisible(find.text(c.tabMembers));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(c.tabMembers));
+      await tester.pumpAndSettle();
       expect(find.text(c.joinClub), findsOneWidget);
       await tester.tap(find.text(c.joinClub));
       await tester.pumpAndSettle();

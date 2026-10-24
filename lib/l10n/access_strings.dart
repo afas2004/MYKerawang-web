@@ -210,6 +210,22 @@ extension AccessStrings on AppStrings {
   String get evCheckedAt => _t("Checked in", "Daftar masuk", "Checked in");
   String get evName => _t("Name", "Nama", "Name");
 
+  // ---- club recruitment ----
+  String get clubRecruitment =>
+      _t("Membership", "Keahlian", "Membership");
+  String get clubRecruitmentOpen =>
+      _t("Accept join requests", "Terima permintaan menyertai", "Accept join requests");
+  String get clubRecruitmentHelp => _t(
+      "When off, the club page shows no way to request membership, and nobody can apply. You can still add members by username.",
+      "Apabila dimatikan, halaman kelab tidak menunjukkan cara untuk memohon, dan tiada siapa boleh memohon. Anda masih boleh menambah ahli melalui nama pengguna.",
+      "When off, nobody can request to join.");
+  String get clubRecruitmentClosed => _t(
+      "This club isn't taking requests right now.",
+      "Kelab ini tidak menerima permohonan buat masa ini.",
+      "This club isn't taking requests right now.");
+  String get clubRequestJoin =>
+      _t("Request to join", "Mohon menyertai", "Request to join");
+
   // ---- categories ----
   String get catTitle => _t("Categories", "Kategori", "カテゴリー");
   String get catEvents => _t("Event topics", "Topik acara", "イベント");
