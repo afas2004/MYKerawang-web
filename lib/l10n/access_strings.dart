@@ -118,6 +118,34 @@ extension AccessStrings on AppStrings {
   String get verifyRejectedDone => _t("Rejected", "Ditolak", "却下しました");
   String get verifySubmittedAt => _t("Submitted {0}", "Dihantar {0}", "提出 {0}");
 
+  // ---- categories ----
+  String get catTitle => _t("Categories", "Kategori", "カテゴリー");
+  String get catEvents => _t("Event topics", "Topik acara", "イベント");
+  String get catListings => _t("Market categories", "Kategori Pasar", "マーケット");
+  String get catAdd => _t("Add category", "Tambah kategori", "カテゴリーを追加");
+  String get catEdit => _t("Edit category", "Edit kategori", "カテゴリーを編集");
+  String get catNameEn => _t("Name (English)", "Nama (Inggeris)", "名前（英語）");
+  String get catNameMs => _t("Name (Malay)", "Nama (Melayu)", "名前（マレー語）");
+  String get catSlug => _t("Slug", "Slug", "スラッグ");
+  String get catSlugHint => _t("lowercase-with-dashes", "huruf-kecil-dengan-sempang", "lowercase-with-dashes");
+  String get catActive => _t("Active", "Aktif", "有効");
+  String get catInactive => _t("Hidden", "Disembunyikan", "非表示");
+  String get catSaved => _t("Category saved", "Kategori disimpan", "カテゴリーを保存しました");
+  String get catDeleted => _t("Category deleted", "Kategori dipadam", "カテゴリーを削除しました");
+  String get catInUse => _t(
+      "Posts still use this category, so it can't be deleted. Switch it off instead.",
+      "Masih ada post menggunakan kategori ini, jadi ia tidak boleh dipadam. Matikannya sahaja.",
+      "このカテゴリーはまだ使われているため削除できません。無効にしてください。");
+  String get catLastOne => _t("A category needs a name and a slug.",
+      "Kategori perlu nama dan slug.", "名前とスラッグが必要です。");
+
+  String get categoryPickHint => _t(
+      "Pick up to {0}. The first one is the main category.",
+      "Pilih sehingga {0}. Yang pertama ialah kategori utama.",
+      "最大{0}件まで。最初のものがメインカテゴリーです。");
+  String get categoryRequired => _t("Pick at least one category.",
+      "Pilih sekurang-kurangnya satu kategori.", "カテゴリーを1つ以上選んでください。");
+
   // ---- sharing ----
   String get copyLink => _t("Copy link", "Salin pautan", "リンクをコピー");
   String get linkCopied =>

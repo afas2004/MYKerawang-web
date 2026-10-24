@@ -12,6 +12,7 @@ import 'language_cubit.dart';
 import 'router.dart';
 // --- IMPORT YOUR SERVICES ---
 import 'services/notification_service.dart';
+import 'services/category_service.dart';
 import 'services/club_service.dart';
 import 'services/admin_unlock.dart';
 import 'services/known_accounts.dart';
@@ -53,6 +54,10 @@ void main() async {
   );
 
   await NotificationService.init();
+
+  // Warm the category cache so filter chips can render labels without an
+  // await. Falls back to the bundled seeds; never throws.
+  CategoryService.warm();
 
   // The Search tab's "All" results include a Clubs section; the hook is
   // optional so SearchScreen keeps working without the clubs feature.

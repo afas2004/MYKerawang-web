@@ -11,11 +11,13 @@ import '../utils/adaptive.dart';
 import '../utils/formatters.dart';
 import '../utils/app_nav.dart';
 import '../utils/form_draft.dart';
+import '../widgets/category_picker.dart';
 import '../widgets/form_layout.dart';
 import '../widgets/media_picker_grid.dart';
 import '../widgets/restriction_gate.dart';
 import '../l10n/create_strings.dart';
 import '../services/club_service.dart';
+import '../utils/categories.dart';
 import '../widgets/post_as_selector.dart';
 
 class CreateEventScreen extends StatefulWidget {
@@ -46,7 +48,23 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   // Index 0 is ALWAYS the Cover Photo.
   final List<dynamic> _mediaItems = [];
   
-  List<String> _selectedTags = [];
+  /// Stored slugs from `content_categories`; first one is the main topic.
+  List<String> _categories = [];
+
+  /// Old rows carry `tags` (capitalised, free text); new rows carry
+  /// `categories` (lowercase slugs). Read whichever is there.
+  static List<String> _categoriesFrom(Map<String, dynamic>? row) {
+    if (row == null) return [];
+    final raw = row['categories'];
+    if (raw is List && raw.isNotEmpty) {
+      return raw.whereType<String>().map((e) => e.toLowerCase()).toList();
+    }
+    final tags = row['tags'];
+    if (tags is List) {
+      return tags.whereType<String>().map((e) => e.toLowerCase()).toList();
+    }
+    return [];
+  }
 
   @override
   void initState() {
@@ -63,9 +81,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       _endDate = event['end_datetime'] != null 
           ? DateTime.parse(event['end_datetime']).toLocal() 
           : _startDate!.add(const Duration(hours: 2));
-if (event['tags'] != null) {
-        _selectedTags = List<String>.from(event['tags']);
-      }
+      _categories = _categoriesFrom(event);
 
       // LOAD EXISTING MEDIA
       // 1. Cover
@@ -96,7 +112,7 @@ if (event['tags'] != null) {
         'location': _locationController.text,
         'description': _descController.text,
         'link': _linkController.text,
-        'tags': _selectedTags,
+        'categories': _categories,
       };
 
   Future<void> _restoreDraft() async {
@@ -108,8 +124,13 @@ if (event['tags'] != null) {
       _locationController.text = d['location'] ?? '';
       _descController.text = d['description'] ?? '';
       _linkController.text = d['link'] ?? '';
-      final tags = d['tags'];
-      if (tags is List) _selectedTags = tags.whereType<String>().toList();
+      final cats = d['categories'];
+      if (cats is List) {
+        _categories = cats.whereType<String>().toList();
+      } else {
+        final tags = d['tags'];
+        if (tags is List) _categories = tags.whereType<String>().toList();
+      }
     });
     _showDraftRestored();
   }
@@ -127,7 +148,7 @@ if (event['tags'] != null) {
             _locationController.clear();
             _descController.clear();
             _linkController.clear();
-            _selectedTags = [];
+            _categories = [];
           });
           _draft.clear();
         },
@@ -145,7 +166,7 @@ if (event['tags'] != null) {
         _linkController.text,
         _startDate?.toIso8601String(),
         _endDate?.toIso8601String(),
-        _selectedTags.join(','),
+        _categories.join(','),
         _mediaItems.length,
         _mediaItems.map((m) => m is String ? m : identityHashCode(m)).join(','),
       ].join('|');
@@ -169,6 +190,11 @@ if (event['tags'] != null) {
     final s = context.l10nRead;
     if (_mediaItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.addPhotoRequired)));
+      return;
+    }
+    if (_categories.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(s.categoryRequired)));
       return;
     }
     if (!await ensureCanWrite(context, ModScope.events) || !mounted) return;
@@ -221,7 +247,7 @@ if (event['tags'] != null) {
         // The Public switch was removed: new events are public, and an
         // edit leaves whatever is_public an existing event already has.
         if (widget.eventToEdit == null) 'is_public': true,
-'tags': _selectedTags,
+        'categories': _categories,
         'organizer_id': user!.id,
       };
 
@@ -354,6 +380,23 @@ if (event['tags'] != null) {
                       hintText: s.eventDescHint,
                       isMultiLine: true,
                     ),
+                  ),
+                ],
+              ),
+              FormSection(
+                title: s.category,
+                icon: AppIcons.filter,
+                children: [
+                  CategoryPicker(
+                    kind: 'event',
+                    value: _categories,
+                    onChanged: (v) => setState(() => _categories = v),
+                  ),
+                  const SizedBox(height: KSpace.xs),
+                  Text(
+                    s.categoryPickHint.fill(['$kMaxCategoriesPerItem']),
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                   ),
                 ],
               ),

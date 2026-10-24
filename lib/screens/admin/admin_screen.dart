@@ -13,6 +13,7 @@ import 'admin_lock_screen.dart';
 import 'admin_overview.dart';
 import 'appeals_tab.dart';
 import 'cases_tab.dart';
+import 'categories_tab.dart';
 import 'club_approvals_tab.dart';
 import 'join_requests_tab.dart';
 import 'log_tab.dart';
@@ -118,6 +119,7 @@ class _AdminScreenState extends State<AdminScreen> {
       (m.tabAppeals, ModIcons.appeal, const AppealsTab()),
       (m.tabRestrictions, ModIcons.ban, const RestrictionsTab()),
       (m.tabLog, ModIcons.log, const LogTab()),
+      (context.l10n.catTitle, ModIcons.category, const CategoriesTab()),
       if (verifyEnabled)
         (context.l10n.verifyQueueTitle, ModIcons.verified, const VerificationsTab()),
       if (owner) (m.tabSettings, ModIcons.settings, const SettingsTab()),

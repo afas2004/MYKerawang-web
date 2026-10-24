@@ -9,7 +9,7 @@ import '../utils/guest_access.dart';
 import '../services/unread_notifications.dart';
 import '../widgets/profile_avatar_action.dart';
 import '../widgets/shell_actions.dart';
-import '../utils/categories.dart';
+import '../services/category_service.dart';
 import '../utils/formatters.dart';
 import '../utils/listing_status.dart';
 import '../widgets/status_badge.dart';
@@ -393,20 +393,29 @@ class _CategoryChipRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final categories = <String?>[null, ...kListingCategories];
+    final categories = CategoryService.cached('listing');
     return SizedBox(
       height: 52,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: KSpace.l, vertical: KSpace.xs),
-        itemCount: categories.length,
+        itemCount: categories.length + 1,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
-          final c = categories[i];
+          if (i == 0) {
+            return FilterChip(
+              label: Text(s.all),
+              selected: selected == null,
+              onSelected: (_) => context.read<MarketplaceCubit>().updateCategory(null),
+              selectedColor: scheme.secondaryContainer,
+              checkmarkColor: scheme.onSecondaryContainer,
+            );
+          }
+          final c = categories[i - 1];
           return FilterChip(
-            label: Text(c ?? s.all),
-            selected: selected == c,
-            onSelected: (_) => context.read<MarketplaceCubit>().updateCategory(c),
+            label: Text(c.label(s)),
+            selected: selected == c.slug,
+            onSelected: (_) => context.read<MarketplaceCubit>().updateCategory(c.slug),
             selectedColor: scheme.secondaryContainer,
             checkmarkColor: scheme.onSecondaryContainer,
           );
@@ -528,12 +537,16 @@ class _MarketFilterFormState extends State<MarketFilterForm> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                for (final c in <String?>[null, ...kListingCategories])
+                for (final entry in <(String?, String)>[
+                  (null, s.all),
+                  for (final cat in CategoryService.cached('listing'))
+                    (cat.slug, cat.label(s)),
+                ])
                   ChoiceChip(
-                    label: Text(c ?? s.all),
-                    selected: _category == c,
+                    label: Text(entry.$2),
+                    selected: _category == entry.$1,
                     onSelected: (_) {
-                      setState(() => _category = c);
+                      setState(() => _category = entry.$1);
                       _changed();
                     },
                   ),

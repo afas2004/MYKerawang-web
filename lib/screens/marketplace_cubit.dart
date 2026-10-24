@@ -174,7 +174,8 @@ class MarketplaceCubit extends Cubit<MarketplaceState> {
     final f = state.filters;
     var query = _supabase.from('listings').select();
 
-    if (f.category != null) query = query.eq('category', f.category!);
+    // Array contains: a listing can sit in several categories.
+    if (f.category != null) query = query.contains('categories', [f.category!]);
     if (f.minPrice != null) query = query.gte('price', f.minPrice!);
     if (f.maxPrice != null) query = query.lte('price', f.maxPrice!);
     if (f.statuses.length < ListingStatus.values.length) {

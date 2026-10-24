@@ -228,10 +228,14 @@ class EventsCubit extends Cubit<EventsState> {
     final filtered = items.where((e) {
       final title = (e['title'] as String).toLowerCase();
       final search = query.toLowerCase();
-      final eventTags = List<String>.from(e['tags'] ?? []);
+      // New rows carry category slugs; older ones carry free-text tags.
+      final eventCats = [
+        ...List<String>.from(e['categories'] ?? const []),
+        ...List<String>.from(e['tags'] ?? const []),
+      ].map((t) => t.toLowerCase()).toList();
 
       final matchesSearch = title.contains(search);
-      final matchesTag = tag == 'All' || eventTags.contains(tag);
+      final matchesTag = tag == 'All' || eventCats.contains(tag);
 
       return matchesSearch && matchesTag;
     }).toList();

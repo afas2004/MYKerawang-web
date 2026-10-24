@@ -60,6 +60,7 @@ abstract final class ModIcons {
   static const IconData searchOff = LucideIcons.searchX;
   static const IconData pointer = LucideIcons.mousePointerClick;
   static const IconData flagOff = LucideIcons.flagOff;
+  static const IconData category = LucideIcons.tags;
   static const IconData saveFile = LucideIcons.save;
 }
 
