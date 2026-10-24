@@ -6,8 +6,16 @@ import 'dart:math';
 // ==========================================
 const String supabaseUrl = 'https://zxjuqpqzyzmegdjttzyz.supabase.co';
 
-// ⚠️ IMPORTANT: PASTE YOUR "SERVICE_ROLE" KEY HERE (NOT ANON KEY!)
-const String serviceRoleKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp4anVxcHF6eXptZWdkanR0enl6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NDQzMDE3MiwiZXhwIjoyMDgwMDA2MTcyfQ.Y61O9-MFCAT0fOSaOtqxIh8_Fya7NLSTsOtbyr61_f4'; 
+// ⚠️ A privileged key must never be committed. Pass it at run time:
+//
+//   flutter run lib/utils/seeder.dart \
+//     --dart-define=SUPABASE_SECRET_KEY=sb_secret_...
+//
+// Accepts the new `sb_secret_…` key, or the legacy `service_role` JWT.
+// The legacy key that used to sit here is in git history; the project
+// moved to publishable/secret API keys to retire it.
+const String serviceRoleKey = String.fromEnvironment('SUPABASE_SECRET_KEY',
+    defaultValue: String.fromEnvironment('SUPABASE_SERVICE_ROLE', defaultValue: ''));
 
 // ==========================================
 // 2. DATA POOLS

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_strings.dart';
 import '../l10n/moderation_strings.dart';
 import '../language_cubit.dart';
 import '../services/moderation_service.dart';
@@ -52,6 +53,36 @@ class _ReportSheetState extends State<ReportSheet> {
   final _note = TextEditingController();
   bool _sending = false;
   ReportOutcome? _outcome;
+
+  /// Which categories are reviewed first. Starts as the shipped policy and
+  /// is replaced by the live setting, so the note under the list is never
+  /// a claim the database disagrees with.
+  List<String> _priority = kDefaultPriorityCategories;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPriority();
+  }
+
+  Future<void> _loadPriority() async {
+    try {
+      final settings = await ModerationService.settings();
+      final raw = settings['priority_categories'];
+      if (raw is List && mounted) {
+        setState(() => _priority = raw.whereType<String>().toList());
+      }
+    } catch (_) {
+      // Reporting must never fail because the policy could not be read.
+    }
+  }
+
+  /// Labels of the reviewed-first categories, in the order the sheet lists
+  /// them (unknown ids from an edited policy are simply skipped).
+  List<String> _priorityLabels(ModerationStrings m) => [
+        for (final c in kReportCategories)
+          if (_priority.contains(c)) m.categoryLabel(c),
+      ];
 
   @override
   void dispose() {
@@ -119,6 +150,22 @@ class _ReportSheetState extends State<ReportSheet> {
             child: Text(u.reportPickCategory,
                 style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant)),
           ),
+          if (_priorityLabels(m).isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+              child: Row(
+                children: [
+                  Icon(ModIcons.info, size: 14, color: scheme.onSurfaceVariant),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      u.reportReviewedFirst.fill([_priorityLabels(m).join(', ')]),
+                      style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           RadioGroup<String>(
             groupValue: _category,
             onChanged: (v) => setState(() => _category = v),

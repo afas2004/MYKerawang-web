@@ -12,6 +12,7 @@ import '../utils/guest_access.dart';
 import '../services/unread_notifications.dart';
 import '../widgets/profile_avatar_action.dart';
 import '../widgets/shell_actions.dart';
+import '../services/category_service.dart';
 import '../utils/categories.dart';
 import '../utils/formatters.dart';
 import '../utils/roles.dart';
@@ -73,7 +74,7 @@ class EventsView extends StatefulWidget {
 class _EventsViewState extends State<EventsView>
     with RefreshOnContentChange {
   final TextEditingController _searchCtrl = TextEditingController();
-  final List<String> _tags = ['All', ...kEventTags];
+  final List<String> _tags = ['All', ...kEventCategorySlugs];
 
   /// Past (ended / cancelled) events start collapsed at the bottom.
   bool _showPast = false;
@@ -107,6 +108,7 @@ class _EventsViewState extends State<EventsView>
               title: Text(s.navEvents),
               actions: [
                 const ShellSearchButton(),
+                const ShellClubsButton(),
                 // Notifications only mean something when signed in.
                 if (ShellAuth.of(context))
                   IconButton(
@@ -563,8 +565,9 @@ class _TagChipRow extends StatelessWidget {
 }
 
 Widget _tagChip(BuildContext context, String tag, String selected) {
+  final s = context.l10n;
   return FilterChip(
-    label: Text(tag == 'All' ? context.l10n.all : tag),
+    label: Text(tag == 'All' ? s.all : CategoryService.labelOf('event', tag, s)),
     selected: selected == tag,
     showCheckmark: false,
     onSelected: (_) => context.read<EventsCubit>().updateTag(tag),

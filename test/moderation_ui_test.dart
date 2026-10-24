@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mykerawang/l10n/app_strings.dart';
 import 'package:mykerawang/l10n/moderation_strings.dart';
 import 'package:mykerawang/language_cubit.dart';
+import 'package:mykerawang/screens/admin/admin_lock_screen.dart';
 import 'package:mykerawang/screens/admin/admin_overview.dart';
 import 'package:mykerawang/screens/admin/case_detail.dart';
 import 'package:mykerawang/screens/admin/case_workspace.dart';
@@ -310,5 +311,25 @@ void main() {
         "They won't be able to post, comment, sell, join events, follow or report.");
     expect(restrictionPreview(ModerationStrings.ms, {ModScope.post}, null, at).first,
         'Mereka tidak boleh menyiarkan.');
+  });
+
+  testWidgets('admin lock screen checks the PIN', (tester) async {
+    var unlocked = false;
+    await pumpAt(
+      tester,
+      375,
+      AdminLockScreen(
+        unlock: (pin) async => pin == '1234',
+        onUnlocked: () => unlocked = true,
+      ),
+    );
+    await tester.enterText(find.byType(TextField), '0000');
+    await tester.tap(find.text(m.unlock));
+    await tester.pumpAndSettle();
+    expect(find.text(m.wrongPin), findsOneWidget);
+    await tester.enterText(find.byType(TextField), '1234');
+    await tester.tap(find.text(m.unlock));
+    await tester.pumpAndSettle();
+    expect(unlocked, isTrue);
   });
 }

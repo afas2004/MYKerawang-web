@@ -104,6 +104,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
         title: Text(s.hub.title),
         actions: [
           const ShellSearchButton(),
+          const ShellClubsButton(),
           if (_canPost)
             IconButton(
               tooltip: s.hub.newAnnouncement,

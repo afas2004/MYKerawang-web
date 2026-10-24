@@ -34,6 +34,209 @@ extension AccessStrings on AppStrings {
       "New accounts need a UiTM student email (@student.uitm.edu.my).",
       "Akaun baharu perlu guna emel pelajar UiTM (@student.uitm.edu.my).",
       "新規登録にはUiTMの学生用メール（@student.uitm.edu.my）が必要です。");
+  String get anyEmailHint => _t(
+      "New here? Sign up with any email address.",
+      "Baru di sini? Daftar dengan mana-mana alamat e-mel.",
+      "新規登録はどのメールアドレスでもできます。");
+
+  // ---- registration switch (owner) ----
+  String get regTitle => _t("Registration", "Pendaftaran", "登録");
+  String get regOpenTitle =>
+      _t("Allow any email to sign up", "Benarkan daftar dengan mana-mana e-mel", "Allow any email to sign up");
+  String get regOpenBody => _t(
+      "Off: only @student.uitm.edu.my addresses can create an account. On: anyone can, and student status is proven separately.",
+      "Tutup: hanya alamat @student.uitm.edu.my boleh cipta akaun. Buka: sesiapa boleh, dan status pelajar dibuktikan secara berasingan.",
+      "Off: student addresses only. On: anyone can sign up.");
+  String get regConfirmTitle => _t("Open signup to any email?",
+      "Buka pendaftaran untuk semua e-mel?", "Open signup to any email?");
+  String get regConfirmBody => _t(
+      "Anyone with an email address will be able to create an account, and the public signup page becomes reachable by link. Existing accounts are not affected.",
+      "Sesiapa yang ada alamat e-mel boleh mencipta akaun, dan halaman pendaftaran awam boleh dicapai melalui pautan. Akaun sedia ada tidak terjejas.",
+      "Anyone with an email can create an account.");
+  String get regConfirmAction => _t("Open signup", "Buka pendaftaran", "Open signup");
+  String get regNowOpen => _t("Signup is open to any email",
+      "Pendaftaran dibuka untuk semua e-mel", "Signup is open to any email");
+  String get regNowStudentOnly => _t("Signup is limited to student emails",
+      "Pendaftaran terhad kepada e-mel pelajar", "Signup is limited to student emails");
+
+  // ---- student verification ----
+  String get verifySectionTitle =>
+      _t("Student verification", "Pengesahan pelajar", "学生確認");
+  String get verifySwitchTitle =>
+      _t("Require verified students", "Wajibkan pelajar disahkan", "学生確認を必須にする");
+  String get verifySwitchBody => _t(
+      "Joining an event, creating an event and selling then need a verified student account. Posting and commenting stay open. Admins and owners are exempt.",
+      "Menyertai acara, mencipta acara dan menjual kemudiannya memerlukan akaun pelajar yang disahkan. Menyiar dan mengomen kekal terbuka. Admin dan pemilik dikecualikan.",
+      "イベント参加・作成・出品には学生確認済みのアカウントが必要になります。投稿とコメントは自由です。管理者は対象外です。");
+  String get verifyConfirmTitle =>
+      _t("Turn on student verification?", "Hidupkan pengesahan pelajar?", "学生確認を有効にしますか？");
+  String get verifyConfirmBody => _t(
+      "Accounts that are not verified yet will not be able to join events, create events or sell until an admin verifies them. Nobody can verify themselves yet — the email code flow is not built.",
+      "Akaun yang belum disahkan tidak boleh menyertai acara, mencipta acara atau menjual sehingga admin mengesahkannya. Buat masa ini tiada siapa boleh mengesahkan diri sendiri — aliran kod e-mel belum dibina.",
+      "未確認のアカウントは、管理者が確認するまでイベント参加・作成・出品ができなくなります。現在、自己確認の仕組みはまだありません。");
+  String get verifyConfirmAction =>
+      _t("Turn on", "Hidupkan", "有効にする");
+  String get verifyOn =>
+      _t("Student verification is on", "Pengesahan pelajar dihidupkan", "学生確認を有効にしました");
+  String get verifyOff =>
+      _t("Student verification is off", "Pengesahan pelajar dimatikan", "学生確認を無効にしました");
+  String get verifyRequired =>
+      _t("Verify your student status to do this.", "Sahkan status pelajar anda untuk melakukan ini.", "これを行うには学生確認が必要です。");
+
+  // ---- verification: the student's side ----
+  String get verifyTitle => _t("Student verification", "Pengesahan pelajar", "学生確認");
+  String get verifyStatusNone => _t("Not verified", "Belum disahkan", "未確認");
+  String get verifyStatusPending =>
+      _t("Waiting for review", "Menunggu semakan", "審査待ち");
+  String get verifyStatusVerified =>
+      _t("Verified student", "Pelajar disahkan", "確認済み");
+  String get verifyStatusRejected => _t("Not approved", "Tidak diluluskan", "承認されませんでした");
+  String get verifyStatusRevoked => _t("Revoked", "Ditarik balik", "取り消し済み");
+  String get verifySheetTitle =>
+      _t("Verify your student status", "Sahkan status pelajar anda", "学生確認");
+  String get verifySheetIntro => _t(
+      "Enter the UiTM student email you can still open. An admin checks it by hand — there is no code by email yet.",
+      "Masukkan e-mel pelajar UiTM yang masih boleh anda buka. Admin menyemaknya secara manual — belum ada kod melalui e-mel.",
+      "まだ開けるUiTMの学生メールを入力してください。管理者が手作業で確認します（メールコードはまだありません）。");
+  String get verifyEmailLabel => _t("Student email", "E-mel pelajar", "学生メール");
+  String get verifyEmailHint =>
+      _t("you@student.uitm.edu.my", "anda@student.uitm.edu.my", "you@student.uitm.edu.my");
+  String get verifySubmit => _t("Submit for review", "Hantar untuk semakan", "審査に提出");
+  String get verifySubmitted =>
+      _t("Submitted for review", "Dihantar untuk semakan", "審査に提出しました");
+  String get verifyPendingBody => _t(
+      "An admin will check your request. You can keep using the app in the meantime.",
+      "Admin akan menyemak permintaan anda. Anda boleh terus menggunakan aplikasi sementara itu.",
+      "管理者が確認します。それまでアプリはそのまま使えます。");
+  String get verifyVerifiedBody => _t(
+      "Verified on {0}. You can join and create events and sell in the Market.",
+      "Disahkan pada {0}. Anda boleh menyertai dan mencipta acara serta menjual di Pasar.",
+      "{0}に確認されました。イベントの参加・作成、出品ができます。");
+  String get verifyRejectedBody => _t(
+      "Your last request was not approved. Check the address and send it again.",
+      "Permintaan terakhir anda tidak diluluskan. Semak alamat dan hantar semula.",
+      "前回の申請は承認されませんでした。アドレスを確認して再提出してください。");
+  String get verifyRevokedBody => _t(
+      "Your verification was revoked. Send a request again if this is a mistake.",
+      "Pengesahan anda ditarik balik. Hantar permintaan semula jika ini satu kesilapan.",
+      "確認は取り消されました。誤りであれば再申請してください。");
+
+  // ---- verification: refusals ----
+  String get verifyClosed => _t("Student verification is not open yet.",
+      "Pengesahan pelajar belum dibuka.", "学生確認はまだ開始されていません。");
+  String get verifyDomainError => _t("Use your @student.uitm.edu.my address.",
+      "Gunakan alamat @student.uitm.edu.my anda.", "@student.uitm.edu.my のアドレスを使ってください。");
+  String get verifyTakenError => _t("That address is already used by another account.",
+      "Alamat itu sudah digunakan oleh akaun lain.", "そのアドレスは別のアカウントで使われています。");
+  String get verifyWaitError => _t("Try again in a few minutes.",
+      "Cuba lagi dalam beberapa minit.", "数分後にもう一度お試しください。");
+  String get verifyAlreadyError => _t("You are already verified.",
+      "Anda sudah disahkan.", "すでに確認済みです。");
+
+  // ---- verification: admin queue ----
+  String get verifyQueueTitle => _t("Verifications", "Pengesahan", "学生確認");
+  String get verifyQueueEmpty => _t("No pending requests.", "Tiada permintaan menunggu.", "保留中の申請はありません。");
+  String get verifyApprove => _t("Approve", "Luluskan", "承認");
+  String get verifyReject => _t("Reject", "Tolak", "却下");
+  String get verifyApproved => _t("Approved", "Diluluskan", "承認しました");
+  String get verifyRejectedDone => _t("Rejected", "Ditolak", "却下しました");
+  String get verifySubmittedAt => _t("Submitted {0}", "Dihantar {0}", "提出 {0}");
+
+  // ---- event details: registration, merit, contacts, attendance ----
+  String get evRegistration => _t("Registration", "Pendaftaran", "Registration");
+  String get evCloseAtStart => _t("Close registration when the event starts",
+      "Tutup pendaftaran apabila acara bermula", "Close registration when the event starts");
+  String get evCloseAtStartHint => _t(
+      "Nobody can join once it begins. You can also close it early from the event page.",
+      "Tiada siapa boleh menyertai selepas ia bermula. Anda juga boleh menutupnya lebih awal dari halaman acara.",
+      "Nobody can join once it begins.");
+  String get evClosed => _t("Registration closed", "Pendaftaran ditutup", "Registration closed");
+  String get evFull => _t("This event is full", "Acara ini sudah penuh", "This event is full");
+  String get evCloseNow => _t("Close registration now", "Tutup pendaftaran sekarang", "Close registration now");
+  String get evCapacity => _t("Places (optional)", "Tempat (pilihan)", "Places (optional)");
+  String get evCapacityHint =>
+      _t("Leave empty for unlimited", "Biarkan kosong untuk tanpa had", "Leave empty for unlimited");
+  String get evFee => _t("Fee (RM)", "Yuran (RM)", "Fee (RM)");
+  String get evFeeHint => _t("Empty or 0 means free", "Kosong atau 0 bermaksud percuma", "Empty or 0 means free");
+  String get evFeeFree => _t("Free", "Percuma", "Free");
+  String get evAudience => _t("Open to", "Terbuka kepada", "Open to");
+  String evAudienceLabel(String? v) => switch (v) {
+        'kolej' => _t("This college", "Kolej ini", "This college"),
+        'klab' => _t("Club members", "Ahli kelab", "Club members"),
+        'awam' => _t("Public", "Awam", "Public"),
+        _ => _t("UiTM students", "Pelajar UiTM", "UiTM students"),
+      };
+  String get evMerit => _t("Merit offered", "Merit disediakan", "Merit offered");
+  String get evMeritHint => _t("Only a club (as the host) or an admin can offer merit.",
+      "Hanya kelab (sebagai penganjur) atau admin boleh menawarkan merit.",
+      "Only a club or an admin can offer merit.");
+  String get evMeritNote => _t("Merit note", "Nota merit", "Merit note");
+  String get evMeritNoteHint => _t("e.g. 2 merit, kokurikulum", "cth. 2 merit, kokurikulum", "e.g. 2 merit");
+  String get evActivityRef => _t("Activity reference", "Rujukan aktiviti", "Activity reference");
+  String get evCoOrganiser =>
+      _t("With cooperation from", "Dengan kerjasama", "With cooperation from");
+  String get evContacts => _t("Contact the organiser", "Hubungi penganjur", "Contact the organiser");
+  String get evContactHint =>
+      _t("Leave blank to hide a channel.", "Biarkan kosong untuk sembunyikan saluran.", "Leave blank to hide a channel.");
+  String get evContactNone => _t("The organiser has not shared a contact.",
+      "Penganjur belum berkongsi hubungan.", "The organiser has not shared a contact.");
+
+  // ---- attendance ----
+  String get evAttendance => _t("Attendance", "Kehadiran", "Attendance");
+  String get evAttendanceHint => _t(
+      "Show this code at the door. It refreshes every 10 seconds; students scan it in the app or with their phone camera.",
+      "Tunjukkan kod ini di pintu. Ia diperbaharui setiap 10 saat; pelajar mengimbasnya dalam aplikasi atau dengan kamera telefon.",
+      "Show this code at the door.");
+  String get evAttendanceOff => _t("Turn on attendance", "Hidupkan kehadiran", "Turn on attendance");
+  String get evCheckIn => _t("Check in", "Daftar masuk", "Check in");
+  String get evScanHint =>
+      _t("Point the camera at the organiser's QR code.", "Halakan kamera ke kod QR penganjur.", "Point at the QR code.");
+  String get evCheckedIn => _t("You're checked in", "Anda telah didaftarkan", "You're checked in");
+  String get evAlreadyIn =>
+      _t("You were already checked in", "Anda sudah pun didaftarkan", "You were already checked in");
+  String get evCheckinExpired => _t("That code just expired — ask the organiser to show it again.",
+      "Kod itu baru tamat — minta penganjur menunjukkannya semula.", "That code expired.");
+  String get evCheckinInvalid =>
+      _t("That is not a check-in code.", "Itu bukan kod daftar masuk.", "That is not a check-in code.");
+  String get evCheckinVerify => _t("Verify your student status before checking in for merit.",
+      "Sahkan status pelajar anda sebelum mendaftar masuk untuk merit.", "Verify your student status first.");
+  String get evAttendanceEmpty =>
+      _t("Nobody has checked in yet.", "Belum ada yang mendaftar masuk.", "Nobody has checked in yet.");
+  String get evAttendanceCount =>
+      _t("{0} checked in", "{0} telah mendaftar masuk", "{0} checked in");
+  String get evExportCsv =>
+      _t("Export attendance (CSV)", "Eksport kehadiran (CSV)", "Export attendance (CSV)");
+  String get evStudentId => _t("Student ID", "No. pelajar", "Student ID");
+  String get evCheckedAt => _t("Checked in", "Daftar masuk", "Checked in");
+  String get evName => _t("Name", "Nama", "Name");
+
+  // ---- categories ----
+  String get catTitle => _t("Categories", "Kategori", "カテゴリー");
+  String get catEvents => _t("Event topics", "Topik acara", "イベント");
+  String get catListings => _t("Market categories", "Kategori Pasar", "マーケット");
+  String get catAdd => _t("Add category", "Tambah kategori", "カテゴリーを追加");
+  String get catEdit => _t("Edit category", "Edit kategori", "カテゴリーを編集");
+  String get catNameEn => _t("Name (English)", "Nama (Inggeris)", "名前（英語）");
+  String get catNameMs => _t("Name (Malay)", "Nama (Melayu)", "名前（マレー語）");
+  String get catSlug => _t("Slug", "Slug", "スラッグ");
+  String get catSlugHint => _t("lowercase-with-dashes", "huruf-kecil-dengan-sempang", "lowercase-with-dashes");
+  String get catActive => _t("Active", "Aktif", "有効");
+  String get catInactive => _t("Hidden", "Disembunyikan", "非表示");
+  String get catSaved => _t("Category saved", "Kategori disimpan", "カテゴリーを保存しました");
+  String get catDeleted => _t("Category deleted", "Kategori dipadam", "カテゴリーを削除しました");
+  String get catInUse => _t(
+      "Posts still use this category, so it can't be deleted. Switch it off instead.",
+      "Masih ada post menggunakan kategori ini, jadi ia tidak boleh dipadam. Matikannya sahaja.",
+      "このカテゴリーはまだ使われているため削除できません。無効にしてください。");
+  String get catLastOne => _t("A category needs a name and a slug.",
+      "Kategori perlu nama dan slug.", "名前とスラッグが必要です。");
+
+  String get categoryPickHint => _t(
+      "Pick up to {0}. The first one is the main category.",
+      "Pilih sehingga {0}. Yang pertama ialah kategori utama.",
+      "最大{0}件まで。最初のものがメインカテゴリーです。");
+  String get categoryRequired => _t("Pick at least one category.",
+      "Pilih sekurang-kurangnya satu kategori.", "カテゴリーを1つ以上選んでください。");
 
   // ---- sharing ----
   String get copyLink => _t("Copy link", "Salin pautan", "リンクをコピー");

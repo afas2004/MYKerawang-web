@@ -27,6 +27,7 @@ class ModerationStrings {
   final String catSpam;
   final String catScam;
   final String catHarassment;
+  final String catImpersonation;
   final String catInappropriate;
   final String catMinorSafety;
   final String catMisinformation;
@@ -93,6 +94,8 @@ class ModerationStrings {
   final String unpin;
   final String pinnedFor;
   final String unpinnedDone;
+  final String pinToClub;
+  final String unpinFromClub;
   final String pinCapTitle;
   final String pinCapBody;
   final String replace;
@@ -104,6 +107,24 @@ class ModerationStrings {
   final String adminOnlyBody;
   final String tabCases;
   final String tabClubs;
+  final String tabJoinRequests;
+  final String adminConsoleSub;
+  final String adminLocked;
+  final String adminLockedBody;
+  final String adminPin;
+  final String adminPinConfirm;
+  final String adminPinSetupHint;
+  final String adminPinSet;
+  final String adminPinChange;
+  final String adminPinConfigured;
+  final String adminPinNotConfigured;
+  final String adminPinSaved;
+  final String adminPinMismatch;
+  final String adminPinTooShort;
+  final String unlock;
+  final String wrongPin;
+  final String idleLockNote;
+  final String lockNow;
   final String tabAppeals;
   final String tabRestrictions;
   final String tabLog;
@@ -284,6 +305,7 @@ class ModerationStrings {
     required this.catSpam,
     required this.catScam,
     required this.catHarassment,
+    required this.catImpersonation,
     required this.catInappropriate,
     required this.catMinorSafety,
     required this.catMisinformation,
@@ -342,6 +364,8 @@ class ModerationStrings {
     required this.unpin,
     required this.pinnedFor,
     required this.unpinnedDone,
+    required this.pinToClub,
+    required this.unpinFromClub,
     required this.pinCapTitle,
     required this.pinCapBody,
     required this.replace,
@@ -351,6 +375,24 @@ class ModerationStrings {
     required this.adminOnlyBody,
     required this.tabCases,
     required this.tabClubs,
+    required this.tabJoinRequests,
+    required this.adminConsoleSub,
+    required this.adminLocked,
+    required this.adminLockedBody,
+    required this.adminPin,
+    required this.adminPinConfirm,
+    required this.adminPinSetupHint,
+    required this.adminPinSet,
+    required this.adminPinChange,
+    required this.adminPinConfigured,
+    required this.adminPinNotConfigured,
+    required this.adminPinSaved,
+    required this.adminPinMismatch,
+    required this.adminPinTooShort,
+    required this.unlock,
+    required this.wrongPin,
+    required this.idleLockNote,
+    required this.lockNow,
     required this.tabAppeals,
     required this.tabRestrictions,
     required this.tabLog,
@@ -518,6 +560,7 @@ class ModerationStrings {
     catSpam: "Spam",
     catScam: "Scam or fraud",
     catHarassment: "Hate speech or harassment",
+    catImpersonation: "Pretending to be someone else",
     catInappropriate: "Sexual or inappropriate content",
     catMinorSafety: "Puts a minor at risk",
     catMisinformation: "Misinformation",
@@ -576,6 +619,8 @@ class ModerationStrings {
     unpin: "Unpin",
     pinnedFor: "Pinned to the top for {0} days",
     unpinnedDone: "Unpinned",
+    pinToClub: "Pin to club page",
+    unpinFromClub: "Unpin from club page",
     pinCapTitle: "Pin limit reached",
     pinCapBody: "A club can have {0} pinned post at a time. Replace “{1}” with this one?",
     replace: "Replace",
@@ -584,7 +629,25 @@ class ModerationStrings {
     adminOnly: "Admins only",
     adminOnlyBody: "This page is for MYKerawang moderators.",
     tabCases: "Cases",
-    tabClubs: "Club approvals",
+    tabClubs: "Clubs",
+    tabJoinRequests: "Join requests",
+    adminConsoleSub: "Open the moderation console",
+    adminLocked: "Admin console locked",
+    adminLockedBody: "Enter the admin PIN to continue.",
+    adminPin: "Admin PIN",
+    adminPinConfirm: "Confirm PIN",
+    adminPinSetupHint: "Set an admin PIN in Settings to lock this console.",
+    adminPinSet: "Set admin PIN",
+    adminPinChange: "Change admin PIN",
+    adminPinConfigured: "A PIN is set. The console locks after 15 minutes idle.",
+    adminPinNotConfigured: "No PIN yet. Set one to protect the console.",
+    adminPinSaved: "Admin PIN updated",
+    adminPinMismatch: "The PINs don't match.",
+    adminPinTooShort: "At least 4 characters.",
+    unlock: "Unlock",
+    wrongPin: "That PIN is wrong.",
+    idleLockNote: "Locks again after 15 minutes without activity.",
+    lockNow: "Lock now",
     tabAppeals: "Appeals",
     tabRestrictions: "Restrictions",
     tabLog: "Log",
@@ -752,6 +815,7 @@ class ModerationStrings {
     catSpam: "Spam",
     catScam: "Penipuan",
     catHarassment: "Ucapan kebencian atau gangguan",
+    catImpersonation: "Menyamar sebagai orang lain",
     catInappropriate: "Kandungan seksual atau tidak sesuai",
     catMinorSafety: "Membahayakan kanak-kanak",
     catMisinformation: "Maklumat palsu",
@@ -810,6 +874,8 @@ class ModerationStrings {
     unpin: "Nyahsemat",
     pinnedFor: "Disemat di atas selama {0} hari",
     unpinnedDone: "Dinyahsemat",
+    pinToClub: "Semat pada halaman kelab",
+    unpinFromClub: "Nyahsemat daripada halaman kelab",
     pinCapTitle: "Had semat dicapai",
     pinCapBody: "Kelab boleh menyemat {0} siaran pada satu masa. Gantikan “{1}” dengan siaran ini?",
     replace: "Ganti",
@@ -818,7 +884,25 @@ class ModerationStrings {
     adminOnly: "Admin sahaja",
     adminOnlyBody: "Halaman ini untuk moderator MYKerawang.",
     tabCases: "Kes",
-    tabClubs: "Kelulusan kelab",
+    tabClubs: "Kelab",
+    tabJoinRequests: "Permohonan sertai",
+    adminConsoleSub: "Buka konsol moderasi",
+    adminLocked: "Konsol admin dikunci",
+    adminLockedBody: "Masukkan PIN admin untuk meneruskan.",
+    adminPin: "PIN admin",
+    adminPinConfirm: "Sahkan PIN",
+    adminPinSetupHint: "Tetapkan PIN admin dalam Tetapan untuk mengunci konsol ini.",
+    adminPinSet: "Tetapkan PIN admin",
+    adminPinChange: "Tukar PIN admin",
+    adminPinConfigured: "PIN telah ditetapkan. Konsol dikunci selepas 15 minit tidak aktif.",
+    adminPinNotConfigured: "Belum ada PIN. Tetapkan satu untuk melindungi konsol.",
+    adminPinSaved: "PIN admin dikemas kini",
+    adminPinMismatch: "PIN tidak sepadan.",
+    adminPinTooShort: "Sekurang-kurangnya 4 aksara.",
+    unlock: "Buka kunci",
+    wrongPin: "PIN itu salah.",
+    idleLockNote: "Dikunci semula selepas 15 minit tanpa aktiviti.",
+    lockNow: "Kunci sekarang",
     tabAppeals: "Rayuan",
     tabRestrictions: "Sekatan",
     tabLog: "Log",
@@ -987,6 +1071,7 @@ class ModerationStrings {
         'spam' => catSpam,
         'scam' => catScam,
         'harassment' => catHarassment,
+        'impersonation' => catImpersonation,
         'inappropriate' => catInappropriate,
         'minor_safety' => catMinorSafety,
         'misinformation' => catMisinformation,
@@ -1094,6 +1179,7 @@ class ModerationUiStrings {
   final String canStill;
   final String historyTitle;
   final String reportPickCategory;
+  final String reportReviewedFirst;
   final String reportNoteLabel;
   final String reportNoteHint;
   final String reportSubmit;
@@ -1107,6 +1193,7 @@ class ModerationUiStrings {
   final String descSpam;
   final String descScam;
   final String descHarassment;
+  final String descImpersonation;
   final String descInappropriate;
   final String descMinorSafety;
   final String descMisinformation;
@@ -1158,6 +1245,7 @@ class ModerationUiStrings {
     required this.canStill,
     required this.historyTitle,
     required this.reportPickCategory,
+    required this.reportReviewedFirst,
     required this.reportNoteLabel,
     required this.reportNoteHint,
     required this.reportSubmit,
@@ -1171,6 +1259,7 @@ class ModerationUiStrings {
     required this.descSpam,
     required this.descScam,
     required this.descHarassment,
+    required this.descImpersonation,
     required this.descInappropriate,
     required this.descMinorSafety,
     required this.descMisinformation,
@@ -1223,6 +1312,7 @@ class ModerationUiStrings {
     canStill: "You can still browse and read everything.",
     historyTitle: "History",
     reportPickCategory: "Choose the reason that fits best",
+    reportReviewedFirst: "Reviewed first: {0}",
     reportNoteLabel: "Add details (optional)",
     reportNoteHint: "Anything that helps admins understand",
     reportSubmit: "Send report",
@@ -1236,6 +1326,7 @@ class ModerationUiStrings {
     descSpam: "Repeated, misleading or unwanted promotion",
     descScam: "Fake sales, phishing or asking for money",
     descHarassment: "Attacks or insults a person or group",
+    descImpersonation: "Uses someone else's name, photo or identity",
     descInappropriate: "Nudity, sexual or graphic content",
     descMinorSafety: "Anything that puts a child at risk",
     descMisinformation: "False information that could cause harm",
@@ -1288,6 +1379,7 @@ class ModerationUiStrings {
     canStill: "Anda masih boleh melayari dan membaca semuanya.",
     historyTitle: "Sejarah",
     reportPickCategory: "Pilih sebab yang paling sesuai",
+    reportReviewedFirst: "Disemak dahulu: {0}",
     reportNoteLabel: "Tambah butiran (pilihan)",
     reportNoteHint: "Apa-apa yang membantu admin memahami",
     reportSubmit: "Hantar laporan",
@@ -1301,6 +1393,7 @@ class ModerationUiStrings {
     descSpam: "Promosi berulang, mengelirukan atau tidak diingini",
     descScam: "Jualan palsu, pancingan data atau meminta wang",
     descHarassment: "Menyerang atau menghina seseorang atau kumpulan",
+    descImpersonation: "Menggunakan nama, gambar atau identiti orang lain",
     descInappropriate: "Kandungan bogel, seksual atau ganas",
     descMinorSafety: "Apa-apa yang membahayakan kanak-kanak",
     descMisinformation: "Maklumat palsu yang boleh membawa mudarat",
@@ -1314,6 +1407,7 @@ class ModerationUiStrings {
         'spam' => descSpam,
         'scam' => descScam,
         'harassment' => descHarassment,
+        'impersonation' => descImpersonation,
         'inappropriate' => descInappropriate,
         'minor_safety' => descMinorSafety,
         'misinformation' => descMisinformation,

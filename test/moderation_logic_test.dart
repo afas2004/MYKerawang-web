@@ -86,6 +86,20 @@ void main() {
       const e = PostgrestException(message: 'MOD:restricted:post', details: '{oops');
       expect(parseModError(e)!.detail, isEmpty);
     });
+
+    test('a VERIFY refusal becomes a friendly code', () {
+      const e = PostgrestException(
+          message: 'VERIFY:required:event_join', code: 'P0001');
+      final err = parseModError(e)!;
+      expect(err.code, 'verify_required');
+      expect(err.sub, 'event_join');
+
+      // Request refusals keep their own code, prefixed so they can never
+      // collide with a MOD code.
+      const domain = PostgrestException(
+          message: 'VERIFY:domain', code: 'P0001');
+      expect(parseModError(domain)!.code, 'verify_domain');
+    });
   });
 
   test('compareCases: priority first, then oldest', () {
@@ -168,6 +182,24 @@ void main() {
 
     test('stored reason is always English', () {
       expect(ModerationStrings.categoryReason('scam'), 'Scam or fraud');
+    });
+
+    test('the reviewed-first defaults are real categories', () {
+      expect(kDefaultPriorityCategories,
+          ['harassment', 'inappropriate']);
+      for (final c in kDefaultPriorityCategories) {
+        expect(kReportCategories, contains(c));
+      }
+    });
+
+    test('impersonation is reportable, with copy in every language', () {      expect(kReportCategories, contains('impersonation'));
+      for (final s in [AppStrings.en, AppStrings.ms]) {
+        final m = s.mod;
+        expect(m.categoryLabel('impersonation'), isNotEmpty);
+        expect(m.ui.categoryDescription('impersonation'), isNotEmpty);
+      }
+      expect(ModerationStrings.categoryReason('impersonation'),
+          'Pretending to be someone else');
     });
 
     test('durationLabel', () {

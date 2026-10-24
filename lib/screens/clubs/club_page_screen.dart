@@ -33,12 +33,14 @@ class _ClubPageScreenState extends State<ClubPageScreen> {
       ClubService.myRole(club.id),
       ClubService.followerCounts([club.id]),
       ClubService.isFollowing(club.id),
+      ClubService.myJoin(club.id),
     ]);
     return _Loaded(
       club,
       results[0] as String?,
       (results[1] as Map<String, int>)[club.id] ?? 0,
       results[2] as bool,
+      results[3] as ClubJoinState,
     );
   }
 
@@ -54,7 +56,9 @@ class _ClubPageScreenState extends State<ClubPageScreen> {
         if (snap.hasError) {
           return Scaffold(
             appBar: AppBar(),
-            body: ErrorState(onRetry: () => setState(() => _future = _load())),
+            body: ErrorState(onRetry: () => setState(() {
+                  _future = _load();
+                })),
           );
         }
         final d = snap.data;
@@ -76,11 +80,17 @@ class _ClubPageScreenState extends State<ClubPageScreen> {
           myRole: d.role,
           followers: d.followers,
           following: d.following,
+          join: d.join,
           signedIn: ClubService.currentUserId != null,
           onSetFollowing: (v) => ClubService.setFollowing(id, v),
+          onJoin: () => ClubService.applyToClub(id),
           onManage: () async {
             await context.push('/c/${d.club.handle}/manage');
-            if (mounted) setState(() => _future = _load());
+            if (mounted) {
+              setState(() {
+                _future = _load();
+              });
+            }
           },
           loadPosts: () => ClubService.posts(id),
           loadEvents: () => ClubService.events(id),
@@ -97,7 +107,8 @@ class _Loaded {
   final String? role;
   final int followers;
   final bool following;
-  const _Loaded(this.club, this.role, this.followers, this.following);
+  final ClubJoinState join;
+  const _Loaded(this.club, this.role, this.followers, this.following, this.join);
 }
 
 /// The page itself: header (cover, logo, name, follow / manage), status
@@ -111,6 +122,8 @@ class ClubPageView extends StatefulWidget {
   final bool signedIn;
   final Future<void> Function(bool follow) onSetFollowing;
   final VoidCallback onManage;
+  final ClubJoinState join;
+  final Future<void> Function()? onJoin;
   final Future<List<Map<String, dynamic>>> Function() loadPosts;
   final Future<List<Map<String, dynamic>>> Function() loadEvents;
   final Future<List<Map<String, dynamic>>> Function() loadListings;
@@ -125,6 +138,8 @@ class ClubPageView extends StatefulWidget {
     required this.signedIn,
     required this.onSetFollowing,
     required this.onManage,
+    this.join = ClubJoinState.none,
+    this.onJoin,
     required this.loadPosts,
     required this.loadEvents,
     required this.loadListings,
@@ -138,9 +153,11 @@ class ClubPageView extends StatefulWidget {
 class _ClubPageViewState extends State<ClubPageView> {
   late bool _following = widget.following;
   late int _followers = widget.followers;
+  late bool _pending = widget.join.pending;
   bool _busy = false;
+  bool _joining = false;
 
-  late final Future<List<Map<String, dynamic>>> _posts = widget.loadPosts();
+  late Future<List<Map<String, dynamic>>> _posts = widget.loadPosts();
   late final Future<List<Map<String, dynamic>>> _events = widget.loadEvents();
   late final Future<List<Map<String, dynamic>>> _listings = widget.loadListings();
   late final Future<List<ClubMember>> _members = widget.loadMembers();
@@ -163,6 +180,23 @@ class _ClubPageViewState extends State<ClubPageView> {
       showClubSnack(context, context.l10nRead.club.genericError, error: true);
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _join() async {
+    final cb = widget.onJoin;
+    if (cb == null) return;
+    final c = context.l10nRead.club;
+    setState(() => _joining = true);
+    try {
+      await cb();
+      if (!mounted) return;
+      setState(() => _pending = true);
+      showClubSnack(context, c.joinRequested);
+    } catch (e) {
+      if (mounted) showClubSnack(context, clubErrorText(c, e), error: true);
+    } finally {
+      if (mounted) setState(() => _joining = false);
     }
   }
 
@@ -192,7 +226,13 @@ class _ClubPageViewState extends State<ClubPageView> {
           ],
           body: TabBarView(
             children: [
-              _PostsTab(future: _posts),
+              _PostsTab(
+                future: _posts,
+                canClubPin: widget.club.isActive && canManageClub(widget.myRole),
+                onClubPinChanged: () => setState(() {
+                  _posts = widget.loadPosts();
+                }),
+              ),
               _CardsTab(future: _events, emptyTitle: c.noEvents, illo: AppIllo.noEvents, isEvent: true),
               _CardsTab(future: _listings, emptyTitle: c.noListings, illo: AppIllo.emptyMarket, isEvent: false),
               _MembersTab(future: _members),
@@ -312,6 +352,23 @@ class _ClubPageViewState extends State<ClubPageView> {
                       ],
                     ],
                   ),
+                  if (widget.signedIn && club.isActive && widget.myRole == null) ...[
+                    const SizedBox(height: KSpace.s),
+                    SizedBox(
+                      width: double.infinity,
+                      child: _pending
+                          ? OutlinedButton.icon(
+                              onPressed: null,
+                              icon: const Icon(AppIcons.clock, size: 18),
+                              label: Text(c.joinPending),
+                            )
+                          : FilledButton.tonalIcon(
+                              onPressed: _joining ? null : _join,
+                              icon: const Icon(AppIcons.person, size: 18),
+                              label: Text(c.joinClub),
+                            ),
+                    ),
+                  ],
                   if (officer && !club.isActive) ...[
                     const SizedBox(height: KSpace.m),
                     ClubStatusBanner(status: club.status),
@@ -397,7 +454,13 @@ class _AsyncTab<T> extends StatelessWidget {
 
 class _PostsTab extends StatelessWidget {
   final Future<List<Map<String, dynamic>>> future;
-  const _PostsTab({required this.future});
+  final bool canClubPin;
+  final VoidCallback onClubPinChanged;
+  const _PostsTab({
+    required this.future,
+    required this.canClubPin,
+    required this.onClubPinChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -406,8 +469,8 @@ class _PostsTab extends StatelessWidget {
       future: future,
       empty: BrandEmptyState(illo: AppIllo.emptyFeed, title: c.noAnnouncements, compact: true),
       builder: (posts) {
-        final pinned = posts.where((p) => p['is_pinned'] == true).toList();
-        final rest = posts.where((p) => p['is_pinned'] != true).toList();
+        final pinned = posts.where((p) => p['is_club_pinned'] == true).toList();
+        final rest = posts.where((p) => p['is_club_pinned'] != true).toList();
         return ListView(
           padding: const EdgeInsets.symmetric(vertical: KSpace.s),
           children: [
@@ -416,9 +479,21 @@ class _PostsTab extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.s, KSpace.l, 0),
                 child: Text(c.pinnedAnnouncement, style: Theme.of(context).textTheme.titleSmall),
               ),
-              for (final p in pinned) PostCard(post: p, onTap: () => context.goPost(p)),
+              for (final p in pinned)
+                PostCard(
+                  post: p,
+                  onTap: () => context.goPost(p),
+                  canClubPin: canClubPin,
+                  onClubPinChanged: onClubPinChanged,
+                ),
             ],
-            for (final p in rest) PostCard(post: p, onTap: () => context.goPost(p)),
+            for (final p in rest)
+              PostCard(
+                post: p,
+                onTap: () => context.goPost(p),
+                canClubPin: canClubPin,
+                onClubPinChanged: onClubPinChanged,
+              ),
           ],
         );
       },
@@ -482,7 +557,7 @@ class _MembersTab extends StatelessWidget {
               title: Text(m.name, maxLines: 1, overflow: TextOverflow.ellipsis),
               subtitle: m.username == null ? null : Text('@${m.username}'),
               trailing: ClubPill(
-                c.roleLabel(m.role),
+                c.rosterLabel(m.position, m.role),
                 background: m.role == 'president' ? scheme.primaryContainer : null,
                 foreground: m.role == 'president' ? scheme.onPrimaryContainer : null,
               ),

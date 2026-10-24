@@ -53,6 +53,17 @@ class ModerationService {
 
   static Future<bool> isOwner() async => (await myRole()) == 'owner';
 
+  // ------------------------------------------------------------- admin lock
+  static Future<bool> adminPinConfigured() async =>
+      (Map<String, dynamic>.from(await _db.rpc('admin_pin_status') as Map)['configured'] == true);
+
+  static Future<bool> checkAdminPin(String pin) async =>
+      await _db.rpc('admin_check_pin', params: {'p_pin': pin}) == true;
+
+  /// Owner only; stores a bcrypt hash, never the PIN.
+  static Future<void> setAdminPin(String pin) =>
+      _db.rpc('admin_set_pin', params: {'p_pin': pin});
+
   // ------------------------------------------------------------- my status
   static ModerationStatus? _status;
   static String? _statusFor;
@@ -236,14 +247,7 @@ class ModerationService {
         .maybeSingle();
   }
 
-  // ------------------------------------------------------------- admin: clubs, appeals
-  static Future<List<Map<String, dynamic>>> clubRequests() async =>
-      List<Map<String, dynamic>>.from(await _db.rpc('admin_club_requests') as List);
-
-  static Future<void> decideClub(String userId, bool approve, String? reason) =>
-      _db.rpc('admin_decide_club',
-          params: {'p_user_id': userId, 'p_approve': approve, 'p_reason': reason});
-
+  // ------------------------------------------------------------- admin: appeals
   static Future<List<Map<String, dynamic>>> appeals({bool pendingOnly = true}) async {
     var q = _db.from('moderation_appeals').select();
     if (pendingOnly) q = q.eq('status', 'pending');
@@ -281,6 +285,32 @@ class ModerationService {
         .select('id');
     return (rows as List).isNotEmpty;
   }
+
+  // ------------------------------------------------------------- access: student verification
+  /// The owner's student-verification switch, readable by any signed-in
+  /// account so the app can gate its own UI before the server says no.
+  static Future<Map<String, dynamic>> accessPolicy() async =>
+      Map<String, dynamic>.from(await _db.rpc('access_policy') as Map);
+
+  /// Owner only; the database raises MOD:not_owner for anyone else.
+  static Future<void> setVerificationEnabled(bool enabled,
+          {String? reason}) =>
+      _db.rpc('set_verification_enabled',
+          params: {'p_enabled': enabled, 'p_reason': reason});
+
+  /// Owner only: 'student_only' or 'open'.
+  static Future<void> setRegistrationMode(String mode) =>
+      _db.rpc('set_registration_mode', params: {'p_mode': mode});
+
+  /// Admin/owner manual verification — the escape hatch before the
+  /// code-by-email flow exists.
+  static Future<void> setStudentVerification(String userId, String email,
+          {String status = 'verified'}) =>
+      _db.rpc('admin_set_student_verification', params: {
+        'p_user_id': userId,
+        'p_email': email,
+        'p_status': status,
+      });
 }
 
 class ModerationStatus {

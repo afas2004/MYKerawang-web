@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../l10n/app_strings.dart';
+import '../l10n/access_strings.dart';
 import '../l10n/moderation_strings.dart';
 import '../language_cubit.dart';
 import '../utils/moderation_logic.dart';
@@ -59,6 +60,7 @@ abstract final class ModIcons {
   static const IconData searchOff = LucideIcons.searchX;
   static const IconData pointer = LucideIcons.mousePointerClick;
   static const IconData flagOff = LucideIcons.flagOff;
+  static const IconData category = LucideIcons.tags;
   static const IconData saveFile = LucideIcons.save;
 }
 
@@ -99,6 +101,7 @@ String modErrorText(BuildContext context, Object e, {String? fallback}) {
     'already_appealed' => m.appealDuplicate,
     'not_appealable' => m.appealNotAllowed,
     'message_length' => m.appealLength,
+    'verify_required' => context.l10nRead.verifyRequired,
     _ => fallback ?? m.errGeneric,
   };
 }

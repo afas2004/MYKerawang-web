@@ -190,6 +190,26 @@ class ShellSearchButton extends StatelessWidget {
   }
 }
 
+/// App-bar shortcut to the club directory, for compact and medium layouts
+/// where the sidebar (and its Clubs row) is not shown.
+///
+/// Tab screens put it next to [ShellSearchButton]:
+/// `actions: [const ShellSearchButton(), const ShellClubsButton(), ...]`.
+class ShellClubsButton extends StatelessWidget {
+  const ShellClubsButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    if (isWide(context)) return const SizedBox.shrink();
+    final s = context.l10n;
+    return IconButton(
+      tooltip: s.shell.clubs,
+      icon: const Icon(AppIcons.people),
+      onPressed: () => context.push('/clubs'),
+    );
+  }
+}
+
 /// Logo mark + brand name in the app's sans, used by the sidebar, the rail
 /// and onboarding. [showLogo] false gives the name alone.
 class Wordmark extends StatelessWidget {

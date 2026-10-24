@@ -23,6 +23,8 @@ import '../widgets/status_badge.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/tap_card.dart';
 import 'gallery_view_screen.dart';
+import 'events/attendance_screen.dart';
+import 'events/checkin_screens.dart';
 import '../widgets/restriction_gate.dart';
 import '../widgets/save_button.dart';
 
@@ -378,12 +380,28 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     }
   }
 
+  bool get _registrationClosed {
+    final d = DateTime.tryParse('${_event['join_deadline'] ?? ''}');
+    return d != null && DateTime.now().isAfter(d);
+  }
+
+  bool get _isFullAtCapacity {
+    final c = _event['capacity'];
+    return c is num && _participantCount >= c.toInt();
+  }
+
   Future<void> _toggleJoin() async {
     final supabase = Supabase.instance.client;
     if (!requireLogin(context)) return;
     final userId = supabase.auth.currentUser!.id;
     if (_isCancelled && !_isJoined) return;
     if (_joining) return;
+    if (!_isJoined && (_registrationClosed || _isFullAtCapacity)) {
+      final s = context.l10nRead;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_isFullAtCapacity ? s.evFull : s.evClosed)));
+      return;
+    }
     if (!_isJoined && (!await ensureCanWrite(context, ModScope.events) || !mounted)) return;
     _joining = true;
 
@@ -475,6 +493,10 @@ class _EventDetailScreenState extends State<EventDetailScreen>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _whenWhereCard(context),
+                if (_hasFacts) ...[
+                  const SizedBox(height: KSpace.m),
+                  _eventFactsCard(context),
+                ],
                 const SizedBox(height: KSpace.m),
                 _attendanceCard(context),
                 if (_organizer != null) ...[
@@ -483,6 +505,8 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                 ],
                 const SizedBox(height: KSpace.l),
                 _primaryAction(context),
+                const SizedBox(height: KSpace.m),
+                _secondaryActions(context),
               ],
             ),
           ),
@@ -513,12 +537,18 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                 if (_isCancelled) ...[const SizedBox(height: KSpace.m), _cancelledBanner(context)],
                 const SizedBox(height: KSpace.l),
                 _whenWhereCard(context),
+                if (_hasFacts) ...[
+                  const SizedBox(height: KSpace.m),
+                  _eventFactsCard(context),
+                ],
                 const SizedBox(height: KSpace.m),
                 _attendanceCard(context),
                 if (_organizer != null) ...[
                   const SizedBox(height: KSpace.m),
                   _organiserRow(context),
                 ],
+                const SizedBox(height: KSpace.m),
+                _secondaryActions(context),
                 const SizedBox(height: KSpace.xl),
                 _aboutSection(context),
                 const SizedBox(height: KSpace.xl),
@@ -866,6 +896,259 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     );
   }
 
+  /// Facts worth showing next to the date: fee, audience, deadline,
+  /// places, merit and the UiTM activity reference.
+  bool get _hasFacts {
+    final e = _event;
+    return e['fee'] != null ||
+        (e['audience'] ?? '') != '' ||
+        e['join_deadline'] != null ||
+        e['capacity'] != null ||
+        e['merit_offered'] == true ||
+        '${e['activity_ref'] ?? ''}'.isNotEmpty ||
+        '${e['co_organiser'] ?? ''}'.isNotEmpty;
+  }
+
+  Widget _eventFactsCard(BuildContext context) {
+    final s = context.l10n;
+    final e = _event;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final rows = <(IconData, String, String)>[];
+
+    final fee = e['fee'];
+    if (fee is num) {
+      rows.add((AppIcons.market, s.evFee, fee <= 0 ? s.evFeeFree : formatPrice(fee)));
+    }
+    if ('${e['audience'] ?? ''}'.isNotEmpty) {
+      rows.add((AppIcons.people, s.evAudience, s.evAudienceLabel('${e['audience']}')));
+    }
+    final deadline = DateTime.tryParse('${e['join_deadline'] ?? ''}');
+    if (deadline != null) {
+      rows.add((AppIcons.calendar, s.evRegistration, formatDate(deadline)));
+    }
+    final cap = e['capacity'];
+    if (cap is num) {
+      rows.add((AppIcons.people, s.evCapacity, '$_participantCount / ${cap.toInt()}'));
+    }
+    if (e['merit_offered'] == true) {
+      final note = '${e['merit_note'] ?? ''}'.trim();
+      rows.add((AppIcons.verified, s.evMerit, note));
+    }
+    final ref = '${e['activity_ref'] ?? ''}'.trim();
+    if (ref.isNotEmpty) rows.add((AppIcons.link, s.evActivityRef, ref));
+    final co = '${e['co_organiser'] ?? ''}'.trim();
+    if (co.isNotEmpty) rows.add((AppIcons.people, s.evCoOrganiser, co));
+
+    if (rows.isEmpty) return const SizedBox.shrink();
+    return KCard(
+      padding: const EdgeInsets.all(KSpace.m),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final (icon, label, value) in rows)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(icon, size: 18, color: scheme.onSurfaceVariant),
+                  const SizedBox(width: KSpace.s),
+                  SizedBox(
+                    width: 110,
+                    child: Text(label,
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: scheme.onSurfaceVariant)),
+                  ),
+                  Expanded(
+                    child: Text(value,
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w500)),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Contact + attendance, under the main action.
+  Widget _secondaryActions(BuildContext context) {
+    final s = context.l10n;
+    final attendanceOn = _event['attendance_enabled'] == true;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OutlinedButton.icon(
+          onPressed: _showContacts,
+          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+          icon: const Icon(AppIcons.email, size: 18),
+          label: Text(s.evContacts),
+        ),
+        if (_isOwner) ...[
+          const SizedBox(height: KSpace.s),
+          OutlinedButton.icon(
+            onPressed: _openAttendance,
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            icon: const Icon(AppIcons.verified, size: 18),
+            label: Text(s.evAttendance),
+          ),
+          if (!_registrationClosed && !_isClosed) ...[
+            const SizedBox(height: KSpace.s),
+            TextButton.icon(
+              onPressed: _closeRegistration,
+              icon: const Icon(AppIcons.lock, size: 18),
+              label: Text(s.evCloseNow),
+            ),
+          ],
+        ] else if (attendanceOn) ...[
+          const SizedBox(height: KSpace.s),
+          FilledButton.tonalIcon(
+            onPressed: _startCheckIn,
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            icon: const Icon(AppIcons.qrCode, size: 18),
+            label: Text(s.evCheckIn),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _showContacts() async {
+    final s = context.l10nRead;
+    final scheme = Theme.of(context).colorScheme;
+    List<Map<String, dynamic>> rows;
+    try {
+      final r = await Supabase.instance.client
+          .rpc('event_contact', params: {'p_event_id': _event['id']});
+      rows = List<Map<String, dynamic>>.from(r as List);
+    } catch (e) {
+      if (mounted) showErrorWithRetry(context, e, onRetry: _showContacts);
+      return;
+    }
+    if (!mounted) return;
+    final c = rows.isEmpty ? <String, dynamic>{} : rows.first;
+    final channels = <String, (IconData, String)>{
+      'whatsapp': (AppIcons.people, 'WhatsApp'),
+      'telegram': (AppIcons.link, 'Telegram'),
+      'instagram': (AppIcons.camera, 'Instagram'),
+      'email': (AppIcons.email, 'Email'),
+      'link': (AppIcons.link, 'Link'),
+    };
+    final available = [
+      for (final e in channels.entries)
+        if ('${c[e.key] ?? ''}'.trim().isNotEmpty) e,
+    ];
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+              child: Text(s.evContacts,
+                  style: Theme.of(ctx).textTheme.titleLarge),
+            ),
+            if (available.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(s.evContactNone,
+                    style: TextStyle(color: scheme.onSurfaceVariant)),
+              )
+            else
+              for (final e in available)
+                ListTile(
+                  leading: Icon(e.value.$1),
+                  title: Text(e.value.$2),
+                  subtitle: Text('${c[e.key]}'),
+                  onTap: () {
+                    final url = _contactUrl(e.key, '${c[e.key]}');
+                    if (url != null) {
+                      launchUrl(Uri.parse(url),
+                          mode: LaunchMode.externalApplication);
+                    }
+                  },
+                ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String? _contactUrl(String channel, String value) {
+    final v = value.trim();
+    if (v.isEmpty) return null;
+    switch (channel) {
+      case 'whatsapp':
+        final digits = v.replaceAll(RegExp(r'[^0-9]'), '');
+        return digits.isEmpty ? null : 'https://wa.me/$digits';
+      case 'telegram':
+        if (v.startsWith('http')) return v;
+        return 'https://t.me/${v.replaceFirst('@', '')}';
+      case 'instagram':
+        if (v.startsWith('http')) return v;
+        return 'https://instagram.com/${v.replaceFirst('@', '')}';
+      case 'email':
+        return 'mailto:$v';
+      default:
+        return v.startsWith('http') ? v : 'https://$v';
+    }
+  }
+
+  /// Organiser closes registration early: the deadline becomes now, which
+  /// the join guard already enforces server-side.
+  Future<void> _closeRegistration() async {
+    final s = context.l10nRead;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(s.evCloseNow),
+        content: Text(s.evCloseAtStartHint),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false), child: Text(s.cancel)),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(s.evCloseNow)),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final now = DateTime.now().toUtc();
+    try {
+      await Supabase.instance.client
+          .from('events')
+          .update({'join_deadline': now.toIso8601String()})
+          .eq('id', _event['id']);
+      if (!mounted) return;
+      setState(() => _event['join_deadline'] = now.toIso8601String());
+    } catch (e) {
+      if (mounted) showErrorWithRetry(context, e, onRetry: _closeRegistration);
+    }
+  }
+
+  void _openAttendance() {    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => AttendanceScreen(
+        eventId: '${_event['id']}',
+        title: '${_event['title'] ?? ''}',
+      ),
+    ));
+  }
+
+  void _startCheckIn() {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => CheckinScanScreen(
+        eventId: '${_event['id']}',
+        title: '${_event['title'] ?? ''}',
+      ),
+    ));
+  }
+
   /// Going count, plus the people you follow who are going.
   Widget _attendanceCard(BuildContext context) {
     final s = context.l10n;
@@ -927,10 +1210,20 @@ class _EventDetailScreenState extends State<EventDetailScreen>
       );
     }
     return FilledButton.icon(
-      onPressed: _isClosed ? null : _toggleJoin,
+      onPressed: (_isClosed || _registrationClosed || _isFullAtCapacity)
+          ? null
+          : _toggleJoin,
       style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
       icon: Icon(_isCancelled ? AppIcons.cancel : AppIcons.calendarAdd, size: 18),
-      label: Text(_isCancelled ? s.cancelled : (_isPast ? s.ended : s.join)),
+      label: Text(_isCancelled
+          ? s.cancelled
+          : _isPast
+              ? s.ended
+              : _registrationClosed
+                  ? s.evClosed
+                  : _isFullAtCapacity
+                      ? s.evFull
+                      : s.join),
     );
   }
 

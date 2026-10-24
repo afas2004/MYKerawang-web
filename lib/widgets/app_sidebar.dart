@@ -6,6 +6,7 @@ import '../screens/announcements/hub_strings.dart';
 import '../services/unread_notifications.dart';
 import '../utils/app_nav.dart';
 import 'admin_nav_entry.dart';
+import 'clubs_nav_entry.dart';
 import 'brand/brand.dart';
 import 'profile_avatar_action.dart';
 import 'shell_actions.dart';
@@ -110,6 +111,7 @@ class AppSidebar extends StatelessWidget {
                         }
                       },
                     ),
+                  const ClubsNavEntry(),
                   const SizedBox(height: KSpace.s),
                   Divider(height: 16, color: scheme.outlineVariant),
                   if (loggedIn) ...[

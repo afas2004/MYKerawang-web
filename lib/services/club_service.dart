@@ -59,9 +59,22 @@ class Club {
       );
 }
 
+/// A club's private contact for its listings (20261023001100): the phone
+/// and payment QR buyers get from `get_listing_contact` when they ask.
+/// Officers and admins only — RLS on `club_private` enforces it.
+class ClubContact {
+  final String? phone;
+  final String? paymentQrUrl;
+
+  const ClubContact({this.phone, this.paymentQrUrl});
+
+  static const empty = ClubContact();
+}
+
 class ClubMember {
   final String userId;
   final String role; // president | officer | member
+  final String? position; // display title: secretary, treasurer, …
   final DateTime? joinedAt;
   final String? username;
   final String? displayName;
@@ -70,6 +83,7 @@ class ClubMember {
   const ClubMember({
     required this.userId,
     required this.role,
+    this.position,
     this.joinedAt,
     this.username,
     this.displayName,
@@ -78,6 +92,73 @@ class ClubMember {
 
   bool get isOfficer => role == 'president' || role == 'officer';
   String get name => (displayName?.trim().isNotEmpty ?? false) ? displayName! : (username ?? '');
+}
+
+/// One recognised club from the admin-maintained registry
+/// (supabase/migrations/20261024002100). Registration is select-only
+/// against these entries.
+class ClubRegistryEntry {
+  final String id;
+  final String code;
+  final String name;
+  final String? faculty;
+  final String? category;
+  final bool isActive;
+  final String? clubId;
+  final String? clubHandle;
+  final String? clubStatus;
+
+  const ClubRegistryEntry({
+    required this.id,
+    required this.code,
+    required this.name,
+    this.faculty,
+    this.category,
+    this.isActive = true,
+    this.clubId,
+    this.clubHandle,
+    this.clubStatus,
+  });
+
+  bool get claimed => clubId != null;
+
+  factory ClubRegistryEntry.fromJson(Map<String, dynamic> j) => ClubRegistryEntry(
+        id: '${j['id']}',
+        code: '${j['code'] ?? ''}',
+        name: '${j['name'] ?? ''}',
+        faculty: j['faculty'] as String?,
+        category: j['category'] as String?,
+        isActive: j['is_active'] != false,
+        clubId: j['club_id'] == null ? null : '${j['club_id']}',
+        clubHandle: j['club_handle'] as String?,
+        clubStatus: j['club_status'] as String?,
+      );
+}
+
+/// Positions the registration form and the roster know about.
+const clubPositions = [
+  'president',
+  'vice_president',
+  'secretary',
+  'treasurer',
+  'committee',
+  'other',
+];
+
+/// What the club page needs to know about the viewer: already a member, or
+/// a join request is waiting.
+class ClubJoinState {
+  final bool member;
+  final bool pending;
+
+  const ClubJoinState({this.member = false, this.pending = false});
+
+  static const none = ClubJoinState();
+
+  factory ClubJoinState.fromJson(Map<String, dynamic> j) => ClubJoinState(
+        member: j['member'] == true,
+        pending: j['pending'] == true,
+      );
 }
 
 /// One entry of the "Post as" choice: yourself (clubId null) or a club
@@ -155,9 +236,17 @@ String suggestHandle(String name) {
   return joined.length > 30 ? joined.substring(0, 30) : joined;
 }
 
+/// Mirrors register_club's page-handle derivation from the official code
+/// (before the uniqueness suffix). Pure, for the registration preview.
+String registryHandlePreview(String code, String name) {
+  final base = code.replaceAll(RegExp(r'[^A-Za-z0-9_]'), '');
+  final cut = base.length > 24 ? base.substring(0, 24) : base;
+  if (cut.length < 3) return suggestHandle(name);
+  return cut;
+}
+
 /// President first, then officers, then members; each by join date.
-List<ClubMember> sortMembers(Iterable<ClubMember> members) {
-  int rank(String r) => switch (r) { 'president' => 0, 'officer' => 1, _ => 2 };
+List<ClubMember> sortMembers(Iterable<ClubMember> members) {  int rank(String r) => switch (r) { 'president' => 0, 'officer' => 1, _ => 2 };
   final list = [...members];
   list.sort((a, b) {
     final r = rank(a.role).compareTo(rank(b.role));
@@ -179,6 +268,15 @@ String? clubErrorCode(Object? e) {
 
 /// Normalises "@Name " → "Name".
 String cleanUsername(String raw) => raw.trim().replaceFirst(RegExp(r'^@+'), '');
+
+/// One row for the search screen's Clubs section (title / subtitle /
+/// avatar / route). Pure, so the shape can be tested without Supabase.
+Map<String, dynamic> clubSearchRow(Club c) => {
+      'title': c.name,
+      'subtitle': '@${c.handle}',
+      'avatar_url': c.logoUrl,
+      'route': '/c/${c.handle}',
+    };
 
 /// Socials the page shows, in display order, from the edit form values.
 Map<String, String> buildSocials({String? instagram, String? tiktok, String? website}) => {
@@ -212,13 +310,19 @@ class ClubService {
     return row == null ? null : Club.fromJson(row);
   }
 
-  static Future<List<Club>> directory({String? search, String? category}) async {
+  static Future<List<Club>> directory({String? search, String? category, int limit = 200}) async {
     var q = _db.from('clubs').select(_clubColumns).eq('status', 'active');
     if (category != null) q = q.eq('category', category);
     final s = search?.trim().replaceAll(RegExp(r'[%,()]'), '');
     if (s != null && s.isNotEmpty) q = q.or('name.ilike.%$s%,handle.ilike.%$s%');
-    final rows = await q.order('name').limit(200);
+    final rows = await q.order('name').limit(limit);
     return [for (final r in rows) Club.fromJson(r)];
+  }
+
+  /// Search source for [SearchScreen.clubSource] (wired in main.dart).
+  static Future<List<Map<String, dynamic>>> searchRows(String term, int limit) async {
+    final clubs = await directory(search: term, limit: limit);
+    return [for (final c in clubs) clubSearchRow(c)];
   }
 
   static Future<Map<String, int>> followerCounts(List<String> clubIds) async {
@@ -228,7 +332,10 @@ class ClubService {
   }
 
   static Future<List<ClubMember>> members(String clubId) async {
-    final rows = await _db.from('club_members').select('user_id, role, joined_at').eq('club_id', clubId);
+    final rows = await _db
+        .from('club_members')
+        .select('user_id, role, position, joined_at')
+        .eq('club_id', clubId);
     final ids = [for (final r in rows) '${r['user_id']}'];
     final profiles = ids.isEmpty
         ? const <dynamic>[]
@@ -242,6 +349,7 @@ class ClubService {
         ClubMember(
           userId: '${r['user_id']}',
           role: '${r['role']}',
+          position: r['position'] as String?,
           joinedAt: DateTime.tryParse('${r['joined_at']}'),
           username: byId['${r['user_id']}']?['username'] as String?,
           displayName: byId['${r['user_id']}']?['display_name'] as String?,
@@ -313,6 +421,29 @@ class ClubService {
       _db.rpc('set_club_contact',
           params: {'p_club_id': clubId, 'p_phone': phone, 'p_payment_qr_url': paymentQrUrl});
 
+  /// The club's saved phone / payment QR (officers and admins; RLS on
+  /// `club_private`). Empty when nothing is set yet.
+  static Future<ClubContact> contact(String clubId) async {
+    final row = await _db
+        .from('club_private')
+        .select('contact_phone, payment_qr_url')
+        .eq('club_id', clubId)
+        .maybeSingle();
+    if (row == null) return ClubContact.empty;
+    return ClubContact(
+      phone: row['contact_phone'] as String?,
+      paymentQrUrl: row['payment_qr_url'] as String?,
+    );
+  }
+
+  // ---- club-page pins (one at a time; never global)
+  static Future<Map<String, dynamic>> clubPin(String postId, {bool replace = false}) async =>
+      Map<String, dynamic>.from(await _db.rpc('club_pin_post',
+          params: {'p_post_id': postId, 'p_replace': replace}) as Map);
+
+  static Future<void> clubUnpin(String postId) =>
+      _db.rpc('club_unpin_post', params: {'p_post_id': postId});
+
   // ---- content of a club page
   static Future<List<Map<String, dynamic>>> posts(String clubId, {int limit = 30}) async =>
       List<Map<String, dynamic>>.from(await _db
@@ -361,21 +492,78 @@ class ClubService {
     }
   }
 
+  // ---- joining
+  /// Whether the viewer is a member and/or has a pending request.
+  static Future<ClubJoinState> myJoin(String clubId) async {
+    if (currentUserId == null) return ClubJoinState.none;
+    return ClubJoinState.fromJson(
+      Map<String, dynamic>.from(await _db.rpc('my_club_join', params: {'p_club_id': clubId}) as Map),
+    );
+  }
+
+  static Future<void> applyToClub(String clubId, {String? message}) =>
+      _db.rpc('apply_to_club', params: {'p_club_id': clubId, 'p_message': message});
+
+  /// Pending requests for a club (officers and admins).
+  static Future<List<Map<String, dynamic>>> joinRequests(String clubId) async =>
+      List<Map<String, dynamic>>.from(
+          await _db.rpc('club_join_requests', params: {'p_club_id': clubId}) as List);
+
+  static Future<void> decideJoin(String requestId, bool approve, {String? note}) =>
+      _db.rpc('decide_club_join_request',
+          params: {'p_request_id': requestId, 'p_approve': approve, 'p_note': note});
+
+  /// Pending requests across every club (admin console).
+  static Future<List<Map<String, dynamic>>> adminJoinRequests() async =>
+      List<Map<String, dynamic>>.from(await _db.rpc('admin_join_requests') as List);
+
   // ---- registration & management
-  static Future<String> register({
-    required String name,
-    required String handle,
-    String? description,
-    String? category,
-    required String proofNote,
+  /// Select-only registration: the club name/ID come from the admin
+  /// registry, so there is no name/handle to type. Returns the new club's
+  /// id and derived handle.
+  static Future<Map<String, dynamic>> register({
+    required String registryId,
+    required String officialEmail,
+    required String position,
+    List<Map<String, String>> council = const [],
+    String? note,
   }) async =>
-      '${await _db.rpc('register_club', params: {
-            'p_name': name,
-            'p_handle': handle.trim(),
-            'p_description': description,
-            'p_category': category,
-            'p_proof_note': proofNote,
-          })}';
+      Map<String, dynamic>.from(await _db.rpc('register_club', params: {
+        'p_registry_id': registryId,
+        'p_official_email': officialEmail.trim(),
+        'p_position': position,
+        'p_council': council,
+        'p_proof_note': note,
+      }) as Map);
+
+  /// Active registry entries no club has claimed (the registration picker).
+  static Future<List<ClubRegistryEntry>> registryOpen() async => [
+        for (final r in (await _db.rpc('club_registry_open') as List))
+          ClubRegistryEntry.fromJson(Map<String, dynamic>.from(r as Map)),
+      ];
+
+  // ---- admin: registry
+  static Future<List<ClubRegistryEntry>> adminRegistry() async => [
+        for (final r in (await _db.rpc('admin_club_registry') as List))
+          ClubRegistryEntry.fromJson(Map<String, dynamic>.from(r as Map)),
+      ];
+
+  static Future<void> saveRegistry({
+    String? id,
+    required String code,
+    required String name,
+    String? faculty,
+    String? category,
+    bool active = true,
+  }) =>
+      _db.rpc('admin_save_club_registry', params: {
+        'p_id': id,
+        'p_code': code.trim(),
+        'p_name': name.trim(),
+        'p_faculty': faculty,
+        'p_category': category,
+        'p_active': active,
+      });
 
   static Future<void> update(
     String clubId, {
@@ -400,11 +588,24 @@ class ClubService {
         'p_socials': socials,
       });
 
-  static Future<String> inviteOfficer(String clubId, String username) async =>
-      '${await _db.rpc('invite_officer', params: {'p_club_id': clubId, 'p_username': cleanUsername(username)})}';
+  /// Adds a roster member (president only). [position] is a display title.
+  static Future<String> addMember(String clubId, String username, {String? position}) async =>
+      '${await _db.rpc('add_club_member', params: {
+            'p_club_id': clubId,
+            'p_username': cleanUsername(username),
+            'p_position': position,
+          })}';
 
-  static Future<void> removeOfficer(String clubId, String userId) =>
-      _db.rpc('remove_officer', params: {'p_club_id': clubId, 'p_user_id': userId});
+  static Future<void> removeMember(String clubId, String userId) =>
+      _db.rpc('remove_club_member', params: {'p_club_id': clubId, 'p_user_id': userId});
+
+  static Future<void> setMemberPosition(String clubId, String userId, String? position) =>
+      _db.rpc('set_club_member_position',
+          params: {'p_club_id': clubId, 'p_user_id': userId, 'p_position': position});
+
+  static Future<void> setMemberRole(String clubId, String userId, String role) =>
+      _db.rpc('set_club_member_role',
+          params: {'p_club_id': clubId, 'p_user_id': userId, 'p_role': role});
 
   static Future<void> transferPresidency(String clubId, String userId) =>
       _db.rpc('transfer_presidency', params: {'p_club_id': clubId, 'p_user_id': userId});
@@ -412,6 +613,17 @@ class ClubService {
   // ---- admin
   static Future<List<Map<String, dynamic>>> pendingRequests() async =>
       List<Map<String, dynamic>>.from(await _db.rpc('admin_pending_clubs') as List);
+
+  /// Every club in one status, for the admin console (RLS lets admins read
+  /// all of them). Pending still goes through [pendingRequests], which also
+  /// carries the proof and the president.
+  static Future<List<Map<String, dynamic>>> adminClubs(String status) async =>
+      List<Map<String, dynamic>>.from(await _db
+          .from('clubs')
+          .select('id, handle, name, description, category, logo_url, is_verified, status, created_at')
+          .eq('status', status)
+          .order('name')
+          .limit(200));
 
   static Future<void> decideRequest(String clubId, bool approve, String? reason) =>
       _db.rpc('admin_decide_club_request',

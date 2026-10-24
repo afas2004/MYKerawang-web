@@ -72,7 +72,13 @@ class FormSection extends StatelessWidget {
               children: [
                 Icon(icon, size: 20, color: scheme.primary),
                 const SizedBox(width: 8),
-                Text(title, style: theme.textTheme.titleMedium),
+                // Flexible: a long section title (or a wide test font)
+                // truncates instead of overflowing the row.
+                Flexible(
+                  child: Text(title,
+                      style: theme.textTheme.titleMedium,
+                      overflow: TextOverflow.ellipsis),
+                ),
                 const SizedBox(width: 12),
                 Expanded(child: Divider(color: scheme.outlineVariant)),
               ],

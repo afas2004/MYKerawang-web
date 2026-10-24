@@ -62,3 +62,8 @@ android/build/
 /verify_security.js
 /supabase/.temp/
 /apply_migrations.sh
+
+# Harness / scratch state. Never commit: these can hold database
+# credentials, backups and worktrees.
+/.deepseek/
+/.dsh-acl-report/

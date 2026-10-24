@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mykerawang/language_cubit.dart';
 import 'package:mykerawang/screens/admin/club_approvals_tab.dart';
+import 'package:mykerawang/screens/admin/club_registry_screen.dart';
+import 'package:mykerawang/screens/admin/join_requests_tab.dart';
 import 'package:mykerawang/screens/clubs/club_directory_screen.dart';
 import 'package:mykerawang/screens/clubs/club_manage_screen.dart';
 import 'package:mykerawang/screens/clubs/club_page_screen.dart';
@@ -89,6 +91,14 @@ void main() {
     expect(club.socials, {'instagram': 'debate'});
   });
 
+  test('parseCouncil reads "Name - Position" lines', () {
+    expect(parseCouncil('Aiman - Secretary\n\nSiti | Treasurer\nAli'), [
+      {'name': 'Aiman', 'position': 'Secretary'},
+      {'name': 'Siti', 'position': 'Treasurer'},
+      {'name': 'Ali', 'position': ''},
+    ]);
+  });
+
   test('every category has a label in en and ms', () {
     for (final s in [ClubStrings.en, ClubStrings.ms]) {
       for (final k in ClubStrings.categories) {
@@ -159,6 +169,34 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Aiman Hakim'), findsOneWidget);
       expect(find.text(c.rolePresident), findsOneWidget);
+    });
+
+    testWidgets('club page join request at ${w.toInt()} px', (tester) async {
+      var joined = 0;
+      await pumpAt(
+        tester,
+        w,
+        ClubPageView(
+          club: club,
+          myRole: null,
+          followers: 0,
+          following: false,
+          signedIn: true,
+          onJoin: () async => joined++,
+          onSetFollowing: (_) async {},
+          onManage: () {},
+          loadPosts: () async => [],
+          loadEvents: () async => [],
+          loadListings: () async => [],
+          loadMembers: () async => [],
+        ),
+        scaffold: false,
+      );
+      expect(find.text(c.joinClub), findsOneWidget);
+      await tester.tap(find.text(c.joinClub));
+      await tester.pumpAndSettle();
+      expect(joined, 1);
+      expect(find.text(c.joinPending), findsOneWidget);
     });
 
     testWidgets('pending club shows officer banner at ${w.toInt()} px', (tester) async {
@@ -240,39 +278,52 @@ void main() {
 
     testWidgets('register flow at ${w.toInt()} px', (tester) async {
       Map<String, Object?>? sent;
-      var calls = 0;
       await pumpAt(
         tester,
         w,
         ClubRegisterScreen(
-          register: ({required name, required handle, description, category, required proofNote}) async {
-            calls++;
-            if (calls == 1) throw Exception('CLUB:handle_taken');
-            sent = {'name': name, 'handle': handle, 'proof': proofNote};
-            return 'new-id';
+          loadRegistry: () async => const [
+            ClubRegistryEntry(
+              id: 'r1',
+              code: 'HEP/2024/012',
+              name: 'Kelab Catur',
+              faculty: 'FSKM',
+              category: 'academic',
+            ),
+          ],
+          register: ({required registryId, required officialEmail, required position, council = const [], note}) async {
+            sent = {
+              'registry': registryId,
+              'email': officialEmail,
+              'position': position,
+              'council': council,
+            };
+            return {'id': 'new-id', 'handle': 'HEP2024012'};
           },
         ),
         scaffold: false,
       );
-      final fields = find.byType(TextFormField);
-      await tester.enterText(fields.at(0), 'Kelab Catur');
-      await tester.pump();
-      expect(find.text('KelabCatur'), findsOneWidget, reason: 'handle suggested from name');
+      await tester.tap(find.byType(DropdownButtonFormField<String>).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Kelab Catur · HEP/2024/012').last);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.widgetWithText(TextFormField, c.officialEmail), 'kelabcatur@gmail.com');
+      await tester.enterText(
+          find.widgetWithText(TextFormField, c.council), 'Aiman - Secretary\nSiti - Treasurer');
       final send = find.widgetWithText(FilledButton, c.submitRequest);
       await tester.ensureVisible(send);
       await tester.tap(send);
       await tester.pumpAndSettle();
-      expect(find.text(c.proofTooShort), findsOneWidget);
-      await tester.enterText(fields.at(3), 'HEP registration no. 99');
-      await tester.ensureVisible(send);
-      await tester.tap(send);
-      await tester.pumpAndSettle();
-      expect(find.text(c.handleTaken), findsOneWidget);
-      await tester.enterText(fields.at(1), 'KelabCatur2');
-      await tester.ensureVisible(send);
-      await tester.tap(send);
-      await tester.pumpAndSettle();
-      expect(sent, {'name': 'Kelab Catur', 'handle': 'KelabCatur2', 'proof': 'HEP registration no. 99'});
+      expect(sent, {
+        'registry': 'r1',
+        'email': 'kelabcatur@gmail.com',
+        'position': 'president',
+        'council': [
+          {'name': 'Aiman', 'position': 'Secretary'},
+          {'name': 'Siti', 'position': 'Treasurer'},
+        ],
+      });
       expect(find.text(c.requestSent), findsOneWidget);
     });
 
@@ -290,8 +341,11 @@ void main() {
           actions: ClubManageActions(
             save: (e) async => saved = e,
             pickImage: () async => null,
-            addOfficer: (u) async => added.add(u),
-            removeOfficer: (_) async {},
+            addMember: (u) async => added.add(u),
+            removeMember: (_) async {},
+            setPosition: (_, __) async {},
+            setRole: (_, __) async {},
+            decideJoin: (_, __) async {},
             transfer: (_) async {},
           ),
         ),
@@ -304,11 +358,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(saved?.name, club.name);
       expect(saved?.socials, {'instagram': 'debateuitm'});
-      final field = find.widgetWithText(TextField, c.addOfficer);
+      final field = find.widgetWithText(TextField, c.addMember);
       await tester.ensureVisible(field);
       await tester.pumpAndSettle();
       await tester.enterText(field, '@farid');
-      await tester.tap(find.widgetWithText(FilledButton, c.addOfficer));
+      await tester.tap(find.widgetWithText(FilledButton, c.addMember));
       await tester.pumpAndSettle();
       expect(added, ['farid']);
       await tester.drag(find.byType(ListView).first, const Offset(0, -3000));
@@ -328,8 +382,11 @@ void main() {
           actions: ClubManageActions(
             save: (_) async {},
             pickImage: () async => null,
-            addOfficer: (_) async {},
-            removeOfficer: (_) async {},
+            addMember: (_) async {},
+            removeMember: (_) async {},
+            setPosition: (_, __) async {},
+            setRole: (_, __) async {},
+            decideJoin: (_, __) async {},
             transfer: (_) async {},
           ),
         ),
@@ -339,7 +396,59 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(c.leave), findsOneWidget);
       expect(find.text(c.transfer, skipOffstage: false), findsNothing);
-      expect(find.text(c.addOfficer, skipOffstage: false), findsNothing);
+      expect(find.text(c.addMember, skipOffstage: false), findsNothing);
+    });
+
+    testWidgets('manage approves a join request at ${w.toInt()} px', (tester) async {
+      String? decided;
+      bool? approved;
+      await pumpAt(
+        tester,
+        w,
+        ClubManageView(
+          club: club,
+          myRole: 'president',
+          myUserId: 'u1',
+          members: members,
+          joinRequests: [
+            {
+              'id': 'j1',
+              'message': 'Can I join?',
+              'user': {'id': 'u9', 'username': 'farid', 'display_name': 'Farid'},
+            },
+          ],
+          actions: ClubManageActions(
+            save: (_) async {},
+            pickImage: () async => null,
+            addMember: (_) async {},
+            removeMember: (_) async {},
+            setPosition: (_, __) async {},
+            setRole: (_, __) async {},
+            decideJoin: (id, ok) async {
+              decided = id;
+              approved = ok;
+            },
+            transfer: (_) async {},
+          ),
+        ),
+        scaffold: false,
+      );
+      await tester.dragUntilVisible(
+        find.text(c.joinRequests),
+        find.byType(ListView).first,
+        const Offset(0, -400),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(c.approveJoin).first);
+      await tester.pumpAndSettle();
+      expect(find.text(c.approveJoinTitle.replaceAll('{0}', 'Farid')), findsOneWidget);
+      await tester.tap(find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text(c.approveJoin),
+      ));
+      await tester.pumpAndSettle();
+      expect(decided, 'j1');
+      expect(approved, isTrue);
     });
 
     testWidgets('admin club request card at ${w.toInt()} px', (tester) async {
@@ -405,6 +514,35 @@ void main() {
     expect(find.text(c.postAs), findsNothing);
   });
 
+  testWidgets('admin join requests tab approves', (tester) async {
+    bool? approved;
+    await pumpAt(
+      tester,
+      375,
+      JoinRequestsTab(
+        load: () async => [
+          {
+            'id': 'j1',
+            'club_name': 'Debate Society',
+            'club_handle': 'debate',
+            'message': 'Can I join?',
+            'user': {'id': 'u9', 'username': 'farid', 'display_name': 'Farid'},
+          },
+        ],
+        decide: (_, ok) async => approved = ok,
+      ),
+    );
+    expect(find.text('Farid'), findsOneWidget);
+    await tester.tap(find.text(c.approveJoin));
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.text(c.approveJoin),
+    ));
+    await tester.pumpAndSettle();
+    expect(approved, isTrue);
+  });
+
   testWidgets('admin tab lists injected requests', (tester) async {
     await pumpAt(
       tester,
@@ -417,5 +555,156 @@ void main() {
       ),
     );
     expect(find.text('Fotografi'), findsOneWidget);
+  });
+
+  test('clubSearchRow maps a club for the search section', () {
+    const club = Club(
+      id: 'c1',
+      handle: 'DebateUiTM',
+      name: 'Debate Society',
+      logoUrl: 'https://cdn/logo.png',
+    );
+    final row = clubSearchRow(club);
+    expect(row['title'], 'Debate Society');
+    expect(row['subtitle'], '@DebateUiTM');
+    expect(row['avatar_url'], 'https://cdn/logo.png');
+    expect(row['route'], '/c/DebateUiTM');
+  });
+
+  testWidgets('manage contact section saves the phone for listings', (tester) async {
+    String? savedPhone;
+    String? savedQr;
+    var qrPicks = 0;
+    await pumpAt(
+      tester,
+      375,
+      ClubManageView(
+        club: club,
+        myRole: 'president',
+        myUserId: 'u1',
+        members: members,
+        contact: const ClubContact(phone: '011-111 2222'),
+        actions: ClubManageActions(
+          save: (_) async {},
+          pickImage: () async => null,
+          addMember: (_) async {},
+          removeMember: (_) async {},
+          setPosition: (_, __) async {},
+          setRole: (_, __) async {},
+          decideJoin: (_, __) async {},
+          transfer: (_) async {},
+          saveContact: (p, q) async {
+            savedPhone = p;
+            savedQr = q;
+          },
+          pickQr: () async {
+            qrPicks++;
+            return null;
+          },
+        ),
+      ),
+      scaffold: false,
+    );
+
+    await tester.dragUntilVisible(
+      find.text(c.contactForListings),
+      find.byType(ListView).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    final phoneField = find.widgetWithText(TextField, c.phone);
+    expect(tester.widget<TextField>(phoneField).controller?.text, '011-111 2222');
+
+    await tester.tap(find.widgetWithText(OutlinedButton, c.uploadQr));
+    await tester.pumpAndSettle();
+    expect(qrPicks, 1);
+
+    await tester.enterText(phoneField, '019-888 7777');
+    final save = find.widgetWithText(FilledButton, c.saveContact);
+    await tester.ensureVisible(save);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(savedPhone, '019-888 7777');
+    expect(savedQr, isNull);
+    expect(find.text(c.contactSaved), findsOneWidget);
+  });
+
+  testWidgets('admin registry lists entries and adds one', (tester) async {
+    final saved = <Map<String, Object?>>[];
+    await pumpAt(
+      tester,
+      375,
+      ClubRegistryScreen(
+        checkAdmin: () async => true,
+        load: () async => const [
+          ClubRegistryEntry(id: 'r1', code: 'HEP/2024/042', name: 'Debate Society', faculty: 'FSKM'),
+        ],
+        save: ({id, required code, required name, faculty, category, active = true}) async {
+          saved.add({'id': id, 'code': code, 'name': name, 'active': active});
+        },
+      ),
+      scaffold: false,
+    );
+    expect(find.text('Debate Society'), findsOneWidget);
+    await tester.tap(find.text(c.addRegistryClub));
+    await tester.pumpAndSettle();
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), 'HEP/2024/055');
+    await tester.enterText(fields.at(1), 'Robotics');
+    await tester.tap(find.text(c.saveRegistry));
+    await tester.pumpAndSettle();
+    expect(saved.single['code'], 'HEP/2024/055');
+    expect(saved.single['name'], 'Robotics');
+    expect(find.text(c.registrySaved), findsOneWidget);
+  });
+
+  testWidgets('admin clubs tab filters and suspends with a reason', (tester) async {
+    final calls = <(String, String, String)>[];
+    Map<String, dynamic> row(String status) => {
+          'id': 'c1',
+          'handle': 'debate',
+          'name': 'Debate Society',
+          'status': status,
+          'is_verified': true,
+        };
+    await pumpAt(
+      tester,
+      375,
+      ClubApprovalsTab(
+        load: () async => [],
+        decide: (_, __, ___) async {},
+        loadClubs: (status) async => [row(status)],
+        setStatus: (id, status, reason) async => calls.add((id, status, reason)),
+      ),
+    );
+    expect(find.text(c.noClubRequests), findsOneWidget);
+
+    await tester.tap(find.text(c.statusActive));
+    await tester.pumpAndSettle();
+    expect(find.text('Debate Society'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(TextButton, c.suspend));
+    await tester.pumpAndSettle();
+    expect(find.text(c.suspendTitle.replaceAll('{0}', 'Debate Society')), findsOneWidget);
+    await tester.enterText(find.byType(TextField).last, 'spam listings');
+    await tester.tap(find.widgetWithText(FilledButton, c.suspend));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(calls, [('c1', 'suspended', 'spam listings')]);
+    expect(find.text(c.suspendedDone), findsOneWidget);
+
+    final suspendedChip = find.text(c.statusSuspended);
+    await tester.ensureVisible(suspendedChip);
+    await tester.tap(suspendedChip);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(c.reactivate));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, 'appeal accepted');
+    await tester.tap(find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.text(c.reactivate),
+    ));
+    await tester.pumpAndSettle();
+    expect(calls.last, ('c1', 'active', 'appeal accepted'));
   });
 }

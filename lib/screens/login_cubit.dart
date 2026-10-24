@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show ValueNotifier, debugPrint, kIsWeb;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/guest_access.dart';
+import '../services/registration_policy.dart';
 
 /// Error codes put in [LoginState.errorMessage]. The cubit has no
 /// BuildContext, so the screen turns these into localized text
@@ -29,6 +30,11 @@ bool isStudentEmail(String? email) =>
 /// redirect); the login screen shows it and clears it.
 final ValueNotifier<String?> pendingLoginError = ValueNotifier(null);
 
+/// Address to pre-fill on the login screen, set when the app sends someone
+/// here on purpose (e.g. "use the account this device already knows").
+/// The login screen consumes and clears it.
+final ValueNotifier<String?> pendingLoginEmail = ValueNotifier(null);
+
 /// Google sign-in can create an account without the student check the
 /// email form does. Call on every signedIn event: an account created by
 /// this sign-in whose address isn't a student one is signed out again.
@@ -42,6 +48,8 @@ Future<void> enforceStudentEmailForNewAccount(User user) async {
   final isNew = created != null &&
       (lastSignIn == null || lastSignIn.difference(created).inSeconds.abs() < 60);
   if (!isNew) return; // grandfathered
+  // The owner may have opened signup to any address.
+  if (await RegistrationPolicy.ensureLoaded()) return;
   debugPrint('Non-student sign-up rejected: ${user.email}');
   pendingLoginError.value = LoginError.studentEmailOnly;
   await Supabase.instance.client.auth.signOut();
@@ -98,8 +106,12 @@ class LoginCubit extends Cubit<LoginState> {
     }
 
     // Only new accounts are restricted; logging in stays open so
-    // existing non-student accounts keep working.
-    if (!state.isLoginMode && !isStudentEmail(email)) {
+    // existing non-student accounts keep working. The owner can open
+    // signup to any address (access_settings.registration_mode), and the
+    // auth.users trigger enforces the same rule server-side.
+    if (!state.isLoginMode &&
+        !RegistrationPolicy.isOpen &&
+        !isStudentEmail(email)) {
       emit(state.copyWith(errorMessage: LoginError.studentEmailOnly));
       return;
     }

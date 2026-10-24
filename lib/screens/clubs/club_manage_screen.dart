@@ -17,16 +17,31 @@ import 'club_widgets.dart';
 class ClubManageActions {
   final Future<void> Function(ClubEdit edit) save;
   final Future<String?> Function() pickImage; // uploaded URL or null
-  final Future<void> Function(String username) addOfficer;
-  final Future<void> Function(String userId) removeOfficer;
+  final Future<void> Function(String username) addMember;
+  final Future<void> Function(String userId) removeMember;
+  final Future<void> Function(String userId, String? position) setPosition;
+  final Future<void> Function(String userId, String role) setRole;
+  final Future<void> Function(String requestId, bool approve) decideJoin;
   final Future<void> Function(String userId) transfer;
+
+  /// Saves the private contact used by the club's listings. Null hides the
+  /// section, so tests that only exercise the page details stay simple.
+  final Future<void> Function(String? phone, String? paymentQrUrl)? saveContact;
+
+  /// Uploads a payment QR image; defaults to [pickImage].
+  final Future<String?> Function()? pickQr;
 
   const ClubManageActions({
     required this.save,
     required this.pickImage,
-    required this.addOfficer,
-    required this.removeOfficer,
+    required this.addMember,
+    required this.removeMember,
+    required this.setPosition,
+    required this.setRole,
+    required this.decideJoin,
     required this.transfer,
+    this.saveContact,
+    this.pickQr,
   });
 }
 
@@ -57,17 +72,22 @@ class ClubManageScreen extends StatefulWidget {
 }
 
 class _ClubManageScreenState extends State<ClubManageScreen> {
-  late Future<(Club, String?, List<ClubMember>)?> _future = _load();
+  late Future<(Club, String?, List<ClubMember>, ClubContact, List<Map<String, dynamic>>)?> _future = _load();
 
-  Future<(Club, String?, List<ClubMember>)?> _load() async {
+  Future<(Club, String?, List<ClubMember>, ClubContact, List<Map<String, dynamic>>)?> _load() async {
     final club = await ClubService.byHandle(widget.handle);
     if (club == null) return null;
     final role = await ClubService.myRole(club.id);
     final members = await ClubService.members(club.id);
-    return (club, role, members);
+    final contact = await ClubService.contact(club.id);
+    final requests =
+        canManageClub(role) ? await ClubService.joinRequests(club.id) : const <Map<String, dynamic>>[];
+    return (club, role, members, contact, requests);
   }
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() => setState(() {
+        _future = _load();
+      });
 
   Future<String?> _pickImage() async {
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1600, imageQuality: 85);
@@ -77,10 +97,19 @@ class _ClubManageScreenState extends State<ClubManageScreen> {
     return urls.first;
   }
 
+  /// Payment QRs must stay sharp to scan, so this keeps full quality.
+  Future<String?> _pickQr() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1200, imageQuality: 100);
+    if (picked == null) return null;
+    final img = await LocalImage.fromXFile(picked);
+    final urls = await PostService.uploadPhotos([img]);
+    return urls.first;
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.l10n.club;
-    return FutureBuilder<(Club, String?, List<ClubMember>)?>(
+    return FutureBuilder<(Club, String?, List<ClubMember>, ClubContact, List<Map<String, dynamic>>)?>(
       future: _future,
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
@@ -105,6 +134,8 @@ class _ClubManageScreenState extends State<ClubManageScreen> {
           myRole: d.$2!,
           myUserId: ClubService.currentUserId,
           members: d.$3,
+          contact: d.$4,
+          joinRequests: d.$5,
           actions: ClubManageActions(
             save: (e) => ClubService.update(
               club.id,
@@ -118,19 +149,34 @@ class _ClubManageScreenState extends State<ClubManageScreen> {
               socials: e.socials,
             ),
             pickImage: _pickImage,
-            addOfficer: (u) async {
-              await ClubService.inviteOfficer(club.id, u);
+            saveContact: (phone, qr) =>
+                ClubService.setContact(club.id, phone: phone, paymentQrUrl: qr),
+            pickQr: _pickQr,
+            addMember: (u) async {
+              await ClubService.addMember(club.id, u);
               _reload();
             },
-            removeOfficer: (id) async {
-              await ClubService.removeOfficer(club.id, id);
+            removeMember: (id) async {
+              await ClubService.removeMember(club.id, id);
               if (id == ClubService.currentUserId) {
-                // No longer an officer: back to the club page (or up to
+                // No longer in the club: back to the club page (or up to
                 // it when this page was opened cold).
                 if (context.mounted) appBack(context);
               } else {
                 _reload();
               }
+            },
+            setPosition: (id, p) async {
+              await ClubService.setMemberPosition(club.id, id, p);
+              _reload();
+            },
+            setRole: (id, role) async {
+              await ClubService.setMemberRole(club.id, id, role);
+              _reload();
+            },
+            decideJoin: (requestId, approve) async {
+              await ClubService.decideJoin(requestId, approve);
+              _reload();
             },
             transfer: (id) async {
               await ClubService.transferPresidency(club.id, id);
@@ -151,6 +197,13 @@ class ClubManageView extends StatefulWidget {
   final List<ClubMember> members;
   final ClubManageActions actions;
 
+  /// Pending join requests (empty for non-officers / when none).
+  final List<Map<String, dynamic>> joinRequests;
+
+  /// Private phone / payment QR for the club's listings; null hides the
+  /// section.
+  final ClubContact? contact;
+
   const ClubManageView({
     super.key,
     required this.club,
@@ -158,6 +211,8 @@ class ClubManageView extends StatefulWidget {
     required this.myUserId,
     required this.members,
     required this.actions,
+    this.joinRequests = const [],
+    this.contact,
   });
 
   @override
@@ -173,18 +228,21 @@ class _ClubManageViewState extends State<ClubManageView> {
   late final _instagram = TextEditingController(text: widget.club.socials['instagram'] ?? '');
   late final _tiktok = TextEditingController(text: widget.club.socials['tiktok'] ?? '');
   late final _website = TextEditingController(text: widget.club.socials['website'] ?? '');
-  late final _officer = TextEditingController();
+  late final _member = TextEditingController();
+  late final _phone = TextEditingController(text: widget.contact?.phone ?? '');
   late String? _category = widget.club.category;
   late String? _logo = widget.club.logoUrl;
   late String? _cover = widget.club.coverUrl;
+  late String? _qr = widget.contact?.paymentQrUrl;
   bool _saving = false;
   bool _adding = false;
+  bool _savingContact = false;
 
   static final _email_ = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
   @override
   void dispose() {
-    for (final t in [_name, _description, _faculty, _email, _instagram, _tiktok, _website, _officer]) {
+    for (final t in [_name, _description, _faculty, _email, _instagram, _tiktok, _website, _member, _phone]) {
       t.dispose();
     }
     super.dispose();
@@ -223,14 +281,39 @@ class _ClubManageViewState extends State<ClubManageView> {
     }
   }
 
+  Future<void> _saveContact() async {
+    final save = widget.actions.saveContact;
+    if (save == null) return;
+    setState(() => _savingContact = true);
+    try {
+      final phone = _phone.text.trim();
+      await save(phone.isEmpty ? null : phone, _qr);
+      if (mounted) showClubSnack(context, c.contactSaved);
+    } catch (e) {
+      if (mounted) showClubSnack(context, clubErrorText(c, e), error: true);
+    } finally {
+      if (mounted) setState(() => _savingContact = false);
+    }
+  }
+
+  Future<void> _setQr() async {
+    try {
+      final pick = widget.actions.pickQr ?? widget.actions.pickImage;
+      final url = await pick();
+      if (url != null && mounted) setState(() => _qr = url);
+    } catch (e) {
+      if (mounted) showClubSnack(context, clubErrorText(c, e), error: true);
+    }
+  }
+
   Future<void> _add() async {
-    final u = cleanUsername(_officer.text);
+    final u = cleanUsername(_member.text);
     if (u.isEmpty) return;
     setState(() => _adding = true);
     try {
-      await widget.actions.addOfficer(u);
-      _officer.clear();
-      if (mounted) showClubSnack(context, c.officerAdded.fill(['@$u']));
+      await widget.actions.addMember(u);
+      _member.clear();
+      if (mounted) showClubSnack(context, c.memberAdded.fill(['@$u']));
     } catch (e) {
       if (mounted) showClubSnack(context, clubErrorText(c, e), error: true);
     } finally {
@@ -242,17 +325,72 @@ class _ClubManageViewState extends State<ClubManageView> {
     final self = m.userId == widget.myUserId;
     final ok = await confirmClubAction(
       context,
-      title: self ? c.leaveTitle : c.removeOfficerTitle.fill([m.name]),
-      body: self ? c.leaveBody : c.removeOfficerBody,
+      title: self ? c.leaveTitle : c.removeMemberTitle.fill([m.name]),
+      body: self ? c.leaveBody : c.removeMemberBody,
       confirmLabel: self ? c.leave : c.remove,
       destructive: true,
     );
     if (!ok) return;
     try {
-      await widget.actions.removeOfficer(m.userId);
-      if (mounted) showClubSnack(context, self ? c.left : c.officerRemoved);
+      await widget.actions.removeMember(m.userId);
+      if (mounted) showClubSnack(context, self ? c.left : c.memberRemoved);
     } catch (e) {
       if (mounted) showClubSnack(context, clubErrorText(c, e), error: true);
+    }
+  }
+
+  Future<void> _setPosition(ClubMember m) async {
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(c.changePosition),
+        children: [
+          SimpleDialogOption(onPressed: () => Navigator.pop(ctx, ''), child: Text(c.noPosition)),
+          for (final p in clubPositions)
+            SimpleDialogOption(onPressed: () => Navigator.pop(ctx, p), child: Text(c.positionLabel(p))),
+        ],
+      ),
+    );
+    if (picked == null) return;
+    try {
+      await widget.actions.setPosition(m.userId, picked.isEmpty ? null : picked);
+      if (mounted) showClubSnack(context, c.positionChanged);
+    } catch (e) {
+      if (mounted) showClubSnack(context, clubErrorText(c, e), error: true);
+    }
+  }
+
+  Future<void> _setRole(ClubMember m, String role) async {
+    try {
+      await widget.actions.setRole(m.userId, role);
+      if (mounted) showClubSnack(context, c.roleChanged);
+    } catch (e) {
+      if (mounted) showClubSnack(context, clubErrorText(c, e), error: true);
+    }
+  }
+
+  final Set<String> _busyJoin = {};
+
+  Future<void> _decideJoin(Map<String, dynamic> r, bool approve) async {
+    final id = '${r['id']}';
+    final user = (r['user'] as Map?) ?? const {};
+    final name = '${user['display_name'] ?? user['username'] ?? ''}';
+    final ok = await confirmClubAction(
+      context,
+      title: (approve ? c.approveJoinTitle : c.rejectJoinTitle).fill([name]),
+      body: approve ? c.approveJoinBody : c.rejectJoinBody,
+      confirmLabel: approve ? c.approveJoin : c.rejectJoin,
+      destructive: !approve,
+    );
+    if (!ok) return;
+    setState(() => _busyJoin.add(id));
+    try {
+      await widget.actions.decideJoin(id, approve);
+      if (mounted) showClubSnack(context, approve ? c.joinedClub.fill([name]) : c.requestRejected);
+    } catch (e) {
+      if (mounted) showClubSnack(context, clubErrorText(c, e), error: true);
+    } finally {
+      if (mounted) setState(() => _busyJoin.remove(id));
     }
   }
 
@@ -292,7 +430,7 @@ class _ClubManageViewState extends State<ClubManageView> {
     final c = context.l10n.club;
     final theme = Theme.of(context);
     final president = isPresident(widget.myRole);
-    final officers = widget.members.where((m) => m.isOfficer).toList();
+    final members = widget.members;
 
     Widget section(String title, List<Widget> children, {String? help}) => Padding(
           padding: const EdgeInsets.only(bottom: KSpace.l),
@@ -427,22 +565,113 @@ class _ClubManageViewState extends State<ClubManageView> {
                   ),
                 ),
               ]),
-              section(c.officers, help: c.officersHelp, [
-                for (final m in officers)
+              if (widget.contact != null && widget.actions.saveContact != null)
+                section(c.contactForListings, help: c.contactForListingsHelp, [
+                  TextField(
+                    controller: _phone,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      labelText: c.phone,
+                      hintText: c.phoneHint,
+                      prefixIcon: const Icon(AppIcons.phone),
+                    ),
+                  ),
+                  const SizedBox(height: KSpace.m),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_qr == null)
+                        OutlinedButton.icon(
+                          onPressed: _setQr,
+                          icon: const Icon(AppIcons.qrCode, size: 18),
+                          label: Text(c.uploadQr),
+                        )
+                      else ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: CachedNetworkImage(
+                            imageUrl: _qr!,
+                            width: 88,
+                            height: 88,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => const SizedBox(width: 88, height: 88),
+                          ),
+                        ),
+                        const SizedBox(width: KSpace.m),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: _setQr,
+                              icon: const Icon(AppIcons.photo, size: 18),
+                              label: Text(c.replaceQr),
+                            ),
+                            TextButton(
+                              onPressed: () => setState(() => _qr = null),
+                              child: Text(c.removeQr),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: KSpace.m),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: FilledButton.tonal(
+                      onPressed: _savingContact ? null : _saveContact,
+                      child: _savingContact
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                          : Text(c.saveContact),
+                    ),
+                  ),
+                ]),
+              section(c.joinRequests, help: c.joinRequestsHelp, [
+                if (widget.joinRequests.isEmpty)
+                  Text(c.noJoinRequests,
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant))
+                else
+                  for (final r in widget.joinRequests)
+                    _JoinRequestTile(
+                      request: r,
+                      busy: _busyJoin.contains('${r['id']}'),
+                      onApprove: () => _decideJoin(r, true),
+                      onReject: () => _decideJoin(r, false),
+                    ),
+              ]),
+              section(c.members, help: c.membersHelp, [
+                for (final m in members)
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     minTileHeight: 56,
                     leading: ClubLogo(url: m.avatarUrl, name: m.name, size: 40),
                     title: Text(m.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text([if (m.username != null) '@${m.username}', c.roleLabel(m.role)].join(' · ')),
+                    subtitle: Text(
+                      [if (m.username != null) '@${m.username}', c.rosterLabel(m.position, m.role)].join(' · '),
+                    ),
                     trailing: m.role == 'president'
                         ? null
-                        : (president || m.userId == widget.myUserId)
-                            ? TextButton(
-                                onPressed: () => _remove(m),
-                                child: Text(m.userId == widget.myUserId ? c.leave : c.remove),
-                              )
-                            : null,
+                        : m.userId == widget.myUserId
+                            ? TextButton(onPressed: () => _remove(m), child: Text(c.leave))
+                            : !president
+                                ? null
+                                : PopupMenuButton<String>(
+                                    icon: const Icon(AppIcons.more, size: 20),
+                                    onSelected: (v) => switch (v) {
+                                      'promote' => _setRole(m, 'officer'),
+                                      'demote' => _setRole(m, 'member'),
+                                      'position' => _setPosition(m),
+                                      _ => _remove(m),
+                                    },
+                                    itemBuilder: (_) => [
+                                      if (m.role == 'member')
+                                        PopupMenuItem(value: 'promote', child: Text(c.makeOfficer))
+                                      else
+                                        PopupMenuItem(value: 'demote', child: Text(c.makeMember)),
+                                      PopupMenuItem(value: 'position', child: Text(c.changePosition)),
+                                      PopupMenuItem(value: 'remove', child: Text(c.remove)),
+                                    ],
+                                  ),
                   ),
                 if (president) ...[
                   const SizedBox(height: KSpace.s),
@@ -451,8 +680,8 @@ class _ClubManageViewState extends State<ClubManageView> {
                     children: [
                       Expanded(
                         child: TextField(
-                          controller: _officer,
-                          decoration: InputDecoration(labelText: c.addOfficer, hintText: c.addOfficerHint),
+                          controller: _member,
+                          decoration: InputDecoration(labelText: c.addMember, hintText: c.addMemberHint),
                           onSubmitted: (_) => _add(),
                         ),
                       ),
@@ -462,7 +691,7 @@ class _ClubManageViewState extends State<ClubManageView> {
                         child: FilledButton.tonal(
                           onPressed: _adding ? null : _add,
                           style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
-                          child: Text(c.addOfficer),
+                          child: Text(c.addMember),
                         ),
                       ),
                     ],
@@ -482,6 +711,92 @@ class _ClubManageViewState extends State<ClubManageView> {
                 ]),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One pending join request, with the applicant's message and decisions.
+class _JoinRequestTile extends StatelessWidget {
+  final Map<String, dynamic> request;
+  final bool busy;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
+
+  const _JoinRequestTile({
+    required this.request,
+    required this.busy,
+    required this.onApprove,
+    required this.onReject,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.l10n.club;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final user = (request['user'] as Map?) ?? const {};
+    final name = '${user['display_name'] ?? user['username'] ?? ''}';
+    final username = user['username'] as String?;
+    final avatar = user['avatar_url'] as String?;
+    final message = (request['message'] as String?)?.trim();
+    final muted = theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: KSpace.s),
+      child: Container(
+        padding: const EdgeInsets.all(KSpace.m),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: scheme.surfaceContainerHighest,
+                  backgroundImage: avatar == null ? null : CachedNetworkImageProvider(avatar),
+                  child: avatar == null
+                      ? Icon(AppIcons.person, size: 18, color: scheme.onSurfaceVariant)
+                      : null,
+                ),
+                const SizedBox(width: KSpace.s),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall),
+                      if (username != null)
+                        Text('@$username', maxLines: 1, overflow: TextOverflow.ellipsis, style: muted),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (message != null && message.isNotEmpty) ...[
+              const SizedBox(height: KSpace.s),
+              Text(message),
+            ],
+            const SizedBox(height: KSpace.s),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(onPressed: busy ? null : onReject, child: Text(c.rejectJoin)),
+                const SizedBox(width: KSpace.s),
+                FilledButton.tonal(
+                  onPressed: busy ? null : onApprove,
+                  child: busy
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Text(c.approveJoin),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

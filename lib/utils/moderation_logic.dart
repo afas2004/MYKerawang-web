@@ -27,11 +27,17 @@ const kReportCategories = [
   'spam',
   'scam',
   'harassment',
+  'impersonation',
   'inappropriate',
   'minor_safety',
   'misinformation',
   'other',
 ];
+
+/// Categories hidden on the first report. Order matches the shipped
+/// `moderation_settings.priority_categories` default; the live list wins
+/// when the sheet can read it (owners may edit it in the admin console).
+const kDefaultPriorityCategories = ['harassment', 'inappropriate'];
 
 /// Reportable target types (`reports.target_type`).
 const kTargetTypes = ['post', 'comment', 'event', 'listing', 'user'];
@@ -132,7 +138,7 @@ class ModError {
   String toString() => 'ModError($code${sub == null ? '' : ':$sub'})';
 }
 
-final _modPattern = RegExp(r'MOD:([a-z_]+)(?::([a-z_]+))?');
+final _modPattern = RegExp(r'(MOD|VERIFY|CHECKIN):([a-z_]+)(?::([a-z_]+))?');
 
 ModError? parseModError(Object? e) {
   if (e == null) return null;
@@ -154,6 +160,18 @@ ModError? parseModError(Object? e) {
   final m = _modPattern.firstMatch(message);
   if (m == null) return null;
 
+  // VERIFY: is raised by the student-verification gate and by the
+  // verification request. `required` is the gate (with the capability as
+  // sub-code); everything else keeps its own name, prefixed so it can
+  // never collide with a MOD code.
+  final kind = m.group(1);
+  final raw = m.group(2)!;
+  final kindCode = switch (kind) {
+    'VERIFY' => raw == 'required' ? 'verify_required' : 'verify_$raw',
+    'CHECKIN' => 'checkin_$raw',
+    _ => raw,
+  };
+
   Map<String, dynamic> detail = const {};
   if (details is Map<String, dynamic>) {
     detail = details;
@@ -163,7 +181,7 @@ ModError? parseModError(Object? e) {
       if (decoded is Map<String, dynamic>) detail = decoded;
     } catch (_) {}
   }
-  return ModError(m.group(1)!, sub: m.group(2), detail: detail);
+  return ModError(kindCode, sub: m.group(3), detail: detail);
 }
 
 /// Queue order: priority first (2 urgent, 1 high, 0 normal), then the

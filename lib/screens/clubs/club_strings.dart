@@ -123,6 +123,98 @@ class ClubStrings {
   final String approved;
   final String rejected;
   final String notPending;
+  final String contactForListings;
+  final String contactForListingsHelp;
+  final String phone;
+  final String phoneHint;
+  final String uploadQr;
+  final String replaceQr;
+  final String removeQr;
+  final String saveContact;
+  final String contactSaved;
+  final String suspend;
+  final String reactivate;
+  final String suspendTitle;
+  final String suspendBody;
+  final String reactivateTitle;
+  final String reactivateBody;
+  final String suspendedDone;
+  final String reactivatedDone;
+  final String noActiveClubs;
+  final String noSuspendedClubs;
+  final String chooseClub;
+  final String chooseClubRequired;
+  final String noRegistryClubs;
+  final String noRegistryClubsBody;
+  final String officialEmail;
+  final String officialEmailHelp;
+  final String position;
+  final String council;
+  final String councilHelp;
+  final String councilTooLong;
+  final String pageAddress;
+  final String positionPresident;
+  final String positionVicePresident;
+  final String positionSecretary;
+  final String positionTreasurer;
+  final String positionCommittee;
+  final String positionOther;
+  final String registryTitle;
+  final String registrySub;
+  final String addRegistryClub;
+  final String editRegistryClub;
+  final String registryCode;
+  final String registryCodeHelp;
+  final String registryFaculty;
+  final String registryActive;
+  final String registryInactive;
+  final String registryClaimed;
+  final String registryAvailable;
+  final String registrySaved;
+  final String registryEmpty;
+  final String saveRegistry;
+  final String registryCodeTaken;
+  final String registryCodeInvalid;
+  final String registryClaimedError;
+  final String registryNotFound;
+  final String positionInvalid;
+  final String councilInvalid;
+  final String registryManage;
+  final String members;
+  final String membersHelp;
+  final String addMember;
+  final String addMemberHint;
+  final String memberAdded;
+  final String memberRemoved;
+  final String removeMemberTitle;
+  final String removeMemberBody;
+  final String makeOfficer;
+  final String makeMember;
+  final String changePosition;
+  final String noPosition;
+  final String positionChanged;
+  final String roleChanged;
+  final String alreadyMember;
+  final String notMember;
+  final String cannotChangePresident;
+  final String roleInvalid;
+  final String joinClub;
+  final String joinPending;
+  final String joinRequested;
+  final String joinRequests;
+  final String joinRequestsHelp;
+  final String noJoinRequests;
+  final String approveJoin;
+  final String rejectJoin;
+  final String joinedClub;
+  final String requestRejected;
+  final String requestNotFound;
+  final String clubNotActive;
+  final String alreadyRequested;
+  final String approveJoinTitle;
+  final String approveJoinBody;
+  final String rejectJoinTitle;
+  final String rejectJoinBody;
 
   const ClubStrings({
     required this.clubs,
@@ -243,6 +335,98 @@ class ClubStrings {
     required this.approved,
     required this.rejected,
     required this.notPending,
+    required this.contactForListings,
+    required this.contactForListingsHelp,
+    required this.phone,
+    required this.phoneHint,
+    required this.uploadQr,
+    required this.replaceQr,
+    required this.removeQr,
+    required this.saveContact,
+    required this.contactSaved,
+    required this.suspend,
+    required this.reactivate,
+    required this.suspendTitle,
+    required this.suspendBody,
+    required this.reactivateTitle,
+    required this.reactivateBody,
+    required this.suspendedDone,
+    required this.reactivatedDone,
+    required this.noActiveClubs,
+    required this.noSuspendedClubs,
+    required this.chooseClub,
+    required this.chooseClubRequired,
+    required this.noRegistryClubs,
+    required this.noRegistryClubsBody,
+    required this.officialEmail,
+    required this.officialEmailHelp,
+    required this.position,
+    required this.council,
+    required this.councilHelp,
+    required this.councilTooLong,
+    required this.pageAddress,
+    required this.positionPresident,
+    required this.positionVicePresident,
+    required this.positionSecretary,
+    required this.positionTreasurer,
+    required this.positionCommittee,
+    required this.positionOther,
+    required this.registryTitle,
+    required this.registrySub,
+    required this.addRegistryClub,
+    required this.editRegistryClub,
+    required this.registryCode,
+    required this.registryCodeHelp,
+    required this.registryFaculty,
+    required this.registryActive,
+    required this.registryInactive,
+    required this.registryClaimed,
+    required this.registryAvailable,
+    required this.registrySaved,
+    required this.registryEmpty,
+    required this.saveRegistry,
+    required this.registryCodeTaken,
+    required this.registryCodeInvalid,
+    required this.registryClaimedError,
+    required this.registryNotFound,
+    required this.positionInvalid,
+    required this.councilInvalid,
+    required this.registryManage,
+    required this.members,
+    required this.membersHelp,
+    required this.addMember,
+    required this.addMemberHint,
+    required this.memberAdded,
+    required this.memberRemoved,
+    required this.removeMemberTitle,
+    required this.removeMemberBody,
+    required this.makeOfficer,
+    required this.makeMember,
+    required this.changePosition,
+    required this.noPosition,
+    required this.positionChanged,
+    required this.roleChanged,
+    required this.alreadyMember,
+    required this.notMember,
+    required this.cannotChangePresident,
+    required this.roleInvalid,
+    required this.joinClub,
+    required this.joinPending,
+    required this.joinRequested,
+    required this.joinRequests,
+    required this.joinRequestsHelp,
+    required this.noJoinRequests,
+    required this.approveJoin,
+    required this.rejectJoin,
+    required this.joinedClub,
+    required this.requestRejected,
+    required this.requestNotFound,
+    required this.clubNotActive,
+    required this.alreadyRequested,
+    required this.approveJoinTitle,
+    required this.approveJoinBody,
+    required this.rejectJoinTitle,
+    required this.rejectJoinBody,
   });
 
   static const en = ClubStrings(
@@ -364,6 +548,98 @@ class ClubStrings {
     approved: "Club approved — the president was notified",
     rejected: "Request rejected — the president was notified",
     notPending: "This request was already handled.",
+    contactForListings: "Contact for listings",
+    contactForListingsHelp: "Buyers who ask for contact on your club's listings get this phone and payment QR. It is never shown on the page.",
+    phone: "Phone (WhatsApp)",
+    phoneHint: "e.g. 012-345 6789",
+    uploadQr: "Upload payment QR",
+    replaceQr: "Replace QR",
+    removeQr: "Remove QR",
+    saveContact: "Save contact",
+    contactSaved: "Contact saved",
+    suspend: "Suspend",
+    reactivate: "Reactivate",
+    suspendTitle: "Suspend {0}?",
+    suspendBody: "The page and all club posts stop showing to visitors, and officers can no longer publish. The president is notified.",
+    reactivateTitle: "Reactivate {0}?",
+    reactivateBody: "The page and its posts become visible again, and officers can publish. The president is notified.",
+    suspendedDone: "Club suspended — the president was notified",
+    reactivatedDone: "Club is active again — the president was notified",
+    noActiveClubs: "No active clubs",
+    noSuspendedClubs: "No suspended clubs",
+    chooseClub: "Club",
+    chooseClubRequired: "Choose your club from the list.",
+    noRegistryClubs: "No clubs to register yet",
+    noRegistryClubsBody: "An admin adds recognised clubs to the registry first. Check back soon.",
+    officialEmail: "Official club Gmail",
+    officialEmailHelp: "The club's shared inbox. Members, buyers and admins reach the club through it; it is shown on the page.",
+    position: "Your position",
+    council: "Council members",
+    councilHelp: "One per line: Name - Position (up to 10). Only admins see this; it never appears on your profile.",
+    councilTooLong: "Up to 10 council members.",
+    pageAddress: "Page address: {0} (set automatically)",
+    positionPresident: "President",
+    positionVicePresident: "Vice President",
+    positionSecretary: "Secretary",
+    positionTreasurer: "Treasurer",
+    positionCommittee: "Committee member",
+    positionOther: "Other",
+    registryTitle: "Club registry",
+    registrySub: "Recognised clubs students can register. A claimed entry can't be picked again.",
+    addRegistryClub: "Add club",
+    editRegistryClub: "Edit club",
+    registryCode: "Official club ID",
+    registryCodeHelp: "As issued by HEP, e.g. HEP/2024/012. Used for the page address.",
+    registryFaculty: "Faculty / kolej",
+    registryActive: "Open for registration",
+    registryInactive: "Closed",
+    registryClaimed: "Claimed",
+    registryAvailable: "Not claimed",
+    registrySaved: "Registry updated",
+    registryEmpty: "No clubs in the registry",
+    saveRegistry: "Save",
+    registryCodeTaken: "That club ID is already in the registry.",
+    registryCodeInvalid: "Club IDs use letters, numbers, . _ / - only.",
+    registryClaimedError: "That club was just registered by someone else. Pick another.",
+    registryNotFound: "That club is no longer in the registry.",
+    positionInvalid: "Choose a valid position.",
+    councilInvalid: "Check the council names (2–80 characters each).",
+    registryManage: "Registry",
+    members: "Members",
+    membersHelp: "Everyone on the club's roster. The president can add members, give positions and promote officers.",
+    addMember: "Add member",
+    addMemberHint: "Their username, e.g. @aiman",
+    memberAdded: "{0} is now a member",
+    memberRemoved: "Member removed",
+    removeMemberTitle: "Remove {0} from the club?",
+    removeMemberBody: "They lose access to the club roster and can no longer act for it.",
+    makeOfficer: "Make officer",
+    makeMember: "Make member",
+    changePosition: "Change position",
+    noPosition: "No title",
+    positionChanged: "Position updated",
+    roleChanged: "Role updated",
+    alreadyMember: "They're already a member.",
+    notMember: "They're not in this club.",
+    cannotChangePresident: "The president's role can't be changed here.",
+    roleInvalid: "Choose a valid role.",
+    joinClub: "Request to join",
+    joinPending: "Request pending",
+    joinRequested: "Request sent — the club's officers will review it",
+    joinRequests: "Join requests",
+    joinRequestsHelp: "Students asking to join. Approving adds them to the roster as a member.",
+    noJoinRequests: "No pending requests",
+    approveJoin: "Approve",
+    rejectJoin: "Decline",
+    joinedClub: "{0} is now a member",
+    requestRejected: "Request declined",
+    requestNotFound: "This request was already handled.",
+    clubNotActive: "This club isn't accepting members right now.",
+    alreadyRequested: "You already asked to join this club.",
+    approveJoinTitle: "Add {0} to the club?",
+    approveJoinBody: "They become a member on the roster and can be given a position.",
+    rejectJoinTitle: "Decline {0}'s request?",
+    rejectJoinBody: "They're notified and can ask again later.",
   );
 
   static const ms = ClubStrings(
@@ -485,6 +761,98 @@ class ClubStrings {
     approved: "Kelab diluluskan — presiden telah dimaklumkan",
     rejected: "Permohonan ditolak — presiden telah dimaklumkan",
     notPending: "Permohonan ini sudah diuruskan.",
+    contactForListings: "Hubungan untuk iklan",
+    contactForListingsHelp: "Pembeli yang meminta hubungan pada iklan kelab anda akan menerima telefon dan kod QR pembayaran ini. Ia tidak pernah dipaparkan pada halaman.",
+    phone: "Telefon (WhatsApp)",
+    phoneHint: "cth. 012-345 6789",
+    uploadQr: "Muat naik QR pembayaran",
+    replaceQr: "Tukar QR",
+    removeQr: "Buang QR",
+    saveContact: "Simpan hubungan",
+    contactSaved: "Hubungan disimpan",
+    suspend: "Gantung",
+    reactivate: "Aktifkan semula",
+    suspendTitle: "Gantung {0}?",
+    suspendBody: "Halaman dan semua siaran kelab tidak lagi dipaparkan kepada pelawat, dan pegawai tidak boleh menyiar. Presiden akan dimaklumkan.",
+    reactivateTitle: "Aktifkan semula {0}?",
+    reactivateBody: "Halaman dan siarannya kelihatan semula, dan pegawai boleh menyiar. Presiden akan dimaklumkan.",
+    suspendedDone: "Kelab digantung — presiden telah dimaklumkan",
+    reactivatedDone: "Kelab aktif semula — presiden telah dimaklumkan",
+    noActiveClubs: "Tiada kelab aktif",
+    noSuspendedClubs: "Tiada kelab digantung",
+    chooseClub: "Kelab",
+    chooseClubRequired: "Pilih kelab anda daripada senarai.",
+    noRegistryClubs: "Belum ada kelab untuk didaftarkan",
+    noRegistryClubsBody: "Admin perlu menambah kelab yang diiktiraf ke dalam daftar dahulu. Sila semak semula nanti.",
+    officialEmail: "Gmail rasmi kelab",
+    officialEmailHelp: "Peti masuk kongsi kelab. Ahli, pembeli dan admin menghubungi kelab melaluinya; ia dipaparkan pada halaman.",
+    position: "Jawatan anda",
+    council: "Ahli majlis",
+    councilHelp: "Satu setiap baris: Nama - Jawatan (maksimum 10). Hanya admin melihat ini; ia tidak dipaparkan pada profil anda.",
+    councilTooLong: "Maksimum 10 ahli majlis.",
+    pageAddress: "Alamat halaman: {0} (ditetapkan automatik)",
+    positionPresident: "Presiden",
+    positionVicePresident: "Naib Presiden",
+    positionSecretary: "Setiausaha",
+    positionTreasurer: "Bendahari",
+    positionCommittee: "Ahli jawatankuasa",
+    positionOther: "Lain-lain",
+    registryTitle: "Daftar kelab",
+    registrySub: "Kelab diiktiraf yang boleh didaftarkan oleh pelajar. Entri yang telah diambil tidak boleh dipilih lagi.",
+    addRegistryClub: "Tambah kelab",
+    editRegistryClub: "Sunting kelab",
+    registryCode: "ID rasmi kelab",
+    registryCodeHelp: "Seperti yang dikeluarkan HEP, cth. HEP/2024/012. Digunakan untuk alamat halaman.",
+    registryFaculty: "Fakulti / kolej",
+    registryActive: "Dibuka untuk pendaftaran",
+    registryInactive: "Ditutup",
+    registryClaimed: "Telah diambil",
+    registryAvailable: "Belum diambil",
+    registrySaved: "Daftar dikemas kini",
+    registryEmpty: "Tiada kelab dalam daftar",
+    saveRegistry: "Simpan",
+    registryCodeTaken: "ID kelab itu sudah ada dalam daftar.",
+    registryCodeInvalid: "ID kelab hanya guna huruf, nombor, . _ / -.",
+    registryClaimedError: "Kelab itu baru didaftarkan oleh orang lain. Pilih yang lain.",
+    registryNotFound: "Kelab itu tiada lagi dalam daftar.",
+    positionInvalid: "Pilih jawatan yang sah.",
+    councilInvalid: "Semak nama ahli majlis (2–80 aksara setiap satu).",
+    registryManage: "Daftar",
+    members: "Ahli",
+    membersHelp: "Semua ahli dalam senarai kelab. Presiden boleh menambah ahli, memberi jawatan dan menaikkan pegawai.",
+    addMember: "Tambah ahli",
+    addMemberHint: "Nama pengguna mereka, cth. @aiman",
+    memberAdded: "{0} kini ahli",
+    memberRemoved: "Ahli dibuang",
+    removeMemberTitle: "Buang {0} daripada kelab?",
+    removeMemberBody: "Mereka hilang akses kepada senarai kelab dan tidak lagi boleh bertindak untuknya.",
+    makeOfficer: "Jadikan pegawai",
+    makeMember: "Jadikan ahli",
+    changePosition: "Tukar jawatan",
+    noPosition: "Tiada jawatan",
+    positionChanged: "Jawatan dikemas kini",
+    roleChanged: "Peranan dikemas kini",
+    alreadyMember: "Mereka sudah menjadi ahli.",
+    notMember: "Mereka bukan ahli kelab ini.",
+    cannotChangePresident: "Peranan presiden tidak boleh diubah di sini.",
+    roleInvalid: "Pilih peranan yang sah.",
+    joinClub: "Mohon sertai",
+    joinPending: "Permohonan menunggu",
+    joinRequested: "Permohonan dihantar — pegawai kelab akan menyemaknya",
+    joinRequests: "Permohonan sertai",
+    joinRequestsHelp: "Pelajar yang meminta untuk menyertai. Meluluskan akan menambah mereka sebagai ahli.",
+    noJoinRequests: "Tiada permohonan menunggu",
+    approveJoin: "Lulus",
+    rejectJoin: "Tolak",
+    joinedClub: "{0} kini ahli",
+    requestRejected: "Permohonan ditolak",
+    requestNotFound: "Permohonan ini sudah diuruskan.",
+    clubNotActive: "Kelab ini tidak menerima ahli buat masa ini.",
+    alreadyRequested: "Anda sudah memohon untuk menyertai kelab ini.",
+    approveJoinTitle: "Tambah {0} ke kelab?",
+    approveJoinBody: "Mereka menjadi ahli dalam senarai dan boleh diberi jawatan.",
+    rejectJoinTitle: "Tolak permohonan {0}?",
+    rejectJoinBody: "Mereka akan dimaklumkan dan boleh memohon lagi nanti.",
   );
 
   /// Category keys stored in clubs.category.
@@ -510,6 +878,22 @@ class ClubStrings {
         'officer' => roleOfficer,
         _ => roleMember,
       };
+
+  /// Roster title; falls back to the permission role when unset.
+  String positionLabel(String? position) => switch (position) {
+        'president' => positionPresident,
+        'vice_president' => positionVicePresident,
+        'secretary' => positionSecretary,
+        'treasurer' => positionTreasurer,
+        'committee' => positionCommittee,
+        'other' => positionOther,
+        _ => '',
+      };
+
+  String rosterLabel(String? position, String? role) {
+    final p = positionLabel(position);
+    return p.isEmpty ? roleLabel(role) : p;
+  }
 
   String statusLabel(String? status) => switch (status) {
         'pending' => statusPending,

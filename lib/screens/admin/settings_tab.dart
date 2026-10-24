@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_strings.dart';
+import '../../l10n/access_strings.dart';
 import '../../l10n/moderation_strings.dart';
 import '../../language_cubit.dart';
+import '../../services/admin_unlock.dart';
 import '../../services/moderation_service.dart';
+import '../../services/registration_policy.dart';
 import '../../utils/moderation_logic.dart';
 import '../../widgets/moderation_ui.dart';
 
@@ -41,6 +44,16 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
   Set<String> _priority = {};
   late Future<void> _loading = _load();
   bool _saving = false;
+  bool _pinConfigured = false;
+  bool _pinSaving = false;
+
+  /// Owner-only student-verification switch (off unless turned on).
+  bool _verification = false;
+  bool _verificationSaving = false;
+
+  /// Owner-only signup switch (student addresses only unless opened).
+  bool _registrationOpen = false;
+  bool _registrationSaving = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -51,6 +64,105 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
       e.value.text = '${s[e.key] ?? ''}';
     }
     _priority = {...((s['priority_categories'] as List?) ?? const []).cast<String>()};
+    _pinConfigured = await ModerationService.adminPinConfigured();
+    try {
+      final policy = await ModerationService.accessPolicy();
+      _verification = policy['verification_enabled'] == true;
+      _registrationOpen = policy['registration_mode'] == 'open';
+    } catch (_) {
+      // Fail closed: an unread policy must not look enabled.
+      _verification = false;
+      _registrationOpen = false;
+    }
+  }
+
+  Future<void> _toggleRegistration(bool value) async {
+    final s = context.l10n;
+    if (value) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(s.regConfirmTitle),
+          content: Text(s.regConfirmBody),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false), child: Text(s.cancel)),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(s.regConfirmAction)),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+    setState(() => _registrationSaving = true);
+    try {
+      await ModerationService.setRegistrationMode(
+          value ? 'open' : 'student_only');
+      // The login screen and the OAuth guard read this cache.
+      RegistrationPolicy.invalidate();
+      if (!mounted) return;
+      setState(() => _registrationOpen = value);
+      showModSnack(context, value ? s.regNowOpen : s.regNowStudentOnly);
+    } catch (e) {
+      if (mounted) showModError(context, e);
+    } finally {
+      if (mounted) setState(() => _registrationSaving = false);
+    }
+  }
+
+  Future<void> _toggleVerification(bool value) async {
+    final s = context.l10n;
+    if (value) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(s.verifyConfirmTitle),
+          content: Text(s.verifyConfirmBody),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false), child: Text(s.cancel)),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(s.verifyConfirmAction)),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+    setState(() => _verificationSaving = true);
+    try {
+      await ModerationService.setVerificationEnabled(value);
+      if (!mounted) return;
+      setState(() => _verification = value);
+      showModSnack(context, value ? s.verifyOn : s.verifyOff);
+    } catch (e) {
+      if (mounted) showModError(context, e);
+    } finally {
+      if (mounted) setState(() => _verificationSaving = false);
+    }
+  }
+
+  Future<void> _setPin() async {
+    final m = modStrings(context);
+    final pin = await showDialog<String>(
+      context: context,
+      builder: (_) => const _AdminPinDialog(),
+    );
+    if (pin == null) return;
+    setState(() => _pinSaving = true);
+    try {
+      await ModerationService.setAdminPin(pin);
+      AdminUnlock.instance.setConfigured(true);
+      AdminUnlock.instance.startSession();
+      if (!mounted) return;
+      setState(() => _pinConfigured = true);
+      showModSnack(context, m.adminPinSaved);
+    } catch (e) {
+      if (mounted) showModError(context, e);
+    } finally {
+      if (mounted) setState(() => _pinSaving = false);
+    }
   }
 
   @override
@@ -129,6 +241,98 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
             children: [
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(ModIcons.lock, size: 20),
+                          const SizedBox(width: 8),
+                          Text(m.adminPin, style: Theme.of(context).textTheme.titleSmall),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(_pinConfigured ? m.adminPinConfigured : m.adminPinNotConfigured,
+                          style: Theme.of(context).textTheme.bodySmall),
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        onPressed: _pinSaving ? null : _setPin,
+                        icon: const Icon(ModIcons.settings, size: 18),
+                        label: Text(_pinConfigured ? m.adminPinChange : m.adminPinSet),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // ---- registration: student addresses only, or anyone ----
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(ModIcons.person, size: 20),
+                          const SizedBox(width: 8),
+                          Text(context.l10n.regTitle,
+                              style: Theme.of(context).textTheme.titleSmall),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(context.l10n.regOpenBody,
+                          style: Theme.of(context).textTheme.bodySmall),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        value: _registrationOpen,
+                        onChanged: _registrationSaving
+                            ? null
+                            : _toggleRegistration,
+                        title: Text(context.l10n.regOpenTitle),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // ---- student verification (the switch that gates joining,
+              // creating events and selling) ----
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(ModIcons.verified, size: 20),
+                          const SizedBox(width: 8),
+                          Text(context.l10n.verifySectionTitle,
+                              style: Theme.of(context).textTheme.titleSmall),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(context.l10n.verifySwitchBody,
+                          style: Theme.of(context).textTheme.bodySmall),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        value: _verification,
+                        onChanged:
+                            _verificationSaving ? null : _toggleVerification,
+                        title: Text(context.l10n.verifySwitchTitle),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
               for (final f in _intFields)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
@@ -183,6 +387,67 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
           ),
         );
       },
+    );
+  }
+}
+
+/// New admin PIN + confirmation. Pops the PIN when valid.
+class _AdminPinDialog extends StatefulWidget {
+  const _AdminPinDialog();
+
+  @override
+  State<_AdminPinDialog> createState() => _AdminPinDialogState();
+}
+
+class _AdminPinDialogState extends State<_AdminPinDialog> {
+  final _form = GlobalKey<FormState>();
+  final _pin = TextEditingController();
+  final _confirm = TextEditingController();
+
+  @override
+  void dispose() {
+    _pin.dispose();
+    _confirm.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (!_form.currentState!.validate()) return;
+    Navigator.pop(context, _pin.text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.l10n.mod;
+    return AlertDialog(
+      title: Text(m.adminPin),
+      content: Form(
+        key: _form,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _pin,
+              autofocus: true,
+              obscureText: true,
+              decoration: InputDecoration(labelText: m.adminPin),
+              validator: (v) => (v ?? '').length < 4 ? m.adminPinTooShort : null,
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _confirm,
+              obscureText: true,
+              decoration: InputDecoration(labelText: m.adminPinConfirm),
+              validator: (v) => v != _pin.text ? m.adminPinMismatch : null,
+              onFieldSubmitted: (_) => _save(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(m.cancel)),
+        FilledButton(onPressed: _save, child: Text(m.save)),
+      ],
     );
   }
 }

@@ -12,6 +12,7 @@ import '../utils/adaptive.dart';
 import '../utils/formatters.dart';
 import '../utils/app_nav.dart';
 import '../utils/form_draft.dart';
+import '../widgets/category_picker.dart';
 import '../widgets/form_layout.dart';
 import '../widgets/media_picker_grid.dart';
 import '../widgets/restriction_gate.dart';
@@ -41,7 +42,19 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   late TextEditingController _quantityController;
   
   // State
-  String _category = 'Books';
+  /// Stored slugs from `content_categories`. The first is the primary
+  /// category; a DB trigger copies it into `listings.category`.
+  List<String> _categories = [];
+
+  static List<String> _categoriesFrom(Map<String, dynamic>? item) {
+    if (item == null) return [];
+    final raw = item['categories'];
+    if (raw is List && raw.isNotEmpty) {
+      return raw.whereType<String>().map((e) => e.toLowerCase()).toList();
+    }
+    final cat = item['category'];
+    return cat is String && cat.trim().isNotEmpty ? [cat.toLowerCase()] : [];
+  }
   bool _isLoading = false;
 
   /// Yourself (null) or one of your clubs. Fixed once published.
@@ -67,9 +80,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     _condition = CreateStrings.conditions.contains(cond) ? cond as String : null;
     
     if (item != null) {
-      // Older/seeded listings may carry a category no longer offered
-      final cat = item['category'];
-      _category = kListingCategories.contains(cat) ? cat : 'Others';
+      _categories = _categoriesFrom(item);
       
       // LOAD EXISTING MEDIA
       // 1. Cover
@@ -100,7 +111,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         'title': _titleController.text,
         'price': _priceController.text,
         'description': _descriptionController.text,
-        'category': _category,
+        'categories': _categories,
         'meetup': _meetupController.text,
         'condition': _condition,
       };
@@ -113,8 +124,8 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
       _titleController.text = d['title'] ?? '';
       _priceController.text = d['price'] ?? '';
       _descriptionController.text = d['description'] ?? '';
-      final cat = d['category'];
-      if (cat is String && kListingCategories.contains(cat)) _category = cat;
+      final cats = d['categories'];
+      if (cats is List) _categories = cats.whereType<String>().toList();
       _meetupController.text = d['meetup'] ?? '';
       final cond = d['condition'];
       if (CreateStrings.conditions.contains(cond)) _condition = cond as String;
@@ -148,7 +159,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         _titleController.text,
         _priceController.text,
         _descriptionController.text,
-        _category,
+        _categories.join(','),
         _meetupController.text,
         _quantityController.text,
         _condition,
@@ -220,6 +231,11 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.addPhotoRequired)));
       return;
     }
+    if (_categories.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(s.categoryRequired)));
+      return;
+    }
 
     final user = _supabase.auth.currentUser;
     if (user == null) return;
@@ -275,7 +291,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         'seller_id': user.id,
         'title': _titleController.text.trim(),
         'price': double.parse(_priceController.text),
-        'category': _category,
+        'categories': _categories,
         'description': _descriptionController.text.trim(),
         'image_url': finalCoverUrl,      // Index 0
         'gallery_urls': finalGalleryUrls, // Index 1+
@@ -413,16 +429,6 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                         return (n == null || n < 0) ? s.priceInvalid : null;
                       },
                     );
-                    final category = DropdownButtonFormField<String>(
-                      // Keyed so a restored draft's category shows.
-                      key: ValueKey(_category),
-                      initialValue: _category,
-                      decoration: InputDecoration(labelText: s.category),
-                      items: kListingCategories
-                          .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                          .toList(),
-                      onChanged: (v) => setState(() => _category = v!),
-                    );
                     final quantity = TextFormField(
                       controller: _quantityController,
                       keyboardType: TextInputType.number,
@@ -438,34 +444,34 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                     if (c.maxWidth < 420) {
                       return Column(children: [
                         price,
-                        const SizedBox(height: 16),
-                        category,
                         if (_asClub) ...[const SizedBox(height: 16), quantity],
                       ]);
                     }
                     if (_asClub) {
                       return Column(children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(child: price),
-                            const SizedBox(width: 16),
-                            Expanded(child: category),
-                          ],
-                        ),
+                        price,
                         const SizedBox(height: 16),
                         quantity,
                       ]);
                     }
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: price),
-                        const SizedBox(width: 16),
-                        Expanded(child: category),
-                      ],
-                    );
+                    return price;
                   }),
+                  const SizedBox(height: 16),
+                  Text(s.category, style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  CategoryPicker(
+                    kind: 'listing',
+                    value: _categories,
+                    onChanged: (v) => setState(() => _categories = v),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    s.categoryPickHint.fill(['$kMaxCategoriesPerItem']),
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
                 ],
               ),
             ],

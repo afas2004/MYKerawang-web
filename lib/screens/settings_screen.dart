@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -9,12 +9,19 @@ import '../theme/app_themes.dart';
 import '../widgets/brand/brand.dart';
 import '../utils/adaptive.dart';
 import '../l10n/app_strings.dart';
+import '../l10n/access_strings.dart';
+import '../l10n/account_strings.dart';
 import '../language_cubit.dart';
 import '../l10n/shell_strings.dart';
 import '../l10n/social_strings.dart';
+import '../l10n/moderation_strings.dart';
 import '../services/account_data.dart';
+import '../services/moderation_service.dart';
+import '../services/student_verification.dart';
 import '../utils/app_nav.dart';
 import 'profile_cubit.dart';
+import 'login_cubit.dart';
+import 'verification/verify_sheet.dart';
 import '../services/update_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -31,7 +38,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _checkingUpdate = false;
   bool _exporting = false;
 
+  /// The account's recovery address, loaded from profile_contacts (the
+  /// owner's own row is the only one readable).
+  String? _backupEmail;
+  bool _backupLoaded = false;
+
+  /// Student verification: shown only while the owner has the switch on.
+  bool _verifyEnabled = false;
+  StudentVerification? _verification;
+
   final _supabase = Supabase.instance.client;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBackupEmail();
+    _loadVerification();
+  }
+
+  Future<void> _loadVerification() async {
+    final enabled = await StudentVerificationService.isEnabled();
+    final v = enabled ? await StudentVerificationService.mine() : null;
+    if (!mounted) return;
+    setState(() {
+      _verifyEnabled = enabled;
+      _verification = v;
+    });
+  }
+
+  String _verificationLabel(AppStrings s) => switch (_verification?.status) {
+        'verified' => s.verifyStatusVerified,
+        'pending' => s.verifyStatusPending,
+        'rejected' => s.verifyStatusRejected,
+        'revoked' => s.verifyStatusRevoked,
+        _ => s.verifyStatusNone,
+      };
+
+  Future<void> _loadBackupEmail() async {
+    final uid = _supabase.auth.currentUser?.id;
+    if (uid == null) return;
+    try {
+      final row = await _supabase
+          .from('profile_contacts')
+          .select('backup_email')
+          .eq('user_id', uid)
+          .maybeSingle();
+      if (!mounted) return;
+      setState(() {
+        _backupEmail = (row?['backup_email'] as String?)?.trim();
+        _backupLoaded = true;
+      });
+    } catch (e) {
+      debugPrint('Backup email load failed: $e');
+      if (mounted) setState(() => _backupLoaded = true);
+    }
+  }
 
   // ---- Privacy & data (PDPA) ------------------------------------------
 
@@ -159,6 +220,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final email = _supabase.auth.currentUser?.email;
+    // The student address stops working after graduation; without a
+    // backup the account is unrecoverable. Only nag about a real gap.
+    final needsBackup = _backupLoaded &&
+        isStudentEmail(email) &&
+        (_backupEmail == null || _backupEmail!.isEmpty);
 
     return Scaffold(
       appBar: appBarConstrained(context,
@@ -260,6 +326,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
 
+              // --- MODERATION (admins and the owner only) ---
+              FutureBuilder<bool>(
+                future: ModerationService.isAdmin(),
+                builder: (context, snap) => snap.data == true
+                    ? _SettingsGroup(
+                        title: context.l10n.mod.moderation,
+                        children: [
+                          ListTile(
+                            leading: const Icon(AppIcons.moderation),
+                            title: Text(context.l10n.mod.moderation),
+                            subtitle: Text(context.l10n.mod.adminConsoleSub),
+                            trailing: const Icon(AppIcons.chevronRight),
+                            onTap: () => context.push('/admin'),
+                          ),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
+              ),
+
               // --- ACCOUNT ---
               _SettingsGroup(
                 title: s.shell.account,
@@ -268,6 +353,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ListTile(
                       leading: const Icon(AppIcons.email),
                       title: Text(email),
+                    ),
+                  ListTile(
+                    leading: const Icon(AppIcons.lock),
+                    title: Text(s.account.backupEmail),
+                    subtitle: Text((_backupEmail == null || _backupEmail!.isEmpty)
+                        ? s.account.backupEmailNone
+                        : _backupEmail!),
+                    trailing: const Icon(AppIcons.chevronRight),
+                    onTap: () async {
+                      await context.push('/profile/edit');
+                      if (mounted) _loadBackupEmail();
+                    },
+                  ),
+                  if (needsBackup)
+                    ListTile(
+                      leading: Icon(AppIcons.warning, color: scheme.tertiary),
+                      title: Text(s.account.backupNudgeTitle,
+                          style: TextStyle(color: scheme.tertiary)),
+                      subtitle: Text(s.account.backupNudgeBody.fill([email ?? ''])),
+                      isThreeLine: true,
+                      onTap: () async {
+                        await context.push('/profile/edit');
+                        if (mounted) _loadBackupEmail();
+                      },
+                    ),
+                  if (_verifyEnabled)
+                    ListTile(
+                      leading: Icon(
+                        AppIcons.verified,
+                        color: _verification?.isVerified == true
+                            ? scheme.primary
+                            : scheme.onSurfaceVariant,
+                      ),
+                      title: Text(s.verifyTitle),
+                      subtitle: Text(_verificationLabel(s)),
+                      trailing: const Icon(AppIcons.chevronRight),
+                      onTap: () async {
+                        await showVerifySheet(context);
+                        if (mounted) _loadVerification();
+                      },
                     ),
                   ListTile(
                     leading: const Icon(AppIcons.info),

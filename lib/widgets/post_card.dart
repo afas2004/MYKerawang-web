@@ -65,6 +65,13 @@ class PostCard extends StatefulWidget {
   /// Thread head on the detail page: no outer margin.
   final bool expanded;
 
+  /// Show the club-page pin action (officers viewing their own club's page).
+  /// Global pinning stays admin-only.
+  final bool canClubPin;
+
+  /// Called after a club-page pin/unpin, so the page can re-order.
+  final VoidCallback? onClubPinChanged;
+
   const PostCard({
     super.key,
     required this.post,
@@ -74,6 +81,8 @@ class PostCard extends StatefulWidget {
     this.onTagTap,
     this.onCommentTap,
     this.expanded = false,
+    this.canClubPin = false,
+    this.onClubPinChanged,
   });
 
   @override
@@ -160,6 +169,15 @@ class _PostCardState extends State<PostCard> {
     }
   }
 
+  Future<void> _toggleClubPin() async {
+    final pinned = _post['is_club_pinned'] == true;
+    final now = await PinActions.toggleClub(context, _post, pinned: pinned);
+    if (mounted && now != pinned) {
+      setState(() => _post = {..._post, 'is_club_pinned': now});
+      widget.onClubPinChanged?.call();
+    }
+  }
+
   void _share() {
     final post = _post;
     final title = (post['title'] as String?)?.trim();
@@ -207,6 +225,8 @@ class _PostCardState extends State<PostCard> {
       onEdit: () => openPostEditor(context, post),
       onDelete: _delete,
       onTogglePin: _togglePin,
+      canClubPin: widget.canClubPin,
+      onToggleClubPin: _toggleClubPin,
       onCopyLink: _copyLink,
     );
 
@@ -429,6 +449,8 @@ class _MoreMenu extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onTogglePin;
+  final bool canClubPin;
+  final VoidCallback onToggleClubPin;
   final VoidCallback onCopyLink;
 
   const _MoreMenu({
@@ -437,6 +459,8 @@ class _MoreMenu extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onTogglePin,
+    required this.canClubPin,
+    required this.onToggleClubPin,
     required this.onCopyLink,
   });
 
@@ -451,6 +475,7 @@ class _MoreMenu extends StatelessWidget {
     final s = context.l10n;
     final m = s.mod;
     final pinned = post['is_pinned'] == true;
+    final clubPinned = post['is_club_pinned'] == true;
 
     PopupMenuItem<String> item(String value, IconData icon, String label,
             {bool danger = false}) =>
@@ -477,12 +502,15 @@ class _MoreMenu extends StatelessWidget {
             'edit' => onEdit(),
             'delete' => onDelete(),
             'pin' => onTogglePin(),
+            'clubPin' => onToggleClubPin(),
             'link' => onCopyLink(),
             _ => _report(context),
           },
           itemBuilder: (_) => [
             item('link', AppIcons.link, s.copyLink),
             if (canPin) item('pin', AppIcons.pin, pinned ? m.unpin : m.pin),
+            if (canClubPin)
+              item('clubPin', AppIcons.pin, clubPinned ? m.unpinFromClub : m.pinToClub),
             if (mine) ...[
               item('edit', AppIcons.edit, s.edit),
               item('delete', AppIcons.delete, s.delete, danger: true),

@@ -65,7 +65,7 @@ class AdminOverview extends StatelessWidget {
         icon: ModIcons.appeal,
         label: u.statAppeals,
         value: s == null ? null : '${n('pending_appeals')}',
-        onTap: () => onOpenTab?.call(2),
+        onTap: () => onOpenTab?.call(3),
       ),
     ];
 

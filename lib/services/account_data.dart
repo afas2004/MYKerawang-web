@@ -48,7 +48,14 @@ class AccountData {
           'contact_details',
           () => _db
               .from('profile_contacts')
-              .select('phone_number, payment_qr_url, updated_at')
+              .select('phone_number, payment_qr_url, backup_email, updated_at')
+              .eq('user_id', uid)
+              .maybeSingle()),
+      section(
+          'student_verification',
+          () => _db
+              .from('student_verifications')
+              .select()
               .eq('user_id', uid)
               .maybeSingle()),
       // Base tables: RLS lets the author read their own anonymous rows.

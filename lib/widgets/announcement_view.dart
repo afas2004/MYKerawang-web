@@ -161,6 +161,9 @@ class AnnouncementData {
   final String? authorAvatar;
   final dynamic cover;
   final List<dynamic> images;
+
+  /// `16:9` (banner) or `1:1` (square). Chosen by the author.
+  final String coverAspect;
   final List<ActionLink> actions;
   final Map<String, dynamic>? linkedEvent;
   final DateTime? publishAt;
@@ -174,6 +177,7 @@ class AnnouncementData {
     this.authorAvatar,
     this.cover,
     this.images = const [],
+    this.coverAspect = '16:9',
     this.actions = const [],
     this.linkedEvent,
     this.publishAt,
@@ -192,6 +196,7 @@ class AnnouncementData {
       authorName: '${club?['name'] ?? profile?['display_name'] ?? fallbackAuthor}',
       authorAvatar: (club?['logo_url'] ?? profile?['avatar_url']) as String?,
       cover: p['cover_url'] ?? p['image_url'],
+      coverAspect: p['cover_aspect'] == '1:1' ? '1:1' : '16:9',
       images: List<String>.from(p['gallery_urls'] ?? const []),
       actions: ActionLink.listFrom(p['action_links']),
       linkedEvent: linkedEvent,
@@ -230,7 +235,9 @@ class AnnouncementView extends StatelessWidget {
         if (d.cover != null && !(d.cover is String && (d.cover as String).isEmpty))
           ClipRRect(
             borderRadius: KRadius.card,
-            child: AspectRatio(aspectRatio: 16 / 9, child: AnnouncementImage(d.cover)),
+            child: AspectRatio(
+                aspectRatio: d.coverAspect == '1:1' ? 1.0 : 16 / 9,
+                child: AnnouncementImage(d.cover)),
           ),
         const SizedBox(height: KSpace.l),
         Wrap(

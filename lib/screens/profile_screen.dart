@@ -12,6 +12,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../utils/roles.dart';
 import '../l10n/access_strings.dart';
+import '../l10n/account_strings.dart';
 import '../l10n/feed_strings.dart';
 import '../l10n/social_strings.dart';
 import '../widgets/post_card.dart';
@@ -20,8 +21,10 @@ import '../widgets/status_badge.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../utils/formatters.dart';
 import '../utils/guest_access.dart';
+import '../widgets/admin_icon_button.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/shell_actions.dart';
+import 'login_cubit.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId; 
@@ -40,6 +43,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   bool _loadError = false;
   bool _isMe = false;
   bool _isFollowing = false;
+
+  /// Own profile only: signed in with a student address and no backup —
+  /// the account dies with the mailbox. Dismissable for this visit.
+  bool _backupNeeded = false;
+  bool _backupBannerHidden = false;
   int _followerCount = 0;   // <--- Add this
   int _followingCount = 0;
   
@@ -121,6 +129,25 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           _followerCount = followers;
           _followingCount = following;
         });
+      }
+
+      // Only the owner can read this row; a failure just hides the banner.
+      if (_isMe && isStudentEmail(_supabase.auth.currentUser?.email)) {
+        var needs = true;
+        try {
+          final c = await _supabase
+              .from('profile_contacts')
+              .select('backup_email')
+              .eq('user_id', targetUid)
+              .maybeSingle();
+          final backup = (c?['backup_email'] as String?)?.trim();
+          needs = backup == null || backup.isEmpty;
+        } catch (_) {
+          needs = false;
+        }
+        if (mounted && needs != _backupNeeded) {
+          setState(() => _backupNeeded = needs);
+        }
       }
     } catch (e) {
       debugPrint("Error loading profile: $e");
@@ -345,12 +372,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           if (_isMe && _inShell(context)) const ShellSearchButton(),
           // Own profile is reached from an avatar now, so Settings is a
           // visible action rather than buried in the menu.
-          if (_isMe)
+          if (_isMe) ...[
+            const AdminIconButton(),
             IconButton(
               tooltip: s.settings,
               icon: const Icon(AppIcons.settings),
               onPressed: () => context.goSettings(),
             ),
+          ],
           _overflowMenu(context),
         ],
       ),
@@ -362,6 +391,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               parent: AlwaysScrollableScrollPhysics()),
           headerSliverBuilder: (context, _) => [
             SliverToBoxAdapter(child: _header(context, p)),
+            if (_isMe && _backupNeeded && !_backupBannerHidden)
+              SliverToBoxAdapter(child: _backupBanner(context)),
             SliverPersistentHeader(
               pinned: true,
               delegate: _TabBarDelegate(
@@ -403,9 +434,60 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
   }
 
+  /// Own profile: no backup email means the account dies with the
+  /// student mailbox. One line of warning, dismissable for this visit.
+  Widget _backupBanner(BuildContext context) {
+    final a = context.l10n.account;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final onTint = scheme.onTertiaryContainer;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.s, KSpace.l, 0),
+      child: Container(
+        padding: const EdgeInsets.all(KSpace.m),
+        decoration: BoxDecoration(
+          color: scheme.tertiaryContainer,
+          borderRadius: KRadius.card,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(AppIcons.warning, size: 20, color: onTint),
+            const SizedBox(width: KSpace.s),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(a.backupNudgeTitle,
+                      style: theme.textTheme.titleSmall?.copyWith(color: onTint)),
+                  const SizedBox(height: 2),
+                  Text(
+                    a.backupNudgeBody
+                        .fill([_supabase.auth.currentUser?.email ?? '']),
+                    style: theme.textTheme.bodySmall?.copyWith(color: onTint),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(children: [
+                    TextButton(
+                      onPressed: () => context.push('/profile/edit'),
+                      child: Text(a.backupNudgeAdd),
+                    ),
+                    TextButton(
+                      onPressed: () => setState(() => _backupBannerHidden = true),
+                      child: Text(a.backupNudgeLater),
+                    ),
+                  ]),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// QR, refresh and settings (own) / report (others) in one menu.
-  Widget _overflowMenu(BuildContext context) {
-    final s = context.l10n;
+  Widget _overflowMenu(BuildContext context) {    final s = context.l10n;
     return PopupMenuButton<String>(
       icon: const Icon(AppIcons.more),
       tooltip: MaterialLocalizations.of(context).showMenuTooltip,

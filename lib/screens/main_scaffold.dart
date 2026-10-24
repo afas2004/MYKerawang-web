@@ -10,6 +10,7 @@ import '../utils/browser_history_stub.dart'
 import '../widgets/brand/brand.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/app_logo.dart';
+import '../widgets/admin_icon_button.dart';
 import '../widgets/app_sidebar.dart';
 import '../widgets/profile_avatar_action.dart';
 import '../widgets/right_rail.dart';
@@ -230,6 +231,7 @@ class ShellFrame extends StatelessWidget {
                     icon: const Icon(AppIcons.settings),
                     onPressed: () => context.goSettings(),
                   ),
+                  const AdminIconButton(),
                 ],
                 const ProfileAvatarAction(compactGuest: true),
               ],

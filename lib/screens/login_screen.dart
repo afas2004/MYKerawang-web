@@ -8,6 +8,7 @@ import '../language_cubit.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/brand/brand.dart';
 import '../utils/guest_access.dart';
+import '../services/registration_policy.dart';
 import 'login_cubit.dart'; // This looks in the SAME folder
 
 class LoginScreen extends StatefulWidget {
@@ -30,10 +31,23 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passCtrl = TextEditingController();
   bool _obscurePassword = true;
 
+  /// Owner-controlled: when open, any email may sign up.
+  bool _openRegistration = RegistrationPolicy.isOpen;
+
   @override
   void initState() {
     super.initState();
     pendingLoginError.addListener(_showPendingError);
+    RegistrationPolicy.refresh().then((open) {
+      if (mounted && open != _openRegistration) {
+        setState(() => _openRegistration = open);
+      }
+    });
+    final prefill = pendingLoginEmail.value;
+    if (prefill != null && prefill.isNotEmpty) {
+      _emailCtrl.text = prefill;
+      pendingLoginEmail.value = null;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final oauthError = widget.oauthError;
@@ -199,15 +213,20 @@ class _LoginScreenState extends State<LoginScreen> {
               decoration: InputDecoration(
                 labelText: s.email,
                 prefixIcon: const Icon(AppIcons.email),
-                // New accounts need a student address; say so up front.
-                helperText: signUp ? s.studentEmailHint : null,
+                // Student addresses are the fast path; when the owner has
+                // opened signup, any address works.
+                helperText: signUp
+                    ? (_openRegistration ? s.anyEmailHint : s.studentEmailHint)
+                    : null,
                 helperMaxLines: 2,
               ),
               validator: (v) {
                 final email = (v ?? '').trim();
                 if (email.isEmpty) return s.fillAllFields;
                 if (!_emailPattern.hasMatch(email)) return s.emailInvalid;
-                if (signUp && !isStudentEmail(email)) return s.studentEmailOnly;
+                if (signUp && !_openRegistration && !isStudentEmail(email)) {
+                  return s.studentEmailOnly;
+                }
                 return null;
               },
             ),

@@ -12,14 +12,22 @@ import 'language_cubit.dart';
 import 'router.dart';
 // --- IMPORT YOUR SERVICES ---
 import 'services/notification_service.dart';
+import 'services/category_service.dart';
+import 'services/club_service.dart';
+import 'services/admin_unlock.dart';
+import 'services/known_accounts.dart';
 import 'services/saved_items.dart';
 import 'services/unread_notifications.dart';
 import 'services/update_service.dart';
 import 'widgets/update_banner.dart';
+import 'l10n/account_strings.dart';
+import 'l10n/app_strings.dart';
 import 'utils/responsive.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'screens/profile_cubit.dart';
+import 'screens/search_screen.dart';
+import 'screens/login_cubit.dart';
 
 /// Lets mouse users drag-scroll lists (like touch), on top of the wheel.
 class AppScrollBehavior extends MaterialScrollBehavior {
@@ -40,12 +48,25 @@ void main() async {
   usePathUrlStrategy();
 
   // 1. Initialize Supabase
+  //
+  // Publishable key, not the legacy anon JWT. It is safe in a browser:
+  // it only ever acts as `anon` and every table is behind RLS. The legacy
+  // service_role key leaked into this repo's history, so the project
+  // moves off JWT-based API keys entirely.
   await Supabase.initialize(
     url: 'https://zxjuqpqzyzmegdjttzyz.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp4anVxcHF6eXptZWdkanR0enl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0MzAxNzIsImV4cCI6MjA4MDAwNjE3Mn0.UD_aL16G55CFD6TAOutU4oiGsJCaU5wq-wqFf6OnW5c',
+    anonKey: 'sb_publishable_REqYNPrrJEIgmEjZjrJhtg_1JrLn_yO',
   );
 
   await NotificationService.init();
+
+  // Warm the category cache so filter chips can render labels without an
+  // await. Falls back to the bundled seeds; never throws.
+  CategoryService.warm();
+
+  // The Search tab's "All" results include a Clubs section; the hook is
+  // optional so SearchScreen keeps working without the clubs feature.
+  SearchScreen.clubSource = ClubService.searchRows;
 
   // Web: poll for newer deploys so phones don't sit on a stale build.
   UpdateService.instance.start();
@@ -120,6 +141,7 @@ class _SessionWatcherState extends State<SessionWatcher> {
     // Handle a session that already exists at startup.
     final session = Supabase.instance.client.auth.currentSession;
     if (session != null) {
+      KnownAccounts.remember(session.user);
       _checkUserProfile(session.user.id);
       _startNotificationStream(session.user.id);
       UnreadNotifications.instance.start(session.user.id);
@@ -136,6 +158,7 @@ class _SessionWatcherState extends State<SessionWatcher> {
         _notificationSubscription = null;
         UnreadNotifications.instance.stop();
         SavedItems.instance.stop();
+        AdminUnlock.instance.reset();
         return;
       }
 
@@ -145,14 +168,21 @@ class _SessionWatcherState extends State<SessionWatcher> {
 
       if (event == AuthChangeEvent.signedIn) {
         NotificationService.requestPermission();
-        _checkUserProfile(session.user.id);
+        // Record every account; only warn once they are past onboarding.
+        KnownAccounts.remember(session.user);
+        _checkUserProfile(session.user.id).then((needsOnboarding) {
+          if (!needsOnboarding) _warnOtherAccount(session.user);
+        });
         _startNotificationStream(session.user.id);
       }
     });
   }
 
   /// New users (no username yet) go to onboarding.
-  Future<void> _checkUserProfile(String userId) async {
+  ///
+  /// Returns true when onboarding was started, so the caller can skip the
+  /// duplicate-account prompt (a brand-new account is still being set up).
+  Future<bool> _checkUserProfile(String userId) async {
     try {
       final data = await Supabase.instance.client
           .from('profiles')
@@ -167,9 +197,33 @@ class _SessionWatcherState extends State<SessionWatcher> {
           if (mounted) GoRouter.of(context).go('/onboarding');
         });
       }
+      return needsOnboarding;
     } catch (e) {
       debugPrint("Profile check error: $e");
       // Fail open — let them into the app.
+      return false;
+    }
+  }
+
+  /// One account per person is the goal; two accounts on one device is
+  /// the usual way that breaks. Warn once, never block.
+  Future<void> _warnOtherAccount(User user) async {
+    try {
+      final others = await KnownAccounts.others(user.id);
+      if (others.isEmpty) return;
+      if (await KnownAccounts.hasBeenAsked(user.id)) return;
+      final nav = rootNavigator;
+      if (nav == null || !mounted) return;
+      final other = others.first;
+      await KnownAccounts.markAsked(user.id);
+      if (nav.mounted) {
+        await nav.push(DialogRoute<void>(
+          context: nav.context,
+          builder: (ctx) => _OtherAccountDialog(other: other),
+        ));
+      }
+    } catch (e) {
+      debugPrint("Other-account check failed: $e");
     }
   }
 
@@ -212,4 +266,36 @@ class _SessionWatcherState extends State<SessionWatcher> {
 
   @override
   Widget build(BuildContext context) => widget.child;
+}
+
+/// "This device has signed in as …" — informational, never blocking.
+/// Switching signs out and pre-fills the login form; it cannot sign in for
+/// them (no password, and Google needs the account picker).
+class _OtherAccountDialog extends StatelessWidget {
+  final KnownAccount other;
+  const _OtherAccountDialog({required this.other});
+
+  @override
+  Widget build(BuildContext context) {
+    final a = context.l10n.account;
+    return AlertDialog(
+      title: Text(a.otherAccountTitle),
+      content: Text(a.otherAccountBody.fill([other.label])),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(a.otherAccountStay),
+        ),
+        FilledButton(
+          onPressed: () async {
+            final email = other.email;
+            Navigator.pop(context);
+            if (email.isNotEmpty) pendingLoginEmail.value = email;
+            await Supabase.instance.client.auth.signOut();
+          },
+          child: Text(a.otherAccountSwitch.fill([other.label])),
+        ),
+      ],
+    );
+  }
 }
