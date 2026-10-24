@@ -160,10 +160,15 @@ ModError? parseModError(Object? e) {
   final m = _modPattern.firstMatch(message);
   if (m == null) return null;
 
-  // VERIFY: is raised by the student-verification gate; one friendly code
-  // for the UI, with the capability as the sub-code.
+  // VERIFY: is raised by the student-verification gate and by the
+  // verification request. `required` is the gate (with the capability as
+  // sub-code); everything else keeps its own name, prefixed so it can
+  // never collide with a MOD code.
   final kind = m.group(1);
-  final kindCode = kind == 'VERIFY' ? 'verify_required' : m.group(2)!;
+  final raw = m.group(2)!;
+  final kindCode = kind == 'VERIFY'
+      ? (raw == 'required' ? 'verify_required' : 'verify_$raw')
+      : raw;
 
   Map<String, dynamic> detail = const {};
   if (details is Map<String, dynamic>) {

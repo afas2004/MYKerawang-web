@@ -9,6 +9,7 @@ import '../theme/app_themes.dart';
 import '../widgets/brand/brand.dart';
 import '../utils/adaptive.dart';
 import '../l10n/app_strings.dart';
+import '../l10n/access_strings.dart';
 import '../l10n/account_strings.dart';
 import '../language_cubit.dart';
 import '../l10n/shell_strings.dart';
@@ -16,9 +17,11 @@ import '../l10n/social_strings.dart';
 import '../l10n/moderation_strings.dart';
 import '../services/account_data.dart';
 import '../services/moderation_service.dart';
+import '../services/student_verification.dart';
 import '../utils/app_nav.dart';
 import 'profile_cubit.dart';
 import 'login_cubit.dart';
+import 'verification/verify_sheet.dart';
 import '../services/update_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -40,13 +43,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _backupEmail;
   bool _backupLoaded = false;
 
+  /// Student verification: shown only while the owner has the switch on.
+  bool _verifyEnabled = false;
+  StudentVerification? _verification;
+
   final _supabase = Supabase.instance.client;
 
   @override
   void initState() {
     super.initState();
     _loadBackupEmail();
+    _loadVerification();
   }
+
+  Future<void> _loadVerification() async {
+    final enabled = await StudentVerificationService.isEnabled();
+    final v = enabled ? await StudentVerificationService.mine() : null;
+    if (!mounted) return;
+    setState(() {
+      _verifyEnabled = enabled;
+      _verification = v;
+    });
+  }
+
+  String _verificationLabel(AppStrings s) => switch (_verification?.status) {
+        'verified' => s.verifyStatusVerified,
+        'pending' => s.verifyStatusPending,
+        'rejected' => s.verifyStatusRejected,
+        'revoked' => s.verifyStatusRevoked,
+        _ => s.verifyStatusNone,
+      };
 
   Future<void> _loadBackupEmail() async {
     final uid = _supabase.auth.currentUser?.id;
@@ -350,6 +376,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onTap: () async {
                         await context.push('/profile/edit');
                         if (mounted) _loadBackupEmail();
+                      },
+                    ),
+                  if (_verifyEnabled)
+                    ListTile(
+                      leading: Icon(
+                        AppIcons.verified,
+                        color: _verification?.isVerified == true
+                            ? scheme.primary
+                            : scheme.onSurfaceVariant,
+                      ),
+                      title: Text(s.verifyTitle),
+                      subtitle: Text(_verificationLabel(s)),
+                      trailing: const Icon(AppIcons.chevronRight),
+                      onTap: () async {
+                        await showVerifySheet(context);
+                        if (mounted) _loadVerification();
                       },
                     ),
                   ListTile(

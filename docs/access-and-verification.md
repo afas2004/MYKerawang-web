@@ -1,10 +1,12 @@
 # Access, registration and student verification
 
-Status: **design draft v3** — rollout steps 1 and 2 are built.
+Status: **design draft v3** — rollout steps 1–3 are built.
 Shipped: backup email + reminders, second-account warning, impersonation
-reports, and the verification record + owner switch (default **off**) +
-the `VERIFY:required` gate on joining/creating events and selling.
-Not built: the verify sheet, code-by-email, club-path gates.
+reports, the verification record + owner switch (default **off**) with
+the `VERIFY:required` gate, the verify sheet (Settings → Student
+verification) and the admin approval queue.
+Not built: code-by-email, club-path gates, the gate's own "verify" sheet
+at the point of failure.
 
 
 v3 changes from v2:

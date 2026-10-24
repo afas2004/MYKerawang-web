@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mykerawang/utils/app_nav.dart';
 
+import '../../l10n/access_strings.dart';
 import '../../l10n/moderation_strings.dart';
 import '../../language_cubit.dart';
 import '../../services/admin_unlock.dart';
 import '../../services/moderation_service.dart';
+import '../../services/student_verification.dart';
 import '../../widgets/moderation_ui.dart';
 import 'admin_lock_screen.dart';
 import 'admin_overview.dart';
@@ -16,6 +18,7 @@ import 'join_requests_tab.dart';
 import 'log_tab.dart';
 import 'restrictions_tab.dart';
 import 'settings_tab.dart';
+import 'verifications_tab.dart';
 
 /// /admin — moderation console. The route is reachable by URL, so the
 /// page checks the role itself; the database checks it again on every
@@ -28,12 +31,13 @@ class AdminScreen extends StatefulWidget {
 }
 
 class _AdminScreenState extends State<AdminScreen> {
-  late Future<(bool, bool, bool)> _access = _load();
+  late Future<(bool, bool, bool, bool)> _access = _load();
 
-  Future<(bool, bool, bool)> _load() async {
+  Future<(bool, bool, bool, bool)> _load() async {
     final admin = await ModerationService.isAdmin();
     var owner = false;
     var configured = false;
+    var verifyEnabled = false;
     if (admin) {
       owner = await ModerationService.isOwner();
       try {
@@ -42,15 +46,16 @@ class _AdminScreenState extends State<AdminScreen> {
         // A transient failure must not lock an admin out of the console.
         configured = false;
       }
+      verifyEnabled = await StudentVerificationService.isEnabled();
     }
     AdminUnlock.instance.setConfigured(configured);
-    return (admin, owner, configured);
+    return (admin, owner, configured, verifyEnabled);
   }
 
   @override
   Widget build(BuildContext context) {
     final m = context.l10n.mod;
-    return FutureBuilder<(bool, bool, bool)>(
+    return FutureBuilder<(bool, bool, bool, bool)>(
       future: _access,
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
@@ -59,7 +64,8 @@ class _AdminScreenState extends State<AdminScreen> {
             body: const Center(child: CircularProgressIndicator()),
           );
         }
-        final (admin, owner, _) = snap.data ?? (false, false, false);
+        final (admin, owner, _, verifyEnabled) =
+            snap.data ?? (false, false, false, false);
         if (!admin) {
           return Scaffold(
             appBar: AppBar(leading: const AppBackButton(), title: Text(m.moderation)),
@@ -94,14 +100,15 @@ class _AdminScreenState extends State<AdminScreen> {
                 ),
               );
             }
-            return _console(context, owner, AdminUnlock.instance.configured);
+            return _console(context, owner, AdminUnlock.instance.configured, verifyEnabled);
           },
         );
       },
     );
   }
 
-  Widget _console(BuildContext context, bool owner, bool configured) {
+  Widget _console(
+      BuildContext context, bool owner, bool configured, bool verifyEnabled) {
     final m = context.l10n.mod;
     final scheme = Theme.of(context).colorScheme;
     final tabs = <(String, IconData, Widget)>[
@@ -111,6 +118,8 @@ class _AdminScreenState extends State<AdminScreen> {
       (m.tabAppeals, ModIcons.appeal, const AppealsTab()),
       (m.tabRestrictions, ModIcons.ban, const RestrictionsTab()),
       (m.tabLog, ModIcons.log, const LogTab()),
+      if (verifyEnabled)
+        (context.l10n.verifyQueueTitle, ModIcons.verified, const VerificationsTab()),
       if (owner) (m.tabSettings, ModIcons.settings, const SettingsTab()),
     ];
 

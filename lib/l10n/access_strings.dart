@@ -59,6 +59,65 @@ extension AccessStrings on AppStrings {
   String get verifyRequired =>
       _t("Verify your student status to do this.", "Sahkan status pelajar anda untuk melakukan ini.", "これを行うには学生確認が必要です。");
 
+  // ---- verification: the student's side ----
+  String get verifyTitle => _t("Student verification", "Pengesahan pelajar", "学生確認");
+  String get verifyStatusNone => _t("Not verified", "Belum disahkan", "未確認");
+  String get verifyStatusPending =>
+      _t("Waiting for review", "Menunggu semakan", "審査待ち");
+  String get verifyStatusVerified =>
+      _t("Verified student", "Pelajar disahkan", "確認済み");
+  String get verifyStatusRejected => _t("Not approved", "Tidak diluluskan", "承認されませんでした");
+  String get verifyStatusRevoked => _t("Revoked", "Ditarik balik", "取り消し済み");
+  String get verifySheetTitle =>
+      _t("Verify your student status", "Sahkan status pelajar anda", "学生確認");
+  String get verifySheetIntro => _t(
+      "Enter the UiTM student email you can still open. An admin checks it by hand — there is no code by email yet.",
+      "Masukkan e-mel pelajar UiTM yang masih boleh anda buka. Admin menyemaknya secara manual — belum ada kod melalui e-mel.",
+      "まだ開けるUiTMの学生メールを入力してください。管理者が手作業で確認します（メールコードはまだありません）。");
+  String get verifyEmailLabel => _t("Student email", "E-mel pelajar", "学生メール");
+  String get verifyEmailHint =>
+      _t("you@student.uitm.edu.my", "anda@student.uitm.edu.my", "you@student.uitm.edu.my");
+  String get verifySubmit => _t("Submit for review", "Hantar untuk semakan", "審査に提出");
+  String get verifySubmitted =>
+      _t("Submitted for review", "Dihantar untuk semakan", "審査に提出しました");
+  String get verifyPendingBody => _t(
+      "An admin will check your request. You can keep using the app in the meantime.",
+      "Admin akan menyemak permintaan anda. Anda boleh terus menggunakan aplikasi sementara itu.",
+      "管理者が確認します。それまでアプリはそのまま使えます。");
+  String get verifyVerifiedBody => _t(
+      "Verified on {0}. You can join and create events and sell in the Market.",
+      "Disahkan pada {0}. Anda boleh menyertai dan mencipta acara serta menjual di Pasar.",
+      "{0}に確認されました。イベントの参加・作成、出品ができます。");
+  String get verifyRejectedBody => _t(
+      "Your last request was not approved. Check the address and send it again.",
+      "Permintaan terakhir anda tidak diluluskan. Semak alamat dan hantar semula.",
+      "前回の申請は承認されませんでした。アドレスを確認して再提出してください。");
+  String get verifyRevokedBody => _t(
+      "Your verification was revoked. Send a request again if this is a mistake.",
+      "Pengesahan anda ditarik balik. Hantar permintaan semula jika ini satu kesilapan.",
+      "確認は取り消されました。誤りであれば再申請してください。");
+
+  // ---- verification: refusals ----
+  String get verifyClosed => _t("Student verification is not open yet.",
+      "Pengesahan pelajar belum dibuka.", "学生確認はまだ開始されていません。");
+  String get verifyDomainError => _t("Use your @student.uitm.edu.my address.",
+      "Gunakan alamat @student.uitm.edu.my anda.", "@student.uitm.edu.my のアドレスを使ってください。");
+  String get verifyTakenError => _t("That address is already used by another account.",
+      "Alamat itu sudah digunakan oleh akaun lain.", "そのアドレスは別のアカウントで使われています。");
+  String get verifyWaitError => _t("Try again in a few minutes.",
+      "Cuba lagi dalam beberapa minit.", "数分後にもう一度お試しください。");
+  String get verifyAlreadyError => _t("You are already verified.",
+      "Anda sudah disahkan.", "すでに確認済みです。");
+
+  // ---- verification: admin queue ----
+  String get verifyQueueTitle => _t("Verifications", "Pengesahan", "学生確認");
+  String get verifyQueueEmpty => _t("No pending requests.", "Tiada permintaan menunggu.", "保留中の申請はありません。");
+  String get verifyApprove => _t("Approve", "Luluskan", "承認");
+  String get verifyReject => _t("Reject", "Tolak", "却下");
+  String get verifyApproved => _t("Approved", "Diluluskan", "承認しました");
+  String get verifyRejectedDone => _t("Rejected", "Ditolak", "却下しました");
+  String get verifySubmittedAt => _t("Submitted {0}", "Dihantar {0}", "提出 {0}");
+
   // ---- sharing ----
   String get copyLink => _t("Copy link", "Salin pautan", "リンクをコピー");
   String get linkCopied =>

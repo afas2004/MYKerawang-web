@@ -93,6 +93,12 @@ void main() {
       final err = parseModError(e)!;
       expect(err.code, 'verify_required');
       expect(err.sub, 'event_join');
+
+      // Request refusals keep their own code, prefixed so they can never
+      // collide with a MOD code.
+      const domain = PostgrestException(
+          message: 'VERIFY:domain', code: 'P0001');
+      expect(parseModError(domain)!.code, 'verify_domain');
     });
   });
 
