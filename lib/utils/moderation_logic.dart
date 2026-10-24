@@ -34,6 +34,11 @@ const kReportCategories = [
   'other',
 ];
 
+/// Categories hidden on the first report. Order matches the shipped
+/// `moderation_settings.priority_categories` default; the live list wins
+/// when the sheet can read it (owners may edit it in the admin console).
+const kDefaultPriorityCategories = ['harassment', 'inappropriate'];
+
 /// Reportable target types (`reports.target_type`).
 const kTargetTypes = ['post', 'comment', 'event', 'listing', 'user'];
 

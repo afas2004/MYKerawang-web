@@ -170,8 +170,15 @@ void main() {
       expect(ModerationStrings.categoryReason('scam'), 'Scam or fraud');
     });
 
-    test('impersonation is reportable, with copy in every language', () {
-      expect(kReportCategories, contains('impersonation'));
+    test('the reviewed-first defaults are real categories', () {
+      expect(kDefaultPriorityCategories,
+          ['harassment', 'inappropriate']);
+      for (final c in kDefaultPriorityCategories) {
+        expect(kReportCategories, contains(c));
+      }
+    });
+
+    test('impersonation is reportable, with copy in every language', () {      expect(kReportCategories, contains('impersonation'));
       for (final s in [AppStrings.en, AppStrings.ms]) {
         final m = s.mod;
         expect(m.categoryLabel('impersonation'), isNotEmpty);

@@ -277,12 +277,22 @@ switch that can lock out hundreds of people is worse than no switch.
 Verification proves an inbox, not a person. So impersonation is handled
 where impersonation is already handled.
 
-Add one report category: **"Pretending to be someone else"**, routed like
-`minor_safety` so a first report is reviewed quickly, applying to posts,
-comments, profiles, clubs and roster seats.
+Add one report category: **"Pretending to be someone else"**. It is
+queued first but, unlike the two urgent categories, it is not hidden on
+the first report — an unproven accusation must not be able to take down
+someone's post.
 
-Concretely: a new allowed value on reports, a mapping from reason text,
-the report sheet entry, EN/MS copy, and a default priority entry.
+Queue policy (owner-editable in Settings):
+
+| Category | First report | Reviewed |
+|---|---|---|
+| Harassment, sexual or inappropriate content | **hidden** | immediately |
+| Impersonation | visible | first |
+| Scam, minor safety, spam, misinformation, other | visible | after 3 distinct reporters |
+
+The sheet states this in one line above the category list ("Reviewed
+first: …"), read from the live setting so the copy cannot drift.
+
 
 ---
 

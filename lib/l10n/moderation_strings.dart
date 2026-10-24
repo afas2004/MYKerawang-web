@@ -1179,6 +1179,7 @@ class ModerationUiStrings {
   final String canStill;
   final String historyTitle;
   final String reportPickCategory;
+  final String reportReviewedFirst;
   final String reportNoteLabel;
   final String reportNoteHint;
   final String reportSubmit;
@@ -1244,6 +1245,7 @@ class ModerationUiStrings {
     required this.canStill,
     required this.historyTitle,
     required this.reportPickCategory,
+    required this.reportReviewedFirst,
     required this.reportNoteLabel,
     required this.reportNoteHint,
     required this.reportSubmit,
@@ -1310,6 +1312,7 @@ class ModerationUiStrings {
     canStill: "You can still browse and read everything.",
     historyTitle: "History",
     reportPickCategory: "Choose the reason that fits best",
+    reportReviewedFirst: "Reviewed first: {0}",
     reportNoteLabel: "Add details (optional)",
     reportNoteHint: "Anything that helps admins understand",
     reportSubmit: "Send report",
@@ -1376,6 +1379,7 @@ class ModerationUiStrings {
     canStill: "Anda masih boleh melayari dan membaca semuanya.",
     historyTitle: "Sejarah",
     reportPickCategory: "Pilih sebab yang paling sesuai",
+    reportReviewedFirst: "Disemak dahulu: {0}",
     reportNoteLabel: "Tambah butiran (pilihan)",
     reportNoteHint: "Apa-apa yang membantu admin memahami",
     reportSubmit: "Hantar laporan",
