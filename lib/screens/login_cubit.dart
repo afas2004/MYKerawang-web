@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show ValueNotifier, debugPrint, kIsWeb;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/guest_access.dart';
+import '../services/registration_policy.dart';
 
 /// Error codes put in [LoginState.errorMessage]. The cubit has no
 /// BuildContext, so the screen turns these into localized text
@@ -47,6 +48,8 @@ Future<void> enforceStudentEmailForNewAccount(User user) async {
   final isNew = created != null &&
       (lastSignIn == null || lastSignIn.difference(created).inSeconds.abs() < 60);
   if (!isNew) return; // grandfathered
+  // The owner may have opened signup to any address.
+  if (await RegistrationPolicy.ensureLoaded()) return;
   debugPrint('Non-student sign-up rejected: ${user.email}');
   pendingLoginError.value = LoginError.studentEmailOnly;
   await Supabase.instance.client.auth.signOut();
@@ -103,8 +106,12 @@ class LoginCubit extends Cubit<LoginState> {
     }
 
     // Only new accounts are restricted; logging in stays open so
-    // existing non-student accounts keep working.
-    if (!state.isLoginMode && !isStudentEmail(email)) {
+    // existing non-student accounts keep working. The owner can open
+    // signup to any address (access_settings.registration_mode), and the
+    // auth.users trigger enforces the same rule server-side.
+    if (!state.isLoginMode &&
+        !RegistrationPolicy.isOpen &&
+        !isStudentEmail(email)) {
       emit(state.copyWith(errorMessage: LoginError.studentEmailOnly));
       return;
     }

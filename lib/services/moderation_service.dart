@@ -298,6 +298,10 @@ class ModerationService {
       _db.rpc('set_verification_enabled',
           params: {'p_enabled': enabled, 'p_reason': reason});
 
+  /// Owner only: 'student_only' or 'open'.
+  static Future<void> setRegistrationMode(String mode) =>
+      _db.rpc('set_registration_mode', params: {'p_mode': mode});
+
   /// Admin/owner manual verification — the escape hatch before the
   /// code-by-email flow exists.
   static Future<void> setStudentVerification(String userId, String email,

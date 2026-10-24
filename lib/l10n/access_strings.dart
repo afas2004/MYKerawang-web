@@ -34,6 +34,30 @@ extension AccessStrings on AppStrings {
       "New accounts need a UiTM student email (@student.uitm.edu.my).",
       "Akaun baharu perlu guna emel pelajar UiTM (@student.uitm.edu.my).",
       "新規登録にはUiTMの学生用メール（@student.uitm.edu.my）が必要です。");
+  String get anyEmailHint => _t(
+      "New here? Sign up with any email address.",
+      "Baru di sini? Daftar dengan mana-mana alamat e-mel.",
+      "新規登録はどのメールアドレスでもできます。");
+
+  // ---- registration switch (owner) ----
+  String get regTitle => _t("Registration", "Pendaftaran", "登録");
+  String get regOpenTitle =>
+      _t("Allow any email to sign up", "Benarkan daftar dengan mana-mana e-mel", "Allow any email to sign up");
+  String get regOpenBody => _t(
+      "Off: only @student.uitm.edu.my addresses can create an account. On: anyone can, and student status is proven separately.",
+      "Tutup: hanya alamat @student.uitm.edu.my boleh cipta akaun. Buka: sesiapa boleh, dan status pelajar dibuktikan secara berasingan.",
+      "Off: student addresses only. On: anyone can sign up.");
+  String get regConfirmTitle => _t("Open signup to any email?",
+      "Buka pendaftaran untuk semua e-mel?", "Open signup to any email?");
+  String get regConfirmBody => _t(
+      "Anyone with an email address will be able to create an account, and the public signup page becomes reachable by link. Existing accounts are not affected.",
+      "Sesiapa yang ada alamat e-mel boleh mencipta akaun, dan halaman pendaftaran awam boleh dicapai melalui pautan. Akaun sedia ada tidak terjejas.",
+      "Anyone with an email can create an account.");
+  String get regConfirmAction => _t("Open signup", "Buka pendaftaran", "Open signup");
+  String get regNowOpen => _t("Signup is open to any email",
+      "Pendaftaran dibuka untuk semua e-mel", "Signup is open to any email");
+  String get regNowStudentOnly => _t("Signup is limited to student emails",
+      "Pendaftaran terhad kepada e-mel pelajar", "Signup is limited to student emails");
 
   // ---- student verification ----
   String get verifySectionTitle =>
