@@ -76,14 +76,29 @@ const bob = await user('bob');
 const carol = await user('carol');
 
 // ---------------------------------------------------------- register
-let e = await err(alice, `select register_club('Debate Society','bad handle!','', 'Academic','proof proof proof')`);
-ok(e?.includes('CLUB:handle_invalid'), 'invalid handle rejected');
-e = await err(alice, `select register_club('Debate Society','debate','', 'Academic','short')`);
-ok(e?.includes('CLUB:proof_required'), 'proof required');
-const debate = (await as(alice, `select register_club('Debate Society','Debate','We argue.','Academic','HEP letter no. 42') id`))[0].id;
-ok(!!debate, 'register_club returns id');
-e = await err(bob, `select register_club('Other','DEBATE','', null,'HEP letter no. 43')`);
-ok(e?.includes('CLUB:handle_taken'), 'handle unique case-insensitively');
+let e;
+const regDebate = (await as(admin, `select admin_save_club_registry(null,'HEP/2024/042','Debate Society','FSKM','academic',true) id`))[0].id;
+ok(!!regDebate, 'admin adds a registry entry');
+e = await err(alice, `select admin_save_club_registry(null,'HEP/2024/099','Other','',null,true)`);
+ok(e?.includes('MOD:not_admin'), 'only admins edit the registry');
+e = await err(admin, `select admin_save_club_registry(null,'HEP/2024/042','Duplicate','',null,true)`);
+ok(e?.includes('CLUB:registry_code_taken'), 'registry codes are unique');
+const open = (await as(alice, `select club_registry_open() j`))[0].j;
+ok(open.length === 1 && open[0].code === 'HEP/2024/042', 'open registry lists unclaimed entry');
+
+e = await err(alice, `select register_club($1,'not-an-email','president','[]'::jsonb)`, [regDebate]);
+ok(e?.includes('CLUB:email_invalid'), 'official email required');
+e = await err(alice, `select register_club($1,'debate@gmail.com','boss','[]'::jsonb)`, [regDebate]);
+ok(e?.includes('CLUB:position_invalid'), 'position validated');
+e = await err(alice, `select register_club($1,'debate@gmail.com','president','[{"name":"A"}]'::jsonb)`, [regDebate]);
+ok(e?.includes('CLUB:council_invalid'), 'council names need 2+ chars');
+
+const reg = (await as(alice, `select register_club($1,'debate@gmail.com','secretary','[{"name":"Aiman","position":"Secretary"},{"name":"Siti","position":"Treasurer"}]'::jsonb) j`, [regDebate]))[0].j;
+const debate = reg.id;
+ok(!!debate && !!reg.handle, 'register_club returns id + handle');
+ok((await as(alice, `select position from club_members where club_id=$1 and user_id=$2`, [debate, alice]))[0].position === 'secretary', 'applicant position stored on the roster');
+e = await err(bob, `select register_club($1,'bob@gmail.com','president','[]'::jsonb)`, [regDebate]);
+ok(e?.includes('CLUB:registry_claimed'), 'claimed entry cannot be registered again');
 ok((await as(alice, `select role from my_clubs()`))[0]?.role === 'president', 'my_clubs shows pending club to its president');
 ok((await as(bob, `select count(*)::int n from clubs where id=$1`, [debate]))[0].n === 0, 'pending club hidden from others');
 ok((await as(null, `select count(*)::int n from clubs where id=$1`, [debate], 'anon'))[0].n === 0, 'pending club hidden from guests');
@@ -99,10 +114,16 @@ ok(e?.includes('MOD:not_admin'), 'only admins decide');
 e = await err(admin, `select admin_decide_club_request($1, false, '')`, [debate]);
 ok(e?.includes('MOD:reason_required'), 'rejection needs a reason');
 const pend = (await as(admin, `select admin_pending_clubs() j`))[0].j;
-ok(pend.length === 2 && pend.some((c) => c.proof_note === 'HEP letter no. 42' && c.president.username === 'alice'), 'admin queue shows proof + president');
+const pDebate = pend.find((c) => c.id === debate);
+ok(pDebate && pDebate.registry_code === 'HEP/2024/042' && pDebate.official_email === 'debate@gmail.com'
+  && pDebate.applicant_position === 'secretary' && pDebate.council_members.length === 2,
+  'admin queue shows registry code, email, position, council');
+ok(pend.some((c) => c.id === chess.id && c.proof_note === 'Registered with HEP, ref 123'), 'legacy proof still shown');
 await as(admin, `select admin_decide_club_request($1, true, null)`, [debate]);
 const d = (await q(`select * from clubs where id=$1`, [debate]))[0];
 ok(d.status === 'active' && d.is_verified, 'approved → active + verified');
+ok(d.registry_id === regDebate, 'club linked to its registry entry');
+ok((await as(alice, `select club_registry_open() j`))[0].j.length === 0, 'claimed entry drops out of the picker');
 ok((await q(`select count(*)::int n from notifications where user_id=$1 and type='club' and data->>'kind'='club_approved'`, [alice]))[0].n === 1, 'president notified');
 await as(admin, `select admin_decide_club_request($1, false, 'No proof attached')`, [chess.id]);
 ok((await q(`select role from profiles where id=$1`, [legacy.pending]))[0].role === 'student', 'legacy club_pending → student on rejection');
@@ -123,6 +144,25 @@ ok((await as(carol, `select can_act_as_club($1) c`, [debate]))[0].c === false, '
 e = await err(alice, `select invite_officer($1, 'bob')`, [debate]);
 ok(e?.includes('CLUB:already_officer'), 'no duplicate officers');
 
+// ---------------------------------------------------------- roster
+e = await err(bob, `select add_club_member($1,'carol',null)`, [debate]);
+ok(e?.includes('CLUB:not_president'), 'only president adds members');
+await as(alice, `select add_club_member($1,'carol','treasurer')`, [debate]);
+ok((await q(`select role, position from club_members where club_id=$1 and user_id=$2`, [debate, carol]))[0].position === 'treasurer', 'member added with position');
+ok((await as(carol, `select can_act_as_club($1) c`, [debate]))[0].c === false, 'member cannot act as club');
+e = await err(alice, `select add_club_member($1,'carol',null)`, [debate]);
+ok(e?.includes('CLUB:already_member'), 'no duplicate members');
+await as(alice, `select set_club_member_position($1,$2,'secretary')`, [debate, carol]);
+ok((await q(`select position from club_members where club_id=$1 and user_id=$2`, [debate, carol]))[0].position === 'secretary', 'position updated');
+await as(alice, `select set_club_member_role($1,$2,'officer')`, [debate, carol]);
+ok((await as(carol, `select can_act_as_club($1) c`, [debate]))[0].c === true, 'promoted member can act');
+await as(alice, `select set_club_member_role($1,$2,'member')`, [debate, carol]);
+ok((await as(carol, `select can_act_as_club($1) c`, [debate]))[0].c === false, 'demoted member cannot act');
+e = await err(alice, `select remove_club_member($1,$2)`, [debate, alice]);
+ok(e?.includes('CLUB:president_must_transfer'), 'president cannot be removed');
+await as(carol, `select remove_club_member($1,$2)`, [debate, carol]);
+ok((await q(`select count(*)::int n from club_members where club_id=$1 and user_id=$2`, [debate, carol]))[0].n === 0, 'member can leave');
+
 // ---------------------------------------------------------- publishing
 const cp = (await as(bob, `insert into posts (user_id, title, club_id, is_announcement, announcement_category, is_anonymous) values ($1,'Meeting Friday',$2,true,'club',true) returning id, is_anonymous`, [bob, debate]))[0];
 ok(cp && cp.is_anonymous === false, 'officer posts as club; club posts never anonymous');
@@ -139,16 +179,26 @@ e = await err(carol, `update posts set club_id=$2 where user_id=$1`, [carol, deb
 const hijack = (await q(`select count(*)::int n from posts where user_id=$1 and club_id is not null`, [carol]))[0].n;
 ok(hijack === 0, 'cannot move own post into a club');
 const pp = (await as(null, `select club, is_announcement, announcement_category from posts_public where id=$1`, [cp.id], 'anon'))[0];
-ok(pp.club?.handle === 'Debate' && pp.club.is_verified && pp.is_announcement && pp.announcement_category === 'club', 'posts_public.club exposed');
+ok(pp.club?.handle === reg.handle && pp.club.is_verified && pp.is_announcement && pp.announcement_category === 'club', 'posts_public.club exposed');
 
 // ---------------------------------------------------------- pins
-await as(bob, `select pin_post($1)`, [cp.id]);
+e = await err(bob, `select pin_post($1)`, [cp.id]);
+ok(e?.includes('MOD:pin_not_allowed'), 'officers cannot pin globally');
+await as(admin, `select pin_post($1)`, [cp.id]);
+const g = (await as(null, `select is_pinned, is_club_pinned from posts_public where id=$1`, [cp.id], 'anon'))[0];
+ok(g.is_pinned === true && g.is_club_pinned === false, 'admin global pin leaves the club pin alone');
+await as(admin, `select unpin_post($1)`, [cp.id]);
+
+await as(bob, `select club_pin_post($1)`, [cp.id]);
 const cp2 = (await as(alice, `insert into posts (user_id, title, club_id) values ($1,'Second',$2) returning id`, [alice, debate]))[0].id;
-e = await err(alice, `select pin_post($1)`, [cp2]);
-ok(e?.includes('MOD:pin_cap'), 'pin cap counted per club across officers');
-const rep = (await as(alice, `select pin_post($1, true) r`, [cp2]))[0].r;
+e = await err(alice, `select club_pin_post($1)`, [cp2]);
+ok(e?.includes('MOD:pin_cap'), 'club pin cap counted per club across officers');
+const rep = (await as(alice, `select club_pin_post($1, true) r`, [cp2]))[0].r;
 ok(rep.replaced[0] === cp.id, 'replace swaps the club pin');
-ok((await err(bob, `select unpin_post($1)`, [cp2])) === null, 'another officer can unpin');
+ok((await err(bob, `select club_unpin_post($1)`, [cp2])) === null, 'another officer can unpin the club pin');
+ok((await as(null, `select is_club_pinned from posts_public where id=$1`, [cp2], 'anon'))[0].is_club_pinned === false, 'club unpin clears the club pin');
+e = await err(carol, `select club_pin_post($1)`, [cp.id]);
+ok(e?.includes('CLUB:not_officer'), 'non-officers cannot club-pin');
 
 // ---------------------------------------------------------- transfer / remove
 e = await err(alice, `select remove_officer($1,$2)`, [debate, alice]);

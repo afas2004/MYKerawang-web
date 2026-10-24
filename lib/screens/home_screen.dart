@@ -175,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen>
   Future<List<Map<String, dynamic>>> _postsPage(int from) => _supabase
       .from('posts_public')
       .select('*')
-      .order('is_pinned') // active pins first (20261019004500)
+      .order('is_pinned', ascending: false) // active pins first (20261019004500)
       .order('created_at', ascending: false)
       .range(from, from + _pageSize - 1);
 

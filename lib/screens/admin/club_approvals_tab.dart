@@ -131,7 +131,11 @@ class _ClubApprovalsTabState extends State<ClubApprovalsTab> with AutomaticKeepA
     return AdminAsyncList<Map<String, dynamic>>(
       future: _future,
       onRetry: _reload,
-      header: _StatusFilter(value: _status, onChanged: _setFilter),
+      header: _StatusFilter(
+        value: _status,
+        onChanged: _setFilter,
+        onRegistry: () => context.push('/admin/clubs/registry'),
+      ),
       empty: empty,
       itemBuilder: (context, r) {
         final id = '${r['id']}';
@@ -162,8 +166,13 @@ class _ClubApprovalsTabState extends State<ClubApprovalsTab> with AutomaticKeepA
 class _StatusFilter extends StatelessWidget {
   final String value;
   final ValueChanged<String> onChanged;
+  final VoidCallback onRegistry;
 
-  const _StatusFilter({required this.value, required this.onChanged});
+  const _StatusFilter({
+    required this.value,
+    required this.onChanged,
+    required this.onRegistry,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -187,6 +196,12 @@ class _StatusFilter extends StatelessWidget {
             ),
             const SizedBox(width: KSpace.s),
           ],
+          const SizedBox(width: KSpace.s),
+          TextButton.icon(
+            onPressed: onRegistry,
+            icon: const Icon(AppIcons.settings, size: 18),
+            label: Text(c.registryManage),
+          ),
         ],
       ),
     );
@@ -303,6 +318,11 @@ class ClubRequestCard extends StatelessWidget {
     final presidentName = president == null
         ? '—'
         : '${president['display_name'] ?? president['username']} @${president['username']}';
+    final registryCode = r['registry_code'] as String?;
+    final officialEmail = r['official_email'] as String?;
+    final position = r['applicant_position'] as String?;
+    final proof = r['proof_note'] as String?;
+    final council = (r['council_members'] as List?) ?? const [];
 
     return KCard(
       child: Column(
@@ -337,24 +357,61 @@ class ClubRequestCard extends StatelessWidget {
             const SizedBox(height: KSpace.m),
             Text('${r['description']}', maxLines: 4, overflow: TextOverflow.ellipsis),
           ],
-          const SizedBox(height: KSpace.m),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(KSpace.m),
-            decoration: BoxDecoration(color: scheme.surfaceContainerHigh, borderRadius: BorderRadius.circular(12)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          if (registryCode != null || officialEmail != null || position != null) ...[
+            const SizedBox(height: KSpace.m),
+            Wrap(
+              spacing: KSpace.s,
+              runSpacing: KSpace.xs,
               children: [
-                Row(children: [
-                  Icon(AppIcons.lock, size: 14, color: scheme.onSurfaceVariant),
-                  const SizedBox(width: KSpace.xs),
-                  Text(c.proofLabel, style: theme.textTheme.labelMedium),
-                ]),
-                const SizedBox(height: KSpace.xs),
-                SelectableText('${r['proof_note'] ?? '—'}'),
+                if (registryCode != null) ClubPill('${c.registryCode}: $registryCode'),
+                if (position != null) ClubPill(c.positionLabel(position)),
               ],
             ),
-          ),
+            if (officialEmail != null) ...[
+              const SizedBox(height: KSpace.xs),
+              Row(
+                children: [
+                  Icon(AppIcons.email, size: 14, color: scheme.onSurfaceVariant),
+                  const SizedBox(width: KSpace.xs),
+                  Flexible(child: SelectableText(officialEmail, maxLines: 1, style: muted)),
+                ],
+              ),
+            ],
+          ],
+          if (proof != null && proof.trim().isNotEmpty) ...[
+            const SizedBox(height: KSpace.m),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(KSpace.m),
+              decoration: BoxDecoration(color: scheme.surfaceContainerHigh, borderRadius: BorderRadius.circular(12)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Icon(AppIcons.lock, size: 14, color: scheme.onSurfaceVariant),
+                    const SizedBox(width: KSpace.xs),
+                    Text(c.proofLabel, style: theme.textTheme.labelMedium),
+                  ]),
+                  const SizedBox(height: KSpace.xs),
+                  SelectableText(proof),
+                ],
+              ),
+            ),
+          ],
+          if (council.isNotEmpty) ...[
+            const SizedBox(height: KSpace.m),
+            Text('${c.council} (${council.length})', style: theme.textTheme.labelMedium),
+            const SizedBox(height: KSpace.xs),
+            for (final m in council)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(
+                  '${(m as Map)['name'] ?? ''}'
+                  '${((m['position'] as String?) ?? '').isEmpty ? '' : ' · ${m['position']}'}',
+                  style: muted,
+                ),
+              ),
+          ],
           const SizedBox(height: KSpace.s),
           InkWell(
             onTap: president == null ? null : () => context.push('/u/${president['id']}'),

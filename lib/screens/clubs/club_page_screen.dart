@@ -146,7 +146,7 @@ class _ClubPageViewState extends State<ClubPageView> {
   late int _followers = widget.followers;
   bool _busy = false;
 
-  late final Future<List<Map<String, dynamic>>> _posts = widget.loadPosts();
+  late Future<List<Map<String, dynamic>>> _posts = widget.loadPosts();
   late final Future<List<Map<String, dynamic>>> _events = widget.loadEvents();
   late final Future<List<Map<String, dynamic>>> _listings = widget.loadListings();
   late final Future<List<ClubMember>> _members = widget.loadMembers();
@@ -198,7 +198,13 @@ class _ClubPageViewState extends State<ClubPageView> {
           ],
           body: TabBarView(
             children: [
-              _PostsTab(future: _posts),
+              _PostsTab(
+                future: _posts,
+                canClubPin: widget.club.isActive && canManageClub(widget.myRole),
+                onClubPinChanged: () => setState(() {
+                  _posts = widget.loadPosts();
+                }),
+              ),
               _CardsTab(future: _events, emptyTitle: c.noEvents, illo: AppIllo.noEvents, isEvent: true),
               _CardsTab(future: _listings, emptyTitle: c.noListings, illo: AppIllo.emptyMarket, isEvent: false),
               _MembersTab(future: _members),
@@ -403,7 +409,13 @@ class _AsyncTab<T> extends StatelessWidget {
 
 class _PostsTab extends StatelessWidget {
   final Future<List<Map<String, dynamic>>> future;
-  const _PostsTab({required this.future});
+  final bool canClubPin;
+  final VoidCallback onClubPinChanged;
+  const _PostsTab({
+    required this.future,
+    required this.canClubPin,
+    required this.onClubPinChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -412,8 +424,8 @@ class _PostsTab extends StatelessWidget {
       future: future,
       empty: BrandEmptyState(illo: AppIllo.emptyFeed, title: c.noAnnouncements, compact: true),
       builder: (posts) {
-        final pinned = posts.where((p) => p['is_pinned'] == true).toList();
-        final rest = posts.where((p) => p['is_pinned'] != true).toList();
+        final pinned = posts.where((p) => p['is_club_pinned'] == true).toList();
+        final rest = posts.where((p) => p['is_club_pinned'] != true).toList();
         return ListView(
           padding: const EdgeInsets.symmetric(vertical: KSpace.s),
           children: [
@@ -422,9 +434,21 @@ class _PostsTab extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.s, KSpace.l, 0),
                 child: Text(c.pinnedAnnouncement, style: Theme.of(context).textTheme.titleSmall),
               ),
-              for (final p in pinned) PostCard(post: p, onTap: () => context.goPost(p)),
+              for (final p in pinned)
+                PostCard(
+                  post: p,
+                  onTap: () => context.goPost(p),
+                  canClubPin: canClubPin,
+                  onClubPinChanged: onClubPinChanged,
+                ),
             ],
-            for (final p in rest) PostCard(post: p, onTap: () => context.goPost(p)),
+            for (final p in rest)
+              PostCard(
+                post: p,
+                onTap: () => context.goPost(p),
+                canClubPin: canClubPin,
+                onClubPinChanged: onClubPinChanged,
+              ),
           ],
         );
       },
@@ -488,7 +512,7 @@ class _MembersTab extends StatelessWidget {
               title: Text(m.name, maxLines: 1, overflow: TextOverflow.ellipsis),
               subtitle: m.username == null ? null : Text('@${m.username}'),
               trailing: ClubPill(
-                c.roleLabel(m.role),
+                c.rosterLabel(m.position, m.role),
                 background: m.role == 'president' ? scheme.primaryContainer : null,
                 foreground: m.role == 'president' ? scheme.onPrimaryContainer : null,
               ),

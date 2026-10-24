@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/moderation_strings.dart';
 import '../language_cubit.dart';
+import '../services/club_service.dart';
 import '../services/moderation_service.dart';
 import '../theme/app_icons.dart';
 import '../utils/moderation_logic.dart';
@@ -32,22 +33,16 @@ class PinBadge extends StatelessWidget {
 
 /// Pin / unpin as an action (it lives in a post's "more" menu).
 ///
-/// Admins can pin any post; clubs their own non-anonymous posts. At the
-/// club cap it explains and offers to replace the current pin. Every
-/// outcome shows a snackbar (with Undo after a change).
+/// Global pins are admin-only. Club officers pin one post to their own
+/// club's page; [toggleClub] handles that separate scope. Every outcome
+/// shows a snackbar (with Undo after a change).
 abstract final class PinActions {
-  /// Whether someone with [role] may pin [post].
-  static bool canPin(Map<String, dynamic> post, String? role) {
-    if (role == 'admin' || role == 'owner') return true;
-    final me = ModerationService.currentUserId;
-    return role == 'club' &&
-        me != null &&
-        post['user_id'] == me &&
-        post['is_anonymous'] != true;
-  }
+  /// Whether someone with [role] may pin [post] globally.
+  static bool canPin(Map<String, dynamic> post, String? role) =>
+      role == 'admin' || role == 'owner';
 
-  /// Pins or unpins; completes with the new pinned state (unchanged on
-  /// failure or when the user backs out of replacing a pin).
+  /// Pins or unpins globally; completes with the new state (unchanged on
+  /// failure).
   static Future<bool> toggle(BuildContext context, Map<String, dynamic> post,
       {required bool pinned}) async {
     final id = '${post['id']}';
@@ -61,6 +56,26 @@ abstract final class PinActions {
         return false;
       }
       return await _pin(context, id, replace: false);
+    } catch (e) {
+      if (context.mounted) showModError(context, e);
+      return pinned;
+    }
+  }
+
+  /// Pins or unpins on the club's own page; same contract as [toggle].
+  static Future<bool> toggleClub(BuildContext context, Map<String, dynamic> post,
+      {required bool pinned}) async {
+    final id = '${post['id']}';
+    try {
+      if (pinned) {
+        await ClubService.clubUnpin(id);
+        if (context.mounted) {
+          showModSnack(context, modStrings(context).unpinnedDone,
+              onUndo: () => ClubService.clubPin(id, replace: true));
+        }
+        return false;
+      }
+      return await _clubPin(context, id, replace: false);
     } catch (e) {
       if (context.mounted) showModError(context, e);
       return pinned;
@@ -95,6 +110,37 @@ abstract final class PinActions {
       );
       if (!ok || !context.mounted) return false;
       return _pin(context, id, replace: true);
+    }
+  }
+
+  static Future<bool> _clubPin(BuildContext context, String id,
+      {required bool replace}) async {
+    try {
+      final r = await ClubService.clubPin(id, replace: replace);
+      if (!context.mounted) return true;
+      final until = DateTime.tryParse('${r['club_pinned_until']}');
+      final days = until == null
+          ? 0
+          : (until.difference(DateTime.now()).inHours / 24).round();
+      showModSnack(context, modStrings(context).pinnedFor.fill([days]),
+          onUndo: () => ClubService.clubUnpin(id));
+      return true;
+    } catch (e) {
+      final err = parseModError(e);
+      if (err?.code != 'pin_cap' || !context.mounted) rethrow;
+      final m = modStrings(context);
+      final pins = (err!.detail['pins'] as List?) ?? const [];
+      final current = pins.isEmpty
+          ? ''
+          : '${(pins.first as Map)['title'] ?? context.l10nRead.untitled}';
+      final ok = await confirmModAction(
+        context,
+        title: m.pinCapTitle,
+        body: m.pinCapBody.fill([err.detail['max'] ?? 1, current]),
+        confirmLabel: m.replace,
+      );
+      if (!ok || !context.mounted) return false;
+      return _clubPin(context, id, replace: true);
     }
   }
 }

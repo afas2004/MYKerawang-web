@@ -149,6 +149,17 @@ String clubErrorText(ClubStrings c, Object e, {String? fallback}) => switch (clu
       'not_officer' => c.notOfficer,
       'not_president' => c.notPresident,
       'not_pending' => c.notPending,
+      'registry_claimed' => c.registryClaimedError,
+      'registry_not_found' => c.registryNotFound,
+      'registry_code_taken' => c.registryCodeTaken,
+      'registry_code_invalid' => c.registryCodeInvalid,
+      'position_invalid' => c.positionInvalid,
+      'council_invalid' => c.councilInvalid,
+      'council_too_long' => c.councilTooLong,
+      'already_member' => c.alreadyMember,
+      'not_member' => c.notMember,
+      'cannot_change_president' => c.cannotChangePresident,
+      'role_invalid' => c.roleInvalid,
       _ => fallback ?? c.genericError,
     };
 

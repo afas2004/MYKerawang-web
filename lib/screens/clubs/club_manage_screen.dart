@@ -17,8 +17,10 @@ import 'club_widgets.dart';
 class ClubManageActions {
   final Future<void> Function(ClubEdit edit) save;
   final Future<String?> Function() pickImage; // uploaded URL or null
-  final Future<void> Function(String username) addOfficer;
-  final Future<void> Function(String userId) removeOfficer;
+  final Future<void> Function(String username) addMember;
+  final Future<void> Function(String userId) removeMember;
+  final Future<void> Function(String userId, String? position) setPosition;
+  final Future<void> Function(String userId, String role) setRole;
   final Future<void> Function(String userId) transfer;
 
   /// Saves the private contact used by the club's listings. Null hides the
@@ -31,8 +33,10 @@ class ClubManageActions {
   const ClubManageActions({
     required this.save,
     required this.pickImage,
-    required this.addOfficer,
-    required this.removeOfficer,
+    required this.addMember,
+    required this.removeMember,
+    required this.setPosition,
+    required this.setRole,
     required this.transfer,
     this.saveContact,
     this.pickQr,
@@ -143,19 +147,27 @@ class _ClubManageScreenState extends State<ClubManageScreen> {
             saveContact: (phone, qr) =>
                 ClubService.setContact(club.id, phone: phone, paymentQrUrl: qr),
             pickQr: _pickQr,
-            addOfficer: (u) async {
-              await ClubService.inviteOfficer(club.id, u);
+            addMember: (u) async {
+              await ClubService.addMember(club.id, u);
               _reload();
             },
-            removeOfficer: (id) async {
-              await ClubService.removeOfficer(club.id, id);
+            removeMember: (id) async {
+              await ClubService.removeMember(club.id, id);
               if (id == ClubService.currentUserId) {
-                // No longer an officer: back to the club page (or up to
+                // No longer in the club: back to the club page (or up to
                 // it when this page was opened cold).
                 if (context.mounted) appBack(context);
               } else {
                 _reload();
               }
+            },
+            setPosition: (id, p) async {
+              await ClubService.setMemberPosition(club.id, id, p);
+              _reload();
+            },
+            setRole: (id, role) async {
+              await ClubService.setMemberRole(club.id, id, role);
+              _reload();
             },
             transfer: (id) async {
               await ClubService.transferPresidency(club.id, id);
@@ -203,7 +215,7 @@ class _ClubManageViewState extends State<ClubManageView> {
   late final _instagram = TextEditingController(text: widget.club.socials['instagram'] ?? '');
   late final _tiktok = TextEditingController(text: widget.club.socials['tiktok'] ?? '');
   late final _website = TextEditingController(text: widget.club.socials['website'] ?? '');
-  late final _officer = TextEditingController();
+  late final _member = TextEditingController();
   late final _phone = TextEditingController(text: widget.contact?.phone ?? '');
   late String? _category = widget.club.category;
   late String? _logo = widget.club.logoUrl;
@@ -217,7 +229,7 @@ class _ClubManageViewState extends State<ClubManageView> {
 
   @override
   void dispose() {
-    for (final t in [_name, _description, _faculty, _email, _instagram, _tiktok, _website, _officer, _phone]) {
+    for (final t in [_name, _description, _faculty, _email, _instagram, _tiktok, _website, _member, _phone]) {
       t.dispose();
     }
     super.dispose();
@@ -282,13 +294,13 @@ class _ClubManageViewState extends State<ClubManageView> {
   }
 
   Future<void> _add() async {
-    final u = cleanUsername(_officer.text);
+    final u = cleanUsername(_member.text);
     if (u.isEmpty) return;
     setState(() => _adding = true);
     try {
-      await widget.actions.addOfficer(u);
-      _officer.clear();
-      if (mounted) showClubSnack(context, c.officerAdded.fill(['@$u']));
+      await widget.actions.addMember(u);
+      _member.clear();
+      if (mounted) showClubSnack(context, c.memberAdded.fill(['@$u']));
     } catch (e) {
       if (mounted) showClubSnack(context, clubErrorText(c, e), error: true);
     } finally {
@@ -300,15 +312,45 @@ class _ClubManageViewState extends State<ClubManageView> {
     final self = m.userId == widget.myUserId;
     final ok = await confirmClubAction(
       context,
-      title: self ? c.leaveTitle : c.removeOfficerTitle.fill([m.name]),
-      body: self ? c.leaveBody : c.removeOfficerBody,
+      title: self ? c.leaveTitle : c.removeMemberTitle.fill([m.name]),
+      body: self ? c.leaveBody : c.removeMemberBody,
       confirmLabel: self ? c.leave : c.remove,
       destructive: true,
     );
     if (!ok) return;
     try {
-      await widget.actions.removeOfficer(m.userId);
-      if (mounted) showClubSnack(context, self ? c.left : c.officerRemoved);
+      await widget.actions.removeMember(m.userId);
+      if (mounted) showClubSnack(context, self ? c.left : c.memberRemoved);
+    } catch (e) {
+      if (mounted) showClubSnack(context, clubErrorText(c, e), error: true);
+    }
+  }
+
+  Future<void> _setPosition(ClubMember m) async {
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(c.changePosition),
+        children: [
+          SimpleDialogOption(onPressed: () => Navigator.pop(ctx, ''), child: Text(c.noPosition)),
+          for (final p in clubPositions)
+            SimpleDialogOption(onPressed: () => Navigator.pop(ctx, p), child: Text(c.positionLabel(p))),
+        ],
+      ),
+    );
+    if (picked == null) return;
+    try {
+      await widget.actions.setPosition(m.userId, picked.isEmpty ? null : picked);
+      if (mounted) showClubSnack(context, c.positionChanged);
+    } catch (e) {
+      if (mounted) showClubSnack(context, clubErrorText(c, e), error: true);
+    }
+  }
+
+  Future<void> _setRole(ClubMember m, String role) async {
+    try {
+      await widget.actions.setRole(m.userId, role);
+      if (mounted) showClubSnack(context, c.roleChanged);
     } catch (e) {
       if (mounted) showClubSnack(context, clubErrorText(c, e), error: true);
     }
@@ -350,7 +392,7 @@ class _ClubManageViewState extends State<ClubManageView> {
     final c = context.l10n.club;
     final theme = Theme.of(context);
     final president = isPresident(widget.myRole);
-    final officers = widget.members.where((m) => m.isOfficer).toList();
+    final members = widget.members;
 
     Widget section(String title, List<Widget> children, {String? help}) => Padding(
           padding: const EdgeInsets.only(bottom: KSpace.l),
@@ -546,22 +588,39 @@ class _ClubManageViewState extends State<ClubManageView> {
                     ),
                   ),
                 ]),
-              section(c.officers, help: c.officersHelp, [
-                for (final m in officers)
+              section(c.members, help: c.membersHelp, [
+                for (final m in members)
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     minTileHeight: 56,
                     leading: ClubLogo(url: m.avatarUrl, name: m.name, size: 40),
                     title: Text(m.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text([if (m.username != null) '@${m.username}', c.roleLabel(m.role)].join(' · ')),
+                    subtitle: Text(
+                      [if (m.username != null) '@${m.username}', c.rosterLabel(m.position, m.role)].join(' · '),
+                    ),
                     trailing: m.role == 'president'
                         ? null
-                        : (president || m.userId == widget.myUserId)
-                            ? TextButton(
-                                onPressed: () => _remove(m),
-                                child: Text(m.userId == widget.myUserId ? c.leave : c.remove),
-                              )
-                            : null,
+                        : m.userId == widget.myUserId
+                            ? TextButton(onPressed: () => _remove(m), child: Text(c.leave))
+                            : !president
+                                ? null
+                                : PopupMenuButton<String>(
+                                    icon: const Icon(AppIcons.more, size: 20),
+                                    onSelected: (v) => switch (v) {
+                                      'promote' => _setRole(m, 'officer'),
+                                      'demote' => _setRole(m, 'member'),
+                                      'position' => _setPosition(m),
+                                      _ => _remove(m),
+                                    },
+                                    itemBuilder: (_) => [
+                                      if (m.role == 'member')
+                                        PopupMenuItem(value: 'promote', child: Text(c.makeOfficer))
+                                      else
+                                        PopupMenuItem(value: 'demote', child: Text(c.makeMember)),
+                                      PopupMenuItem(value: 'position', child: Text(c.changePosition)),
+                                      PopupMenuItem(value: 'remove', child: Text(c.remove)),
+                                    ],
+                                  ),
                   ),
                 if (president) ...[
                   const SizedBox(height: KSpace.s),
@@ -570,8 +629,8 @@ class _ClubManageViewState extends State<ClubManageView> {
                     children: [
                       Expanded(
                         child: TextField(
-                          controller: _officer,
-                          decoration: InputDecoration(labelText: c.addOfficer, hintText: c.addOfficerHint),
+                          controller: _member,
+                          decoration: InputDecoration(labelText: c.addMember, hintText: c.addMemberHint),
                           onSubmitted: (_) => _add(),
                         ),
                       ),
@@ -581,7 +640,7 @@ class _ClubManageViewState extends State<ClubManageView> {
                         child: FilledButton.tonal(
                           onPressed: _adding ? null : _add,
                           style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
-                          child: Text(c.addOfficer),
+                          child: Text(c.addMember),
                         ),
                       ),
                     ],

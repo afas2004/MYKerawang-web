@@ -93,6 +93,8 @@ class ModerationStrings {
   final String unpin;
   final String pinnedFor;
   final String unpinnedDone;
+  final String pinToClub;
+  final String unpinFromClub;
   final String pinCapTitle;
   final String pinCapBody;
   final String replace;
@@ -342,6 +344,8 @@ class ModerationStrings {
     required this.unpin,
     required this.pinnedFor,
     required this.unpinnedDone,
+    required this.pinToClub,
+    required this.unpinFromClub,
     required this.pinCapTitle,
     required this.pinCapBody,
     required this.replace,
@@ -576,6 +580,8 @@ class ModerationStrings {
     unpin: "Unpin",
     pinnedFor: "Pinned to the top for {0} days",
     unpinnedDone: "Unpinned",
+    pinToClub: "Pin to club page",
+    unpinFromClub: "Unpin from club page",
     pinCapTitle: "Pin limit reached",
     pinCapBody: "A club can have {0} pinned post at a time. Replace “{1}” with this one?",
     replace: "Replace",
@@ -810,6 +816,8 @@ class ModerationStrings {
     unpin: "Nyahsemat",
     pinnedFor: "Disemat di atas selama {0} hari",
     unpinnedDone: "Dinyahsemat",
+    pinToClub: "Semat pada halaman kelab",
+    unpinFromClub: "Nyahsemat daripada halaman kelab",
     pinCapTitle: "Had semat dicapai",
     pinCapBody: "Kelab boleh menyemat {0} siaran pada satu masa. Gantikan “{1}” dengan siaran ini?",
     replace: "Ganti",

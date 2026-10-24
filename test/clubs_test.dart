@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mykerawang/language_cubit.dart';
 import 'package:mykerawang/screens/admin/club_approvals_tab.dart';
+import 'package:mykerawang/screens/admin/club_registry_screen.dart';
 import 'package:mykerawang/screens/clubs/club_directory_screen.dart';
 import 'package:mykerawang/screens/clubs/club_manage_screen.dart';
 import 'package:mykerawang/screens/clubs/club_page_screen.dart';
@@ -87,6 +88,14 @@ void main() {
     });
     expect(club.isActive, isTrue);
     expect(club.socials, {'instagram': 'debate'});
+  });
+
+  test('parseCouncil reads "Name - Position" lines', () {
+    expect(parseCouncil('Aiman - Secretary\n\nSiti | Treasurer\nAli'), [
+      {'name': 'Aiman', 'position': 'Secretary'},
+      {'name': 'Siti', 'position': 'Treasurer'},
+      {'name': 'Ali', 'position': ''},
+    ]);
   });
 
   test('every category has a label in en and ms', () {
@@ -240,39 +249,52 @@ void main() {
 
     testWidgets('register flow at ${w.toInt()} px', (tester) async {
       Map<String, Object?>? sent;
-      var calls = 0;
       await pumpAt(
         tester,
         w,
         ClubRegisterScreen(
-          register: ({required name, required handle, description, category, required proofNote}) async {
-            calls++;
-            if (calls == 1) throw Exception('CLUB:handle_taken');
-            sent = {'name': name, 'handle': handle, 'proof': proofNote};
-            return 'new-id';
+          loadRegistry: () async => const [
+            ClubRegistryEntry(
+              id: 'r1',
+              code: 'HEP/2024/012',
+              name: 'Kelab Catur',
+              faculty: 'FSKM',
+              category: 'academic',
+            ),
+          ],
+          register: ({required registryId, required officialEmail, required position, council = const [], note}) async {
+            sent = {
+              'registry': registryId,
+              'email': officialEmail,
+              'position': position,
+              'council': council,
+            };
+            return {'id': 'new-id', 'handle': 'HEP2024012'};
           },
         ),
         scaffold: false,
       );
-      final fields = find.byType(TextFormField);
-      await tester.enterText(fields.at(0), 'Kelab Catur');
-      await tester.pump();
-      expect(find.text('KelabCatur'), findsOneWidget, reason: 'handle suggested from name');
+      await tester.tap(find.byType(DropdownButtonFormField<String>).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Kelab Catur · HEP/2024/012').last);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.widgetWithText(TextFormField, c.officialEmail), 'kelabcatur@gmail.com');
+      await tester.enterText(
+          find.widgetWithText(TextFormField, c.council), 'Aiman - Secretary\nSiti - Treasurer');
       final send = find.widgetWithText(FilledButton, c.submitRequest);
       await tester.ensureVisible(send);
       await tester.tap(send);
       await tester.pumpAndSettle();
-      expect(find.text(c.proofTooShort), findsOneWidget);
-      await tester.enterText(fields.at(3), 'HEP registration no. 99');
-      await tester.ensureVisible(send);
-      await tester.tap(send);
-      await tester.pumpAndSettle();
-      expect(find.text(c.handleTaken), findsOneWidget);
-      await tester.enterText(fields.at(1), 'KelabCatur2');
-      await tester.ensureVisible(send);
-      await tester.tap(send);
-      await tester.pumpAndSettle();
-      expect(sent, {'name': 'Kelab Catur', 'handle': 'KelabCatur2', 'proof': 'HEP registration no. 99'});
+      expect(sent, {
+        'registry': 'r1',
+        'email': 'kelabcatur@gmail.com',
+        'position': 'president',
+        'council': [
+          {'name': 'Aiman', 'position': 'Secretary'},
+          {'name': 'Siti', 'position': 'Treasurer'},
+        ],
+      });
       expect(find.text(c.requestSent), findsOneWidget);
     });
 
@@ -290,8 +312,10 @@ void main() {
           actions: ClubManageActions(
             save: (e) async => saved = e,
             pickImage: () async => null,
-            addOfficer: (u) async => added.add(u),
-            removeOfficer: (_) async {},
+            addMember: (u) async => added.add(u),
+            removeMember: (_) async {},
+            setPosition: (_, __) async {},
+            setRole: (_, __) async {},
             transfer: (_) async {},
           ),
         ),
@@ -304,11 +328,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(saved?.name, club.name);
       expect(saved?.socials, {'instagram': 'debateuitm'});
-      final field = find.widgetWithText(TextField, c.addOfficer);
+      final field = find.widgetWithText(TextField, c.addMember);
       await tester.ensureVisible(field);
       await tester.pumpAndSettle();
       await tester.enterText(field, '@farid');
-      await tester.tap(find.widgetWithText(FilledButton, c.addOfficer));
+      await tester.tap(find.widgetWithText(FilledButton, c.addMember));
       await tester.pumpAndSettle();
       expect(added, ['farid']);
       await tester.drag(find.byType(ListView).first, const Offset(0, -3000));
@@ -328,8 +352,10 @@ void main() {
           actions: ClubManageActions(
             save: (_) async {},
             pickImage: () async => null,
-            addOfficer: (_) async {},
-            removeOfficer: (_) async {},
+            addMember: (_) async {},
+            removeMember: (_) async {},
+            setPosition: (_, __) async {},
+            setRole: (_, __) async {},
             transfer: (_) async {},
           ),
         ),
@@ -339,7 +365,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(c.leave), findsOneWidget);
       expect(find.text(c.transfer, skipOffstage: false), findsNothing);
-      expect(find.text(c.addOfficer, skipOffstage: false), findsNothing);
+      expect(find.text(c.addMember, skipOffstage: false), findsNothing);
     });
 
     testWidgets('admin club request card at ${w.toInt()} px', (tester) async {
@@ -449,8 +475,10 @@ void main() {
         actions: ClubManageActions(
           save: (_) async {},
           pickImage: () async => null,
-          addOfficer: (_) async {},
-          removeOfficer: (_) async {},
+          addMember: (_) async {},
+          removeMember: (_) async {},
+          setPosition: (_, __) async {},
+          setRole: (_, __) async {},
           transfer: (_) async {},
           saveContact: (p, q) async {
             savedPhone = p;
@@ -486,6 +514,35 @@ void main() {
     expect(savedPhone, '019-888 7777');
     expect(savedQr, isNull);
     expect(find.text(c.contactSaved), findsOneWidget);
+  });
+
+  testWidgets('admin registry lists entries and adds one', (tester) async {
+    final saved = <Map<String, Object?>>[];
+    await pumpAt(
+      tester,
+      375,
+      ClubRegistryScreen(
+        checkAdmin: () async => true,
+        load: () async => const [
+          ClubRegistryEntry(id: 'r1', code: 'HEP/2024/042', name: 'Debate Society', faculty: 'FSKM'),
+        ],
+        save: ({id, required code, required name, faculty, category, active = true}) async {
+          saved.add({'id': id, 'code': code, 'name': name, 'active': active});
+        },
+      ),
+      scaffold: false,
+    );
+    expect(find.text('Debate Society'), findsOneWidget);
+    await tester.tap(find.text(c.addRegistryClub));
+    await tester.pumpAndSettle();
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), 'HEP/2024/055');
+    await tester.enterText(fields.at(1), 'Robotics');
+    await tester.tap(find.text(c.saveRegistry));
+    await tester.pumpAndSettle();
+    expect(saved.single['code'], 'HEP/2024/055');
+    expect(saved.single['name'], 'Robotics');
+    expect(find.text(c.registrySaved), findsOneWidget);
   });
 
   testWidgets('admin clubs tab filters and suspends with a reason', (tester) async {
