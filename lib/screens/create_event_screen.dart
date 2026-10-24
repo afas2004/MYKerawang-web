@@ -55,6 +55,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   // Registration + merit + contacts.
   bool _closeAtStart = true;
   bool _meritOffered = false;
+  bool _attendanceEnabled = false;
   bool _isAdminUser = false;
   String? _audience = 'uitm';
   final _capacityCtrl = TextEditingController();
@@ -105,6 +106,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       _feeCtrl.text = event['fee']?.toString() ?? '';
       _audience = (event['audience'] as String?) ?? 'uitm';
       _meritOffered = event['merit_offered'] == true;
+      _attendanceEnabled = event['attendance_enabled'] == true;
       _meritNoteCtrl.text = event['merit_note'] ?? '';
       _activityRefCtrl.text = event['activity_ref'] ?? '';
       _coOrganiserCtrl.text = event['co_organiser'] ?? '';
@@ -329,6 +331,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         'merit_note': _nullIfEmpty(_meritNoteCtrl.text),
         'activity_ref': _nullIfEmpty(_activityRefCtrl.text),
         'co_organiser': _nullIfEmpty(_coOrganiserCtrl.text),
+        'attendance_enabled': _attendanceEnabled,
       };
 
       if (widget.eventToEdit != null) {
@@ -578,6 +581,16 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   const SizedBox(height: 12),
                   _input(_coOrganiserCtrl, s.evCoOrganiser,
                       icon: AppIcons.people),
+                  const Divider(height: 32),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: _attendanceEnabled,
+                    onChanged: (v) => setState(() => _attendanceEnabled = v),
+                    title: Text(s.evAttendance),
+                    subtitle: Text(s.evAttendanceHint,
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                  ),
                 ],
               ),
               FormSection(

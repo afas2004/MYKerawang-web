@@ -38,6 +38,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   int _count = 0;
   bool _loading = true;
   bool _exporting = false;
+  bool _enabled = false;
 
   SupabaseClient get _db => Supabase.instance.client;
 
@@ -46,7 +47,36 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     super.initState();
     _refreshToken();
     _loadCount();
+    _loadEnabled();
     _timer = Timer.periodic(_refresh, (_) => _refreshToken());
+  }
+
+  Future<void> _loadEnabled() async {
+    try {
+      final row = await _db
+          .from('events')
+          .select('attendance_enabled')
+          .eq('id', widget.eventId)
+          .maybeSingle();
+      if (mounted) {
+        setState(() => _enabled = row?['attendance_enabled'] == true);
+      }
+    } catch (_) {
+      // Leave it off; the organiser can switch it on below.
+    }
+  }
+
+  Future<void> _setEnabled(bool v) async {
+    setState(() => _enabled = v);
+    try {
+      await _db
+          .from('events')
+          .update({'attendance_enabled': v}).eq('id', widget.eventId);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _enabled = !v);
+      showErrorWithRetry(context, e, onRetry: () => _setEnabled(v));
+    }
   }
 
   @override
@@ -150,7 +180,18 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodySmall
                         ?.copyWith(color: scheme.onSurfaceVariant)),
-                const SizedBox(height: KSpace.l),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _enabled,
+                  onChanged: _setEnabled,
+                  title: Text(s.evAttendance),
+                  subtitle: Text(
+                    _enabled ? s.evAttendanceCount.fill(['$_count']) : s.evAttendanceOff,
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                ),
+                const SizedBox(height: KSpace.s),
                 if (_loading)
                   const Padding(
                     padding: EdgeInsets.all(48),
