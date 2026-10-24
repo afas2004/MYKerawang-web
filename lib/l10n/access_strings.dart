@@ -143,6 +143,9 @@ extension AccessStrings on AppStrings {
   String get verifySubmittedAt => _t("Submitted {0}", "Dihantar {0}", "提出 {0}");
 
   // ---- event details: registration, merit, contacts, attendance ----
+  String get eventSearchHint => _t("Search events", "Cari acara", "Search events");
+  String get eventPickerEmpty =>
+      _t("No events match that search.", "Tiada acara sepadan dengan carian itu.", "No events match.");
   String get evRegistration => _t("Registration", "Pendaftaran", "Registration");
   String get evCloseAtStart => _t("Close registration when the event starts",
       "Tutup pendaftaran apabila acara bermula", "Close registration when the event starts");

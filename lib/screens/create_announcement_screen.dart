@@ -350,10 +350,6 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
             authorName: club?.label ?? AppStrings.appName,
             authorAvatar: club?.avatarUrl,
             cover: _d.cover.firstOrNull,
-            coverAspect: _d.coverAspect,
-            // Posting as a club is the club's own voice; only the app
-            // itself (admin, no club) carries the Official badge.
-            official: _d.clubId == null && p.isAdmin,
             images: _d.images,
             actions: _d.actions.where((l) => validateActionLink(l.label, l.url) == null).toList(),
             linkedEvent: _d.linkedEvent,
