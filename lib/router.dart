@@ -15,6 +15,7 @@ import 'screens/event_detail_screen.dart';
 import 'screens/follow_list_screen.dart';
 import 'screens/privacy_policy_screen.dart';
 import 'screens/tag_feed_screen.dart';
+import 'screens/events/checkin_screens.dart';
 import 'screens/guest_views.dart';
 import 'screens/events_screen.dart';
 import 'screens/home_screen.dart';
@@ -244,6 +245,15 @@ GoRouter buildRouter() {
             initial: state.extra as Map<String, dynamic>?,
             build: (data) => EventDetailScreen(event: data),
           ),
+        ),
+      ),
+      GoRoute(
+        path: '/event/:id/checkin',
+        // The phone-camera fallback: the attendance QR opens this URL.
+        // Members only — authRedirect sends guests to login and back.
+        builder: (context, state) => CheckinPage(
+          eventId: state.pathParameters['id']!,
+          token: state.uri.queryParameters['t'],
         ),
       ),
       GoRoute(

@@ -1,7 +1,9 @@
 # Content fields: events, listings, announcements
 
-Status: **phase 1 shipped** (data-driven categories + multi-select).
-Phases 2–4 designed below.
+Status: **phases 1–5 shipped**.
+Categories are data-driven; events carry registration, merit, contact and
+attendance fields; announcements have a 16:9 / 1:1 cover.
+Not built: waitlist, proximity proof for check-in.
 
 ## Decisions from review
 

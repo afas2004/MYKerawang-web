@@ -59,8 +59,12 @@ class AnnouncementDraft {
   String title = '';
   String body = '';
 
-  /// Cover (16:9) and extra photos: URLs (`String`) or picked LocalImages.
+  /// Cover (16:9 or 1:1) and extra photos: URLs (`String`) or picked
+  /// LocalImages.
   final List<dynamic> cover = [];
+
+  /// `16:9` (default, banner) or `1:1` (square, feed-friendly).
+  String coverAspect = '16:9';
   final List<dynamic> images = [];
   final List<ActionLink> actions = [];
   Map<String, dynamic>? linkedEvent;
@@ -81,7 +85,8 @@ class AnnouncementDraft {
       ..publishAt = DateTime.tryParse('${p['publish_at'] ?? ''}')?.toLocal()
       ..featureUntil = DateTime.tryParse('${p['feature_until'] ?? ''}')?.toLocal()
       ..commentsEnabled = p['comments_enabled'] != false
-      ..showInFeed = p['show_in_feed'] != false;
+      ..showInFeed = p['show_in_feed'] != false
+      ..coverAspect = (p['cover_aspect'] == '1:1') ? '1:1' : '16:9';
     final cover = (p['cover_url'] ?? p['image_url']) as String?;
     if (cover != null && cover.isNotEmpty) d.cover.add(cover);
     d.images.addAll(List<String>.from(p['gallery_urls'] ?? const []));
@@ -114,6 +119,7 @@ class AnnouncementDraft {
         'title': title.trim(),
         'body': body,
         'cover_url': coverUrl,
+        'cover_aspect': coverAspect,
         // The hub and older cards read image_url; keep it as the cover.
         'image_url': coverUrl,
         'gallery_urls': imageUrls,

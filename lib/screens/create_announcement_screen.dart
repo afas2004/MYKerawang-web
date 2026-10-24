@@ -438,13 +438,26 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
 
         // Cover
         label(a.cover),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: SegmentedButton<String>(
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(value: '16:9', label: Text('16:9')),
+              ButtonSegment(value: '1:1', label: Text('1:1')),
+            ],
+            selected: {_d.coverAspect},
+            onSelectionChanged: (v) => _set(() => _d.coverAspect = v.first),
+          ),
+        ),
+        const SizedBox(height: KSpace.s),
         Semantics(
           button: true,
           label: a.coverHint,
           child: ClipRRect(
             borderRadius: KRadius.card,
             child: AspectRatio(
-              aspectRatio: 16 / 9,
+              aspectRatio: _d.coverAspect == '1:1' ? 1.0 : 16 / 9,
               child: Material(
                 color: scheme.surfaceContainerHigh,
                 child: InkWell(

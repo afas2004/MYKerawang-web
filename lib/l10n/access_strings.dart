@@ -118,6 +118,74 @@ extension AccessStrings on AppStrings {
   String get verifyRejectedDone => _t("Rejected", "Ditolak", "却下しました");
   String get verifySubmittedAt => _t("Submitted {0}", "Dihantar {0}", "提出 {0}");
 
+  // ---- event details: registration, merit, contacts, attendance ----
+  String get evRegistration => _t("Registration", "Pendaftaran", "Registration");
+  String get evCloseAtStart => _t("Close registration when the event starts",
+      "Tutup pendaftaran apabila acara bermula", "Close registration when the event starts");
+  String get evCloseAtStartHint => _t(
+      "Nobody can join once it begins. You can also close it early from the event page.",
+      "Tiada siapa boleh menyertai selepas ia bermula. Anda juga boleh menutupnya lebih awal dari halaman acara.",
+      "Nobody can join once it begins.");
+  String get evClosed => _t("Registration closed", "Pendaftaran ditutup", "Registration closed");
+  String get evFull => _t("This event is full", "Acara ini sudah penuh", "This event is full");
+  String get evCloseNow => _t("Close registration now", "Tutup pendaftaran sekarang", "Close registration now");
+  String get evCapacity => _t("Places (optional)", "Tempat (pilihan)", "Places (optional)");
+  String get evCapacityHint =>
+      _t("Leave empty for unlimited", "Biarkan kosong untuk tanpa had", "Leave empty for unlimited");
+  String get evFee => _t("Fee (RM)", "Yuran (RM)", "Fee (RM)");
+  String get evFeeHint => _t("Empty or 0 means free", "Kosong atau 0 bermaksud percuma", "Empty or 0 means free");
+  String get evFeeFree => _t("Free", "Percuma", "Free");
+  String get evAudience => _t("Open to", "Terbuka kepada", "Open to");
+  String evAudienceLabel(String? v) => switch (v) {
+        'kolej' => _t("This college", "Kolej ini", "This college"),
+        'klab' => _t("Club members", "Ahli kelab", "Club members"),
+        'awam' => _t("Public", "Awam", "Public"),
+        _ => _t("UiTM students", "Pelajar UiTM", "UiTM students"),
+      };
+  String get evMerit => _t("Merit offered", "Merit disediakan", "Merit offered");
+  String get evMeritHint => _t("Only a club (as the host) or an admin can offer merit.",
+      "Hanya kelab (sebagai penganjur) atau admin boleh menawarkan merit.",
+      "Only a club or an admin can offer merit.");
+  String get evMeritNote => _t("Merit note", "Nota merit", "Merit note");
+  String get evMeritNoteHint => _t("e.g. 2 merit, kokurikulum", "cth. 2 merit, kokurikulum", "e.g. 2 merit");
+  String get evActivityRef => _t("Activity reference", "Rujukan aktiviti", "Activity reference");
+  String get evCoOrganiser =>
+      _t("With cooperation from", "Dengan kerjasama", "With cooperation from");
+  String get evContacts => _t("Contact the organiser", "Hubungi penganjur", "Contact the organiser");
+  String get evContactHint =>
+      _t("Leave blank to hide a channel.", "Biarkan kosong untuk sembunyikan saluran.", "Leave blank to hide a channel.");
+  String get evContactNone => _t("The organiser has not shared a contact.",
+      "Penganjur belum berkongsi hubungan.", "The organiser has not shared a contact.");
+
+  // ---- attendance ----
+  String get evAttendance => _t("Attendance", "Kehadiran", "Attendance");
+  String get evAttendanceHint => _t(
+      "Show this code at the door. It refreshes every 10 seconds; students scan it in the app or with their phone camera.",
+      "Tunjukkan kod ini di pintu. Ia diperbaharui setiap 10 saat; pelajar mengimbasnya dalam aplikasi atau dengan kamera telefon.",
+      "Show this code at the door.");
+  String get evAttendanceOff => _t("Turn on attendance", "Hidupkan kehadiran", "Turn on attendance");
+  String get evCheckIn => _t("Check in", "Daftar masuk", "Check in");
+  String get evScanHint =>
+      _t("Point the camera at the organiser's QR code.", "Halakan kamera ke kod QR penganjur.", "Point at the QR code.");
+  String get evCheckedIn => _t("You're checked in", "Anda telah didaftarkan", "You're checked in");
+  String get evAlreadyIn =>
+      _t("You were already checked in", "Anda sudah pun didaftarkan", "You were already checked in");
+  String get evCheckinExpired => _t("That code just expired — ask the organiser to show it again.",
+      "Kod itu baru tamat — minta penganjur menunjukkannya semula.", "That code expired.");
+  String get evCheckinInvalid =>
+      _t("That is not a check-in code.", "Itu bukan kod daftar masuk.", "That is not a check-in code.");
+  String get evCheckinVerify => _t("Verify your student status before checking in for merit.",
+      "Sahkan status pelajar anda sebelum mendaftar masuk untuk merit.", "Verify your student status first.");
+  String get evAttendanceEmpty =>
+      _t("Nobody has checked in yet.", "Belum ada yang mendaftar masuk.", "Nobody has checked in yet.");
+  String get evAttendanceCount =>
+      _t("{0} checked in", "{0} telah mendaftar masuk", "{0} checked in");
+  String get evExportCsv =>
+      _t("Export attendance (CSV)", "Eksport kehadiran (CSV)", "Export attendance (CSV)");
+  String get evStudentId => _t("Student ID", "No. pelajar", "Student ID");
+  String get evCheckedAt => _t("Checked in", "Daftar masuk", "Checked in");
+  String get evName => _t("Name", "Nama", "Name");
+
   // ---- categories ----
   String get catTitle => _t("Categories", "Kategori", "カテゴリー");
   String get catEvents => _t("Event topics", "Topik acara", "イベント");

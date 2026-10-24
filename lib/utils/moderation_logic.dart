@@ -138,7 +138,7 @@ class ModError {
   String toString() => 'ModError($code${sub == null ? '' : ':$sub'})';
 }
 
-final _modPattern = RegExp(r'(MOD|VERIFY):([a-z_]+)(?::([a-z_]+))?');
+final _modPattern = RegExp(r'(MOD|VERIFY|CHECKIN):([a-z_]+)(?::([a-z_]+))?');
 
 ModError? parseModError(Object? e) {
   if (e == null) return null;
@@ -166,9 +166,11 @@ ModError? parseModError(Object? e) {
   // never collide with a MOD code.
   final kind = m.group(1);
   final raw = m.group(2)!;
-  final kindCode = kind == 'VERIFY'
-      ? (raw == 'required' ? 'verify_required' : 'verify_$raw')
-      : raw;
+  final kindCode = switch (kind) {
+    'VERIFY' => raw == 'required' ? 'verify_required' : 'verify_$raw',
+    'CHECKIN' => 'checkin_$raw',
+    _ => raw,
+  };
 
   Map<String, dynamic> detail = const {};
   if (details is Map<String, dynamic>) {
