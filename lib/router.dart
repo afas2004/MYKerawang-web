@@ -263,6 +263,12 @@ GoRouter buildRouter() {
         path: '/event/:id/form',
         // Answering: open to guests (they see a sign-in bar). The server
         // decides whether an answer is accepted.
+        //
+        // onExit is not optional on the web: a pop reported as a new history
+        // entry makes the browser's back return to the page you just left,
+        // which is how the form "came back by itself".
+        parentNavigatorKey: _rootKey,
+        onExit: historyAwareExit,
         builder: (context, state) => EventFormScreen(
           eventId: state.pathParameters['id']!,
           formId: state.uri.queryParameters['f'],
@@ -272,6 +278,7 @@ GoRouter buildRouter() {
         path: '/event/:id/form/responses',
         // The organiser's report page: S1/S2/S3 and the CSV.
         parentNavigatorKey: _rootKey,
+        onExit: historyAwareExit,
         builder: (context, state) => FormResponsesScreen(
           eventId: state.pathParameters['id']!,
           formId: state.uri.queryParameters['f'],
@@ -283,8 +290,10 @@ GoRouter buildRouter() {
         // first (leaveFormRoute → FormGuard).
         parentNavigatorKey: _rootKey,
         onExit: leaveFormRoute,
-        builder: (context, state) =>
-            FormEditorScreen(eventId: state.pathParameters['id']!),
+        builder: (context, state) => FormEditorScreen(
+          eventId: state.pathParameters['id']!,
+          formId: state.uri.queryParameters['f'],
+        ),
       ),
       GoRoute(
         path: '/post/:id',

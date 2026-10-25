@@ -8,6 +8,7 @@ import '../../services/form_service.dart';
 import '../../theme/app_icons.dart';
 import '../../theme/tokens.dart';
 import '../../utils/adaptive.dart';
+import '../../utils/app_nav.dart';
 import '../../utils/feedback.dart';
 import '../../utils/form_csv.dart';
 import '../../utils/responsive.dart';
@@ -146,6 +147,7 @@ class _FormResponsesScreenState extends State<FormResponsesScreen> {
       appBar: appBarConstrained(
         context,
         maxWidth: Responsive.detailMaxWidth,
+        leading: const AppBackButton(),
         title: Text(s.formResponsesTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
           if (doc != null)
@@ -158,7 +160,17 @@ class _FormResponsesScreenState extends State<FormResponsesScreen> {
             IconButton(
               tooltip: s.formEditThis,
               icon: const Icon(AppIcons.edit),
-              onPressed: () => context.push('/event/${widget.eventId}/form/edit'),
+              onPressed: () {
+                // Opened from the editor? Return to it rather than pushing a
+                // second editor on top — that stack grew one page per round
+                // trip, and every page in it was a form with a guard.
+                final from = GoRouterState.of(context).uri.queryParameters['from'];
+                if (from == 'edit' && context.canPop()) {
+                  context.pop();
+                  return;
+                }
+                context.push('/event/${widget.eventId}/form/edit?f=${doc.id}');
+              },
             ),
         ],
       ),

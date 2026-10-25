@@ -255,6 +255,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
       appBar: appBarConstrained(
         context,
         maxWidth: 760,
+        // Explicit: a form opened from a QR code or a shared link has no page
+        // beneath it, and without this the app bar shows no way up.
+        leading: const AppBackButton(),
         title: Text(
           view?.doc.title ?? s.formAnswerTitle,
           maxLines: 1,
@@ -265,7 +268,11 @@ class _EventFormScreenState extends State<EventFormScreen> {
             IconButton(
               tooltip: s.formEditThis,
               icon: const Icon(AppIcons.edit),
-              onPressed: () => context.push('/event/${widget.eventId}/form/edit'),
+              // Edit *this* form: an event can hold more than one, and the
+              // editor would otherwise open the newest.
+              onPressed: () => context.push(
+                '/event/${widget.eventId}/form/edit?f=${view.doc.id}',
+              ),
             ),
         ],
       ),

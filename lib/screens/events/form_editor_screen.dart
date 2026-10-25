@@ -408,6 +408,8 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
       appBar: appBarConstrained(
         context,
         maxWidth: 1180,
+        // Explicit, so a cold-opened link still has a way up (to the event).
+        leading: const AppBackButton(),
         title: Text(
           s.formEditorTitle,
           maxLines: 1,
@@ -418,7 +420,12 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
             IconButton(
               tooltip: s.formResponsesTitle,
               icon: const Icon(AppIcons.list),
-              onPressed: () => context.push('/event/${widget.eventId}/form/responses'),
+              // The analyses of *this* form, not of whatever is newest.
+              // `from=edit` lets the responses page come back here instead of
+              // pushing a second editor on top (that stack grew every round).
+              onPressed: () => context.push(
+                '/event/${widget.eventId}/form/responses?f=${doc.id}&from=edit',
+              ),
             ),
           if (doc != null && !_readOnly)
             IconButton(

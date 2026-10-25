@@ -25,6 +25,11 @@ import 'browser_history_stub.dart'
 /// * On the web, an in-app back steps the browser history back instead of
 ///   adding an entry ([historyAwareExit]), so the browser's own back
 ///   button and the app's back arrow always agree.
+///
+/// Every pushed page needs `onExit: historyAwareExit` (or [leaveFormRoute]
+/// for a form). Without it the pop is reported to the browser as a *new*
+/// entry, so the browser's back returns to the page that was just closed —
+/// the form that "came back by itself". The form screens were missing it.
 
 // ---------------------------------------------------------------------------
 // Typed links
@@ -106,6 +111,12 @@ String backFallbackFor(String location) {
   final uri = Uri.parse(location);
   final seg = uri.pathSegments.where((s) => s.isNotEmpty).toList();
   if (seg.isEmpty) return '/home';
+
+  // The form screens belong to an event: /event/:id/form, …/form/edit,
+  // …/form/responses all go up to the event, not to the events list.
+  if (seg.length >= 3 && seg.first == 'event' && seg[2] == 'form') {
+    return '/event/${seg[1]}';
+  }
 
   // Edit forms → the thing being edited (/post|event|item/:id/edit).
   if (seg.length == 3 && seg.last == 'edit') return '/${seg[0]}/${seg[1]}';
