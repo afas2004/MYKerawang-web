@@ -399,14 +399,67 @@ migration.
    4-character floor, or accept the PIN as a UX gate only.
 10. **`flutter pub upgrade`** for the Supabase stack (M18), then re-run
     `flutter analyze` and the util tests.
-11. **Optional, before inviting clubs:** confirm the base-table policies for
-    `profiles`, `posts`, `comments`, `events`, `listings` and `reports` in the
-    dashboard (Database → Policies) against §3. They are not in the repo, so
-    that is the one part of the RLS picture I could not read.
+11. **Close the one real review gap:** paste `supabase/pending/preflight.sql`
+    sections 8–9 and send the output. That prints every policy on
+    `profiles/posts/comments/events/listings/reports` and flags any write policy
+    with no ownership predicate. It is the only part of the RLS picture I could
+    not read, and it takes 30 seconds.
 
 ---
 
-## 12. Limits of this review
+## 12. Is the gap dangerous?
+
+Short answer: **the gap is not itself dangerous, and it does not raise the risk
+of anything already found — but it hides exactly one class of hole, and that
+class is worth 30 seconds to rule out.**
+
+**What the gap cannot hide.** Everything an unauthenticated stranger can reach
+was measured, not inferred: the storage write hole (C1), the anon reads (H2),
+every guest path. The RPC surface was read in full, and all 157 security-definer
+functions have a pinned `search_path` with the auth check before the first
+write. So nothing in "guest / anonymous" is unverified.
+
+**What it does hide.** The six base tables whose policies live only in the
+dashboard: `profiles`, `posts`, `comments`, `events`, `listings`, `reports`. If
+any of them carries a permissive write policy with no ownership predicate
+(`using (true)` — the shape the test stub models at
+`supabase/tests/moderation/stub.sql:39`), one signed-in student could:
+
+| If this policy is open | Consequence |
+|---|---|
+| `profiles` UPDATE | change anyone's display name / avatar / bio → impersonation. Role, `is_verified` and `is_banned` are protected by `guard_profile_privileges`, so **no admin escalation** |
+| `posts` UPDATE | edit anyone's post text → defacement, impersonation |
+| `listings` UPDATE | change a seller's price → scam |
+| `comments` UPDATE | rewrite someone's comment |
+| `events` UPDATE | change an event's time/place |
+
+No escalation to admin or owner is possible through any of them: `is_admin()`
+reads `profiles.role`, and the guard trigger rewrites `role` back for every
+non-owner caller. So the worst case is horizontal tampering between students,
+not takeover.
+
+**How to close it, cheapest first.**
+1. `preflight.sql` §8–9 (no login, 30 seconds) — if every write policy names
+   `auth.uid()` or `is_admin()`, this gap is closed and I will say so plainly.
+2. A throwaway account lets me confirm it against the live API with a
+   type-error oracle that changes nothing (`PATCH` with a value that cannot
+   cast: if RLS filters the row, no row is touched; if it doesn't, Postgres
+   rejects the write — either way the data is unchanged).
+
+**Separately verified while writing this:** the `service_role` JWT that leaked
+into the seeder commits is **dead**. Its payload still claims
+`role: service_role` and `exp: 2035`, but the project refuses it —
+`401` on `/rest/v1/`, on an RLS-protected table, and on
+`/auth/v1/admin/users`. So the handover was right, and the one credential in
+git history is not a live key.
+
+**The gap that is *not* about security:** the six signed-in click-throughs.
+Those are "does it still work for users", and they only matter once the client
+fixes in §10 are deployed — which they are not.
+
+---
+
+## 13. Limits of this review
 
 * No database password or Management API token was available here, so
   `pg_policies` could not be read directly. Repo-defined policies were read in

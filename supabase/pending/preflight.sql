@@ -62,3 +62,31 @@ order by table_name, grantee;
 
 -- 7. How many objects are in each bucket (context for the storage change).
 select bucket_id, count(*) from storage.objects group by bucket_id order by bucket_id;
+
+-- 8. THE IMPORTANT ONE FOR THE REVIEW GAP. The base tables were created in the
+--    dashboard, so their policies are not in the repo and are the only part of
+--    the RLS picture that could not be read. This prints them.
+select tablename, policyname, cmd, roles::text,
+       coalesce(qual, '(none)')       as using_expr,
+       coalesce(with_check, '(none)') as check_expr
+from pg_policies
+where schemaname = 'public'
+  and tablename in ('profiles', 'posts', 'comments', 'events', 'listings', 'reports')
+order by tablename, cmd, policyname;
+
+-- 9. The dangerous subset: a policy that lets a normal signed-in user write
+--    with no ownership predicate. Any row here is a real hole — e.g. a post or
+--    profile UPDATE with `using (true)` lets one student edit another's
+--    content. Send me this output and I will say which lines matter.
+select tablename, policyname, cmd, roles::text,
+       coalesce(qual, '(none)')       as using_expr,
+       coalesce(with_check, '(none)') as check_expr
+from pg_policies
+where schemaname = 'public'
+  and permissive = 'PERMISSIVE'
+  and tablename in ('profiles', 'posts', 'comments', 'events', 'listings', 'reports')
+  and (
+        (cmd = 'INSERT' and (with_check is null or with_check = 'true'))
+     or (cmd in ('ALL', 'UPDATE') and (qual is null or qual = 'true'))
+      )
+order by tablename, cmd, policyname;
