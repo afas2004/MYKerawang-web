@@ -1,7 +1,8 @@
 # Handover — MYKerawang web
 
 Written 2026-10-25. Everything below was verified, not remembered. Updated at
-the end of the second session that day (PR #8 merged, two bugs fixed).
+the end of the second session that day (PR #8 and #9 merged, two bugs fixed,
+1.7.7 released).
 
 ## Where things stand
 
@@ -9,16 +10,13 @@ the end of the second session that day (PR #8 merged, two bugs fixed).
 |---|---|
 | Repo | `C:\src\project\Flutter\MYKerawang-web` |
 | Worktree used | `.deepseek/worktrees/clubs-admin` (the one to reopen) |
-| Branch | `deepseek/clubs-admin` — pushed; 3 commits ahead of `origin/main` |
-| Last merge | PR #8 → `e491899` (all of 1.7.2–1.7.6) |
+| Branch | `deepseek/clubs-admin` — level with `origin/main` |
+| Last merge | PR #9 → `6da73ad` (1.7.7); before it PR #8 → `e491899` (1.7.2–1.7.6) |
 | Live | https://mykerawang-app.web.app — build `202610250823`, version **1.7.7** |
 | Tests | 446 Flutter tests green; analyzer has 18 info/warning findings, no errors |
 | Latest migration | `20261026006100_club_recruitment.sql` (applied to live) |
 
-`main` is at 1.7.6; the live site is at 1.7.7 without a PR for it yet. The branch
-holds the three commits after `e491899`: the two announcement fixes and the
-Google sign-in history fix, released as 1.7.7 (build `202610250823`) after a
-release build + `firebase deploy`. Merge at the next natural stop.
+`main`, the branch and the live site are all at 1.7.7 (build `202610250823`).
 
 ## What changed this session
 
@@ -171,7 +169,6 @@ and the old `signInWithOAuth` path still compiles.
 
 1. Run the three Google sign-in checks above on the live 1.7.7. If any fails,
    revert the login commit and redeploy before anything else.
-2. Open a PR for the three commits and merge it, so `main` matches production
-   again (it is still at 1.7.6).
-3. Then either the captcha work — which touches the same OAuth launch — or the
-   form builder, with a design document before any UI.
+2. Then either the captcha work (the last code item before inviting a club —
+   it needs a hCaptcha/Turnstile site key) or the form builder, with a design
+   document before any UI.
