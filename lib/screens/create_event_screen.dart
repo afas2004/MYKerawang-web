@@ -273,10 +273,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     final s = context.l10nRead;
-    if (_mediaItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.addPhotoRequired)));
-      return;
-    }
+    // A photo is optional: an event without a cover still has a date block and
+    // every list renders it. (It used to be required, which made a seeded or
+    // quickly-created event impossible to open and re-save.)
     if (_categories.isEmpty) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(s.categoryRequired)));

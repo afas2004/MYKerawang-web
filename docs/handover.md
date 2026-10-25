@@ -12,16 +12,15 @@ the end of the second session that day (PR #8 and #9 merged, two bugs fixed,
 | Worktree used | `.deepseek/worktrees/clubs-admin` (the one to reopen) |
 | Branch | `deepseek/clubs-admin` — 11 commits ahead of `origin/main`, pushed |
 | Last merge | PR #9 → `6da73ad` (1.7.7); before it PR #8 → `e491899` (1.7.2–1.7.6) |
-| Live | https://mykerawang-app.web.app — build `202610251011`, version **1.7.8** |
-| Tests | 490 Flutter tests green; migration suites: moderation (all but 2 pre-existing), clubs 87, verification 13, forms 58, events 10; analyzer has 18 info/warning findings, no errors |
-| Latest migration | `20261026008100_event_links_pic.sql` — **written, tested, NOT applied to live**; before it `20261026007100_event_forms.sql` (also not applied), then `20261026006100_club_recruitment.sql` (live) |
+| Live | https://mykerawang-app.web.app — build `202610251047`, version **1.7.9** |
+| Tests | 490 Flutter tests green; migration suites: moderation (all but 2 pre-existing), clubs 87, verification 13, forms 58, event links 10, attendance 15; analyzer has 18 info/warning findings, no errors |
+| Latest migration | `20261026009100_fix_checkin_token.sql` — **written, tested, NOT applied to live**. Before it: `20261026008100_event_links_pic.sql` and `20261026007100_event_forms.sql`, both **applied** (the seed event exists and the app writes `pic`/`action_links`). |
 
-`main` is at 1.7.7; the live site is at **1.7.8** (build `202610251011`) with the
-forms screens. **Two migrations are waiting to be applied** (see How to work):
-the forms one and the event-links one. The forms UI hides itself until the first
-runs; the event composer **writes `pic`/`action_links`**, so the second must be
-applied before a build with that composer is deployed — otherwise creating any
-event fails with a missing column. Merge at the next natural stop.
+`main` is at 1.7.7; the live site is at **1.7.9** (build `202610251047`) with the
+forms screens and the rebuilt event composer. The forms and event-links
+migrations **are** applied; the **attendance fix is not** — until
+`20261026009100_fix_checkin_token.sql` is pasted, the attendance screen shows
+`column reference "expires_at" is ambiguous`. Merge at the next natural stop.
 
 ## What changed this session
 
@@ -120,12 +119,9 @@ node forms/forms_test.mjs ../..        # event forms: template, editor, S1/S2/S3
 # run is safe. The seed guard (a `not exists` on the template's fields) means
 # re-running never duplicates the KI template.
 #
-# Pending against live, in this order:
-#   1. supabase/migrations/20261026007100_event_forms.sql
-#   2. supabase/migrations/20261026008100_event_links_pic.sql
-#   3. supabase/seed/2026-10-25_ki_test_event.sql   (a past event to test with)
-# The composer writes pic/action_links, so 2 must run before a build that has
-# it is deployed, or creating an event fails on a missing column.
+# Pending against live:
+#   supabase/migrations/20261026009100_fix_checkin_token.sql
+#   (the forms + event-links migrations and the KI test-event seed are applied)
 
 # deploy: bump BOTH places, then build/stamp/deploy
 #   pubspec.yaml version: 1.7.x+N
@@ -169,7 +165,21 @@ firebase deploy --only hosting --project mykerawang-app
   verification (13) run again — they had been silently unrunnable.
 - The PGlite stub's `event_participants` has **no `ON DELETE CASCADE`**, so a test
   that deletes an event must clear participants first — otherwise the FK blocks
-  it and the failure looks like it belongs to the migration under test.
+  it and the failure looks like it belongs to the migration under test. It now
+  has the primary key `(event_id, user_id)` it has in production: without one,
+  `ON CONFLICT DO NOTHING` cannot dedupe and a test can insert the same person
+  twice and still pass.
+- **`returns table (a, b, …)` makes those names PL/pgSQL variables.** An
+  unqualified column reference with the same name raises
+  `42702 column reference "x" is ambiguous` at run time — which is exactly how
+  `event_checkin_token()` shipped broken (its cleanup `DELETE … where expires_at
+  < …`), so the attendance QR never issued a code. Qualify the column
+  (`t.expires_at`) or rename the output. `event_checkin_token` is fixed by
+  `20261026009100`; `checkin_with_token` and `event_attendance_list` were
+  checked and are fine.
+- The event composer no longer requires a photo. It used to, which meant an
+  event created without one (or the seeded test event) could be opened in the
+  editor and then never saved.
 - **`app_strings.save` is `"SAVE"` and `cancel` is `"Cancel"`** — widget tests
   that tap a dialog button must use the exact case (`find.widgetWithText(
   FilledButton, 'SAVE')`), or the finder matches nothing and the failure looks
