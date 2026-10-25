@@ -61,6 +61,9 @@ class FormDoc {
 
   bool get isDraft => status == 'draft';
 
+  /// The caller may fill this form in.
+  bool get isOpen => status == 'open';
+
   /// The `p_form` half of `save_event_form`.
   Map<String, dynamic> get header => {
         'title': title,
@@ -89,23 +92,63 @@ class FormDoc {
       );
 }
 
-/// The editor's data source. Swappable so widget tests never touch Supabase:
-/// `FormService.instance = FakeFormService()`.
+/// `form_public()` as a whole: the form, whether the caller may answer it, and
+/// the answer they already gave (if any).
+class FormView {
+  final FormDoc doc;
+
+  /// False with a [reason] when the caller cannot answer.
+  final bool canAnswer;
+
+  /// `signed_out` · `closed` · `not_joined` · `full`.
+  final String? reason;
+
+  /// The caller's own answers, keyed by field id, and the role they picked.
+  final Map<String, dynamic>? mine;
+  final String? myRole;
+
+  const FormView({
+    required this.doc,
+    this.canAnswer = false,
+    this.reason,
+    this.mine,
+    this.myRole,
+  });
+
+  bool get answered => mine != null;
+}
+
+/// The editor's and answer page's data source. Swappable so widget tests never
+/// touch Supabase: `FormService.instance = FakeFormService()`.
 abstract class FormService {
   Future<List<FormTemplate>> templates();
 
-  /// The event's newest draft/open form, or null when it has none.
+  /// The event's newest draft/open form, or null when it has none. Managers
+  /// only — a student gets null.
   Future<FormSummary?> summary(String eventId);
+
+  /// The form a student should answer, or null. Available to guests too.
+  Future<String?> openFormId(String eventId);
+
+  /// The signed-in user's email, for pre-filling a matric. Null for guests.
+  Future<String?> myEmail();
 
   Future<String> createBlank(String eventId, {String? title});
 
   Future<String> createFromTemplate(String eventId, String slug);
 
-  Future<FormDoc> load(String formId);
+  Future<FormView> load(String formId);
 
   Future<void> save(FormDoc doc);
 
   Future<void> publish(String formId);
+
+  /// Answers land here. [role] is `peserta` or `penganjur`.
+  Future<void> submit(
+    String formId, {
+    required Map<String, dynamic> answers,
+    String? role,
+  });
 
   static FormService instance = const SupabaseFormService();
 
@@ -146,6 +189,15 @@ class SupabaseFormService implements FormService {
   }
 
   @override
+  Future<String?> openFormId(String eventId) async {
+    final raw = await _db.rpc('event_open_form', params: {'p_event_id': eventId});
+    return raw == null ? null : '$raw';
+  }
+
+  @override
+  Future<String?> myEmail() async => _db.auth.currentUser?.email;
+
+  @override
   Future<String> createBlank(String eventId, {String? title}) async =>
       '${await _db.rpc('create_blank_form',
           params: {'p_event_id': eventId, 'p_title': title})}';
@@ -156,22 +208,29 @@ class SupabaseFormService implements FormService {
           params: {'p_event_id': eventId, 'p_template_slug': slug})}';
 
   @override
-  Future<FormDoc> load(String formId) async {
+  Future<FormView> load(String formId) async {
     final raw = await _db.rpc('form_public', params: {'p_form_id': formId});
     final all = Map<String, dynamic>.from(raw as Map);
     final form = Map<String, dynamic>.from((all['form'] as Map?) ?? const {});
     final fields = ((all['fields'] as List?) ?? const [])
         .map((e) => FormFieldSpec.fromRpc(Map<String, dynamic>.from(e as Map)))
         .toList();
-    return FormDoc(
-      id: '${form['id']}',
-      title: '${form['title'] ?? ''}',
-      status: '${form['status'] ?? 'draft'}',
-      intro: form['intro'] as String?,
-      requireRsvp: form['require_rsvp'] == true,
-      afterCheckin: form['after_checkin'] == true,
-      canEdit: all['can_edit'] == true,
-      fields: fields,
+    final mine = all['mine'];
+    return FormView(
+      doc: FormDoc(
+        id: '${form['id']}',
+        title: '${form['title'] ?? ''}',
+        status: '${form['status'] ?? 'draft'}',
+        intro: form['intro'] as String?,
+        requireRsvp: form['require_rsvp'] == true,
+        afterCheckin: form['after_checkin'] == true,
+        canEdit: all['can_edit'] == true,
+        fields: fields,
+      ),
+      canAnswer: all['can_answer'] == true,
+      reason: all['reason'] as String?,
+      mine: mine is Map ? Map<String, dynamic>.from(mine) : null,
+      myRole: mine is Map ? mine['role'] as String? : null,
     );
   }
 
@@ -185,4 +244,17 @@ class SupabaseFormService implements FormService {
   @override
   Future<void> publish(String formId) =>
       _db.rpc('publish_form', params: {'p_form_id': formId});
+
+  @override
+  Future<void> submit(
+    String formId, {
+    required Map<String, dynamic> answers,
+    String? role,
+  }) =>
+      _db.rpc('submit_form_response', params: {
+        'p_form_id': formId,
+        'p_for_user': null,
+        'p_role': role ?? 'peserta',
+        'p_answers': answers,
+      });
 }

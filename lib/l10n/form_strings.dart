@@ -120,6 +120,34 @@ extension FormStrings on AppStrings {
   String get formClosed => _t("Closed", "Ditutup", "Closed");
   String formResponses(int n) => _t("$n responses", "$n jawapan", "$n responses");
 
+  // ---- answering ----
+  String get formAnswerTitle => _t("Program form", "Borang program", "Program form");
+  String get formAnswerSend => _t("Submit", "Hantar", "Submit");
+  String get formAnswerUpdate => _t("Update answers", "Kemas kini jawapan", "Update answers");
+  String get formAnswerThanks => _t(
+      "Thanks — your answers are saved.",
+      "Terima kasih — jawapan anda disimpan.",
+      "Thanks — your answers are saved.");
+  String get formAnswerAlready => _t(
+      "You have answered this form. You can change it until it closes.",
+      "Anda sudah menjawab borang ini. Boleh ubah sehingga ditutup.",
+      "You have answered this form.");
+  String get formAnswerClosed =>
+      _t("This form is closed.", "Borang ini sudah ditutup.", "This form is closed.");
+  String get formAnswerJoinFirst => _t(
+      "Only people who joined this event can answer. Join it first, then come back.",
+      "Hanya peserta acara ini boleh menjawab. Sertai dahulu, kemudian kembali.",
+      "Only people who joined this event can answer.");
+  String get formAnswerFull =>
+      _t("This form is full.", "Borang ini sudah penuh.", "This form is full.");
+  String get formAnswerSignIn =>
+      _t("Sign in to answer", "Log masuk untuk menjawab", "Sign in to answer");
+  String get formAnswerRequired =>
+      _t("Please answer the required questions.", "Sila jawab soalan wajib.", "Please answer the required questions.");
+  String get formNotAvailable =>
+      _t("This event has no form yet.", "Acara ini belum ada borang.", "This event has no form yet.");
+  String get formEditThis => _t("Edit form", "Sunting borang", "Edit form");
+
   // ---- problems ----
   String formIssueText(String code) => switch (code) {
         'label_required' => _t("A question needs a label.", "Soalan perlu label.", "A question needs a label."),

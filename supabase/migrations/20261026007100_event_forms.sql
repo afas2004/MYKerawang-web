@@ -474,6 +474,26 @@ $$;
 revoke execute on function public.event_form_summary(uuid) from public, anon;
 grant  execute on function public.event_form_summary(uuid) to authenticated;
 
+-- The form a student should answer, if there is one. Deliberately open to
+-- guests (it leaks nothing but the existence of a published form), because the
+-- event page is readable by guests and the button has to know.
+create or replace function public.event_open_form(p_event_id uuid)
+returns uuid
+language sql security definer stable
+set search_path = public
+as $$
+  select f.id
+  from public.event_forms f
+  where f.event_id = p_event_id
+    and f.status = 'open'
+    and (f.closes_at is null or f.closes_at > now())
+  order by f.created_at desc
+  limit 1;
+$$;
+
+revoke execute on function public.event_open_form(uuid) from public;
+grant  execute on function public.event_open_form(uuid) to anon, authenticated;
+
 -- ====================================================== the editor's write
 
 -- The whole field list in one call, so the client never has to keep three

@@ -215,6 +215,37 @@ List<FieldProblem> checkFields(List<FormFieldSpec> fields) {
 FormFieldSpec blankField({String kind = 'short_text'}) =>
     FormFieldSpec(kind: kind, label: '', required: false);
 
+/// The required fields with no answer, by id, so the page can mark them.
+///
+/// `false` counts as missing for a consent field: agreeing is the answer.
+List<String> missingRequired(
+    List<FormFieldSpec> fields, Map<String, dynamic> answers) {
+  final missing = <String>[];
+  for (final f in fields) {
+    if (f.kind == 'heading' || !f.required || f.id == null) continue;
+    final v = answers[f.id];
+    final empty = v == null ||
+        (v is String && v.trim().isEmpty) ||
+        (v is List && v.isEmpty) ||
+        v == false;
+    if (empty) missing.add(f.id!);
+  }
+  return missing;
+}
+
+/// The role a response carries, read from a choice field that offers
+/// Peserta / Penganjur — the KI form's first question. The server stores the
+/// role on its own column because S1/S2 are split by it; this keeps the two in
+/// step without asking the same thing twice.
+String roleForAnswers(List<FormFieldSpec> fields, Map<String, dynamic> answers) {
+  for (final f in fields) {
+    if (f.kind != 'single_choice') continue;
+    final v = answers[f.id]?.toString().trim().toLowerCase();
+    if (v == 'penganjur') return 'penganjur';
+  }
+  return 'peserta';
+}
+
 /// A field list pasted as text: one question per line, cells separated by a tab
 /// or a comma (see `docs/ki-template-fields.csv`).
 ///

@@ -130,6 +130,8 @@ ok((await q(`select label from form_fields where form_id=$1 and sort=60`, [form]
 const summ = (await as(officer, `select event_form_summary($1) j`, [ev]))[0].j;
 ok(summ !== null && summ.id === form && summ.status === 'draft' && summ.responses === 0,
   'the summary points at the draft');
+ok((await as(s1, `select event_open_form($1) f`, [ev]))[0].f === null,
+  'a draft is not offered as the form to answer');
 
 e = await err(officer, `select create_form_from_template($1,'ki')`, [ev]);
 ok(e === null, 'a draft form may be created alongside');
@@ -187,6 +189,10 @@ ok(e?.includes('FORM:too_many_ki'), 'more than seven KI fields per phase is refu
 // ---------------------------------------------------------- publishing
 await as(pres, `select publish_form($1)`, [form]);
 ok((await q(`select status from event_forms where id=$1`, [form]))[0].status === 'open', 'publish opens the form');
+ok((await as(s1, `select event_open_form($1) f`, [ev]))[0].f === form,
+  'a student finds the open form to answer');
+ok((await as(null, `select event_open_form($1) f`, [ev], 'anon'))[0].f === form,
+  'a guest can find it too — it reveals only that a form exists');
 e = await err(officer, `select publish_form($1)`, [form]);
 ok(e?.includes('FORM:not_draft'), 'publishing twice is refused');
 
@@ -316,6 +322,8 @@ ok(e === null, 'joining first satisfies require_rsvp');
 
 // ---------------------------------------------------------- closing
 await as(officer, `select close_form($1)`, [form]);
+ok((await as(s2, `select event_open_form($1) f`, [ev]))[0].f === null,
+  'a closed form is no longer offered');
 e = await err(s2, `select submit_form_response($1,null,'peserta',$2)`, [form, JSON.stringify(answersFor())]);
 ok(e?.includes('FORM:closed'), 'a closed form refuses new answers');
 ok((await as(s2, `select form_public($1) p`, [form]))[0].p.form.status === 'closed',

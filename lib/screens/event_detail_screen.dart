@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../services/comment_pins.dart';
+import '../services/form_service.dart';
 import '../services/moderation_service.dart';
 import 'package:mykerawang/services/share_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -80,6 +81,20 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     _event = widget.event;
     _commentsStream = _fetchCommentsStream();
     _fetchEventDetails();
+    _loadOpenForm();
+  }
+
+  /// The event's published form, if any, for the "answer" entry point.
+  String? _openFormId;
+
+  Future<void> _loadOpenForm() async {
+    try {
+      final id = await FormService.instance.openFormId('${_event['id']}');
+      if (mounted) setState(() => _openFormId = id);
+    } catch (e) {
+      // Not signed in, or the forms migration is not applied yet: no button.
+      debugPrint('No open form: $e');
+    }
   }
 
   Future<void> _fetchEventDetails() async {
@@ -983,6 +998,13 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     context.push('/event/$id/form/edit');
   }
 
+  /// The same form, as a student fills it in.
+  void _openAnswerForm() {
+    final id = _event['id'];
+    if (id == null) return;
+    context.push('/event/$id/form');
+  }
+
   /// Contact + attendance, under the main action.
   Widget _secondaryActions(BuildContext context) {
     final s = context.l10n;
@@ -1026,6 +1048,15 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
             icon: const Icon(AppIcons.qrCode, size: 18),
             label: Text(s.evCheckIn),
+          ),
+        ],
+        if (_openFormId != null && !_isOwner) ...[
+          const SizedBox(height: KSpace.s),
+          FilledButton.tonalIcon(
+            onPressed: _openAnswerForm,
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            icon: const Icon(AppIcons.list, size: 18),
+            label: Text(s.formAnswerTitle),
           ),
         ],
       ],

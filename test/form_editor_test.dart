@@ -54,7 +54,17 @@ class FakeFormService implements FormService {
   }
 
   @override
-  Future<FormDoc> load(String formId) async => doc!;
+  Future<String?> openFormId(String eventId) async => doc?.id;
+
+  @override
+  Future<String?> myEmail() async => null;
+
+  @override
+  Future<FormView> load(String formId) async => FormView(doc: doc!, canAnswer: doc!.isOpen);
+
+  @override
+  Future<void> submit(String formId,
+          {required Map<String, dynamic> answers, String? role}) async {}
 
   @override
   Future<void> save(FormDoc doc) async {

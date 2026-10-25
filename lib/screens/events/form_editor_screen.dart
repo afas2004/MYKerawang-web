@@ -90,9 +90,9 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
         });
         return;
       }
-      final doc = await FormService.instance.load(id);
+      final view = await FormService.instance.load(id);
       if (!mounted) return;
-      _apply(doc);
+      _apply(view.doc);
       setState(() => _loading = false);
     } catch (e) {
       if (!mounted) return;
@@ -118,9 +118,9 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
     setState(() => _saving = true);
     try {
       final id = await create();
-      final doc = await FormService.instance.load(id);
+      final view = await FormService.instance.load(id);
       if (!mounted) return;
-      _apply(doc);
+      _apply(view.doc);
       setState(() {
         _choosing = false;
         _saving = false;
@@ -154,9 +154,9 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
     setState(() => _saving = true);
     try {
       final id = await FormService.instance.createBlank(widget.eventId);
-      final doc = await FormService.instance.load(id);
+      final view = await FormService.instance.load(id);
       if (!mounted) return;
-      _apply(doc);
+      _apply(view.doc);
       setState(() {
         _fields = paste.fields;
         _problems = paste.problems;
@@ -198,7 +198,7 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
       // another copy of every question added since the last one.
       final fresh = await FormService.instance.load(doc.id);
       if (!mounted) return false;
-      _apply(fresh);
+      _apply(fresh.doc);
       setState(() => _saving = false);
       notifyContentChanged();
       if (!quiet) _toast(context.l10nRead.formSaved);
@@ -576,8 +576,8 @@ class _FieldTile extends StatelessWidget {
     final bits = <String>[
       s.formKindLabel(field.kind),
       if (field.required && field.kind != 'heading') s.formFieldRequired,
-      if (field.analysis == 'ki_pre') 'KI ${field.kiCode} Â· ${s.formTagKiPre}',
-      if (field.analysis == 'ki_post') 'KI ${field.kiCode} Â· ${s.formTagKiPost}',
+      if (field.analysis == 'ki_pre') 'KI ${field.kiCode} · ${s.formTagKiPre}',
+      if (field.analysis == 'ki_post') 'KI ${field.kiCode} · ${s.formTagKiPost}',
       if (field.analysis == 'feedback') s.formTagFeedback,
     ];
 
@@ -609,7 +609,7 @@ class _FieldTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      bits.join(' Â· '),
+                      bits.join(' · '),
                       style: Theme.of(context)
                           .textTheme
                           .bodySmall

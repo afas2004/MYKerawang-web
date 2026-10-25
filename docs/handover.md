@@ -13,7 +13,7 @@ the end of the second session that day (PR #8 and #9 merged, two bugs fixed,
 | Branch | `deepseek/clubs-admin` — level with `origin/main` |
 | Last merge | PR #9 → `6da73ad` (1.7.7); before it PR #8 → `e491899` (1.7.2–1.7.6) |
 | Live | https://mykerawang-app.web.app — build `202610250823`, version **1.7.7** |
-| Tests | 467 Flutter tests green; migration suites: moderation (all but 2 pre-existing), clubs 87, verification 13, forms 54; analyzer has 18 info/warning findings, no errors |
+| Tests | 474 Flutter tests green; migration suites: moderation (all but 2 pre-existing), clubs 87, verification 13, forms 58; analyzer has 18 info/warning findings, no errors |
 | Latest migration | `20261026007100_event_forms.sql` — **written and tested, not applied to live**; before it `20261026006100_club_recruitment.sql` (live) |
 
 `main`, the branch and the live site are all at 1.7.7 (build `202610250823`).
@@ -87,7 +87,7 @@ the end of the second session that day (PR #8 and #9 merged, two bugs fixed,
 | Categories | `lib/utils/categories.dart` (seeds), `lib/services/category_service.dart`, `lib/widgets/category_picker.dart` |
 | Moderation | `lib/services/moderation_service.dart`, `lib/utils/moderation_logic.dart`, `lib/widgets/moderation_ui.dart` |
 | Navigation / back | `lib/router.dart`, `lib/utils/app_nav.dart`, `lib/utils/browser_history_{web,stub}.dart` |
-| Event forms / KI report | `supabase/migrations/20261026007100_event_forms.sql`, `lib/services/form_service.dart`, `lib/screens/events/form_editor_screen.dart`, `lib/utils/form_rules.dart`, `lib/l10n/form_strings.dart` |
+| Event forms / KI report | `supabase/migrations/20261026007100_event_forms.sql`, `lib/services/form_service.dart`, `lib/screens/events/form_editor_screen.dart`, `lib/screens/events/event_form_screen.dart`, `lib/utils/form_rules.dart`, `lib/l10n/form_strings.dart` |
 
 ## How to work
 
@@ -214,18 +214,25 @@ and the old `signInWithOAuth` path still compiles.
   students answer for themselves; responses are private to organiser + club
   officers + admins; the form is **optional to the QR** (`after_checkin`,
   default off).
-  Next: **phase 3, the answer page** — a published form can be filled by
-  students. Then phase 4, the S1/S2/S3 screen and CSV export.
-  The migration is **not applied to live**; apply it when the answer page needs
-  it. Five design questions remain at the end of the doc; the two that matter are
-  whether MPP's version ships as a second template, and whether the matric must
-  stay editable (**4 of 13 respondents used Gmail**).
+  Next: **phase 4, the S1/S2/S3 screen and CSV export** — the part the club
+  actually hands in.
+  The migration is **not applied to live**; apply it when a build with the forms
+  screens is deployed. Five design questions remain at the end of the doc; the
+  two that matter are whether MPP's version ships as a second template, and
+  whether the matric must stay editable (**4 of 13 respondents used Gmail**).
 - **KI editor (phase 2) is built**: `/event/:id/form/edit`, opened from a
   "KI report" button on the event page for the organiser. Start chooser
   (template / blank / pasted list), one plain list of questions with label, kind,
   required, options, scale and analysis tag, up/down/delete, save and publish.
   `save_event_form` reloads after saving so new questions get their ids — without
   that, every save would insert another copy of each new question.
+- **KI answer page (phase 3) is built**: `/event/:id/form`, opened from a
+  "Program form" button on the event page whenever an open form exists (the
+  organiser gets the editor button instead). Renders every field kind, pre-fills
+  the matric from a `@student.uitm.edu.my` address, shows an existing answer with
+  "Update answers", and gives guests a sign-in bar. The role (`peserta` /
+  `penganjur`) is read from the template's role question rather than asked twice.
+  Server: `event_open_form()`, because `event_form_summary()` is manager-only.
 - Recurring announcements (needs pg_cron or materialise-on-read).
 - Shared-link thumbnails need per-URL OG tags (SPA limitation; needs a function
   or prerender).
@@ -234,9 +241,9 @@ and the old `signInWithOAuth` path still compiles.
 
 1. Run the three Google sign-in checks above on the live 1.7.7. If any fails,
    revert the login commit and redeploy before anything else.
-2. Build **phase 3 of the KI reports: the answer page** (`/event/:id/form`) —
-   render each field kind, submit through `submit_form_response`, show the
-   "you answered" state. Then phase 4, the S1/S2/S3 screen and CSV. Apply
-   `20261026007100_event_forms.sql` to live when the answer page is ready to try,
-   not before. Or the captcha work first — that is the last code item before
+2. Build **phase 4 of the KI reports: the S1/S2/S3 screen and CSV export**
+   (`form_analysis` and `form_response_list` already return everything it needs).
+   Then the `after_checkin` prompt (phase 5). Apply
+   `20261026007100_event_forms.sql` to live alongside the build that ships the
+   forms screens. Or the captcha work first — that is the last code item before
    inviting a club, and it needs a hCaptcha/Turnstile site key from the owner.

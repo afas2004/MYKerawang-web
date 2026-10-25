@@ -1,18 +1,18 @@
 # KI event reports: design
 
-Status: **phases 1 and 2 shipped (server + editor), no answer page yet.** Design
-written 2026-10-25 against 1.7.7 (`6da73ad`) and rewritten twice the same day:
-once after the owner corrected the requirement (the KI report *is* the job; the
-builder merely extends it), and once after reading the two real documents —
-`BORANG KI QUIZ BAHASA ARAB (Responses).xlsx` (what a Google Form collected) and
-`LAPORAN PROGRAM QUIZ BAHASA ARAB.pdf` (what the club hands in).
+Status: **phases 1–3 shipped (server, editor, answer page), no analysis screen
+yet.** Design written 2026-10-25 against 1.7.7 (`6da73ad`) and rewritten twice the
+same day: once after the owner corrected the requirement (the KI report *is* the
+job; the builder merely extends it), and once after reading the two real
+documents — `BORANG KI QUIZ BAHASA ARAB (Responses).xlsx` (what a Google Form
+collected) and `LAPORAN PROGRAM QUIZ BAHASA ARAB.pdf` (what the club hands in).
 
-Phase 1 is `supabase/migrations/20261026007100_event_forms.sql` (54 assertions in
-`supabase/tests/forms/forms_test.mjs`); phase 2 is
-`lib/screens/events/form_editor_screen.dart` plus `lib/services/form_service.dart`,
-`lib/utils/form_rules.dart` and `lib/l10n/form_strings.dart` (21 widget/unit
-tests). **The migration is not applied to the live project yet** — no screen the
-public can reach calls it until the answer page exists.
+Phase 1 is `supabase/migrations/20261026007100_event_forms.sql` (58 assertions in
+`supabase/tests/forms/forms_test.mjs`); phase 2 is the editor
+(`lib/screens/events/form_editor_screen.dart`); phase 3 is the answer page
+(`lib/screens/events/event_form_screen.dart`). Client tests: 15 rules, 6 editor,
+7 answer. **The migration is not applied to the live project yet** — nothing a
+real student can reach calls it until the event page is deployed with it.
 
 ## What the paperwork actually is
 
@@ -270,8 +270,13 @@ into the Word report by hand.
    write targets a form id) and `event_form_summary()` (the event page's label).
    Tests: `test/form_rules_test.dart` (15) and `test/form_editor_test.dart` (6,
    against a fake `FormService`).
-3. **The answer page.** A published form can be filled. Next.
-4. **S1/S2/S3 screen + CSV export.**
+3. **The answer page.** A published form can be filled. **Done**:
+   `/event/:id/form`, reached from a "Program form" button on the event page
+   whenever the event has an open form. Renders every kind, pre-fills the matric
+   from a student address, shows an existing answer with "Update answers", and
+   gives guests the sign-in bar rather than a blank rejection. Needed one more
+   RPC: `event_open_form()` — the manager-only summary is no use to a student.
+4. **S1/S2/S3 screen + CSV export.** Next — this is the part the club hands in.
 5. **`after_checkin` prompt**, and later the richer builder.
 
 ## Tests

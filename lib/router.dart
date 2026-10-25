@@ -16,6 +16,7 @@ import 'screens/follow_list_screen.dart';
 import 'screens/privacy_policy_screen.dart';
 import 'screens/tag_feed_screen.dart';
 import 'screens/events/checkin_screens.dart';
+import 'screens/events/event_form_screen.dart';
 import 'screens/events/form_editor_screen.dart';
 import 'screens/guest_views.dart';
 import 'screens/events_screen.dart';
@@ -255,6 +256,15 @@ GoRouter buildRouter() {
         builder: (context, state) => CheckinPage(
           eventId: state.pathParameters['id']!,
           token: state.uri.queryParameters['t'],
+        ),
+      ),
+      GoRoute(
+        path: '/event/:id/form',
+        // Answering: open to guests (they see a sign-in bar). The server
+        // decides whether an answer is accepted.
+        builder: (context, state) => EventFormScreen(
+          eventId: state.pathParameters['id']!,
+          formId: state.uri.queryParameters['f'],
         ),
       ),
       GoRoute(
