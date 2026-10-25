@@ -1,0 +1,271 @@
+# KI event reports: design
+
+Status: **design only — no schema, no UI.** Written 2026-10-25 against 1.7.7
+(`6da73ad`), and rewritten the same day after reading the two real documents:
+`BORANG KI QUIZ BAHASA ARAB (Responses).xlsx` (what a Google Form collected) and
+`LAPORAN PROGRAM QUIZ BAHASA ARAB.pdf` (what the club hands in).
+
+Earlier drafts of this file guessed. This one is grounded in those documents.
+
+## What the paperwork actually is
+
+Every student activity ends with a report pack for HEP, under Borang
+**L2-HEP/PKP/21 (Pindaan 2013)**, due **within 14 days** of the activity. The PDF
+is that pack. It has three layers:
+
+| Layer | What it is | Who produces it |
+|---|---|---|
+| The report form | MAKLUMAT AKTIVITI (club, activity, date, place, level, category, participant count), **1.0 Hasil Aktiviti** (5+ learning outcomes in prose), **2.0 KI matrix** (which of KI1–KI7 the activity involved, ticked for Penganjur and for Peserta), **3.3 Cadangan Penambah Baikan**, **4.0 Penilaian Keberkesanan** (level, VIP, media, achievement) | The club writes it; 4.0 is for the *Pensyarah/Pegawai Pengiring* |
+| The three analyses | 3.1 and 3.2 point at **"analisa Excel S1 – PESERTA", "S2 – PENGANJUR", "S3 – PESERTA"** (forms L3/L4/L5-HEP/PKP/22–24) | Computed from survey responses |
+| The attachments | Lampiran 1 timetable, 2 budget, 3 screenshots of the Google Form, 4 participant list grouped by class (NAMA / NOM MATRIK / PROGRAM) | Club + survey |
+
+The Google Form in the workbook is the **data collection** step, and it is what
+this app replaces. Its 26 columns:
+
+- identity — Timestamp, Email, **Nama Penuh**, **Nombor Matrik**, **Pilih**
+  (Peserta / Penganjur);
+- **seven KI self-ratings before** the activity (1–5) — **8 answers**: the
+  participants answered this part, the organisers did not;
+- **the same seven after** the activity (1–5) — **13 answers**: everyone;
+- **six feedback items** (1–5) — 13 answers — Pengisian Program, Persembahan
+  multimedia, Lokasi, Aturcara dan Pengendalian, Mutu makanan dan minuman,
+  Keseluruhan mutu;
+- one free-text **Cadangan / maklum balas**.
+
+(The class codes and "adakah anda orang Melayu" seen in Lampiran 3 of the PDF
+belong to the *quiz* form, not this feedback form; they are not part of the
+template.)
+
+The seven KI elements are fixed and numbered in the report itself:
+
+| Code | Element (as printed on the form) |
+|---|---|
+| KI1 | Kemahiran Berkomunikasi |
+| KI2 | Pemikiran Kritis dan Kemahiran Menyelesaikan Masalah |
+| KI3 | Kemahiran Kerja Berpasukan |
+| KI4 | Pembelajaran Berterusan dan Pengurusan Maklumat |
+| KI5 | Kemahiran Keusahawanan |
+| KI6 | Etika dan Moral Profesional |
+| KI7 | Kemahiran Kepimpinan |
+
+So the deliverable is not "a form builder" and not "a printable PDF of the whole
+report". It is: **collect the survey, then produce S1, S2 and S3 as numbers.**
+
+**`docs/ki-template-fields.csv` is that survey, as data** — 28 rows (24 questions,
+4 section headings) with the same order, kinds, scales and `ki_pre`/`ki_post`/
+`feedback` tags the analysis needs. It was generated from the workbook, not typed
+by hand, so it cannot drift from the source. It is both the seed for phase 1 and
+the worked example of the paste-import format.
+
+Two things the workbook itself shows, which the design has to respect:
+
+- the source numbers its KI questions in a different order from the report's
+  KI1–KI7 matrix and numbers two of them "6)" — mapping by **name** is the only
+  safe way, which is why fields carry `ki_code` rather than relying on labels;
+- **4 of the 13 respondents used a personal Gmail**, not a student address, so a
+  matric number cannot always be derived from the email.
+
+## Scope
+
+| | |
+|---|---|
+| **MVP** | The survey end to end, and the three analyses: pick a template on the event, students answer, the organiser sees S1/S2/S3 and exports the CSV. |
+| **Needed early** | More than one template, because versions differ — and a club must be able to get a new version in **without a release**. |
+| **Extension** | A field-by-field builder with drag/reorder. |
+| **Out of scope** | The report prose (1.0 outcomes, 3.3 suggestions, 4.0 effectiveness), the budget, the timetable, the participant-list formatting. The club keeps producing those in Word as it does now. |
+
+## Decisions
+
+| Topic | Decision | Why |
+|---|---|---|
+| **The survey is the unit, not the report** | The app owns the questionnaire, the responses and the three analyses. The PDF stays with the club. | The report is half prose and half an officer's signature; reproducing it would be a document generator, not a feature. The part that hurts — collating 13 spreadsheets by hand — is exactly the survey. |
+| **Templates are data, and multiple** | `form_templates` + fields, seeded with the club's KI version now; **another version is a new template row, not a release**. | The owner confirmed versions differ (MPP's is extended). If adding a version needed a deploy, the feature would be useless within a club year. |
+| **A template is created by pasting a question list** | Admin pastes a question list (CSV or tab-separated) to create or revise a template. No drag-and-drop in phase 1. | The stated reason for import was "copy-paste questions is hard". That is a *template authoring* problem, and a paste box solves it. |
+| **Fields carry an analysis tag** | Each field may be tagged `analysis` = `ki_pre` / `ki_post` / `feedback`, plus `ki_code` 1–7 for the KI ones. | This is what makes S1/S2/S3 computable no matter how a version words or orders its questions. Without tags the app would guess from labels — and the source form already has two questions numbered "6)". |
+| **Ratings are a first-class field kind** | `kind = 'rating'`, with `options {"min":1,"max":5}`. Not a bare number field. | The analysis is means of 1–5 ratings; a generic number field would let 7 and 0 into the average. |
+| **Who answers** | **Students answer for themselves** (owner's decision). The role — Peserta or Penganjur — is **derived**: club officer or event committee → Penganjur, otherwise Peserta, correctable by the respondent. | The Google Form asked, and 5 of 13 respondents said Penganjur. Deriving removes a question and a class of error; the overview still needs an override because a committee member may attend as a participant. |
+| **Three analyses, one definition** | `form_analysis(p_form_id)` returns S1/S2/S3 computed server-side; the screen and the CSV both read it. | "They will process the CSV themselves, but we can count the average rating ourselves too" — the averages must agree with the export, so they are computed once. |
+| **Response privacy** | Organiser, club officers of the owning club, admins. A student reads only their own. No `_public` view. | Responses are PII: full names and matric numbers. Same reasoning that kept `event_contacts` off the guest-readable `events` table. |
+| **Attendance stays separate** | `after_checkin` defaults off; the survey never blocks check-in and check-in never requires it. | The owner: "forms also optional for the qr, not explicitly embedded with attendance". |
+| **Due date is the report's** | The event page shows "KI report due `<end + 14 days>`" until a survey exists. | The 14-day deadline is printed on the checklist (PERINGATAN). It is the one piece of paperwork timing worth surfacing. |
+
+## Schema
+
+```sql
+-- 20261026007100_event_forms.sql (next free number)
+
+create table if not exists public.form_templates (
+  id         uuid primary key default gen_random_uuid(),
+  slug       text not null unique,          -- 'ki', 'ki-mpp', ...
+  name       text not null,                 -- "Borang KI (Kelab Bahasa Arab)"
+  name_ms    text,
+  intro      text,
+  source     text not null default 'official'
+             check (source in ('official', 'club')),
+  active     boolean not null default true,
+  sort       int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.form_template_fields (
+  id          uuid primary key default gen_random_uuid(),
+  template_id uuid not null references public.form_templates(id) on delete cascade,
+  kind        text not null check (kind in
+              ('short_text','long_text','rating','single_choice','multi_choice',
+               'number','date','email','phone','student_id','consent','heading')),
+  label       text not null,
+  help        text,
+  required    boolean not null default false,
+  options     jsonb,          -- choices: {"choices":["Peserta","Penganjur"]}
+                              -- rating:  {"min":1,"max":5}
+  analysis    text check (analysis in ('ki_pre','ki_post','feedback')),
+  ki_code     int  check (ki_code between 1 and 7),
+  sort        int not null default 0,
+  -- a KI tag belongs on a KI field, and only on one
+  check ((analysis in ('ki_pre','ki_post')) = (ki_code is not null)),
+  check ((kind in ('single_choice','multi_choice')) = (options is not null))
+);
+```
+
+`event_forms` gains `template_id`, `after_checkin` (default false) and
+`require_rsvp` (default false); it is otherwise as in the previous draft.
+`form_fields` is the event's **copy** of the template fields, carrying the same
+`analysis` / `ki_code` tags, so a later template edit cannot rewrite a past
+analysis.
+
+`form_responses` gains `role text check (role in ('peserta','penganjur'))` and
+`entered_by uuid` (organiser entering on someone's behalf). One row per
+`(form_id, user_id)`, upserted on re-submit.
+
+## Server API
+
+House pattern: `security definer`, `set search_path = public`, explicit
+`auth.uid()` checks, `NS:code` errors.
+
+| Function | Who | Does |
+|---|---|---|
+| `form_templates_list()` | signed in | Active templates for the chooser. |
+| `import_form_template(p_slug, p_name, p_rows jsonb)` | admin | Turns a pasted question list into a template + fields. Validates kinds, options, analysis tags. |
+| `create_form_from_template(p_event_id, p_template_slug)` | organiser, `can_act_as_club`, admin | **MVP entry point.** Draft form + copied fields. Refuses if an open form exists. |
+| `publish_form` / `close_form` | same | `draft → open → closed`; publish validates the field set. |
+| `form_public(p_form_id)` | anyone incl. guests | Form + fields + the caller's own response + `can_answer` (+ reason). Never anyone else's data. |
+| `submit_form_response(p_form_id, p_for_user, p_role, p_answers)` | signed in | The only write: open + deadline + `require_rsvp` + validation, upsert. |
+| `form_response_list(p_form_id)` | organiser, `is_club_officer`, admin | Rows + profile + answers, for the table and the CSV. |
+| **`form_analysis(p_form_id)`** | same | **S1, S2, S3** — see below. One definition for screen and export. |
+
+`submit_form_response` calls `require_verified('form_submit')`; add that
+capability to `verification_required` and to the `mod_guard_write` trigger on
+`form_responses` (scope `events`, owner `user_id`).
+
+## What S1, S2 and S3 are
+
+Computed over submitted responses, restricted by `role`:
+
+| Analysis | Population | Columns |
+|---|---|---|
+| **S1 — PESERTA** | role = `peserta` | per KI element (KI1–KI7): n, mean **before**, mean **after**, difference |
+| **S2 — PENGANJUR** | role = `penganjur` | per KI element: n, mean **after** (the source form has no "before" for organisers) |
+| **S3 — PESERTA** | role = `peserta` | per feedback item: n, mean; plus the free-text answers |
+
+Means are of the 1–5 ratings, rounded to 2 dp, computed **server-side** so the
+screen, the CSV and any future export cannot disagree. A null rating is excluded
+from that element's `n`, and `n` is reported beside every mean — an average of 2
+answers is not an average of 13.
+
+## Response validation
+
+`lib/utils/form_rules.dart`, pure and unit-tested, mirrored by the server (the
+server is authoritative; its message is shown as-is through `describeWriteError`):
+
+| Rule | Value |
+|---|---|
+| Fields per form | 40 max (a KI version has ~26) |
+| Label | 1–200 chars |
+| Rating | `min`/`max` from options, both 1–10, `min < max`; answer an integer in range |
+| Choice | answer must be one of the field's option values |
+| Short text | ≤ 200; long text ≤ 2000 |
+| Required | present and non-empty; a heading is never required |
+| Analysis tags | `ki_code` only on `ki_pre` / `ki_post`, exactly one per field; `feedback` carries none; at most 7 `ki_pre` and 7 `ki_post` per template |
+
+## Attendance link: optional
+
+`checkin_with_token` is untouched. When `after_checkin` is on **and** a survey is
+open, the success screen offers it as a skippable next step. Nothing gates.
+
+## Client plan
+
+| Piece | File |
+|---|---|
+| Service | `lib/services/form_service.dart` |
+| Pick a template, create the survey | `lib/screens/events/form_create_screen.dart` |
+| Answer page | `lib/screens/events/event_form_screen.dart` |
+| Responses + S1/S2/S3 + CSV | `lib/screens/events/form_responses_screen.dart` |
+| KI before/after bars | `lib/widgets/ki_chart.dart` (drawn, no chart package) |
+| Per-kind inputs | `lib/widgets/form_field_input.dart` |
+| Pure rules | `lib/utils/form_rules.dart` |
+| Copy (en/ms, ja→en) | `lib/l10n/form_strings.dart` |
+
+Routes `/event/:id/form` and `/event/:id/form/responses`; add the first to
+`backFallbackFor` (→ event page) and to the guest paths.
+
+The analysis screen is the point of the feature: three compact tables (S1, S2, S3)
+plus the free-text list, each with a copy button, because the numbers get typed
+into the Word report by hand.
+
+## Phases
+
+1. **Schema + analyses + a seeded KI template + `forms_test.mjs`.** No UI. The
+   numbers are the deliverable; prove them first.
+2. **Answer page + create-from-template.** A survey exists and students fill it.
+3. **S1/S2/S3 screen + CSV export.**
+4. **Template paste-import** (so a new club version needs no release), then the
+   builder, then the `after_checkin` prompt.
+
+## Tests
+
+`supabase/tests/forms/forms_test.mjs` (house harness, migrations applied twice):
+
+1. the seeded KI template has 7 `ki_pre`, 7 `ki_post`, 6 `feedback` fields, KI1–7;
+2. creating from a template **copies** fields; editing the template afterwards
+   changes neither the form nor its analysis;
+3. a student, a guest, and an officer of another club cannot create or publish;
+4. a student cannot read another's response; a same-club officer can;
+5. submit refuses: closed, missing required, out-of-range rating (0, 6, 3.5), an
+   option value not in the field, an unknown field id;
+6. re-submitting upserts one row; a role correction is accepted;
+7. **`form_analysis` means**: fixtures where S1's KI2-before is 4 and 5 → mean
+   4.5, and `n` counts only non-null answers;
+8. S1 excludes `penganjur` rows and S2 excludes `peserta` rows;
+9. a template row with a bad tag (ki_code on a feedback field) is refused;
+10. deleting the event removes forms, fields and responses; account deletion
+    removes that user's responses.
+
+Widget tests: rating widget, required errors, guest sees read-only, the S1 table
+renders the fixture means, CSV header order.
+
+## Honest limits
+
+- **No PDF of the report.** The club still assembles L2-HEP/PKP/21 in Word.
+- **No automatic participant list by class.** The class code is an answer, not a
+  profile field; grouping the Lampiran 4 list is the club's job.
+- **No file uploads, no branching, no anonymous answers.**
+- **No merit.** Merit still comes from attendance.
+- **Ratings only.** A version that asks Yes/No or free text per KI element falls
+  outside S1/S2 — the paste-import validates this and says so.
+
+## Open questions
+
+1. **Which template versions ship first?** Your Bahasa Arab one is the seed, taken
+   from the workbook. Say if the MPP extended version should be seeded too, or
+   added later by paste-import (recommended — it exercises that path).
+2. **Is `Pilih` (Peserta / Penganjur) derived or asked?** This design derives it
+   from club office and lets the respondent correct it; the Google Form asked.
+3. **Nombor Matrik** — the workbook exports it as a float (`2023837334.0`), a
+   spreadsheet artifact. The app pre-fills it from the verified student email
+   (the part before `@`), but **4 of 13 respondents signed in with Gmail**, so it
+   must stay editable rather than read-only. Confirm that is acceptable.
+4. **The 14-day nag** — show "report due" on past events, or keep quiet?
+5. **Do organisers need a "before" rating too?** S2 as printed shows only the
+   after-state, which matches the data (only 8 of 13 answered the "before" part).
+   If MPP's version has both, the schema allows it (`ki_pre` fields for
+   organisers) but the seeded KI template would not include them.

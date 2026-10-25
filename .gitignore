@@ -67,3 +67,6 @@ android/build/
 # credentials, backups and worktrees.
 /.deepseek/
 /.dsh-acl-report/
+# Real student data supplied for design work (names, matric numbers). Never commit.
+/BORANG KI QUIZ BAHASA ARAB (Responses).xlsx
+/LAPORAN PROGRAM QUIZ BAHASA ARAB.pdf
