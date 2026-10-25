@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../utils/filter_rules.dart';
+
 /// Clubs: pages run by student officers (supabase/migrations/20261022002*).
 /// The database decides who may do what (can_act_as_club, RPC checks);
 /// this file calls it, holds the models and the small pure rules the UI
@@ -320,7 +322,9 @@ class ClubService {
   static Future<List<Club>> directory({String? search, String? category, int limit = 200}) async {
     var q = _db.from('clubs').select(_clubColumns).eq('status', 'active');
     if (category != null) q = q.eq('category', category);
-    final s = search?.trim().replaceAll(RegExp(r'[%,()]'), '');
+    // A `.or()` filter is a string, not a parameter: `,` and `()` would add
+    // conditions. [filterSafe] removes the filter syntax, not the words.
+    final s = search == null ? null : filterSafe(search);
     if (s != null && s.isNotEmpty) q = q.or('name.ilike.%$s%,handle.ilike.%$s%');
     final rows = await q.order('name').limit(limit);
     return [for (final r in rows) Club.fromJson(r)];

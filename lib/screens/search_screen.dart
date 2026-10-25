@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../utils/tags.dart';
+import '../utils/filter_rules.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -89,15 +90,10 @@ class _SearchScreenState extends State<SearchScreen> {
     await _performSearch();
   }
 
-  /// The query as a safe PostgREST filter value. `,` `(` `)` split or
-  /// group `.or()` terms, `"` `\` quote, `:` casts — none mean anything
-  /// to a user, so they become spaces. A leading @ (handle search) is
-  /// dropped so "@ali" and "ali" match the same people.
-  static String _filterSafe(String raw) => raw
-      .replaceAll(RegExp(r'[,()"\\:]'), ' ')
-      .replaceAll(RegExp(r'\s+'), ' ')
-      .trim()
-      .replaceFirst(RegExp(r'^@+'), '');
+  /// The query as a safe PostgREST filter value (see [filterSafe]); a leading
+  /// @ (handle search) is dropped so "@ali" and "ali" match the same people.
+  static String _filterSafe(String raw) =>
+      filterSafe(raw).replaceFirst(RegExp(r'^@+'), '');
 
   bool _hasEnded(Map<String, dynamic> event) {
     final end = parseLocal(event['end_datetime']) ??

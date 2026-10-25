@@ -210,6 +210,10 @@ class AppStrings {
   final String leavingApp;
   final String externalLinkWarning;
   final String openAnyway;
+
+  /// Shown when a stored link is not a scheme the app will launch
+  /// (`javascript:`, `data:`, `intent:` …).
+  final String linkUnsupported;
   final String locationTba;
   final String dateTba;
   final String attendingCount;
@@ -521,6 +525,7 @@ class AppStrings {
     required this.leavingApp,
     required this.externalLinkWarning,
     required this.openAnyway,
+    required this.linkUnsupported,
     required this.locationTba,
     required this.dateTba,
     required this.attendingCount,
@@ -815,6 +820,7 @@ class AppStrings {
     leavingApp: "Leaving MYKerawang",
     externalLinkWarning: "This link goes to an external site:\n\n{0}\n\nAre you sure it's safe?",
     openAnyway: "Open anyway",
+    linkUnsupported: "That link cannot be opened.",
     locationTba: "TBA",
     dateTba: "Date TBA",
     attendingCount: "{0} attending",
@@ -1109,6 +1115,7 @@ class AppStrings {
     leavingApp: "Keluar dari MYKerawang",
     externalLinkWarning: "Pautan ni ke laman luar:\n\n{0}\n\nPasti ia selamat?",
     openAnyway: "Buka juga",
+    linkUnsupported: "Pautan itu tidak boleh dibuka.",
     locationTba: "Belum ditetapkan",
     dateTba: "Tarikh belum ditetapkan",
     attendingCount: "{0} join",
@@ -1403,6 +1410,7 @@ class AppStrings {
     leavingApp: "MYKerawangを離れます",
     externalLinkWarning: "外部サイトへのリンクです：\n\n{0}\n\n安全ですか？",
     openAnyway: "それでも開く",
+    linkUnsupported: "このリンクは開けません。",
     locationTba: "未定",
     dateTba: "日程未定",
     attendingCount: "{0}人参加",

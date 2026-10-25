@@ -100,6 +100,17 @@ ActionLinkIssue? validateActionLink(String label, String url) {
   if (u.startsWith('/')) {
     return isKnownInternalRoute(u) ? null : ActionLinkIssue.unknownRoute;
   }
+  return validateHttpsUrl(u);
+}
+
+/// The URL half of [validateActionLink], for fields that only hold a link —
+/// an event's registration page, which is launched the same way.
+///
+/// https only: a `javascript:` or `data:` URL in a saved event is code that
+/// runs when a student taps the button.
+ActionLinkIssue? validateHttpsUrl(String url) {
+  final u = url.trim();
+  if (u.isEmpty) return ActionLinkIssue.emptyUrl;
   final uri = Uri.tryParse(u);
   if (uri == null || !uri.hasScheme || uri.host.isEmpty) return ActionLinkIssue.badUrl;
   if (uri.scheme != 'https') return ActionLinkIssue.notHttps;

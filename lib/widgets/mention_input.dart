@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 
+import '../utils/filter_rules.dart';
+
 class MentionInput extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;
@@ -97,6 +99,10 @@ class MentionInput extends StatelessWidget {
         if (!isMention && currentWord.length < 2) return null;
 
         final query = isMention ? currentWord.substring(1) : currentWord;
+        // The club query goes into a `.or(...)` filter *string*, where `,`
+        // and `()` mean structure. Strip them before building it.
+        final safe = filterSafe(query);
+        if (safe.isEmpty) return null;
         final out = <Map<String, dynamic>>[];
 
         // 4a. People, for an @mention.
@@ -105,7 +111,7 @@ class MentionInput extends StatelessWidget {
             final res = await Supabase.instance.client
                 .from('profiles')
                 .select('id, username, avatar_url')
-                .ilike('username', '$query%')
+                .ilike('username', '$safe%')
                 .limit(5);
             out.addAll(List<Map<String, dynamic>>.from(res));
           } catch (e) {
@@ -121,7 +127,7 @@ class MentionInput extends StatelessWidget {
                 .from('clubs')
                 .select('name, handle')
                 .eq('status', 'active')
-                .or('name.ilike.%$query%,handle.ilike.%$query%')
+                .or('name.ilike.%$safe%,handle.ilike.%$safe%')
                 .limit(5);
             out.addAll([
               for (final c in List<Map<String, dynamic>>.from(res))

@@ -559,7 +559,20 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   _label(s.location),
                   _input(_locationController, s.locationHint, validator: _required(s.location)),
                   _label(s.registrationLinkOptional),
-                  _input(_linkController, "https://forms.gle/...", icon: AppIcons.link),
+                  // The registration link is launched from the event page, so
+                  // it has to be an https URL — not `javascript:`.
+                  _input(
+                    _linkController,
+                    "https://forms.gle/...",
+                    icon: AppIcons.link,
+                    validator: (v) {
+                      final text = (v ?? '').trim();
+                      if (text.isEmpty) return null;
+                      return validateHttpsUrl(text) == null
+                          ? null
+                          : context.announceL10nRead.errActionNotHttps;
+                    },
+                  ),
                 ],
               ),
               FormSection(
