@@ -17,6 +17,7 @@ import '../widgets/comment_tile.dart';
 import '../widgets/owner_menu.dart';
 import '../widgets/post_card.dart';
 import '../l10n/app_strings.dart';
+import '../l10n/create_strings.dart';
 import '../l10n/feed_strings.dart';
 import '../l10n/post_strings.dart';
 import '../language_cubit.dart';
@@ -476,6 +477,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     final count =
         (_postData['comment_count'] as num?)?.toInt() ?? _comments.length;
 
+    // The headline is what the page is about, so it belongs in the bar;
+    // "Thread" / "Announcement" are only the fallback for an untitled one.
+    final title = postPageTitle(
+      _postData,
+      thread: s.threadTitle,
+      announcement: s.create.announcement,
+    );
+
     return Scaffold(
       appBar: appBarConstrained(
         context,
@@ -485,7 +494,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           icon: const BackButtonIcon(),
           onPressed: _leave,
         ),
-        title: Text(s.threadTitle),
+        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
       ),
       body: LinearRefresher(
         onRefresh: _refreshData,
@@ -495,7 +504,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               ? AnnouncementDetailHead(
                   post: _postData,
                   linkedEvent: _linkedEvent,
-                  canManage: _mine || _canPinComments,
+                  // Author only — see [AnnouncementDetailHead.mine]. An
+                  // officer or admin who didn't write it gets Edit that
+                  // the RPC would refuse.
+                  mine: _mine,
                   onEdit: () => openPostEditor(context, _postData),
                   onDelete: _deleteAnnouncement,
                 )
@@ -795,11 +807,21 @@ class CommentsOffNotice extends StatelessWidget {
 }
 
 /// Top of an announcement's page: the reader template plus Share and,
-/// for the author / club officers / admins, Edit and Delete.
+/// for the author, Edit and Delete.
 class AnnouncementDetailHead extends StatelessWidget {
   final Map<String, dynamic> post;
   final Map<String, dynamic>? linkedEvent;
-  final bool canManage;
+
+  /// The viewer wrote this announcement.
+  ///
+  /// Edit and Delete are the author's alone: `update_my_post` and
+  /// `delete_my_post` both require `user_id = auth.uid()`, so showing them
+  /// to a club officer or an admin who didn't write it only ever produced
+  /// a "not the author of this post" error. Moderation of someone else's
+  /// announcement happens in the admin console (hide / remove from the
+  /// reports queue), which is where those rights actually live.
+  final bool mine;
+
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -807,7 +829,7 @@ class AnnouncementDetailHead extends StatelessWidget {
     super.key,
     required this.post,
     required this.linkedEvent,
-    required this.canManage,
+    required this.mine,
     required this.onEdit,
     required this.onDelete,
   });
@@ -839,7 +861,7 @@ class AnnouncementDetailHead extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              if (canManage) ...[
+              if (mine) ...[
                 TextButton.icon(
                   onPressed: onEdit,
                   icon: const Icon(AppIcons.edit, size: 18),

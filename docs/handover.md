@@ -1,6 +1,7 @@
 # Handover — MYKerawang web
 
-Written 2026-10-25. Everything below was verified, not remembered.
+Written 2026-10-25. Everything below was verified, not remembered. Updated at
+the end of the second session that day (PR #8 merged, two bugs fixed).
 
 ## Where things stand
 
@@ -8,11 +9,34 @@ Written 2026-10-25. Everything below was verified, not remembered.
 |---|---|
 | Repo | `C:\src\project\Flutter\MYKerawang-web` |
 | Worktree used | `.deepseek/worktrees/clubs-admin` (the one to reopen) |
-| Branch | `deepseek/clubs-admin` — 5 commits ahead of `origin/main` |
-| Last merge | PR #7 → `88c8578` (before 1.7.2). Merge again at the next natural stop. |
-| Live | https://mykerawang-app.web.app — build `202610250751`, version **1.7.6** |
-| Tests | 443 Flutter tests green; analyzer clean |
+| Branch | `deepseek/clubs-admin` — pushed; 3 commits ahead of `origin/main` |
+| Last merge | PR #8 → `e491899` (all of 1.7.2–1.7.6) |
+| Live | https://mykerawang-app.web.app — build `202610250823`, version **1.7.7** |
+| Tests | 446 Flutter tests green; analyzer has 18 info/warning findings, no errors |
 | Latest migration | `20261026006100_club_recruitment.sql` (applied to live) |
+
+`main` is at 1.7.6; the live site is at 1.7.7 without a PR for it yet. The branch
+holds the three commits after `e491899`: the two announcement fixes and the
+Google sign-in history fix, released as 1.7.7 (build `202610250823`) after a
+release build + `firebase deploy`. Merge at the next natural stop.
+
+## What changed this session
+
+- **Merged** the branch (PR #8, merge commit `e491899`), so `main` matches
+  what is running.
+- **Announcement Edit/Delete are the author's alone** (was: admins and owners
+  too). `update_my_post` and `delete_my_post` both require
+  `user_id = auth.uid()`, so the buttons were dead for everyone else — they
+  only ever produced "not the author of this post". `AnnouncementDetailHead`
+  now takes `mine` instead of `canManage`; the post card's own menu already
+  did this. Admins still moderate other people's announcements, from the
+  console (reports → hide/remove), which is where those rights live.
+  Regression test: `test/announcement_detail_test.dart`.
+- **The detail app bar shows the post's headline**, not the generic "Thread"
+  (`postPageTitle` in `lib/utils/announcement_rules.dart`, unit-tested; falls
+  back to "Announcement" or "Thread" when there is no headline).
+- **Google sign-in leaves no history entry** (see below — unverified on a
+  real browser).
 
 ## Infrastructure
 
@@ -53,9 +77,10 @@ Written 2026-10-25. Everything below was verified, not remembered.
 | Student verification | `lib/services/student_verification.dart`, `lib/screens/verification/verify_sheet.dart`, admin `verifications_tab.dart` |
 | Clubs | `lib/screens/clubs/*`, `lib/services/club_service.dart` |
 | Events | `lib/screens/create_event_screen.dart`, `event_detail_screen.dart`, `lib/screens/events/` (attendance + check-in) |
-| Announcements | `create_announcement_screen.dart`, `lib/widgets/announcement_view.dart`, `lib/services/announcement_service.dart` |
+| Announcements | `create_announcement_screen.dart`, `lib/widgets/announcement_view.dart`, `lib/services/announcement_service.dart`, `lib/utils/announcement_rules.dart` |
 | Categories | `lib/utils/categories.dart` (seeds), `lib/services/category_service.dart`, `lib/widgets/category_picker.dart` |
 | Moderation | `lib/services/moderation_service.dart`, `lib/utils/moderation_logic.dart`, `lib/widgets/moderation_ui.dart` |
+| Navigation / back | `lib/router.dart`, `lib/utils/app_nav.dart`, `lib/utils/browser_history_{web,stub}.dart` |
 
 ## How to work
 
@@ -96,18 +121,38 @@ firebase deploy --only hosting --project mykerawang-app
 - Attendance: the QR token lives 20 s, drawn every 10 s. The QR is a URL so the
   phone camera works as a fallback.
 - Form section headers truncate rather than overflow (long titles on narrow phones).
+- A club officer **cannot** edit an announcement they did not write — the RPC is
+  author-only. If the product wants officers to edit club announcements, that is
+  a migration (`update_my_post` would need an officer branch), not a UI change.
+- supabase_flutter hardcodes `webOnlyWindowName: '_self'` for OAuth, so it always
+  *pushes* a history entry. `signInWithGoogle` now builds the same URL with
+  `getOAuthSignInUrl` and calls `replaceLocationForOAuth` (push a spare entry,
+  then `location.replace`) so Google never survives in the back stack. Web-only;
+  the stub returns false on mobile and the library path runs as before.
 
 ## Open work
 
 **Launch ops** (see `docs/launch-checklist.md`):
 rotate the DB password; one attendance dry run before promising merit;
-captcha (remember it covers sign-in too); invite the first club.
+captcha (remember it covers sign-in too — **and it will interact with the OAuth
+launch above**, since the captcha token rides in `queryParams`); invite the
+first club.
+
+**Deployed on 1.7.7 but not verified on a real browser yet:** The Google sign-in
+history fix. There is no widget test for it (`location` is not reachable from a
+test), so check it on the live build, in this order:
+
+1. sign in with Google, then press the browser's Back — it must **not** show
+   Google's account chooser;
+2. sign out, start Google sign-in again, press Back **on Google's page** —
+   it must land back on `/login`;
+3. sign in from a shared post link (`/post/…` → "Log in to comment") and
+   confirm `?from=` still returns you to the post.
+
+If sign-in breaks, `git revert` the login commit — it is one file plus a helper,
+and the old `signInWithOAuth` path still compiles.
 
 **Bugs still open:**
-- Edit button appears for admins/owners on a club's announcement — decide whether
-  to restrict Edit to the author/club officer and leave admins with hide/remove.
-- Announcement detail app bar says "Thread" (it is the generic post title).
-- Browser back after Google sign-in returns to the account chooser.
 - Announcement categories are a fixed set of five.
 
 **Features queued:**
@@ -124,5 +169,9 @@ captcha (remember it covers sign-in too); invite the first club.
 
 ## Suggested next session
 
-Merge the branch, then either the three small bugs above (an hour) or start the
-form builder with a design document before any UI.
+1. Run the three Google sign-in checks above on the live 1.7.7. If any fails,
+   revert the login commit and redeploy before anything else.
+2. Open a PR for the three commits and merge it, so `main` matches production
+   again (it is still at 1.7.6).
+3. Then either the captcha work — which touches the same OAuth launch — or the
+   form builder, with a design document before any UI.
