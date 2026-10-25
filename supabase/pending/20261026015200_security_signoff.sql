@@ -23,10 +23,14 @@
 -- guests (profiles_public, follow_counts, event_participant_counts); only
 -- the base tables stop being world-readable.
 --
--- Risk: the guest profile page must read profiles_public, and the guest
--- event page event_participant_counts. Both do (lib/screens/profile_screen.dart
--- is signed-in only; lib/widgets/guest_views.dart uses profiles_public).
--- Check the guest pages on a signed-out browser after applying.
+-- Flow check (docs/app-permissions-map.md): every guest path already branches
+-- to a view before touching these tables —
+--   event_detail_screen.dart:133   guests read profiles_public, not profiles
+--   event_detail_screen.dart:140-152 guests read event_participant_counts
+--   guest_views.dart:110-116      guest profile = profiles_public + follow_counts
+--   router.dart:322-324           /u/:id sends guests to GuestProfileScreen
+-- and /u/:id/followers is not a guest path at all (two segments). So the
+-- revoke removes a scrape surface without removing a designed read.
 --
 -- do $$
 -- declare pol record;
