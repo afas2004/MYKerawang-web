@@ -81,15 +81,25 @@ List<String> cleanChoices(Iterable<String> raw) {
 /// formulas.
 String csvSafe(String value) {
   if (value.isEmpty) return value;
-  final first = value.codeUnitAt(0);
+  // Excel skips leading spaces when it decides a cell is a formula, so the
+  // check looks at the first character that is not a space or a tab.
+  var at = 0;
+  while (at < value.length) {
+    final c = value.codeUnitAt(at);
+    if (c != 0x20 && c != 0x09) break;
+    at++;
+  }
+  if (at >= value.length) return value;
+  final first = value.codeUnitAt(at);
   final risky = first == 0x3D || // =
       first == 0x2B || // +
       first == 0x2D || // -
       first == 0x40 || // @
-      first == 0x09 || // tab
-      first == 0x0D; // CR
+      first == 0x09 || // tab (a field that starts lower down)
+      first == 0x0D || // CR
+      first == 0x0A; // LF
   if (!risky) return value;
-  if (double.tryParse(value) != null) return value;
+  if (double.tryParse(value.trim()) != null) return value;
   return "'$value";
 }
 

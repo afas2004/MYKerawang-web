@@ -54,8 +54,15 @@ Future<void> main() async {
   final client = SupabaseClient(supabaseUrl, serviceRoleKey);
 
   String userId = '';
-  const email = 'admin@uitm.edu.my';
-  const password = 'StrongPassword123!';
+  // Never commit a credential to this file again: both come from --dart-define
+  // (the same rule as the key above). A hardcoded admin e-mail + password was
+  // here until the October security review.
+  const email = String.fromEnvironment('SEED_EMAIL');
+  const password = String.fromEnvironment('SEED_PASSWORD');
+  if (email.isEmpty || password.isEmpty) {
+    print('❌ Set --dart-define=SEED_EMAIL=… and --dart-define=SEED_PASSWORD=…');
+    return;
+  }
 
   // 1. AUTHENTICATE (ADMIN WAY)
   try {

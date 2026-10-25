@@ -42,6 +42,27 @@ Uint8List webpX(int w, int h) => Uint8List.fromList([
       ...List.filled(8, 0),
     ]);
 
+/// A lossless WebP ('VP8L'): the size is bit-packed, 14 bits each, minus one.
+Uint8List webpL(int w, int h) {
+  final bits = ((w - 1) & 0x3FFF) | (((h - 1) & 0x3FFF) << 14);
+  return Uint8List.fromList([
+    0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, // RIFF
+    0x57, 0x45, 0x42, 0x50, // WEBP
+    0x56, 0x50, 0x38, 0x4C, 0x2F, 0, 0, 0, // 'VP8L' + chunk size
+    0x2F, // signature byte
+    bits & 0xFF, (bits >> 8) & 0xFF, (bits >> 16) & 0xFF, (bits >> 24) & 0xFF,
+    ...List.filled(8, 0),
+  ]);
+}
+
+/// A WebP whose chunk we do not understand, so the size cannot be read.
+Uint8List webpUnknown() => Uint8List.fromList([
+      0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, // RIFF
+      0x57, 0x45, 0x42, 0x50, // WEBP
+      0x56, 0x50, 0x38, 0x5A, 0x0A, 0, 0, 0, // 'VP8Z'
+      ...List.filled(12, 0),
+    ]);
+
 void main() {
   group('photoMime', () {
     test('reads the signature, not the extension', () {
@@ -66,11 +87,13 @@ void main() {
       expect(photoSize(gif(320, 240)), (320, 240));
       expect(photoSize(jpeg(800, 600)), (800, 600));
       expect(photoSize(webpX(1000, 750)), (1000, 750));
+      expect(photoSize(webpL(640, 480)), (640, 480));
     });
 
     test('null for a format it cannot read, and for rubbish', () {
       expect(photoSize(Uint8List.fromList('%PDF'.codeUnits)), isNull);
       expect(photoSize(Uint8List(3)), isNull);
+      expect(photoSize(webpUnknown()), isNull);
     });
   });
 
@@ -97,6 +120,20 @@ void main() {
       final bomb = png(12000, 12000); // 144 MP, a few hundred bytes here
       expect(bomb.length, lessThan(kMaxUploadBytes));
       expect(checkPhoto(bomb), PhotoProblem.tooManyPixels);
+    });
+
+    test('a lossless-WebP bomb is caught, not let through as unknown', () {
+      // VP8L used to return null from photoSize, and checkPhoto allowed an
+      // unknown size — so this 144 MP file passed every gate.
+      final bomb = webpL(12000, 12000);
+      expect(bomb.length, lessThan(kMaxUploadBytes));
+      expect(photoSize(bomb), (12000, 12000));
+      expect(checkPhoto(bomb), PhotoProblem.tooManyPixels);
+      expect(checkPhoto(webpL(800, 600)), isNull);
+    });
+
+    test('a WebP whose size cannot be read is refused', () {
+      expect(checkPhoto(webpUnknown()), PhotoProblem.notAnImage);
     });
 
     test('the pixel ceiling is where we think it is', () {

@@ -86,5 +86,16 @@ void main() {
       expect(tsvCell('a\nb'), 'a b');
       expect(tsvCell('  =1+1  '), "'=1+1");
     });
+
+    test('a formula hidden behind whitespace is still neutralised', () {
+      // Excel ignores leading spaces when it decides a cell is a formula, so
+      // reading only codeUnitAt(0) left " =1+1" live.
+      expect(csvSafe(' =1+1'), "' =1+1");
+      expect(csvSafe('\t=1+1'), "'\t=1+1");
+      expect(csvSafe('\n=1+1'), "'\n=1+1");
+      expect(csvSafe('@SUM(A1)'), "'@SUM(A1)");
+      // ...but a number with leading spaces is still a number.
+      expect(csvSafe('  -5'), '  -5');
+    });
   });
 }

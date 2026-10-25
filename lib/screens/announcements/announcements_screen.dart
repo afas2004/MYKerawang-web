@@ -10,6 +10,7 @@ import '../../theme/app_themes.dart' show kOnPhoto, photoScrim;
 import '../../language_cubit.dart';
 import '../../utils/app_nav.dart';
 import '../../utils/formatters.dart';
+import '../../utils/url_rules.dart';
 import '../../widgets/brand/brand.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/profile_avatar_action.dart';
@@ -234,8 +235,14 @@ IconData categoryIcon(AnnouncementCategory c) => switch (c) {
     };
 
 /// Opens an announcement's action link in a new tab / the browser app.
-Future<void> openAnnouncementLink(Uri url) =>
-    launchUrl(url, mode: LaunchMode.externalApplication, webOnlyWindowName: '_blank');
+///
+/// The link is DB text, so it goes through the same scheme allowlist as every
+/// other remote link: a host-less `https:javascript:…` is not launchable.
+Future<void> openAnnouncementLink(Uri url) async {
+  final safe = launchableUri(url.toString());
+  if (safe == null) return;
+  await launchUrl(safe, mode: LaunchMode.externalApplication, webOnlyWindowName: '_blank');
+}
 
 class _CategoryEmpty extends StatelessWidget {
   final AnnouncementCategory? category;

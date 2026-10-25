@@ -9,6 +9,7 @@ import '../../language_cubit.dart';
 import '../../services/club_service.dart';
 import '../../services/post_service.dart';
 import '../../utils/local_image.dart';
+import '../../utils/photo_rules.dart';
 import '../../widgets/brand/brand.dart';
 import '../../widgets/error_state.dart';
 import 'club_strings.dart';
@@ -98,6 +99,7 @@ class _ClubManageScreenState extends State<ClubManageScreen> {
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1600, imageQuality: 85);
     if (picked == null) return null;
     final img = await LocalImage.fromXFile(picked);
+    if (!_acceptPhoto(img)) return null;
     final urls = await PostService.uploadPhotos([img]);
     return urls.first;
   }
@@ -107,8 +109,21 @@ class _ClubManageScreenState extends State<ClubManageScreen> {
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1200, imageQuality: 100);
     if (picked == null) return null;
     final img = await LocalImage.fromXFile(picked);
+    if (!_acceptPhoto(img)) return null;
     final urls = await PostService.uploadPhotos([img]);
     return urls.first;
+  }
+
+  /// The same byte gate the post/event pickers use. This path had none, so a
+  /// renamed file or a tiny decompression bomb went straight to the bucket.
+  bool _acceptPhoto(LocalImage img) {
+    final problem = checkPhoto(img.bytes);
+    if (problem == null) return true;
+    if (mounted) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text(photoProblemText(context.l10nRead, problem))));
+    }
+    return false;
   }
 
   @override

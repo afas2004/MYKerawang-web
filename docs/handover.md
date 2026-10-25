@@ -11,16 +11,17 @@ database.
 | Repo | `C:\src\project\Flutter\MYKerawang-web` |
 | Worktree to reopen | `.deepseek/worktrees/clubs-admin` |
 | Branch | `deepseek/clubs-admin` — clean, **6 commits ahead of `origin`** |
-| Live | https://kerawang.my — build `202610251705`, version **1.9.0** (+25) |
-| **Production is behind the branch** | the six commits below are not deployed |
-| Tests | **553** Flutter tests green; analyzer 17 info/warnings, **no errors** |
+| Live | https://kerawang.my — build `202610251841`, version **1.9.1** (+26) |
+| **Production is behind the branch** | the security-review commit is not deployed (it is docs + a pending migration; no client behaviour change beyond guards) |
+| Tests | **556** Flutter tests green; analyzer 17 info/warnings, **no errors** |
 | Migrations | all applied, including tonight's storage limits |
 | Supabase | project `zxjuqpqzyzmegdjttzyz` |
 
 ## Do this first: deploy
 
-Production is at 1.9.0 and does **not** contain tonight's work. Bump both
-places to 1.9.1 and run the deploy:
+**Done on 2026-10-25.** Production is now 1.9.1+26 / build `202610251841`
+(verified from `https://kerawang.my/build.json`, `version.json` and the string in
+`main.dart.js`). The six commits below are live. To redeploy:
 
 ```powershell
 # pubspec.yaml           version: 1.9.1+26
@@ -73,6 +74,7 @@ https and Firebase sends HSTS (one year).
 | `20261026010100_form_after_checkin.sql` | `set_form_after_checkin(form, bool)` — the "ask the KI form after check-in" switch |
 | `20261026011100_checkin_does_not_join.sql` | A check-in no longer inserts into `event_participants` |
 | `20261026014100_storage_image_limits.sql` | `images` and `avatars` buckets: `allowed_mime_types` (jpeg/png/webp/gif) and a 5 MB `file_size_limit`. Applied 2026-10-25. |
+| `20261026015100_security_review_fixes.sql` | **NOT APPLIED YET.** Form text caps, hidden-event counts, exact signup domain, verification-domain trigger, execute grants, and the `images` bucket write policies. Apply before the club year — see `docs/security-review.md`. |
 
 Seeded data: `supabase/seed/2026-10-25_ki_test_event.sql` created **Malam Ujian
 KI** — the event to test the whole report loop on. Re-runnable.
@@ -116,10 +118,41 @@ Check-in opens 15 min before the start (`lib/utils/event_live.dart`).
   creation and in a DB trigger; `safeReturnPath` blocks open redirects.
 - CSV/TSV: formula prefixes neutralised.
 - Uploads: generated object names, sniffed content type, 5 MB + 40 MP caps,
-  bucket MIME allowlist.
-- **Not done:** a Content-Security-Policy (the wasm build needs
-  `wasm-unsafe-eval` and a working `connect-src`; needs a test deploy), storage
-  **write policies** (dashboard-only, never in the repo), and a full RLS audit.
+  bucket MIME allowlist. **Every** pick path now checks the bytes, including the
+  club logo/cover/QR pickers (they did not before), and `uploadPhotos` refuses
+  unchecked bytes itself. Lossless-WebP bombs are caught.
+- **Not done:** a Content-Security-Policy (tested and ready in
+  `docs/security-review.md` §6 — do not ship it without reading that), and
+  storage **write policies** — see below.
+
+## The October security review (read this before touching storage or RLS)
+
+`docs/security-review.md` has the full findings table, evidence and fixes. The
+short version:
+
+1. **`images` bucket was world-writable** — anonymous create, overwrite, delete
+   and list, measured with only the publishable key. Anyone could have wiped or
+   replaced every photo. The fix is in
+   `supabase/migrations/20261026015100_security_review_fixes.sql`; **it is not
+   applied yet** (no DB access from the review session). Apply it, then re-run
+   the curl check in the review doc.
+2. Three RLS changes **need an owner decision** and are deliberately kept out
+   of `supabase/migrations` in
+   `supabase/pending/20261026015200_security_signoff.sql`: anon reads of
+   `profiles`/`followers`/`event_participants` (the repo says anon should not
+   have them), the notification insert policy (any user can notify any user),
+   and server-derived report categories (one report can hide anyone's content).
+3. Everything else is listed by severity, with the dashboard instructions in
+   review doc §11.
+
+**The SQL test harness was red** and is fixed: the shared stub had no
+`storage.buckets`, so every suite stopped at the storage-limits migration. The
+`moderation` suite still has its two known assertion failures and then crashes at
+`pin_post` (admin-only since `20261024004100_club_pins.sql`; the test was never
+updated). `create/*` and `posts_v13/*` were already broken and are not in the
+list above.
+
+New suite: `node supabase/tests/security/security_test.mjs .` — 22 assertions.
 
 ## Open work
 
@@ -190,9 +223,11 @@ pre-existing, not yours.
   the app is fine. Use `Flexible`/ellipsis and `quietCounter` rather than
   chasing the overflow in the app.
 - Headless Edge reports a viewport **wider than `--window-size`** (430 → 492),
-  so screenshots are cropped at the right edge. Not a layout bug. And it cannot
-  boot the wasm build at all (splash forever, same for a local copy) — use a
-  real browser for visual checks.
+  so screenshots are cropped at the right edge. Not a layout bug. **Correction
+  (Oct 2026):** `--headless=new` with `--enable-unsafe-swiftshader
+  --use-angle=swiftshader` *does* boot the wasm build — the CSP tests in
+  `.deepseek/csp/` drive it over CDP. The old "cannot boot the wasm build at
+  all" note applied to the legacy headless mode.
 - `app_strings.save` is `"SAVE"` (uppercase) and `cancel` is `"Cancel"`.
   Widget tests that tap a dialog button must match the case exactly.
 - `DropdownButtonFormField` needs `isExpanded: true` in a narrow dialog; a bare
@@ -208,8 +243,11 @@ pre-existing, not yours.
   builds — `git checkout --` them before committing.
 - Student data supplied for design work (`BORANG KI…xlsx`, `LAPORAN…pdf`) is
   git-ignored by name and must never be committed.
-- Storage **write policies are not in the repo** — they live only in the
-  Supabase dashboard. Do not assume they exist because a migration says nothing.
+- Storage **write policies were not in the repo** — they lived only in the
+  Supabase dashboard, and the `images` ones granted anonymous write (see the
+  October review). `20261026015100_security_review_fixes.sql` now owns them for
+  `images`; `avatars` is still dashboard-only. Do not assume a bucket is safe
+  because a migration says nothing.
 
 ## Suggested next session
 

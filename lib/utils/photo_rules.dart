@@ -26,6 +26,16 @@ const int kMaxUploadPixels = 40 * 1000 * 1000;
 
 enum PhotoProblem { notAnImage, tooLarge, tooManyPixels }
 
+/// Thrown by [PostService.uploadPhotos] when bytes reach it that no picker
+/// checked. Callers that already gate at pick time never see it.
+class PhotoUploadException implements Exception {
+  final PhotoProblem problem;
+  const PhotoUploadException(this.problem);
+
+  @override
+  String toString() => 'PhotoUploadException($problem)';
+}
+
 /// The sentence for [problem], from the app strings.
 String photoProblemText(AppStrings s, PhotoProblem problem) => switch (problem) {
       PhotoProblem.notAnImage => s.photoNotImage,
@@ -54,13 +64,15 @@ String? photoMime(Uint8List b) {
 }
 
 /// Width and height from the header, when the format lets us read them
-/// without decoding. Null when unknown — the caller treats that as "allow",
-/// since [photoMime] has already established it is an image.
+/// without decoding. Null means the header is unreadable — [checkPhoto]
+/// refuses that rather than let the pixel ceiling be skipped.
 (int, int)? photoSize(Uint8List b) {
   int be16(int o) => (b[o] << 8) | b[o + 1];
   int be32(int o) => (b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3];
   int le16(int o) => b[o] | (b[o + 1] << 8);
   int le24(int o) => b[o] | (b[o + 1] << 8) | (b[o + 2] << 16);
+  int le32(int o) =>
+      b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24);
 
   final mime = photoMime(b);
   try {
@@ -83,7 +95,14 @@ String? photoMime(Uint8List b) {
       if (b[12] == 0x56 && b[13] == 0x50 && b[14] == 0x38 && b[15] == 0x20) {
         return (le16(26) & 0x3FFF, le16(28) & 0x3FFF);
       }
-      return null; // VP8L: bit-packed, not worth the risk of a wrong answer
+      // 'VP8L' lossless: byte 20 is the 0x2F signature, then 4 bytes pack
+      // (width - 1) in the low 14 bits and (height - 1) in the next 14.
+      if (b[12] == 0x56 && b[13] == 0x50 && b[14] == 0x38 && b[15] == 0x4C) {
+        if (b.length < 25) return null;
+        final bits = le32(21);
+        return ((bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1);
+      }
+      return null;
     }
     if (mime == 'image/jpeg') {
       // Walk the segments to the SOFn frame header (C0–CF except C4/C8/CC).
@@ -132,7 +151,11 @@ PhotoProblem? checkPhoto(Uint8List bytes) {
   if (photoMime(bytes) == null) return PhotoProblem.notAnImage;
   if (bytes.length > kMaxUploadBytes) return PhotoProblem.tooLarge;
   final size = photoSize(bytes);
-  if (size != null && size.$1 * size.$2 > kMaxUploadPixels) {
+  // Unknown dimensions mean the header could not be read at all. Allowing
+  // those would make the pixel ceiling optional: a lossless WebP (or any
+  // crafted header) would reach the bucket and then every viewer's decoder.
+  if (size == null) return PhotoProblem.notAnImage;
+  if (size.$1 * size.$2 > kMaxUploadPixels) {
     return PhotoProblem.tooManyPixels;
   }
   return null;

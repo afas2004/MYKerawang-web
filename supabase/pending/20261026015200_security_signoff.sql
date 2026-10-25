@@ -1,0 +1,130 @@
+-- 20261026015200_security_signoff.sql
+--
+-- NOT APPLIED. Kept outside supabase/migrations so `supabase db push` cannot
+-- pick it up by accident: each statement changes who may read or write data,
+-- and the owner asked to see before/after first.
+--
+-- Read docs/security-review.md ("Needs your sign-off") before running any of
+-- this. Each block is independent and idempotent.
+
+-- ====================================================== 1. anon can read
+-- profiles / followers / event_participants
+--
+-- BEFORE (measured against the live project, 2026-10-25, anon key only):
+--   GET /rest/v1/profiles?select=full_name       → 200, 19 rows
+--   GET /rest/v1/profiles?select=device_id       → 200
+--   GET /rest/v1/followers                        → 200, 8 rows
+--   GET /rest/v1/event_participants               → 200, 1 row
+-- The repo says the opposite (20261022001100_guest_read_access.sql: "Never
+-- granted to anon: profiles (contacts), event_participants, followers"),
+-- so this is drift between the migrations and the live grants.
+--
+-- AFTER: guests keep working through the views the app already uses for
+-- guests (profiles_public, follow_counts, event_participant_counts); only
+-- the base tables stop being world-readable.
+--
+-- Risk: the guest profile page must read profiles_public, and the guest
+-- event page event_participant_counts. Both do (lib/screens/profile_screen.dart
+-- is signed-in only; lib/widgets/guest_views.dart uses profiles_public).
+-- Check the guest pages on a signed-out browser after applying.
+--
+-- do $$
+-- declare pol record;
+-- begin
+--   for pol in
+--     select p.polname, p.polrelid::regclass as tbl
+--     from pg_policy p
+--     where p.polrelid in ('public.profiles'::regclass,
+--                          'public.followers'::regclass,
+--                          'public.event_participants'::regclass)
+--       and p.polroles = '{0}'::oid[]           -- PUBLIC (covers anon)
+--       and pg_get_expr(p.polqual, p.polrelid) = 'true'
+--   loop
+--     execute format('drop policy %I on %s', pol.polname, pol.tbl);
+--   end loop;
+-- end $$;
+--
+-- revoke select on public.profiles           from anon;
+-- revoke select on public.followers          from anon;
+-- revoke select on public.event_participants from anon;
+
+-- ====================================================== 2. notifications
+--
+-- BEFORE: `notifications_insert_as_self` only checks actor_id = auth.uid(),
+-- so any signed-in user can insert a row for ANY user_id with any title,
+-- body, type and data (route included). That is in-app spoofing/phishing
+-- and unbounded spam. The client inserts directly from four places:
+--   lib/screens/create_event_screen.dart:408,
+--   lib/screens/profile_screen.dart:194 (follow),
+--   lib/services/mention_service.dart:100 (mention),
+--   plus updates in notification_screen.dart.
+--
+-- AFTER: an insert is only accepted when it corresponds to a real
+-- relationship the caller can prove. This keeps follow + mention, which are
+-- the only two the client sends; event/club notices come from
+-- security-definer RPCs, which bypass RLS.
+--
+-- Risk: if create_event_screen's notification is not a follow/mention it
+-- will start failing (the insert throws). Read that call site and add its
+-- type to the whitelist below before applying.
+--
+-- drop policy if exists "notifications_insert_as_self" on public.notifications;
+-- create policy "notifications_insert_as_self" on public.notifications
+-- for insert to authenticated
+-- with check (
+--   actor_id = auth.uid()
+--   and user_id is distinct from auth.uid()
+--   and length(title) <= 120
+--   and length(coalesce(body, '')) <= 500
+--   and (
+--     (type = 'follow' and exists (
+--        select 1 from public.followers f
+--        where f.follower_id = auth.uid() and f.following_id = user_id))
+--     or (type = 'mention' and (
+--        exists (select 1 from public.posts p
+--                where p.id::text = data->>'post_id' and p.user_id = auth.uid())
+--        or exists (select 1 from public.comments c
+--                where c.id::text = data->>'comment_id' and c.user_id = auth.uid())))
+--   )
+-- );
+
+-- ====================================================== 3. report category
+--
+-- BEFORE: the client picks reports.category and a priority category
+-- ('harassment', 'inappropriate') hides the target on the first report with
+-- no admin involved (20261025001100:79-83,134,166-167 + 20261025003100:15).
+-- One account can therefore hide unlimited content by choosing that category.
+--
+-- AFTER: the category is derived from the reason text server-side; a client
+-- value is ignored. Keep the auto-hide for genuine priority reports, or
+-- require reporter trust (mod_reporter_trusted) as well — the second version
+-- is the conservative one.
+--
+-- create or replace function public.mod_report_before_insert()
+-- returns trigger language plpgsql security definer set search_path = public
+-- as $$
+-- declare
+--   v_owner uuid; v_anon boolean; v_case uuid;
+-- begin
+--   if auth.uid() is not null then new.reporter_id := auth.uid(); end if;
+--   new.target_type := lower(new.target_type);
+--   new.status := 'open'; new.handled_by := null;
+--   new.handled_at := null; new.resolution_note := null;
+--   -- Server-side only: the client's category is discarded.
+--   new.category := public.mod_category_from_reason(new.reason);
+--   select o.owner_id, o.anonymous into v_owner, v_anon
+--   from public.mod_target_owner(new.target_type, new.target_id::text) o;
+--   if not found then raise exception 'MOD:target_missing' using errcode = 'P0001'; end if;
+--   if v_owner = new.reporter_id then raise exception 'MOD:self_report' using errcode = 'P0001'; end if;
+--   new.counts_toward_auto_hide := public.mod_reporter_trusted(new.reporter_id);
+--   ... (rest identical to 20261025001100)
+-- end $$;
+
+-- ====================================================== 4. event contacts
+--
+-- BEFORE: event_contact(p_event_id) needs only a session, so any signed-in
+-- student can read every event's WhatsApp/Telegram/e-mail/link — a
+-- harvesting surface for the whole club year.
+-- AFTER (choose one): a per-user reveal cap like listing contacts
+-- (contact_reveals, 20261019002600) or "only after joining". Both are
+-- product decisions, so nothing is written here.
