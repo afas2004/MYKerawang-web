@@ -1,96 +1,107 @@
 # Handover — MYKerawang web
 
-Written 2026-10-25. Everything below was verified, not remembered. Updated at
-the end of the second session that day (PR #8 and #9 merged, two bugs fixed,
-1.7.7 and 1.7.8 released).
+Written 2026-10-25 at the end of a long session, for the next one to start cold.
+Everything below was checked against the repo, the live site and the database, not
+remembered.
 
 ## Where things stand
 
 | | |
 |---|---|
 | Repo | `C:\src\project\Flutter\MYKerawang-web` |
-| Worktree used | `.deepseek/worktrees/clubs-admin` (the one to reopen) |
-| Branch | `deepseek/clubs-admin` — 11 commits ahead of `origin/main`, pushed |
-| Last merge | PR #9 → `6da73ad` (1.7.7); before it PR #8 → `e491899` (1.7.2–1.7.6) |
+| Worktree to reopen | `.deepseek/worktrees/clubs-admin` |
+| Branch | `deepseek/clubs-admin` — clean, pushed, **17 commits ahead of `origin/main`** |
+| `origin/main` | still 1.7.7. The branch has never been merged since PR #9. |
 | Live | https://mykerawang-app.web.app — build `202610251557`, version **1.8.3** |
-| Tests | 516 Flutter tests green; migration suites: moderation (all but 2 pre-existing), clubs 87, verification 13, forms 62, event links 10, attendance 15; analyzer has 17 info/warning findings, no errors |
-| Latest migration | `20261026011100_checkin_does_not_join.sql` — **applied to live** (owner confirmed), as are `20261026010100`, `20261026009100`, `20261026008100`, `20261026007100` and the KI seed. **Nothing is pending.** |
+| Tests | **516** Flutter tests green; analyzer 17 info/warnings, **no errors** |
+| Migrations | **all applied to live**, nothing pending (see the table below) |
+| Supabase | project `zxjuqpqzyzmegdjttzyz` |
 
-`main` is at 1.7.7; the live site is at **1.8.3** (build `202610251557`) with the
-forms screens, the rebuilt event composer, the attendance flow and the guided
-answer page. **Every migration is applied and nothing is pending.** The branch is
-a long way ahead of `main` — merge at the next natural stop.
+The branch is deployed but not merged, so production is ahead of `main`. Merge at
+the next natural stop; nothing on the branch needs the database to roll back.
 
-## What changed this session
+## First thing to ask the owner
 
-- **Merged** the branch twice: PR #8 (`e491899`, 1.7.2–1.7.6) and PR #9
-  (`6da73ad`, 1.7.7), so `main` matches what is running.
-- **Announcement Edit/Delete are the author's alone** (was: admins and owners
-  too). `update_my_post` and `delete_my_post` both require
-  `user_id = auth.uid()`, so the buttons were dead for everyone else — they
-  only ever produced "not the author of this post". `AnnouncementDetailHead`
-  now takes `mine` instead of `canManage`; the post card's own menu already
-  did this. Admins still moderate other people's announcements, from the
-  console (reports → hide/remove), which is where those rights live.
-  Regression test: `test/announcement_detail_test.dart`.
-- **The detail app bar shows the post's headline**, not the generic "Thread"
-  (`postPageTitle` in `lib/utils/announcement_rules.dart`, unit-tested; falls
-  back to "Announcement" or "Thread" when there is no headline).
-- **Google sign-in leaves no history entry** (see below — unverified on a
-  real browser).
-- **Released 1.7.7** (build `202610250823`), then **designed and built phase 1 of
-  the KI event reports**: `docs/ki-event-reports.md`, `docs/ki-template-fields.csv`
-  (the survey as data), `20261026007100_event_forms.sql` and a 44-assertion test.
-  The design took three passes — the first got the requirement wrong (a builder
-  with a KI example), the owner corrected it (the KI report *is* the requirement),
-  and the third is grounded in the two real documents the owner supplied. The
-  owner then corrected again: templates are only **options**, picked and **edited
-  in a simple editor**, with CSV as another way to fill that editor.
+The owner reported "not fix the edit/create event page" and I could not tell which
+element they meant. **Ask for the specific thing** (a screenshot with it circled)
+before changing that page again. What is *already* fixed there: the attendance
+toggle is gone, contact channels are rows with their own icons, the cooperation
+field takes mentions and suggests clubs, pictures are optional, categories are an
+autocomplete field, and the description uses the announcement's light markup.
+
+## Migrations, in order (all applied)
+
+| Migration | What it does |
+|---|---|
+| `20261026007100_event_forms.sql` | The KI report survey: templates, forms, responses, `form_analysis` (S1/S2/S3), `event_open_form`, `event_form_summary`, `create_blank_form` |
+| `20261026008100_event_links_pic.sql` | `events.action_links` (max 2 buttons, guarded by a trigger) and `events.pic` |
+| `20261026009100_fix_checkin_token.sql` | **The attendance fix.** `event_checkin_token()` had a `returns table (…, expires_at)` output column and a bare `expires_at` in its cleanup `DELETE` → `42702 ambiguous`, so the rotating code never worked at all |
+| `20261026010100_form_after_checkin.sql` | `set_form_after_checkin(form, bool)` — the "ask the KI form after check-in" switch |
+| `20261026011100_checkin_does_not_join.sql` | A check-in no longer inserts into `event_participants`. Scanning used to inflate the event's places count — one number meaning two things |
+
+Seeded data: `supabase/seed/2026-10-25_ki_test_event.sql` created **Malam Ujian KI**
+(owner-owned, attendance on, a bulleted description, two buttons, a PIC) — the
+event to test the whole report loop on. Re-runnable.
+
+## What exists now (built between 1.7.2 and 1.8.3)
+
+**Forms / KI report** — read `docs/ki-event-reports.md` first; it is the design and
+it is grounded in the club's real documents. The short version:
+
+- The app owns the **survey and its analysis**, not the HEP report PDF.
+- A template is a **starting point**: pick it (28 rows from the club's Google Form,
+  `docs/ki-template-fields.csv`), then edit in a deliberately plain editor. Blank
+  and "paste a question list" are the other two ways in.
+- Fields carry `analysis` (`ki_pre` / `ki_post` / `feedback`) and `ki_code` (1–7),
+  because the source form numbers its KI questions out of order and twice as "6)".
+- Answers: one row per person, role derived from the template's own role question.
+- The organiser's analysis screen shows **S1** (participants, before/after per KI
+  element, with the change), **S2** (organisers, after), **S3** (feedback) — every
+  mean with its `n` — plus copy buttons (tab-separated) for the Word report and a
+  CSV of all responses.
+- Screens: `/event/:id/form/edit` (editor), `/event/:id/form` (answer),
+  `/event/:id/form/responses` (analysis).
+
+**Attendance flow** (`lib/screens/events/attendance_live_screen.dart`):
+
+1. The event page's action for the organiser is **Take attendance**; it asks one
+   question — *add the KI report?* — which writes `after_checkin`.
+2. Start opens the door: rotating code (20 s token, redrawn every 10 s), a live
+   count, the **last person in** (given name only, cut at bin/binti), and one
+   **End attendance** button.
+3. Ending shows an animated summary with **attendance CSV**, **KI CSV**, or both as
+   two separate files.
+4. A student who checks in is offered the KI form once, when it was part of the
+   session.
+
+**Event page / composer**
+
+- The event page leads with the door for its owner; everything else is behind
+  **Manage event** (Edit, KI report, Close registration). Contact channels are
+  buttons, not a sheet.
+- The check-in button appears to non-organisers only inside the window
+  (`lib/utils/event_live.dart`: 15 min before the start → the end), which also
+  drives a "Check-in is open" banner and a chip on the event card.
+- Composer: announcement-style markup in the description, category **autocomplete**,
+  up to two **buttons with links**, **person in charge**, **cooperation** with
+  `@people` mentions *and* club-name suggestions (clubs have a handle but **no
+  profile**, so `@club` notifies nobody — names are inserted instead).
 
 ## Infrastructure
 
-- **Supabase** project `zxjuqpqzyzmegdjttzyz`. The app uses a **publishable** key
-  (`sb_publishable_…`) in `lib/main.dart`. The legacy JWT keys are **disabled**;
-  the old `service_role` that leaked into git history is dead (verified 401).
-  Any privileged key now comes from `--dart-define=SUPABASE_SECRET_KEY=…`; never commit it.
-- **Auth**: email + Google. Confirm email **on**, anonymous sign-ins **off**,
-  manual linking off. Custom SMTP through **Resend** with `kerawang.my`
-  (DKIM + `rsend`/`send` CNAMEs at Hostinger, DMARC `p=none`). Confirmations
-  verified received.
-- **Hosting**: Firebase `mykerawang-app`. Deploy stamps a build id into
+- **Supabase** project `zxjuqpqzyzmegdjttzyz`. The app uses the **publishable** key
+  in `lib/main.dart`; the legacy JWT keys are disabled and the old leaked
+  `service_role` is dead. A privileged key, if ever needed, comes from
+  `--dart-define=SUPABASE_SECRET_KEY=…` and is never committed.
+- **Auth**: email + Google. Confirm email on, anonymous sign-ins off. SMTP through
+  **Resend** on `kerawang.my`. Google sign-in launches with `getOAuthSignInUrl` +
+  `replaceLocationForOAuth` so the account chooser does not survive in history.
+- **Hosting**: Firebase `mykerawang-app`. A deploy stamps a build id into
   `build.json`, `index.html` and `flutter_bootstrap.js`.
-
-## Data
-
-- 18 accounts (13 real testers, KMI, owner, admin, a password-less `demo` account).
-- One club (KMI, active). Beta seed: 3 KMI announcements, 3 events (two with
-  merit + attendance), 4 sample posts, 3 listings from `demo`.
-- Old development content is **hidden** (`is_hidden`), not deleted. Backup:
-  `.deepseek/backups/2026-10-24-beta-reset/` (outside git).
-- One-off SQL: `supabase/seed/2026-10-24_beta_cleanup.sql` and `…_beta_seed.sql`.
-  The seed refuses to run twice; the cleanup has a `created_at` guard.
-
-## Switches that change behaviour
-
-| Column | Where | Default |
-|---|---|---|
-| `access_settings.registration_mode` | owner console | `open` (live) |
-| `access_settings.verification_enabled` | owner console | `false` |
-| `clubs.recruitment_open` | club manage | `true` |
-
-## Code map
-
-| Area | Files |
-|---|---|
-| Auth / login | `lib/screens/login_cubit.dart`, `login_screen.dart`, `lib/services/registration_policy.dart` |
-| Student verification | `lib/services/student_verification.dart`, `lib/screens/verification/verify_sheet.dart`, admin `verifications_tab.dart` |
-| Clubs | `lib/screens/clubs/*`, `lib/services/club_service.dart` |
-| Events | `lib/screens/create_event_screen.dart`, `event_detail_screen.dart`, `lib/screens/events/` (attendance + check-in) |
-| Announcements | `create_announcement_screen.dart`, `lib/widgets/announcement_view.dart`, `lib/services/announcement_service.dart`, `lib/utils/announcement_rules.dart` |
-| Categories | `lib/utils/categories.dart` (seeds), `lib/services/category_service.dart`, `lib/widgets/category_picker.dart` |
-| Moderation | `lib/services/moderation_service.dart`, `lib/utils/moderation_logic.dart`, `lib/widgets/moderation_ui.dart` |
-| Navigation / back | `lib/router.dart`, `lib/utils/app_nav.dart`, `lib/utils/browser_history_{web,stub}.dart` |
-| Event forms / KI report | `supabase/migrations/20261026007100_event_forms.sql`, `lib/services/form_service.dart`, `lib/screens/events/form_editor_screen.dart`, `lib/screens/events/event_form_screen.dart`, `lib/screens/events/form_responses_screen.dart`, `lib/utils/form_rules.dart`, `lib/utils/form_csv.dart`, `lib/l10n/form_strings.dart` |
+- **No Supabase CLI, no `psql`, no DB password here.** Migrations are applied by
+  pasting the file into
+  https://supabase.com/dashboard/project/zxjuqpqzyzmegdjttzyz/sql/new and pressing
+  Run. Every migration in this repo is re-runnable.
 
 ## How to work
 
@@ -99,251 +110,97 @@ cd C:\src\project\Flutter\MYKerawang-web\.deepseek\worktrees\clubs-admin
 flutter analyze --no-pub
 flutter test
 
-# migrations (need PGlite once)
+# migration suites (PGlite). Install once:
 cd supabase/tests/moderation; npm i --no-save @electric-sql/pglite@0.2.17
-node moderation_test.mjs ../../../     # applies every migration twice
-# The other tests import pglite directly, and ESM resolves from the TEST FILE's
+node moderation_test.mjs ../../../         # applies every migration twice
+# The other suites import pglite directly and ESM resolves from the TEST FILE's
 # folder, so a copy must exist one level up. One junction, done once:
 #   New-Item -ItemType Junction -Path supabase/tests/node_modules `
 #     -Target (Resolve-Path supabase/tests/moderation/node_modules)
 cd supabase/tests
-node clubs/clubs_test.mjs ../..        # (this command never worked as documented
-node verification/verification_test.mjs ../..   #  until the junction existed)
-node forms/forms_test.mjs ../..        # event forms: template, editor, S1/S2/S3
-
-# applying a migration to LIVE: there is no Supabase CLI, no psql and no DB
-# password in this environment, so it is a dashboard paste:
-#   https://supabase.com/dashboard/project/zxjuqpqzyzmegdjttzyz/sql/new
-# Paste the whole file, Run. Every migration here is re-runnable, so a second
-# run is safe. The seed guard (a `not exists` on the template's fields) means
-# re-running never duplicates the KI template.
-#
-# Pending against live:
-#   supabase/migrations/20261026011100_checkin_does_not_join.sql
-#   (everything before it, including the after-check-in switch, the attendance
-#   fix, both event migrations and the seed, is applied)
+node clubs/clubs_test.mjs ../..            # 87 assertions
+node verification/verification_test.mjs ../..
+node forms/forms_test.mjs ../..            # 62
+node events/events_links_test.mjs ../..    # 10
+node events/attendance_flow_test.mjs ../.. # 15
 
 # deploy: bump BOTH places, then build/stamp/deploy
-#   pubspec.yaml version: 1.7.x+N
-#   lib/services/update_service.dart appVersion
+#   pubspec.yaml           version: 1.8.x+N
+#   lib/services/update_service.dart   appVersion
 flutter build web --release --wasm --pwa-strategy=none --dart-define=BUILD_ID=<yyyyMMddHHmm>
-# write build.json, replace __BUILD_ID__ in index.html + flutter_bootstrap.js,
-# copy sw_reset.js over flutter_service_worker.js, then:
+# then write build.json, replace __BUILD_ID__ in index.html + flutter_bootstrap.js,
+# copy sw_reset.js over flutter_service_worker.js, and:
 firebase deploy --only hosting --project mykerawang-app
+# verify from the site, not the log: build.json, version.json, and the id inside
+# main.dart.js
 ```
 
-## Gotchas learned the hard way
+Two moderation assertions fail **without** any of the new migrations too
+("two reports → one open case", "priority category hidden on first report") —
+pre-existing, not yours.
 
-- **Do not append Dart with `Add-Content`.** It mangled an em-dash into invalid
-  UTF-8 and the analyzer reported "URI doesn't exist" for a file that was fine.
-  Use the write/edit tools.
-- After appending to a file, `flutter analyze` may report a stale
-  "Target of URI doesn't exist" for that file; `flutter analyze <file>` is accurate.
-- Generated plugin registrants (`linux/`, `macos/`, `windows/`) get touched by
-  builds — `git checkout --` them before committing.
-- The **owner account cannot delete itself** (`owner_cannot_delete`); the UI now
-  says so before asking for a username.
-- Hidden content stays visible to its author, so the owner still sees their own
-  hidden rows. Admins do **not** get a feed pass.
-- The `demo@mykerawang.local` account has no password and cannot be logged into.
-- Attendance: the QR token lives 20 s, drawn every 10 s. The QR is a URL so the
-  phone camera works as a fallback.
-- Form section headers truncate rather than overflow (long titles on narrow phones).
-- A club officer **cannot** edit an announcement they did not write — the RPC is
-  author-only. If the product wants officers to edit club announcements, that is
-  a migration (`update_my_post` would need an officer branch), not a UI change.
-- supabase_flutter hardcodes `webOnlyWindowName: '_self'` for OAuth, so it always
-  *pushes* a history entry. `signInWithGoogle` now builds the same URL with
-  `getOAuthSignInUrl` and calls `replaceLocationForOAuth` (push a spare entry,
-  then `location.replace`) so Google never survives in the back stack. Web-only;
-  the stub returns false on mobile and the library path runs as before.
-- **The migration tests never ran as documented.** PGlite was installed only in
-  `supabase/tests/moderation/node_modules`, but Node resolves a bare import from
-  the *test file's* folder, so `node ../clubs/clubs_test.mjs` could not find it.
-  Fixed with one junction at `supabase/tests/node_modules` (see How to work);
-  `node_modules/` is now in `.gitignore`. With it, clubs (87 assertions) and
-  verification (13) run again — they had been silently unrunnable.
-- The PGlite stub's `event_participants` has **no `ON DELETE CASCADE`**, so a test
-  that deletes an event must clear participants first — otherwise the FK blocks
-  it and the failure looks like it belongs to the migration under test. It now
-  has the primary key `(event_id, user_id)` it has in production: without one,
-  `ON CONFLICT DO NOTHING` cannot dedupe and a test can insert the same person
-  twice and still pass.
-- **`returns table (a, b, …)` makes those names PL/pgSQL variables.** An
-  unqualified column reference with the same name raises
-  `42702 column reference "x" is ambiguous` at run time — which is exactly how
-  `event_checkin_token()` shipped broken (its cleanup `DELETE … where expires_at
-  < …`), so the attendance QR never issued a code. Qualify the column
-  (`t.expires_at`) or rename the output. `event_checkin_token` is fixed by
-  `20261026009100`; `checkin_with_token` and `event_attendance_list` were
-  checked and are fine.
-- The event composer no longer requires a photo. It used to, which meant an
-  event created without one (or the seeded test event) could be opened in the
-  editor and then never saved.
-- **`app_strings.save` is `"SAVE"` and `cancel` is `"Cancel"`** — widget tests
-  that tap a dialog button must use the exact case (`find.widgetWithText(
-  FilledButton, 'SAVE')`), or the finder matches nothing and the failure looks
-  like a broken screen.
-- A `DropdownButtonFormField` needs `isExpanded: true` inside a narrow dialog,
-  and a bare `DropdownButton` with `isExpanded` needs a bounded width
-  (`Expanded`) — otherwise the dialog overflows on a 375 px phone.
-- Do not rewrite a text file with PowerShell `Get-Content -Raw | Set-Content`: it
-  double-encodes non-ASCII (an em-dash came back as four visible bytes) in this
-  file and twice in `form_editor_screen.dart`. Use the edit tool; if a file does
-  get mangled, `.deepseek/fix_mojibake.py <file>` reverses the sequences.
-- Two `moderation_test.mjs` assertions ("two reports → one open case" and
-  "priority category hidden on first report") fail **without** the forms
-  migration too. They are pre-existing; don't chase them while testing forms.
+## Code map
+
+| Area | Files |
+|---|---|
+| Events | `lib/screens/event_detail_screen.dart`, `events_screen.dart`, `create_event_screen.dart` |
+| Attendance | `events/attendance_live_screen.dart`, `events/checkin_screens.dart`, `lib/utils/attendance_rules.dart`, `lib/utils/event_live.dart` |
+| Forms / KI | `lib/services/form_service.dart`, `events/form_editor_screen.dart`, `events/event_form_screen.dart`, `events/form_responses_screen.dart`, `lib/utils/form_rules.dart`, `lib/utils/form_csv.dart`, `lib/l10n/form_strings.dart` |
+| Mentions | `lib/widgets/mention_input.dart` (`suggestClubs`) |
+| Auth | `lib/screens/login_cubit.dart`, `login_screen.dart`, `lib/router.dart` (`authRedirect`) |
+| Navigation | `lib/router.dart`, `lib/utils/app_nav.dart`, `browser_history_{web,stub}.dart` |
+| Docs | `docs/ki-event-reports.md`, `docs/mobile-ui-rules.md`, `docs/launch-checklist.md`, `docs/handover.md` |
 
 ## Open work
 
-**Launch ops** (see `docs/launch-checklist.md`):
-rotate the DB password; one attendance dry run before promising merit;
-captcha (remember it covers sign-in too — **and it will interact with the OAuth
-launch above**, since the captcha token rides in `queryParams`); invite the
-first club.
+**Waiting on the owner:** what exactly is wrong on the edit/create event page.
 
-**Deployed on 1.7.7 and 1.7.8 but not verified on a real browser yet:** The Google sign-in
-history fix. There is no widget test for it (`location` is not reachable from a
-test), so check it on the live build, in this order:
+**Bugs:**
+- Announcement categories are still a fixed set of five.
+- The "check-in is open" indicator is missing from the **feed/announcement** cards.
+  It exists on the event page and the event card in the Events list.
 
-1. sign in with Google, then press the browser's Back — it must **not** show
-   Google's account chooser;
-2. sign out, start Google sign-in again, press Back **on Google's page** —
-   it must land back on `/login`;
-3. sign in from a shared post link (`/post/…` → "Log in to comment") and
-   confirm `?from=` still returns you to the post.
+**Launch ops** (`docs/launch-checklist.md`): rotate the DB password; one real
+attendance dry run; **captcha** (needs an hCaptcha/Turnstile site key from the
+owner, and it will touch the OAuth launch); a manual backup before inviting clubs.
 
-If sign-in breaks, `git revert` the login commit — it is one file plus a helper,
-and the old `signInWithOAuth` path still compiles.
+**Form builder, if it continues:** a paste-import UI for new template versions, a
+richer builder, and the open design questions at the end of
+`docs/ki-event-reports.md` (MPP's version as a second template; whether the matric
+stays editable — 4 of 13 respondents signed in with Gmail).
 
-**Bugs still open:**
-- Announcement categories are a fixed set of five.
+## Gotchas that cost real time
 
-**Features queued:**
-- Per-post "post officially" toggle (owner currently always looks official).
-- Event PIC field + tag clubs/people as collaborators.
-- Registration toggle on the event page after publishing, with instant QR and a
-  "add a form?" prompt.
-- **KI event reports.** Phase 1 (server) is **built and tested**; see
-  `docs/ki-event-reports.md`, with the survey itself as data in
-  `docs/ki-template-fields.csv` (28 rows, generated from the owner's Google-Form
-  export). Files: `supabase/migrations/20261026007100_event_forms.sql` and
-  `supabase/tests/forms/forms_test.mjs`.
-  The requirement, as corrected by the owner: every club hands in a Kemahiran
-  Insaniah report after **every** event, under L2-HEP/PKP/21, within 14 days, and
-  the field set is already fixed — so a **template is a starting point** the
-  organiser picks, then **edits in a deliberately simple editor** (one list of
-  fields; no drag-and-drop, no sections). CSV/paste is the other way to get
-  questions in; it fills the same editor, which is why there is no server-side
-  template authoring.
-  The app owns the *survey* and the three analyses (**S1 Peserta**,
-  **S2 Penganjur**, **S3 feedback** — the "analisa Excel" the report asks for),
-  not the report PDF. Template fields carry `ki_code` / `analysis` tags so the
-  averages are computable whatever the wording; ratings are a first-class kind;
-  students answer for themselves; responses are private to organiser + club
-  officers + admins; the form is **optional to the QR** (`after_checkin`,
-  default off).
-  Next: the **`after_checkin` prompt** (phase 5), then the richer builder.
-  The migration is **not applied to live**; apply it when a build with the forms
-  screens is deployed. Five design questions remain at the end of the doc; the
-  two that matter are whether MPP's version ships as a second template, and
-  whether the matric must stay editable (**4 of 13 respondents used Gmail**).
-- **KI editor (phase 2) is built**: `/event/:id/form/edit`, opened from a
-  "KI report" button on the event page for the organiser. Start chooser
-  (template / blank / pasted list), one plain list of questions with label, kind,
-  required, options, scale and analysis tag, up/down/delete, save and publish.
-  `save_event_form` reloads after saving so new questions get their ids — without
-  that, every save would insert another copy of each new question.
-- **KI answer page (phase 3) is built**: `/event/:id/form`, opened from a
-  "Program form" button on the event page whenever an open form exists (the
-  organiser gets the editor button instead). Renders every field kind, pre-fills
-  the matric from a `@student.uitm.edu.my` address, shows an existing answer with
-  "Update answers", and gives guests a sign-in bar. The role (`peserta` /
-  `penganjur`) is read from the template's role question rather than asked twice.
-  Server: `event_open_form()`, because `event_form_summary()` is manager-only.
-- **KI analysis screen + CSV (phase 4) is built**: `/event/:id/form/responses`,
-  from the list icon in the editor's app bar. S1 (participants, KI before/after
-  with the change), S2 (organisers, after), S3 (feedback) — each with a copy
-  button that yields tab-separated numbers for the Word report, every mean shown
-  with its `n`, the free-text suggestions and the respondent list, and the CSV
-  download. `lib/utils/form_csv.dart` holds both artefacts as pure functions, so
-  the CSV columns and the copied tables cannot drift from the questions.
-- **Event composer caught up with the announcement one**:
-  - the description documents and renders the same light markup (`**bold**`,
-    `- ` bullets, https links) — the event page now uses `FormattedBody`;
-  - **categories are a text field with autocomplete** (`CategoryField`) instead
-    of a wall of chips, with the chosen ones as removable chips underneath;
-  - **buttons with links** (max 2, `events.action_links`), same validation as an
-    announcement's action buttons, rendered on the event page;
-  - **person in charge** (`events.pic`), shown in the facts card.
-  Tests: `test/category_field_test.dart` (4) and
-  `supabase/tests/events/events_links_test.mjs` (10).
-- **Taking attendance is a flow, not a toggle.** The event page's action for the
-  organiser is **Take attendance**, which asks one question — *add the KI report?*
-  — and then opens the door:
-  `lib/screens/events/attendance_live_screen.dart`. That screen is the rotating
-  code with a **running count** and **the last person in** (given name only, cut
-  at bin/binti: `shortAttendeeName` in `lib/utils/attendance_rules.dart`), and a
-  single **End attendance** button. Ending shows an animated summary — total
-  attendance, KI reports when the form was part of the session — with three
-  exports: attendance CSV, KI CSV, or both as **two separate files**.
-  The old `attendance_screen.dart` (a switch beside the QR) is deleted, and the
-  attendance toggle is gone from the event composer (new events are created with
-  `attendance_enabled = true`).
-- **Contact is buttons, not a sheet.** `contactLinks()` turns the organiser's
-  channels into WhatsApp / Telegram / Instagram / Email / Link buttons that open
-  straight away; guests get one sign-in prompt instead.
-- **Manage event** now holds only what is left: Edit, KI report, Close
-  registration. Attendance and the after-check-in choice are no longer duplicated
-  there.
-- The check-in button is not permanent: non-organisers see it only inside the
-  check-in window (`lib/utils/event_live.dart`, 15 minutes before the start until
-  the end), and that window also drives a **Check-in is open** banner on the event
-  page and a chip on the event card in the list.
-- **Counts update live**: the event page subscribes to `event_participants` and
-  re-reads the count on any change (best-effort: guests have no socket).
-- **Check-in now leads to the KI form.** When the form was started with the KI
-  option, the check-in success screen offers "Answer the KI form" once. The
-  choice is made in the Take-attendance dialog, which writes
-  `after_checkin` through `set_form_after_checkin`.
-- **The answer page now guides.** Per the form guidance in
-  `docs/mobile-ui-rules.md`: a field is validated when you leave it, then on
-  every change once it has an error, and again on submit; submit marks
-  everything, scrolls to the first problem and says how many remain; a fixed
-  required field shows a tick; and a progress bar reads "7 of 24 answered".
-- **Taking attendance no longer changes registration.** `checkin_with_token()`
-  used to insert the attendee into `event_participants` ("attending implies
-  going"), so the event's places counter rose on a scan even though nobody had
-  joined — one number meaning two things. A check-in is only a check-in now:
-  `20261026011100_checkin_does_not_join.sql` (**not applied to live**).
-- **`docs/mobile-ui-rules.md`** records the rules the app follows for forms and
-  flows — validation timing, error copy, progress, progressive disclosure, one
-  number one meaning, animation limits, and the English/Malay requirement — with
-  the sources they came from and where each lives in the code.
-- **"With cooperation from" takes mentions, and suggests clubs.** The field was
-  a plain text input. It is now a `MentionInput(suggestClubs: true)`: typing an
-  `@` suggests people and inserts `@username`; typing anything else suggests
-  **active clubs** by name or handle and inserts the club's **name** — a club has
-  a handle but **no profile**, so `@club` would notify nobody. People mentioned
-  there get the same event notification as the description
-  (`_processMentions` scans both).
-- **The composer's contact channels read as rows**, one icon per channel
-  (WhatsApp, Telegram, Instagram, Email, Link — they all used the email icon
-  before), instead of five anonymous boxes.
-- Recurring announcements (needs pg_cron or materialise-on-read).
-- Shared-link thumbnails need per-URL OG tags (SPA limitation; needs a function
-  or prerender).
+- **Do not rewrite text files with PowerShell** (`Get-Content -Raw` → `Set-Content`,
+  or `-replace`). It double-encoded em-dashes, arrows and middle dots in
+  `handover.md` and twice in Dart. Use the edit/write tools. If a file is already
+  mangled, `.deepseek/fix_mojibake.py <file>` reverses the common sequences.
+- `app_strings.save` is `"SAVE"` (uppercase) and `cancel` is `"Cancel"`. Widget
+  tests that tap a dialog button must match the case exactly.
+- `DropdownButtonFormField` needs `isExpanded: true` in a narrow dialog; a bare
+  `DropdownButton` with it needs a bounded width (`Expanded`), or the dialog
+  overflows at 375 px.
+- **`returns table (a, b, …)` makes those names PL/pgSQL variables.** An
+  unqualified column with the same name raises `42702 … ambiguous` at run time —
+  that is how the attendance QR shipped broken and nobody noticed.
+- The PGlite stub's `event_participants` now has the `(event_id, user_id)` primary
+  key production has; without it `ON CONFLICT DO NOTHING` cannot dedupe and a test
+  can insert the same person twice and still pass.
+- `supabase_flutter` hardcodes `webOnlyWindowName: '_self'` for OAuth, so it always
+  pushes a history entry; hence the custom launch.
+- The **owner account cannot delete itself** (`owner_cannot_delete`).
+- The `demo@mykerawang.local` account has no password and cannot be logged into.
+- Hidden content stays visible to its author; admins do not get a feed pass.
+- Generated plugin registrants (`linux/`, `macos/`, `windows/`) get touched by
+  builds — `git checkout --` them before committing.
+- Student data supplied for design work (`BORANG KI…xlsx`, `LAPORAN…pdf`) is
+  git-ignored by name and must never be committed.
 
 ## Suggested next session
 
-1. Run the three Google sign-in checks above on the live build (1.7.8). If any fails,
-   revert the login commit and redeploy before anything else.
-2. Ship the forms work: apply `20261026007100_event_forms.sql` to live, bump to
-   1.7.8 and deploy, then walk the loop on the live site — create a report from
-   the KI template on a test event, answer it as a student, read S1/S2/S3. That
-   is the first time any of it meets real data in a browser, and every phase so
-   far is only proven against PGlite and fakes.
-3. Then the `after_checkin` prompt (phase 5), or the captcha work — the last code
-   item before inviting a club, which needs a hCaptcha/Turnstile site key from
-   the owner.
+1. Ask what is wrong on the edit/create page, and fix that specifically.
+2. Merge the branch into `main` — production has been ahead of `main` for 17
+   commits.
+3. Then either the feed's "check-in is open" indicator (small), or the launch ops
+   that are actually blocking a first club: DB password rotation, captcha, a real
+   attendance dry run.
