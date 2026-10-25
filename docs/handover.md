@@ -36,7 +36,10 @@ the end of the second session that day (PR #8 and #9 merged, two bugs fixed,
 - **Google sign-in leaves no history entry** (see below — unverified on a
   real browser).
 - **Released 1.7.7** (build `202610250823`) and **wrote `docs/form-builder.md`**,
-  the design pass the form builder was waiting on. No form code was written.
+  the design for the KI event report and the form builder behind it. No form
+  code was written. The first draft got the requirement wrong (a builder with a
+  KI example); the owner corrected it: the KI report *is* the requirement, built
+  from a fixed template, and the builder extends it.
 
 ## Infrastructure
 
@@ -160,14 +163,18 @@ and the old `signInWithOAuth` path still compiles.
 - Event PIC field + tag clubs/people as collaborators.
 - Registration toggle on the event page after publishing, with instant QR and a
   "add a form?" prompt.
-- **Form builder** (the big one): designed, not built — see
-  `docs/form-builder.md`. That document settles per-event vs reusable
-  (per-event, copy to reuse), response privacy (organiser + club officers +
-  admins, never a public view), and the RSVP gate (per-form toggle, default on
-  when the event has capacity). Five questions at its end still need answers
-  before phase 1: what CSV import imports, sign-in-only answers, whether club
-  officers see PII, whether feedback is a separate form, and whether the
-  questions themselves may be public.
+- **Event reports (KI), then a form builder.** Designed, not built — see
+  `docs/form-builder.md`. The requirement, as corrected by the owner: every club
+  must hand in a Kemahiran Insaniah response report after **every** event, and
+  the field set is already fixed and handed out — so the first thing built is a
+  **template the organiser picks**, not a builder. The builder is the extension;
+  CSV import is for the *questions* (nobody wants to retype 40 of them), not for
+  responses; and the form is **optional to the QR** (`after_checkin`, default
+  off) — it must never be welded to attendance. The document settles template
+  copying, per-participant responses with `entered_by`, response privacy
+  (organiser + club officers + admins, never a public view) and deletion.
+  Four questions at its end still need answers before phase 1 — most importantly
+  **the actual KI fields**, which only the handed-out form has.
 - Recurring announcements (needs pg_cron or materialise-on-read).
 - Shared-link thumbnails need per-URL OG tags (SPA limitation; needs a function
   or prerender).
@@ -176,7 +183,7 @@ and the old `signInWithOAuth` path still compiles.
 
 1. Run the three Google sign-in checks above on the live 1.7.7. If any fails,
    revert the login commit and redeploy before anything else.
-2. Answer the four open questions in `docs/form-builder.md`, then build phase 1
-   of it (schema + RPCs + `forms_test.mjs`, no UI). Or the captcha work first —
-   that is the last code item before inviting a club, and it needs a
+2. Get the KI field list into `docs/form-builder.md`, then build phase 1 of it
+   (template seed + schema + RPCs + `forms_test.mjs`, no UI). Or the captcha work
+   first — that is the last code item before inviting a club, and it needs a
    hCaptcha/Turnstile site key from the owner.
