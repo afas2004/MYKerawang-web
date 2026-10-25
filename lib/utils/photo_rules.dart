@@ -148,13 +148,18 @@ String? photoMime(Uint8List b) {
 /// Order matters: a text file is refused as "not an image" even when it is
 /// also huge.
 PhotoProblem? checkPhoto(Uint8List bytes) {
-  if (photoMime(bytes) == null) return PhotoProblem.notAnImage;
+  final mime = photoMime(bytes);
+  if (mime == null) return PhotoProblem.notAnImage;
   if (bytes.length > kMaxUploadBytes) return PhotoProblem.tooLarge;
   final size = photoSize(bytes);
-  // Unknown dimensions mean the header could not be read at all. Allowing
-  // those would make the pixel ceiling optional: a lossless WebP (or any
-  // crafted header) would reach the bucket and then every viewer's decoder.
-  if (size == null) return PhotoProblem.notAnImage;
+  if (size == null) {
+    // WebP is the one format that could hide its dimensions without the file
+    // being broken (VP8L used to return null), so an unreadable WebP is
+    // refused outright. For JPEG a missing SOF means a damaged file: the
+    // decoder and the bucket's 5 MB cap already cover it, and refusing it
+    // here would newly block photos that uploaded fine before this review.
+    return mime == 'image/webp' ? PhotoProblem.notAnImage : null;
+  }
   if (size.$1 * size.$2 > kMaxUploadPixels) {
     return PhotoProblem.tooManyPixels;
   }

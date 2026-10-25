@@ -52,7 +52,7 @@ ordinary student account.
 | **M3** | Medium | The admin verification path skips the student-domain rule | `20261025004100:336` only checks for an `@` | Any admin can mark a gmail address `verified`, unlocking gated actions | **Done**: `guard_verification_domain` trigger + test. Behaviour change: an admin can no longer verify a legacy non-domain address; do that by clearing `student_domain` for the operation, or ask for an owner-only override |
 | **M4** | Medium | Form title/intro/help/choice caps are client-only | `20261026007100:544-546`, `:596`, `:604`; columns are plain `text`; `form_check_field` checked only the number of choices | Call `save_event_form` directly and store unbounded text | **Done**: column checks (120/500/300) + per-choice 60 in the validator + tests |
 | **M5** | Medium | Club logo/cover/payment-QR pickers bypass every upload check | `club_manage_screen.dart:97-112` (before) — no `checkPhoto`; web compression is a no-op (`image_compressor.dart:13`) and `image_picker_for_web` never resizes GIFs | Officer uploads a renamed non-image or a sub-5 MB 65535×65535 GIF → decoded by every club-page visitor | **Done**: check at pick time + inside `PostService.uploadPhotos` (throws `PhotoUploadException`), plus a unit test |
-| **M6** | Medium | Lossless WebP (VP8L) returned an unknown size, and `checkPhoto` allowed unknown | `photo_rules.dart:86` + `:134-136` (before) | VP8L decompression bomb passes the pixel ceiling | **Done**: VP8L dimensions parsed, unknown size now refused, tests |
+| **M6** | Medium | Lossless WebP (VP8L) returned an unknown size, and `checkPhoto` allowed unknown | `photo_rules.dart:86` + `:134-136` (before) | VP8L decompression bomb passes the pixel ceiling | **Done**: VP8L parsed; an unreadable **WebP** is refused. A damaged JPEG is still allowed (exactly the old behaviour) — a JPEG without a readable SOF is a damaged file, not a hidden bomb, and refusing it would have newly blocked photos that upload today |
 | **M7** | Medium | Reporters can read the admin's internal decision note | `20261019004100:333-334` (row-level select, all columns) + `20261019004400:196-199` writes `resolution_note` | Reporter re-reads their own report row → admin's private reason | Column-level `revoke select (resolution_note, handled_by, decision ids)`; noted in the signoff file |
 | **M8** | Medium | `delete_my_account` deletes/nulls *other* users' data | `20261019003200:99-100` (comments on my posts), `:109-112` (other users' posts' embeds), `:115-120` (their notifications), `:127-133` (their bookmarks), `:151` (nulls `reports.reporter_id`) | A user can wipe comments others wrote on their post and strip report attribution | Design decision — document it, or keep a pseudonymous reporter id. Not changed |
 | **M9** | Medium | Admin PIN has no lockout, floor is 4 characters | `20261024006100:37-45` (server check ✓, bcrypt ✓), `:61` length floor | Stolen admin JWT + 10⁴ calls brute-forces the PIN | Add attempt counter/lockout; raise the floor. Dashboard/function change |
@@ -294,7 +294,7 @@ Advisory DB:
 | `supabase/tests/security/security_test.mjs` | **new** — 22 assertions covering every fixed property |
 | `supabase/tests/moderation/stub.sql` | storage stub so the migration suites can run again |
 | `lib/utils/photo_rules.dart` | VP8L size parsing; unknown size refused; `PhotoUploadException` |
-| `lib/services/post_service.dart` | upload gate inside `uploadPhotos` (single choke point) |
+| `lib/services/post_service.dart` | re-validates anything uploaded through it. Note: the event, listing and avatar paths call `storage.uploadBinary` directly and rely on the pick-time check (`media_picker_grid.dart:56`, `edit_profile_screen.dart:125`); this is not a single choke point |
 | `lib/screens/clubs/club_manage_screen.dart` | logo/cover/QR picked images now pass `checkPhoto`, with the same message as other pickers |
 | `lib/utils/text_rules.dart` | `csvSafe` skips leading whitespace, includes LF |
 | `lib/utils/csv_saver.dart` | `csvCell` routes through `csvSafe` |
@@ -319,13 +319,42 @@ Two things in the migration that are *tightenings*, not repairs:
   existing verified rows are untouched; promoting a legacy address now needs
   `student_domain` cleared for that moment (see M3).
 
+Run `supabase/pending/preflight.sql` (read-only) before applying the migration:
+it lists exactly the rows those two tightenings would block, plus the current
+storage policies and anon grants. If it returns no rows in sections 1–3, the
+migration cannot break existing data.
+
+### What was verified, and how
+
+| Change | Verified by | Not covered |
+|---|---|---|
+| Server migration (all of it) | PGlite: every migration applied twice + 22 assertions on the fixed properties | The real database: no password/token here. Dashboard-only policies unseen (pre-flight §5–6) |
+| Storage policy replacement | Simulated `storage.objects` in PGlite: anon insert/delete denied, own insert allowed, cross-owner update/delete no-op, anon read still allowed | **A real signed-in upload.** Not run against production — that is the one flow to smoke-test after applying |
+| `checkPhoto` / VP8L / upload gate | Unit tests (VP8L bomb, unknown WebP, damaged JPEG carve-out) + the 556-test suite | A real photo picker on a phone |
+| Club logo/cover/QR pickers | `flutter analyze` + the existing club widget tests still pass | Tapping the picker in the running app |
+| `csvSafe` change | Unit tests for ` =1+1`, `\t=`, `\n=`, and `  -5`; CSV/TSV exporters all route through it | Opening the CSV in Excel |
+| Announcement link filter | `launchableUri` unit tests (existing) | Tapping an announcement link |
+| Seeder | Not imported anywhere; analyzer only | Nothing to break |
+| CSP | Headless Edge: local build, HTTPS preview channel, and Android UA (CanvasKit) — zero violations | Safari (unavailable); a real device |
+| Auth/OAuth/?from= | Code reading + live `/auth/v1/settings` | **A real Google sign-in round-trip** |
+
+The honest summary: the **client** changes are covered by unit tests and the
+full suite, but not by a click-through of the signed-in app; the **database**
+changes are covered by a simulated database, not by your live one. Both gaps
+close with (a) the pre-flight SQL and (b) one signed-in smoke test after the
+migration.
+
 ---
 
 ## 11. Do these, in this order
 
-1. **Apply the fixes migration.** Supabase → SQL Editor, paste
-   `supabase/migrations/20261026015100_security_review_fixes.sql`, run. Or
-   `supabase db push` if you use the CLI. Then re-run the proof below.
+1. **Run `supabase/pending/preflight.sql`, then apply the fixes migration.**
+   The preflight is read-only; if its sections 1–3 return rows, the new caps or
+   the domain trigger would block editing those existing forms/verifications —
+   send me the output and I will adjust the migration rather than tighten it
+   over live data. If they are empty, paste
+   `supabase/migrations/20261026015100_security_review_fixes.sql` into the SQL
+   Editor (or `supabase db push`), run it, then re-run the proof below.
    *Verify before/after:* before, with only the publishable key,
    `curl -s -o /dev/null -w "%{http_code}" -X POST
    "https://zxjuqpqzyzmegdjttzyz.supabase.co/storage/v1/object/images/probe.png"

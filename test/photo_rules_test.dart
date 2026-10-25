@@ -136,6 +136,15 @@ void main() {
       expect(checkPhoto(webpUnknown()), PhotoProblem.notAnImage);
     });
 
+    test('a JPEG whose header is damaged keeps the old behaviour', () {
+      // Deliberate: a missing SOF is a damaged file, not a hidden bomb, and
+      // refusing it would newly block photos that uploaded before the review.
+      final noSof = Uint8List.fromList([0xFF, 0xD8, 0xFF, ...List.filled(40, 0)]);
+      expect(photoMime(noSof), 'image/jpeg');
+      expect(photoSize(noSof), isNull);
+      expect(checkPhoto(noSof), isNull);
+    });
+
     test('the pixel ceiling is where we think it is', () {
       expect(checkPhoto(png(8000, 4999)), isNull); // 40.0 MP, just under
       expect(checkPhoto(png(8000, 5001)), PhotoProblem.tooManyPixels);
