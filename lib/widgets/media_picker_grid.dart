@@ -7,6 +7,7 @@ import '../screens/gallery_view_screen.dart';
 import '../theme/app_themes.dart';
 import '../utils/adaptive.dart';
 import '../utils/local_image.dart';
+import '../utils/photo_rules.dart';
 import 'tap_card.dart';
 
 /// Photo strip for the create/edit forms (listing, event).
@@ -26,9 +27,10 @@ class MediaPickerGrid extends StatelessWidget {
 
   static const double _tileHeight = 140;
 
-  Future<void> _pick(ImageSource source) async {
+  Future<void> _pick(BuildContext context, ImageSource source) async {
     final picker = ImagePicker();
     try {
+      final List<XFile> pickedList;
       if (source == ImageSource.camera) {
         final picked = await picker.pickImage(
             source: ImageSource.camera,
@@ -36,14 +38,33 @@ class MediaPickerGrid extends StatelessWidget {
             maxHeight: kPhotoMaxDimension,
             imageQuality: kPhotoQuality);
         if (picked == null) return;
-        items.add(await LocalImage.fromXFile(picked));
+        pickedList = [picked];
       } else {
-        final pickedList = await picker.pickMultiImage(
+        pickedList = await picker.pickMultiImage(
             maxWidth: kPhotoMaxDimension,
             maxHeight: kPhotoMaxDimension,
             imageQuality: kPhotoQuality);
         if (pickedList.isEmpty) return;
-        items.addAll(await Future.wait(pickedList.map(LocalImage.fromXFile)));
+      }
+
+      // Check the bytes, not the file name: a renamed .txt or an oversized
+      // image is refused here with a sentence instead of a failed upload.
+      final accepted = <LocalImage>[];
+      PhotoProblem? problem;
+      for (final file in pickedList) {
+        final img = await LocalImage.fromXFile(file);
+        final issue = checkPhoto(img.bytes);
+        if (issue == null) {
+          accepted.add(img);
+        } else {
+          problem ??= issue;
+        }
+      }
+      items.addAll(accepted);
+      if (problem != null && context.mounted) {
+        final s = context.l10nRead;
+        ScaffoldMessenger.maybeOf(context)
+            ?.showSnackBar(SnackBar(content: Text(photoProblemText(s, problem))));
       }
       onChanged();
     } catch (e) {
@@ -65,7 +86,7 @@ class MediaPickerGrid extends StatelessWidget {
                 title: Text(s.takePhoto),
                 onTap: () {
                   Navigator.pop(sheet);
-                  _pick(ImageSource.camera);
+                  _pick(context, ImageSource.camera);
                 },
               ),
             ListTile(
@@ -73,7 +94,7 @@ class MediaPickerGrid extends StatelessWidget {
               title: Text(s.chooseFromGallery),
               onTap: () {
                 Navigator.pop(sheet);
-                _pick(ImageSource.gallery);
+                _pick(context, ImageSource.gallery);
               },
             ),
           ],

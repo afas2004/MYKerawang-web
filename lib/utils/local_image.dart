@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 
+import 'photo_rules.dart';
+
 /// Platform-agnostic picked image.
 ///
 /// Wraps the picked [XFile] together with its bytes so the image can be
@@ -26,12 +28,8 @@ const int kPhotoQuality = 80;
 
 /// MIME type sniffed from the file signature, so uploads aren't mislabelled
 /// (the picker may hand back PNG/WebP, not just JPEG).
-String imageContentType(Uint8List bytes) {
-  bool starts(List<int> sig, [int offset = 0]) =>
-      bytes.length >= offset + sig.length &&
-      List.generate(sig.length, (i) => bytes[offset + i] == sig[i]).every((m) => m);
-  if (starts([0x89, 0x50, 0x4E, 0x47])) return 'image/png';
-  if (starts([0x47, 0x49, 0x46])) return 'image/gif';
-  if (starts([0x52, 0x49, 0x46, 0x46]) && starts([0x57, 0x45, 0x42, 0x50], 8)) return 'image/webp';
-  return 'image/jpeg';
-}
+///
+/// One definition of the magic numbers lives in [photoMime]; anything that is
+/// not one of those formats has already been refused by [checkPhoto] before
+/// this is called, and JPEG is the fallback for the compressor's output.
+String imageContentType(Uint8List bytes) => photoMime(bytes) ?? 'image/jpeg';

@@ -10,6 +10,7 @@ import '../utils/announcement_rules.dart';
 import '../utils/app_nav.dart';
 import '../utils/formatters.dart';
 import '../utils/local_image.dart';
+import '../utils/photo_rules.dart';
 import '../widgets/announcement_view.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/media_picker_grid.dart';
@@ -110,6 +111,15 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
       );
       if (picked == null) return;
       final img = await LocalImage.fromXFile(picked);
+      final issue = checkPhoto(img.bytes);
+      if (issue != null) {
+        if (mounted) {
+          final s = context.l10nRead;
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+              SnackBar(content: Text(photoProblemText(s, issue))));
+        }
+        return;
+      }
       _set(() => _d.cover
         ..clear()
         ..add(img));
