@@ -31,7 +31,7 @@ The three questions the handover left open, plus the ones the schema forces.
 | **Guest submissions** | **No** in v1: the page is a public URL, but answering requires sign-in. | Without an account there is no one to attribute the answer to, nothing to delete on account deletion, and no rate limit but captcha (not built yet). The public page therefore shows the form read-only with a "Sign in to answer" bar — the same `GuestActionBar` the rest of the app uses. |
 | **Only one open form per event** | Partial unique index `where status = 'open'`. | The check-in hand-off ("one more step") has to pick *a* form; two open forms makes it ambiguous. |
 | **What is public** | The **questions** are readable by anyone (including guests); the **answers** never are. `form_public` is granted to `anon` and returns the field list with `can_answer: false`. | A shared form link has to show what it is asking before it can ask you to sign in — otherwise the page is a bare "Sign in" wall. The trade is that the question set is visible; if a form asks for IC numbers, that intent is visible too. The alternative (sign-in before the fields render) is one line in the RPC's guard — say if you want it. |
-| **Deletion** | `on delete cascade` from `events` down; extend `delete_my_account` to remove the user's responses. | An event that never happened must not leave a table of IC numbers behind. The account-deletion RPC already enumerates tables — a new one must be added there or the guarantee quietly breaks. |
+| **Deletion** | `on delete cascade` from `events` down, and from `profiles` for a respondent. | An event that never happened must not leave a table of IC numbers behind, and deleting an account must take its answers with it. The cascade on `form_responses.user_id → profiles(id)` covers account deletion without touching `delete_my_account` (that RPC deletes children before `profiles`, so the cascade fires at the end either way) — but the migration's re-run must not drop that FK, so test 9 below is not decoration. |
 
 ## Schema
 
@@ -118,6 +118,13 @@ inside `verification_required`, and attach the same capability to
 `mod_guard_write` for `form_responses` (scope `events`, owner column `user_id`),
 so a restricted account cannot submit.
 
+Two club helpers decide the officer path, and they are not interchangeable:
+`can_act_as_club(club_id)` (president/officer of an **active** club — the rule
+that already lets them publish events) gates **writing** the form, while
+`is_club_officer(club_id)` (any club status) gates **reading** responses, so a
+club whose status is mid-approval can still see what it collected. Use
+`is_admin()` for staff everywhere, as the existing policies do.
+
 ## Validation rules (one place)
 
 `lib/utils/form_rules.dart`, pure and unit-tested, mirrored by the server:
@@ -202,7 +209,7 @@ tables, so it is safe to merge before the UI lands.
 6. `form_response_list` raises for a student and for a different club's officer;
 7. anon cannot submit;
 8. deleting the event removes forms, fields and responses;
-9. account deletion removes the user's responses;
+9. account deletion removes the user's responses (the `profiles` cascade);
 10. import skips an unknown username with a reason and imports the rest.
 
 Widget tests: each field kind renders and validates, the required-error text
