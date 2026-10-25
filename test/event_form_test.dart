@@ -147,6 +147,40 @@ void main() {
     expect(find.textContaining('required'), findsWidgets);
   });
 
+  testWidgets('each field explains itself, and clears when it is fixed', (tester) async {
+    final fake = FakeAnswerService(view: openView());
+    FormService.instance = fake;
+
+    await pumpAt(tester, kCompact, const EventFormScreen(eventId: 'e1'));
+    await tester.pumpAndSettle();
+
+    // Submitting is a request to see everything that is missing: the name, the
+    // rating and the role are all required, so all three say so at once.
+    await tester.tap(find.widgetWithText(FilledButton, 'Submit'));
+    await tester.pumpAndSettle();
+    expect(find.text('This one is required'), findsNWidgets(3));
+
+    // Fixing one clears only that one (hybrid timing: re-checked on change).
+    await tester.enterText(find.byKey(const ValueKey('input-f1')), 'AHMAD');
+    await tester.pumpAndSettle();
+    expect(find.text('This one is required'), findsNWidgets(2));
+  });
+
+  testWidgets('the progress line counts answered questions', (tester) async {
+    final fake = FakeAnswerService(view: openView());
+    FormService.instance = fake;
+
+    await pumpAt(tester, kCompact, const EventFormScreen(eventId: 'e1'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('0 of 5 answered'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const ValueKey('input-f1')), 'AHMAD');
+    await tester.tap(find.byKey(const ValueKey('rate-f2-4')));
+    await tester.pumpAndSettle();
+    expect(find.text('2 of 5 answered'), findsOneWidget);
+  });
+
   testWidgets('an existing answer is shown with an Update button', (tester) async {
     final fake = FakeAnswerService(
       view: openView(mine: {

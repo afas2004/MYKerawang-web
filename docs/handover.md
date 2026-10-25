@@ -12,9 +12,9 @@ the end of the second session that day (PR #8 and #9 merged, two bugs fixed,
 | Worktree used | `.deepseek/worktrees/clubs-admin` (the one to reopen) |
 | Branch | `deepseek/clubs-admin` — 11 commits ahead of `origin/main`, pushed |
 | Last merge | PR #9 → `6da73ad` (1.7.7); before it PR #8 → `e491899` (1.7.2–1.7.6) |
-| Live | https://mykerawang-app.web.app — build `202610251134`, version **1.8.1** |
-| Tests | 506 Flutter tests green; migration suites: moderation (all but 2 pre-existing), clubs 87, verification 13, forms 62, event links 10, attendance 15; analyzer has 17 info/warning findings, no errors |
-| Latest migration | `20261026010100_form_after_checkin.sql` — **written, tested, NOT applied to live**. Applied: `20261026009100` (attendance fix — the QR works now), `20261026008100` (event links + PIC), `20261026007100` (event forms), plus the KI test-event seed. |
+| Live | https://mykerawang-app.web.app — build `202610251153`, version **1.8.2** |
+| Tests | 516 Flutter tests green; migration suites: moderation (all but 2 pre-existing), clubs 87, verification 13, forms 62, event links 10, attendance 15; analyzer has 17 info/warning findings, no errors |
+| Latest migration | `20261026011100_checkin_does_not_join.sql` — **written, tested, NOT applied to live**. Applied: `20261026010100` (after-check-in switch), `20261026009100` (attendance fix), `20261026008100` (event links + PIC), `20261026007100` (event forms), plus the KI test-event seed. |
 
 `main` is at 1.7.7; the live site is at **1.8.0** (build `202610251109`) with the
 forms screens, the rebuilt event composer and the organiser manage sheet. All
@@ -121,8 +121,9 @@ node forms/forms_test.mjs ../..        # event forms: template, editor, S1/S2/S3
 # re-running never duplicates the KI template.
 #
 # Pending against live:
-#   supabase/migrations/20261026010100_form_after_checkin.sql
-#   (everything before it, including the attendance fix and the seed, is applied)
+#   supabase/migrations/20261026011100_checkin_does_not_join.sql
+#   (everything before it, including the after-check-in switch, the attendance
+#   fix, both event migrations and the seed, is applied)
 
 # deploy: bump BOTH places, then build/stamp/deploy
 #   pubspec.yaml version: 1.7.x+N
@@ -308,6 +309,20 @@ and the old `signInWithOAuth` path still compiles.
   option, the check-in success screen offers "Answer the KI form" once. The
   choice is made in the Take-attendance dialog, which writes
   `after_checkin` through `set_form_after_checkin`.
+- **The answer page now guides.** Per the form guidance in
+  `docs/mobile-ui-rules.md`: a field is validated when you leave it, then on
+  every change once it has an error, and again on submit; submit marks
+  everything, scrolls to the first problem and says how many remain; a fixed
+  required field shows a tick; and a progress bar reads "7 of 24 answered".
+- **Taking attendance no longer changes registration.** `checkin_with_token()`
+  used to insert the attendee into `event_participants` ("attending implies
+  going"), so the event's places counter rose on a scan even though nobody had
+  joined — one number meaning two things. A check-in is only a check-in now:
+  `20261026011100_checkin_does_not_join.sql` (**not applied to live**).
+- **`docs/mobile-ui-rules.md`** records the rules the app follows for forms and
+  flows — validation timing, error copy, progress, progressive disclosure, one
+  number one meaning, animation limits, and the English/Malay requirement — with
+  the sources they came from and where each lives in the code.
 - Recurring announcements (needs pg_cron or materialise-on-read).
 - Shared-link thumbnails need per-URL OG tags (SPA limitation; needs a function
   or prerender).

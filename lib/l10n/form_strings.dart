@@ -158,6 +158,26 @@ extension FormStrings on AppStrings {
       _t("Sign in to answer", "Log masuk untuk menjawab", "Sign in to answer");
   String get formAnswerRequired =>
       _t("Please answer the required questions.", "Sila jawab soalan wajib.", "Please answer the required questions.");
+  String formAnswerProgress(int done, int total) =>
+      _t("$done of $total answered", "$done daripada $total dijawab", "$done of $total answered");
+  String formAnswerMissing(int n) => _t(
+      n == 1 ? "1 question still needs an answer" : "$n questions still need an answer",
+      "$n soalan belum dijawab",
+      "$n questions still need an answer");
+
+  /// One field's problem, phrased the way the form guidance asks: what is
+  /// wrong, in the fewest words that tell the user what to do.
+  String formAnswerIssueText(String code) => switch (code) {
+        'required' => _t("This one is required", "Yang ini wajib diisi", "This one is required"),
+        'rating' => _t("Pick a value on the scale", "Pilih nilai pada skala", "Pick a value on the scale"),
+        'choice' => _t("Choose one of the options", "Pilih salah satu pilihan", "Choose one of the options"),
+        'too_long' => _t("That is too long", "Terlalu panjang", "That is too long"),
+        'matric' => _t("A matric number is 6-12 digits", "Nombor matrik 6-12 digit", "A matric number is 6-12 digits"),
+        'number' => _t("Use digits only", "Guna angka sahaja", "Use digits only"),
+        'date' => _t("Pick a date", "Pilih tarikh", "Pick a date"),
+        'email' => _t("That does not look like an email", "Itu bukan emel yang sah", "That does not look like an email"),
+        _ => _t("Check this answer", "Semak jawapan ini", "Check this answer"),
+      };
   String get formNotAvailable =>
       _t("This event has no form yet.", "Acara ini belum ada borang.", "This event has no form yet.");
   String get formEditThis => _t("Edit form", "Sunting borang", "Edit form");

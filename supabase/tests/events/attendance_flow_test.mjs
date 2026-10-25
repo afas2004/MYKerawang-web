@@ -91,8 +91,8 @@ ok(attendance === 1, `one attendance row, not two (${attendance})`);
 
 const participants = await q(
   `select event_id, user_id from event_participants where event_id=$1`, [ev]);
-ok(participants.length === 1 && participants[0].user_id === student,
-  `attending implies going (${participants.length} row(s): ${JSON.stringify(participants)})`);
+ok(participants.length === 0,
+  `a check-in does not join, so places stay registration-only (${participants.length} row(s))`);
 
 e = await err(student, `select checkin_with_token('not-a-token')`);
 ok(e?.includes('CHECKIN:invalid'), 'a made-up code is refused');

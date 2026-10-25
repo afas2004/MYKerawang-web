@@ -35,12 +35,19 @@ class EventFormScreen extends StatefulWidget {
 class _EventFormScreenState extends State<EventFormScreen> {
   final Map<String, dynamic> _answers = {};
   final Map<String, TextEditingController> _texts = {};
+  final Map<String, FocusNode> _focusNodes = {};
+  final Map<String, GlobalKey> _keys = {};
+
+  /// Fields the user has left (or completed), and what is wrong with them.
+  /// Nothing is reported until a field has been touched — the form guidance is
+  /// explicit that errors on a pristine field punish the user for arriving.
+  final Set<String> _touched = {};
+  final Map<String, String> _errors = {};
 
   FormView? _view;
   bool _loading = true;
   bool _sending = false;
   bool _noForm = false;
-  Set<String> _missing = const {};
   Object? _error;
 
   @override
@@ -53,6 +60,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
   void dispose() {
     for (final c in _texts.values) {
       c.dispose();
+    }
+    for (final f in _focusNodes.values) {
+      f.dispose();
     }
     super.dispose();
   }
@@ -87,7 +97,6 @@ class _EventFormScreenState extends State<EventFormScreen> {
         _view = view;
         _noForm = false;
         _loading = false;
-        _missing = const {};
       });
     } catch (e) {
       if (!mounted) return;
@@ -122,22 +131,82 @@ class _EventFormScreenState extends State<EventFormScreen> {
         return TextEditingController(text: v?.toString() ?? '');
       });
 
+  /// One focus node per text field: leaving a field is when it is validated.
+  FocusNode _focusFor(FormFieldSpec f) => _focusNodes.putIfAbsent(f.id!, () {
+        final node = FocusNode();
+        node.addListener(() {
+          if (!node.hasFocus) _touch(f);
+        });
+        return node;
+      });
+
+  GlobalKey _keyFor(FormFieldSpec f) =>
+      _keys.putIfAbsent(f.id!, () => GlobalKey());
+
+  /// Report this field's problem, if any. Called on blur, on change once the
+  /// field already has an error, and on submit.
+  void _check(FormFieldSpec f) {
+    final id = f.id;
+    if (id == null) return;
+    _touched.add(id);
+    final issue = validateAnswer(f, _answers[id]);
+    setState(() {
+      if (issue == null) {
+        _errors.remove(id);
+      } else {
+        _errors[id] = issue;
+      }
+    });
+  }
+
+  void _touch(FormFieldSpec f) {
+    if (f.id == null) return;
+    _touched.add(f.id!);
+    _check(f);
+  }
+
+  bool _showsError(FormFieldSpec f) =>
+      f.id != null && _touched.contains(f.id) && _errors.containsKey(f.id);
+
+  /// True once a required field has been answered acceptably — positive
+  /// feedback, not just the absence of red.
+  bool _showsDone(FormFieldSpec f) =>
+      f.id != null &&
+      _touched.contains(f.id) &&
+      f.required &&
+      !_errors.containsKey(f.id) &&
+      !answerIsEmpty(_answers[f.id]);
+
   Future<void> _submit() async {
     final doc = _doc;
     final view = _view;
     if (doc == null || view == null || _sending) return;
 
-    final missing = missingRequired(doc.fields, _answers);
-    if (missing.isNotEmpty) {
-      setState(() => _missing = missing.toSet());
-      _toast(context.l10nRead.formAnswerRequired);
+    final invalid = invalidAnswers(doc.fields, _answers);
+    if (invalid.isNotEmpty) {
+      setState(() {
+        // Submitting is a request to see everything that is missing.
+        for (final f in doc.fields) {
+          if (f.id != null) _touched.add(f.id!);
+        }
+        for (final id in invalid) {
+          final field = doc.fields.firstWhere((f) => f.id == id);
+          _errors[id] = validateAnswer(field, _answers[id])!;
+        }
+      });
+
+      // Take the user to the first one rather than leaving them to hunt.
+      final ctx = _keys[invalid.first]?.currentContext;
+      if (ctx != null) {
+        await Scrollable.ensureVisible(ctx,
+            duration: const Duration(milliseconds: 300), alignment: 0.1);
+      }
+      if (!mounted) return;
+      _toast(context.l10nRead.formAnswerMissing(invalid.length));
       return;
     }
 
-    setState(() {
-      _sending = true;
-      _missing = const {};
-    });
+    setState(() => _sending = true);
     try {
       await FormService.instance.submit(
         doc.id,
@@ -218,6 +287,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
           children: [
             if (view.answered)
               _Banner(text: s.formAnswerAlready, icon: AppIcons.check),
+            _Progress(doc: doc, answers: _answers),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.l, KSpace.l, KSpace.xxl),
@@ -234,21 +304,45 @@ class _EventFormScreenState extends State<EventFormScreen> {
                       ),
                     ),
                   for (final f in doc.fields)
-                    _FieldInput(
-                      field: f,
-                      value: f.id == null ? null : _answers[f.id],
-                      controller: f.id == null ? null : _textController(f),
-                      missing: f.id != null && _missing.contains(f.id),
-                      enabled: !_sending,
-                      onChanged: (v) {
-                        if (f.id != null) _answers[f.id!] = v;
-                        if (_missing.contains(f.id)) {
-                          setState(() => _missing = {..._missing}..remove(f.id));
-                        }
-                      },
-                      onText: (v) {
-                        if (f.id != null) _answers[f.id!] = v;
-                      },
+                    Container(
+                      key: f.id == null ? null : _keyFor(f),
+                      child: _FieldInput(
+                        field: f,
+                        value: f.id == null ? null : _answers[f.id],
+                        controller: f.id == null ? null : _textController(f),
+                        focusNode: f.id == null ? null : _focusFor(f),
+                        errorText: _showsError(f)
+                            ? s.formAnswerIssueText(_errors[f.id] ?? '')
+                            : null,
+                        done: _showsDone(f),
+                        enabled: !_sending,
+                        onChanged: (v) {
+                          if (f.id == null) return;
+                          _answers[f.id!] = v;
+                          // Discrete answers are complete the moment they are
+                          // tapped, so they are checked there; a text field is
+                          // not, and waits for blur.
+                          if (f.kind != 'short_text' &&
+                              f.kind != 'long_text' &&
+                              f.kind != 'number' &&
+                              f.kind != 'email' &&
+                              f.kind != 'phone' &&
+                              f.kind != 'student_id') {
+                            _check(f);
+                          } else if (_errors.containsKey(f.id)) {
+                            _check(f);
+                          } else {
+                            setState(() {});
+                          }
+                        },
+                        onText: (v) {
+                          if (f.id == null) return;
+                          _answers[f.id!] = v;
+                          // Hybrid timing: once a field has an error, it clears
+                          // as soon as the input becomes valid.
+                          if (_errors.containsKey(f.id)) _check(f);
+                        },
+                      ),
                     ),
                 ],
               ),
@@ -306,13 +400,68 @@ class _Banner extends StatelessWidget {
   }
 }
 
+/// How far through the form you are.
+///
+/// The guidance for long forms is a visible progress signal; 28 questions is a
+/// long form, and "7 of 24 answered" is the honest version of it.
+class _Progress extends StatelessWidget {
+  final FormDoc doc;
+  final Map<String, dynamic> answers;
+
+  const _Progress({required this.doc, required this.answers});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final (done, total) = answerProgress(doc.fields, answers);
+    if (total == 0) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.s, KSpace.l, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: done / total),
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeOutCubic,
+              builder: (context, v, _) => LinearProgressIndicator(
+                value: v,
+                minHeight: 6,
+                backgroundColor: scheme.surfaceContainerHighest,
+              ),
+            ),
+          ),
+          const SizedBox(height: KSpace.xs),
+          Text(
+            s.formAnswerProgress(done, total),
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// One question, rendered by kind. Keeps the state in the parent so a submit
 /// can read it all at once.
 class _FieldInput extends StatelessWidget {
   final FormFieldSpec field;
   final dynamic value;
   final TextEditingController? controller;
-  final bool missing;
+  final FocusNode? focusNode;
+
+  /// Shown under the field once it has been touched; null while pristine.
+  final String? errorText;
+
+  /// A required field that is answered — a tick, not just an absent error.
+  final bool done;
   final bool enabled;
   final ValueChanged<dynamic> onChanged;
   final ValueChanged<String> onText;
@@ -321,7 +470,9 @@ class _FieldInput extends StatelessWidget {
     required this.field,
     required this.value,
     required this.controller,
-    required this.missing,
+    this.focusNode,
+    this.errorText,
+    this.done = false,
     required this.enabled,
     required this.onChanged,
     required this.onText,
@@ -329,7 +480,6 @@ class _FieldInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final s = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final label = field.label + (field.required && field.kind != 'heading' ? ' *' : '');
 
@@ -346,7 +496,13 @@ class _FieldInput extends StatelessWidget {
       );
     }
 
-    final error = missing ? s.formAnswerRequired : null;
+    final error = errorText;
+    final tick = done
+        ? Padding(
+            padding: const EdgeInsets.only(right: KSpace.s, top: KSpace.xs),
+            child: Icon(AppIcons.check, size: 18, color: scheme.primary),
+          )
+        : null;
 
     switch (field.kind) {
       case 'long_text':
@@ -355,6 +511,7 @@ class _FieldInput extends StatelessWidget {
           child: TextField(
             key: ValueKey('input-${field.id}'),
             controller: controller,
+            focusNode: focusNode,
             enabled: enabled,
             minLines: 3,
             maxLines: 6,
@@ -515,13 +672,19 @@ class _FieldInput extends StatelessWidget {
           child: TextField(
             key: ValueKey('input-${field.id}'),
             controller: controller,
+            focusNode: focusNode,
             enabled: enabled,
             keyboardType: keyboard,
             inputFormatters: field.kind == 'student_id'
                 ? [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(12)]
                 : null,
             onChanged: onText,
-            decoration: InputDecoration(labelText: label, helperText: field.help, errorText: error),
+            decoration: InputDecoration(
+              labelText: label,
+              helperText: field.help,
+              errorText: error,
+              suffixIcon: tick,
+            ),
           ),
         );
     }

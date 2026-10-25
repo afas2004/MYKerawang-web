@@ -215,6 +215,97 @@ List<FieldProblem> checkFields(List<FormFieldSpec> fields) {
 FormFieldSpec blankField({String kind = 'short_text'}) =>
     FormFieldSpec(kind: kind, label: '', required: false);
 
+/// Why one answer is not acceptable.
+///
+/// The answer page validates a field when it loses focus, then on every change
+/// once it has an error (the hybrid timing the form-design guidance recommends),
+/// and again on submit. All three read this one function.
+abstract final class AnswerIssue {
+  static const required = 'required';
+  static const rating = 'rating';
+  static const choice = 'choice';
+  static const tooLong = 'too_long';
+  static const matric = 'matric';
+  static const number = 'number';
+  static const date = 'date';
+  static const email = 'email';
+}
+
+/// True when there is no answer to speak of. An unticked consent is not one.
+bool answerIsEmpty(Object? value) =>
+    value == null ||
+    (value is String && value.trim().isEmpty) ||
+    (value is List && value.isEmpty) ||
+    value == false;
+
+/// The problem with [value] for [field], or null when it is acceptable.
+///
+/// An optional field that is empty is fine; only a required one complains.
+String? validateAnswer(FormFieldSpec field, Object? value) {
+  if (field.kind == 'heading') return null;
+
+  if (answerIsEmpty(value)) {
+    return field.required ? AnswerIssue.required : null;
+  }
+
+  final text = '$value';
+
+  if (field.kind == 'rating') {
+    final n = value is num ? value.toDouble() : double.tryParse(text);
+    if (n == null ||
+        n != n.roundToDouble() ||
+        n < field.min ||
+        n > field.max) {
+      return AnswerIssue.rating;
+    }
+  } else if (field.kind == 'single_choice') {
+    if (!field.choices.contains(text)) return AnswerIssue.choice;
+  } else if (field.kind == 'multi_choice') {
+    final list = value is List ? value : const [];
+    if (list.any((v) => !field.choices.contains('$v'))) return AnswerIssue.choice;
+  } else if (field.kind == 'short_text') {
+    if (text.length > 200) return AnswerIssue.tooLong;
+  } else if (field.kind == 'long_text') {
+    if (text.length > 2000) return AnswerIssue.tooLong;
+  } else if (field.kind == 'student_id') {
+    if (!RegExp(r'^[0-9]{6,12}$').hasMatch(text)) return AnswerIssue.matric;
+  } else if (field.kind == 'number') {
+    if (num.tryParse(text) == null) return AnswerIssue.number;
+  } else if (field.kind == 'date') {
+    if (DateTime.tryParse(text) == null) return AnswerIssue.date;
+  } else if (field.kind == 'email') {
+    if (!text.contains('@')) return AnswerIssue.email;
+  } else if (field.kind == 'consent') {
+    if (value != true) return AnswerIssue.required;
+  }
+
+  return null;
+}
+
+/// The fields with an unacceptable answer, by id.
+List<String> invalidAnswers(
+        List<FormFieldSpec> fields, Map<String, dynamic> answers) =>
+    [
+      for (final f in fields)
+        if (f.id != null && validateAnswer(f, answers[f.id]) != null) f.id!,
+    ];
+
+/// How many questions are answered acceptably, and how many there are.
+(int answered, int total) answerProgress(
+    List<FormFieldSpec> fields, Map<String, dynamic> answers) {
+  var answered = 0;
+  var total = 0;
+  for (final f in fields) {
+    if (f.kind == 'heading') continue;
+    total++;
+    if (!answerIsEmpty(answers[f.id]) &&
+        validateAnswer(f, answers[f.id]) == null) {
+      answered++;
+    }
+  }
+  return (answered, total);
+}
+
 /// The required fields with no answer, by id, so the page can mark them.
 ///
 /// `false` counts as missing for a consent field: agreeing is the answer.
