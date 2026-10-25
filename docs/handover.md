@@ -9,16 +9,16 @@ the end of the second session that day (PR #8 merged, two bugs fixed).
 |---|---|
 | Repo | `C:\src\project\Flutter\MYKerawang-web` |
 | Worktree used | `.deepseek/worktrees/clubs-admin` (the one to reopen) |
-| Branch | `deepseek/clubs-admin` — pushed; 2 commits ahead of `origin/main` |
+| Branch | `deepseek/clubs-admin` — pushed; 3 commits ahead of `origin/main` |
 | Last merge | PR #8 → `e491899` (all of 1.7.2–1.7.6) |
-| Live | https://mykerawang-app.web.app — build `202610250751`, version **1.7.6** |
+| Live | https://mykerawang-app.web.app — build `202610250823`, version **1.7.7** |
 | Tests | 446 Flutter tests green; analyzer has 18 info/warning findings, no errors |
 | Latest migration | `20261026006100_club_recruitment.sql` (applied to live) |
 
-`main` and the live site are both at 1.7.6. The two commits on the branch after
-the merge (the announcement fixes and the Google sign-in history fix) are **not**
-released yet — they need the version bump and a deploy before they exist
-anywhere but git.
+`main` is at 1.7.6; the live site is at 1.7.7 without a PR for it yet. The branch
+holds the three commits after `e491899`: the two announcement fixes and the
+Google sign-in history fix, released as 1.7.7 (build `202610250823`) after a
+release build + `firebase deploy`. Merge at the next natural stop.
 
 ## What changed this session
 
@@ -138,17 +138,19 @@ captcha (remember it covers sign-in too — **and it will interact with the OAut
 launch above**, since the captcha token rides in `queryParams`); invite the
 first club.
 
-**Needs live verification before the next release:**
-- The Google sign-in history fix. There is no widget test for it (`location` is
-  not reachable from a test), so check on the deployed build, in this order:
-  1. sign in with Google, then press the browser's Back — it must **not** show
-     Google's account chooser;
-  2. sign out, start Google sign-in again, press Back **on Google's page** —
-     it must land back on `/login`;
-  3. sign in from a shared post link (`/post/…` → "Log in to comment") and
-     confirm `?from=` still returns you to the post.
-  If sign-in breaks, `git revert` the login commit — it is one file plus a
-  helper, and the old `signInWithOAuth` path still compiles.
+**Deployed on 1.7.7 but not verified on a real browser yet:** The Google sign-in
+history fix. There is no widget test for it (`location` is not reachable from a
+test), so check it on the live build, in this order:
+
+1. sign in with Google, then press the browser's Back — it must **not** show
+   Google's account chooser;
+2. sign out, start Google sign-in again, press Back **on Google's page** —
+   it must land back on `/login`;
+3. sign in from a shared post link (`/post/…` → "Log in to comment") and
+   confirm `?from=` still returns you to the post.
+
+If sign-in breaks, `git revert` the login commit — it is one file plus a helper,
+and the old `signInWithOAuth` path still compiles.
 
 **Bugs still open:**
 - Announcement categories are a fixed set of five.
@@ -167,6 +169,9 @@ first club.
 
 ## Suggested next session
 
-Release 1.7.7 (version bump both places, build, stamp, deploy) and run the three
-Google sign-in checks above on it. Then either the captcha work — which touches
-the same OAuth launch — or the form builder, with a design document before any UI.
+1. Run the three Google sign-in checks above on the live 1.7.7. If any fails,
+   revert the login commit and redeploy before anything else.
+2. Open a PR for the three commits and merge it, so `main` matches production
+   again (it is still at 1.7.6).
+3. Then either the captcha work — which touches the same OAuth launch — or the
+   form builder, with a design document before any UI.
