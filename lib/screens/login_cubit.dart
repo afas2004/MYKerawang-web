@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/guest_access.dart';
 import '../services/registration_policy.dart';
+import '../utils/browser_history_stub.dart'
+    if (dart.library.js_interop) '../utils/browser_history_web.dart';
 
 /// Error codes put in [LoginState.errorMessage]. The cubit has no
 /// BuildContext, so the screen turns these into localized text
@@ -155,18 +157,33 @@ class LoginCubit extends Cubit<LoginState> {
   Future<void> signInWithGoogle({String? from}) async {
     emit(state.copyWith(isLoading: true, errorMessage: null));
     try {
+      // WEB: come back to this same page after Google login.
+      // MOBILE: deep link back into the app (must match Supabase URL settings
+      // and the AndroidManifest intent filter).
+      // The full URL must be allowed in Supabase Auth → URL
+      // Configuration (e.g. https://mykerawang-app.web.app/**).
+      final redirectTo = kIsWeb
+          ? '${Uri.base.origin}${loginPathFor(from)}'
+          : 'mykerawang://login-callback';
+
+      // On the web the redirect is launched here rather than by
+      // signInWithOAuth, so it can *replace* this page's history entry
+      // instead of adding one. A pushed entry left the browser's Back
+      // pointing at Google's account chooser after signing in. Same URL,
+      // same PKCE verifier — only the history mode differs.
+      if (kIsWeb) {
+        final oauth = await supabase.auth.getOAuthSignInUrl(
+          provider: OAuthProvider.google,
+          redirectTo: redirectTo,
+        );
+        if (replaceLocationForOAuth(oauth.url)) return;
+      }
+
       // 1. Trigger Supabase OAuth
       // NOTE: Ensure you have "Google" enabled in Supabase Auth Providers
       await supabase.auth.signInWithOAuth(
         OAuthProvider.google,
-        // WEB: come back to this same page after Google login.
-        // MOBILE: deep link back into the app (must match Supabase URL settings
-        // and the AndroidManifest intent filter).
-        // The full URL must be allowed in Supabase Auth → URL
-        // Configuration (e.g. https://mykerawang-app.web.app/**).
-        redirectTo: kIsWeb
-            ? '${Uri.base.origin}${loginPathFor(from)}'
-            : 'mykerawang://login-callback',
+        redirectTo: redirectTo,
         // iOS WebKit blocks the storage access a popup needs to finish the
         // credential exchange (ITP), so the popup silently dies after account
         // selection. A same-tab, full-page redirect avoids popups entirely.
