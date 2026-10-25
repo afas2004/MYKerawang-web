@@ -74,19 +74,21 @@ where schemaname = 'public'
   and tablename in ('profiles', 'posts', 'comments', 'events', 'listings', 'reports')
 order by tablename, cmd, policyname;
 
--- 9. The dangerous subset: a policy that lets a normal signed-in user write
---    with no ownership predicate. Any row here is a real hole — e.g. a post or
---    profile UPDATE with `using (true)` lets one student edit another's
---    content. Send me this output and I will say which lines matter.
+-- 9. The dangerous subset: a policy that lets a normal signed-in user write or
+--    DELETE with no ownership predicate. Any row here is a real hole — an
+--    UPDATE with `using (true)` lets one student edit another's content, and a
+--    DELETE with `using (true)` lets them destroy it. Send me this output and
+--    I will say which lines matter.
 select tablename, policyname, cmd, roles::text,
        coalesce(qual, '(none)')       as using_expr,
        coalesce(with_check, '(none)') as check_expr
 from pg_policies
 where schemaname = 'public'
   and permissive = 'PERMISSIVE'
-  and tablename in ('profiles', 'posts', 'comments', 'events', 'listings', 'reports')
+  and tablename in ('profiles', 'posts', 'comments', 'events', 'listings', 'reports',
+                    'event_participants', 'club_members', 'form_responses')
   and (
         (cmd = 'INSERT' and (with_check is null or with_check = 'true'))
-     or (cmd in ('ALL', 'UPDATE') and (qual is null or qual = 'true'))
+     or (cmd in ('ALL', 'UPDATE', 'DELETE') and (qual is null or qual = 'true'))
       )
 order by tablename, cmd, policyname;

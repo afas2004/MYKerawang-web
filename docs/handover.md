@@ -136,14 +136,19 @@ short version:
    `supabase/migrations/20261026015100_security_review_fixes.sql`; **it is not
    applied yet** (no DB access from the review session). Apply it, then re-run
    the curl check in the review doc.
-2. Three RLS changes **need an owner decision** and are deliberately kept out
+2. Two RLS changes **need an owner decision** and are deliberately kept out
    of `supabase/migrations` in
    `supabase/pending/20261026015200_security_signoff.sql`: anon reads of
    `profiles`/`followers`/`event_participants` (the repo says anon should not
-   have them), the notification insert policy (any user can notify any user),
-   and server-derived report categories (one report can hide anyone's content).
+   have them), and the notification insert policy (any user can notify any
+   user). The third block — report categories hiding on the first priority
+   report — is **accepted as the intended design** and needs nothing.
 3. Everything else is listed by severity, with the dashboard instructions in
-   review doc §11.
+   review doc §11. `docs/app-permissions-map.md` maps the actors, routes and
+   guest/authenticated branches, so a future RLS change can be checked against
+   a screen instead of guessed.
+4. The one thing that is destructive today is the `images` bucket (anonymous
+   delete/overwrite, measured). Nothing else lets an outsider destroy data.
 
 **The SQL test harness was red** and is fixed: the shared stub had no
 `storage.buckets`, so every suite stopped at the storage-limits migration. The

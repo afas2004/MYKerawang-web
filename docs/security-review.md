@@ -52,7 +52,7 @@ ordinary student account.
 | # | Sev | Finding | Evidence | Exploit path | Fix |
 |---|---|---|---|---|---|
 | **C1** | **Critical** | The `images` bucket accepts anonymous create, overwrite, delete and listing | **Measured**: `POST /storage/v1/object/images/<any path>` → `200` with only the publishable key; `x-upsert:true` over an existing object → `200`; `DELETE` of an existing object → `200` *and the object 404s afterwards*; `POST /object/list/images {"prefix":"posts"}` → object names | No account needed. List `posts/`, then delete or replace every event/listing/post image; upload arbitrary image bytes (MIME allowlist still applies); burn your storage quota | `20261026015100_security_review_fixes.sql` drops the permissive policy and creates owner-scoped write policies. **Needs applying** (dashboard or `db push`) |
-| **H1** | High | One ordinary account can hide anyone's post/comment/event/listing, with no admin and no threshold | `20261019004100:329-330` (insert = own report), `20261025001100:79-83` (client `category` accepted if in the enum), `:134` + `:166-167` (priority category → `mod_auto_hide`), `20261025003100:15` (`{harassment,inappropriate}` are priority). No rate limit on reports (`20261019004200:160-161` uses an empty kind) | `POST /rest/v1/reports {"target_type":"post","target_id":"…","category":"harassment","reason":"x"}` → target hidden immediately | Derive `category` from `reason` server-side and/or require reporter trust. SQL in `supabase/pending/…_security_signoff.sql` (block 3) — **your call**, it changes moderation behaviour |
+| **H1** | ~~High~~ **By design** | Priority-category reports hide content on the first report — no admin, no threshold | `20261019004100:329-330` (insert = own report), `20261025001100:79-83` (client `category` accepted if in the enum), `:134` + `:166-167` (priority category → `mod_auto_hide`), `20261025003100:15` (`{harassment,inappropriate}` are priority). No rate limit on reports (`20261019004200:160-161` uses an empty kind) | `POST /rest/v1/reports {"target_type":"post","target_id":"…","category":"harassment","reason":"x"}` → target hidden immediately | **Owner confirmed this is intended** (2026-10-25): a harassment/inappropriate report parks the content out of sight until a moderator looks. Not a vulnerability; the residual is only that the client picks the category, so the designed behaviour can be triggered by anyone. No action |
 | **H2** | High | `profiles`, `followers` and `event_participants` are world-readable, though the repo says anon gets only the public views | **Measured**: `GET /profiles?select=full_name` → `200`, 19 rows; `?select=device_id` → `200`; `/followers` → `200`, 8 rows; `/event_participants` → `200`. Repo intent: `20261019002100:5-10`, `20261022001100:8-10`. **Flow check**: every guest path branches to a view (`event_detail_screen.dart:133,146-151`, `guest_views.dart:110-116`, `router.dart:322-324`), so no designed flow needs these grants | Anyone can scrape every student's full name, `device_id`, `is_banned`, `ban_reason`, `last_active_at`, plus the whole follow graph and who attends what | Revoke anon select + drop the `using (true)` anon policies — SQL in the signoff file (block 1). Guest pages use `profiles_public` / `follow_counts` / `event_participant_counts`, so they keep working |
 | **H3** | High | Any signed-in user can insert a notification for any other user, with any title/body/type/data (route included) | `20261019003000:31-34`: `with check (actor_id = auth.uid())` — `user_id`, `type`, `title`, `body`, `data` unconstrained; client sends them directly (`create_event_screen.dart:408`, `profile_screen.dart:194`, `mention_service.dart:100`) | Spoof an "account will be deleted" notice, phish a link, or spam the bell forever | Replace with a relationship-checked policy (follow edge / authored mention) — signoff file block 2. Read `create_event_screen.dart:408` first: if that type is not follow/mention it needs its own clause |
 | **M1** | Medium | A hidden (moderated) event is still enumerable through the counts view | `20261019002100:44-52` — owner-run view, only `is_public` filter, granted to anon | `GET /rest/v1/event_participant_counts` reveals hidden event ids + head-counts | **Done** in `…_security_review_fixes.sql` (adds `not coalesce(is_hidden,false)`) + test |
@@ -381,11 +381,11 @@ migration.
 4. **Storage → Policies → `avatars`.** Confirm the write policies require a
    signed-in user and, ideally, `owner = auth.uid()` for update/delete. The
    migration deliberately does not touch this bucket.
-5. **Decide the three sign-off items** in
+5. **Decide the two sign-off items** in
    `supabase/pending/20261026015200_security_signoff.sql`: anon reads on
-   profiles/followers/participants (H2), the notification insert policy (H3),
-   and server-derived report categories (H1). Each block states before/after and
-   what could break.
+   profiles/followers/participants (H2) and the notification insert policy (H3).
+   Each block states before/after and what could break. (The third block, report
+   categories, is accepted as design and needs nothing.)
 6. **Firebase Hosting → add `www.kerawang.my`** (Custom domain → Add). Until
    then the www host serves a certificate warning.
 7. **Ship the CSP** by pasting the two headers from §6 into `firebase.json`
@@ -456,6 +456,23 @@ git history is not a live key.
 **The gap that is *not* about security:** the six signed-in click-throughs.
 Those are "does it still work for users", and they only matter once the client
 fixes in §10 are deployed — which they are not.
+
+### What can actually be destroyed
+
+| Asset | Outsider, no account | Signed-in user | Evidence |
+|---|---|---|---|
+| **Images** (post/event/listing photos, club logos, payment QRs) | **Yes — delete or overwrite any object** | same, plus their own cleanup | Measured: anon `DELETE` → `200`, object `404`; anon `x-upsert` → `200` |
+| Database rows (`profiles`, `posts`, `comments`, `events`, `listings`) | **No anonymous path** — no delete grant or policy for `anon` | Own rows only per the policies in the repo (`posts_delete_own`, `comments_delete_own`). Others' rows: unknown if a dashboard-only `DELETE … using (true)` exists → preflight §9 now flags `DELETE` | `/rest/v1/posts` with anon key: delete returns 0 rows |
+| Tables / schema | **No.** PostgREST exposes no DDL, no `TRUNCATE`, no `DROP` | same | API surface |
+| Another account's data | **No** | `delete_my_account` only for self (it does cascade onto some rows linked to your content — M8) | `20261019003200` |
+| Storage quota / your bill | **Yes** — unlimited anonymous uploads until C1 is fixed | — | Measured upload |
+| Availability | Not found — no unbounded expensive query | — | — |
+
+So: **no destructive attack on the database itself.** The one destructive
+attack that exists today targets your *images*, needs no account, and is
+irreversible — Supabase backups cover the database, not storage objects, and
+there is no object versioning. That is why C1 is the first item and the only one
+I would not leave for later.
 
 ---
 

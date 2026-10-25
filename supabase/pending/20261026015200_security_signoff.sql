@@ -94,35 +94,20 @@
 
 -- ====================================================== 3. report category
 --
--- BEFORE: the client picks reports.category and a priority category
--- ('harassment', 'inappropriate') hides the target on the first report with
--- no admin involved (20261025001100:79-83,134,166-167 + 20261025003100:15).
--- One account can therefore hide unlimited content by choosing that category.
+-- ACCEPTED AS DESIGN (owner, 2026-10-25). Nothing to apply. Kept here so the
+-- next reviewer does not re-open it: a priority-category report parking the
+-- content until a moderator looks is the intended moderation flow.
 --
--- AFTER: the category is derived from the reason text server-side; a client
--- value is ignored. Keep the auto-hide for genuine priority reports, or
--- require reporter trust (mod_reporter_trusted) as well — the second version
--- is the conservative one.
+-- Current behaviour: the client picks reports.category and a priority category
+-- ('harassment', 'inappropriate') hides the target on the first report with no
+-- admin involved (20261025001100:79-83,134,166-167 + 20261025003100:15).
 --
--- create or replace function public.mod_report_before_insert()
--- returns trigger language plpgsql security definer set search_path = public
--- as $$
--- declare
---   v_owner uuid; v_anon boolean; v_case uuid;
--- begin
---   if auth.uid() is not null then new.reporter_id := auth.uid(); end if;
---   new.target_type := lower(new.target_type);
---   new.status := 'open'; new.handled_by := null;
---   new.handled_at := null; new.resolution_note := null;
---   -- Server-side only: the client's category is discarded.
+-- If that ever needs to change, the conservative version ignores the client
+-- value and derives the category from the reason text:
+--
+-- create or replace function public.mod_report_before_insert() ... 
 --   new.category := public.mod_category_from_reason(new.reason);
---   select o.owner_id, o.anonymous into v_owner, v_anon
---   from public.mod_target_owner(new.target_type, new.target_id::text) o;
---   if not found then raise exception 'MOD:target_missing' using errcode = 'P0001'; end if;
---   if v_owner = new.reporter_id then raise exception 'MOD:self_report' using errcode = 'P0001'; end if;
---   new.counts_toward_auto_hide := public.mod_reporter_trusted(new.reporter_id);
---   ... (rest identical to 20261025001100)
--- end $$;
+-- (rest identical to 20261025001100)
 
 -- ====================================================== 4. event contacts
 --
