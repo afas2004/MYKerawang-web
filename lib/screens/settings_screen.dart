@@ -126,6 +126,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return row?['username'] as String?;
   }
 
+  Future<String?> _myRole() async {
+    final uid = _supabase.auth.currentUser?.id;
+    if (uid == null) return null;
+    final row =
+        await _supabase.from('profiles').select('role').eq('id', uid).maybeSingle();
+    return row?['role'] as String?;
+  }
+
   Future<void> _deleteAccount() async {
     final s = context.l10nRead;
     final messenger = ScaffoldMessenger.of(context);
@@ -139,7 +147,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ));
       return;
     }
-    if (!mounted || username == null) return;
+    if (!mounted) return;
+
+    // Refuse before asking them to type anything: the owner account is the
+    // only one the database will not delete, and silently failing after the
+    // confirmation reads as "the button does nothing".
+    try {
+      if (await _myRole() == 'owner' && mounted) {
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            icon: Icon(AppIcons.lock, color: Theme.of(ctx).colorScheme.error),
+            title: Text(s.social.deleteAccountTitle),
+            content: Text(s.ownerDeleteBlocked),
+            actions: [
+              FilledButton(
+                  onPressed: () => Navigator.pop(ctx), child: Text(s.close)),
+            ],
+          ),
+        );
+        return;
+      }
+    } catch (_) {
+      // Cannot read the role: let the RPC decide.
+    }
+    if (!mounted) return;
+
+    if (username == null || username.isEmpty) {
+      messenger.showSnackBar(SnackBar(content: Text(s.deleteNeedsUsername)));
+      return;
+    }
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -194,6 +231,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _signOut() async {
+    final s = context.l10nRead;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(AppIcons.logout),
+        title: Text(s.signOutConfirmTitle),
+        content: Text(s.signOutConfirmBody),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false), child: Text(s.cancel)),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true), child: Text(s.signOut)),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
     try {
       await _supabase.auth.signOut();
       // The router's auth redirect also catches this; go explicitly so the

@@ -95,7 +95,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(AnnouncementView), findsOneWidget);
     expect(find.text('Mesyuarat Agung'), findsOneWidget);
-    expect(find.text('Official'), findsOneWidget);
+    // Posting as a club: the club's own voice, no app Official badge.
+    expect(find.text('Official'), findsNothing);
     await tester.tap(find.byTooltip('Edit'));
     await tester.pumpAndSettle();
     expect(find.byType(AnnouncementView), findsNothing);

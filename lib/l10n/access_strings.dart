@@ -143,6 +143,9 @@ extension AccessStrings on AppStrings {
   String get verifySubmittedAt => _t("Submitted {0}", "Dihantar {0}", "提出 {0}");
 
   // ---- event details: registration, merit, contacts, attendance ----
+  String get eventSearchHint => _t("Search events", "Cari acara", "Search events");
+  String get eventPickerEmpty =>
+      _t("No events match that search.", "Tiada acara sepadan dengan carian itu.", "No events match.");
   String get evRegistration => _t("Registration", "Pendaftaran", "Registration");
   String get evCloseAtStart => _t("Close registration when the event starts",
       "Tutup pendaftaran apabila acara bermula", "Close registration when the event starts");
@@ -209,6 +212,35 @@ extension AccessStrings on AppStrings {
   String get evStudentId => _t("Student ID", "No. pelajar", "Student ID");
   String get evCheckedAt => _t("Checked in", "Daftar masuk", "Checked in");
   String get evName => _t("Name", "Nama", "Name");
+
+  // ---- club recruitment ----
+  String get signOutConfirmTitle => _t("Sign out?", "Log keluar?", "Sign out?");
+  String get signOutConfirmBody => _t(
+      "You can keep reading as a guest, or sign back in any time.",
+      "Anda boleh terus membaca sebagai tetamu, atau log masuk semula bila-bila masa.",
+      "You can keep reading as a guest.");
+  String get ownerDeleteBlocked => _t(
+      "The owner account can't delete itself — the app would be left without an owner. Hand the owner role to another account first.",
+      "Akaun pemilik tidak boleh memadam dirinya — aplikasi akan hilang pemilik. Pindahkan peranan pemilik kepada akaun lain dahulu.",
+      "The owner account can't delete itself.");
+  String get deleteNeedsUsername => _t(
+      "Finish setting up your profile (choose a username) before deleting the account.",
+      "Selesaikan profil anda (pilih nama pengguna) sebelum memadam akaun.",
+      "Finish your profile before deleting the account.");
+  String get clubRecruitment =>
+      _t("Membership", "Keahlian", "Membership");
+  String get clubRecruitmentOpen =>
+      _t("Accept join requests", "Terima permintaan menyertai", "Accept join requests");
+  String get clubRecruitmentHelp => _t(
+      "When off, the club page shows no way to request membership, and nobody can apply. You can still add members by username.",
+      "Apabila dimatikan, halaman kelab tidak menunjukkan cara untuk memohon, dan tiada siapa boleh memohon. Anda masih boleh menambah ahli melalui nama pengguna.",
+      "When off, nobody can request to join.");
+  String get clubRecruitmentClosed => _t(
+      "This club isn't taking requests right now.",
+      "Kelab ini tidak menerima permohonan buat masa ini.",
+      "This club isn't taking requests right now.");
+  String get clubRequestJoin =>
+      _t("Request to join", "Mohon menyertai", "Request to join");
 
   // ---- categories ----
   String get catTitle => _t("Categories", "Kategori", "カテゴリー");

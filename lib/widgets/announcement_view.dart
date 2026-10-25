@@ -164,6 +164,10 @@ class AnnouncementData {
 
   /// `16:9` (banner) or `1:1` (square). Chosen by the author.
   final String coverAspect;
+
+  /// True only for an account marked official. A club announcement carries
+  /// the club's own name and does not need the app's badge.
+  final bool official;
   final List<ActionLink> actions;
   final Map<String, dynamic>? linkedEvent;
   final DateTime? publishAt;
@@ -178,6 +182,7 @@ class AnnouncementData {
     this.cover,
     this.images = const [],
     this.coverAspect = '16:9',
+    this.official = false,
     this.actions = const [],
     this.linkedEvent,
     this.publishAt,
@@ -197,6 +202,7 @@ class AnnouncementData {
       authorAvatar: (club?['logo_url'] ?? profile?['avatar_url']) as String?,
       cover: p['cover_url'] ?? p['image_url'],
       coverAspect: p['cover_aspect'] == '1:1' ? '1:1' : '16:9',
+      official: profile?['is_verified'] == true,
       images: List<String>.from(p['gallery_urls'] ?? const []),
       actions: ActionLink.listFrom(p['action_links']),
       linkedEvent: linkedEvent,
@@ -246,7 +252,8 @@ class AnnouncementView extends StatelessWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             _Badge(icon: AppIcons.announcement, label: a.categoryLabel(d.category), color: scheme.primary),
-            _Badge(icon: AppIcons.official, label: a.official, color: scheme.tertiary),
+            if (d.official)
+              _Badge(icon: AppIcons.official, label: a.official, color: scheme.tertiary),
             if (d.scheduled)
               _Badge(
                   icon: AppIcons.clock,
@@ -383,7 +390,7 @@ class AnnouncementCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: KSpace.gutter, vertical: KSpace.m / 2),
       child: KCard(
         onTap: onTap,
-        official: true,
+        official: d.official,
         padding: const EdgeInsets.all(KSpace.m),
         semanticLabel: '${a.categoryLabel(d.category)}, ${d.title}',
         child: Row(
@@ -412,7 +419,8 @@ class AnnouncementCard extends StatelessWidget {
                     const SizedBox(width: KSpace.xs),
                     Flexible(
                       child: Text(
-                        '${a.categoryLabel(d.category)} · ${a.official}',
+                        [a.categoryLabel(d.category), if (d.official) a.official]
+                            .join(' · '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelMedium

@@ -489,24 +489,16 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 title: s.sectionWhenWhere,
                 icon: AppIcons.calendar,
                 children: [
-                  LayoutBuilder(builder: (context, c) {
-                    // Side by side when there's room, stacked on small phones.
-                    if (c.maxWidth < 420) {
-                      return Column(children: [
-                        _dateSelector(true),
-                        const SizedBox(height: 12),
-                        _dateSelector(false),
-                      ]);
-                    }
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: _dateSelector(true)),
-                        const SizedBox(width: 12),
-                        Expanded(child: _dateSelector(false)),
-                      ],
-                    );
-                  }),
+                  // Start and end side by side at every width: two date
+                  // fields fit even on a small phone.
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: _dateSelector(true)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _dateSelector(false)),
+                    ],
+                  ),
                   _label(s.location),
                   _input(_locationController, s.locationHint, validator: _required(s.location)),
                   _label(s.registrationLinkOptional),

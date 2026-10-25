@@ -163,7 +163,13 @@ class _PostCardState extends State<PostCard> {
 
   Future<void> _togglePin() async {
     final pinned = _post['is_pinned'] == true;
-    final now = await PinActions.toggle(context, _post, pinned: pinned);
+    // The undo action runs from the snackbar, outside this state, so the
+    // callback is how the card hears about it and repaints.
+    final now = await PinActions.toggle(context, _post,
+        pinned: pinned,
+        onChanged: (v) {
+          if (mounted) setState(() => _post = {..._post, 'is_pinned': v});
+        });
     if (mounted && now != pinned) {
       setState(() => _post = {..._post, 'is_pinned': now});
     }
@@ -171,7 +177,13 @@ class _PostCardState extends State<PostCard> {
 
   Future<void> _toggleClubPin() async {
     final pinned = _post['is_club_pinned'] == true;
-    final now = await PinActions.toggleClub(context, _post, pinned: pinned);
+    final now = await PinActions.toggleClub(context, _post,
+        pinned: pinned,
+        onChanged: (v) {
+          if (!mounted) return;
+          setState(() => _post = {..._post, 'is_club_pinned': v});
+          widget.onClubPinChanged?.call();
+        });
     if (mounted && now != pinned) {
       setState(() => _post = {..._post, 'is_club_pinned': now});
       widget.onClubPinChanged?.call();

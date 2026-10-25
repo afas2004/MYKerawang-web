@@ -18,6 +18,9 @@ class Club {
   final String? contactEmail;
   final Map<String, String> socials;
   final bool isVerified;
+
+  /// President-controlled: whether the club takes join requests at all.
+  final bool recruitmentOpen;
   final String status; // pending | active | rejected | suspended
   final DateTime? createdAt;
 
@@ -33,6 +36,7 @@ class Club {
     this.contactEmail,
     this.socials = const {},
     this.isVerified = false,
+    this.recruitmentOpen = true,
     this.status = 'active',
     this.createdAt,
   });
@@ -54,6 +58,9 @@ class Club {
             if ('${e.value}'.trim().isNotEmpty) '${e.key}': '${e.value}',
         },
         isVerified: j['is_verified'] == true,
+        // Defaults open, so an older row or a partial select still behaves
+        // like every club did before the switch existed.
+        recruitmentOpen: j['recruitment_open'] != false,
         status: '${j['status'] ?? 'active'}',
         createdAt: DateTime.tryParse('${j['created_at']}'),
       );
@@ -609,6 +616,11 @@ class ClubService {
 
   static Future<void> transferPresidency(String clubId, String userId) =>
       _db.rpc('transfer_presidency', params: {'p_club_id': clubId, 'p_user_id': userId});
+
+  /// President only (enforced by the RPC).
+  static Future<void> setRecruitment(String clubId, bool open) =>
+      _db.rpc('set_club_recruitment',
+          params: {'p_club_id': clubId, 'p_open': open});
 
   // ---- admin
   static Future<List<Map<String, dynamic>>> pendingRequests() async =>

@@ -4,6 +4,7 @@ import '../../utils/app_nav.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../l10n/app_strings.dart';
+import '../../l10n/access_strings.dart';
 import '../../language_cubit.dart';
 import '../../services/club_service.dart';
 import '../../services/post_service.dart';
@@ -24,6 +25,9 @@ class ClubManageActions {
   final Future<void> Function(String requestId, bool approve) decideJoin;
   final Future<void> Function(String userId) transfer;
 
+  /// Opens/closes the club to join requests. Null hides the switch.
+  final Future<void> Function(bool open)? setRecruitment;
+
   /// Saves the private contact used by the club's listings. Null hides the
   /// section, so tests that only exercise the page details stay simple.
   final Future<void> Function(String? phone, String? paymentQrUrl)? saveContact;
@@ -40,6 +44,7 @@ class ClubManageActions {
     required this.setRole,
     required this.decideJoin,
     required this.transfer,
+    this.setRecruitment,
     this.saveContact,
     this.pickQr,
   });
@@ -180,6 +185,10 @@ class _ClubManageScreenState extends State<ClubManageScreen> {
             },
             transfer: (id) async {
               await ClubService.transferPresidency(club.id, id);
+              _reload();
+            },
+            setRecruitment: (open) async {
+              await ClubService.setRecruitment(club.id, open);
               _reload();
             },
           ),
@@ -626,6 +635,17 @@ class _ClubManageViewState extends State<ClubManageView> {
                     ),
                   ),
                 ]),
+              section(context.l10n.clubRecruitment, [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: widget.club.recruitmentOpen,
+                  onChanged: widget.actions.setRecruitment == null
+                      ? null
+                      : (v) => widget.actions.setRecruitment!(v),
+                  title: Text(context.l10n.clubRecruitmentOpen),
+                  subtitle: Text(context.l10n.clubRecruitmentHelp),
+                ),
+              ]),
               section(c.joinRequests, help: c.joinRequestsHelp, [
                 if (widget.joinRequests.isEmpty)
                   Text(c.noJoinRequests,

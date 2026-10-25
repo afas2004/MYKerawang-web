@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../language_cubit.dart';
+import '../../l10n/access_strings.dart';
 import '../../services/club_service.dart';
 import '../../utils/app_nav.dart';
 import '../../widgets/brand/brand.dart';
@@ -235,7 +236,17 @@ class _ClubPageViewState extends State<ClubPageView> {
               ),
               _CardsTab(future: _events, emptyTitle: c.noEvents, illo: AppIllo.noEvents, isEvent: true),
               _CardsTab(future: _listings, emptyTitle: c.noListings, illo: AppIllo.emptyMarket, isEvent: false),
-              _MembersTab(future: _members),
+              _MembersTab(
+                future: _members,
+                onJoin: (widget.signedIn &&
+                        club.isActive &&
+                        widget.myRole == null)
+                    ? _join
+                    : null,
+                pending: _pending,
+                joining: _joining,
+                recruitmentOpen: club.recruitmentOpen,
+              ),
             ],
           ),
         ),
@@ -352,23 +363,8 @@ class _ClubPageViewState extends State<ClubPageView> {
                       ],
                     ],
                   ),
-                  if (widget.signedIn && club.isActive && widget.myRole == null) ...[
-                    const SizedBox(height: KSpace.s),
-                    SizedBox(
-                      width: double.infinity,
-                      child: _pending
-                          ? OutlinedButton.icon(
-                              onPressed: null,
-                              icon: const Icon(AppIcons.clock, size: 18),
-                              label: Text(c.joinPending),
-                            )
-                          : FilledButton.tonalIcon(
-                              onPressed: _joining ? null : _join,
-                              icon: const Icon(AppIcons.person, size: 18),
-                              label: Text(c.joinClub),
-                            ),
-                    ),
-                  ],
+                  // Membership requests live in the Members tab now, not
+                  // as a full-width button under the header.
                   if (officer && !club.isActive) ...[
                     const SizedBox(height: KSpace.m),
                     ClubStatusBanner(status: club.status),
@@ -534,37 +530,94 @@ class _CardsTab extends StatelessWidget {
 
 class _MembersTab extends StatelessWidget {
   final Future<List<ClubMember>> future;
-  const _MembersTab({required this.future});
+
+  /// Null when the viewer can't ask (guest, already a member, inactive
+  /// club). When null, no request entry point is shown at all.
+  final VoidCallback? onJoin;
+  final bool pending;
+  final bool joining;
+  final bool recruitmentOpen;
+
+  const _MembersTab({
+    required this.future,
+    this.onJoin,
+    this.pending = false,
+    this.joining = false,
+    this.recruitmentOpen = true,
+  });
 
   @override
   Widget build(BuildContext context) {
     final c = context.l10n.club;
     final scheme = Theme.of(context).colorScheme;
-    return _AsyncTab<ClubMember>(
-      future: future,
-      empty: BrandEmptyState(icon: AppIcons.people, title: c.tabMembers, compact: true),
-      builder: (members) => ListView(
-        padding: const EdgeInsets.symmetric(vertical: KSpace.s),
-        children: [
-          for (final m in members)
-            ListTile(
-              minTileHeight: 56,
-              leading: CircleAvatar(
-                backgroundColor: scheme.surfaceContainerHighest,
-                backgroundImage: m.avatarUrl == null ? null : CachedNetworkImageProvider(m.avatarUrl!),
-                child: m.avatarUrl == null ? Icon(AppIcons.person, size: 20, color: scheme.onSurfaceVariant) : null,
-              ),
-              title: Text(m.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-              subtitle: m.username == null ? null : Text('@${m.username}'),
-              trailing: ClubPill(
-                c.rosterLabel(m.position, m.role),
-                background: m.role == 'president' ? scheme.primaryContainer : null,
-                foreground: m.role == 'president' ? scheme.onPrimaryContainer : null,
-              ),
-              onTap: () => context.goUser(m.userId),
+    // The request entry point is a footer, not part of the roster list:
+    // a club with no members still needs a way in, and joining should be
+    // a deliberate look below the names rather than a header button.
+    final footer = onJoin == null
+        ? null
+        : Padding(
+            padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.s, KSpace.l, KSpace.m),
+            child: pending
+                ? OutlinedButton.icon(
+                    onPressed: null,
+                    icon: const Icon(AppIcons.clock, size: 18),
+                    label: Text(c.joinPending),
+                  )
+                : recruitmentOpen
+                    ? FilledButton.tonalIcon(
+                        onPressed: joining ? null : onJoin,
+                        style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(48)),
+                        icon: const Icon(AppIcons.person, size: 18),
+                        label: Text(context.l10n.clubRequestJoin),
+                      )
+                    : Text(
+                        context.l10n.clubRecruitmentClosed,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: scheme.onSurfaceVariant),
+                      ),
+          );
+
+    return Column(
+      children: [
+        Expanded(
+          child: _AsyncTab<ClubMember>(
+            future: future,
+            empty: BrandEmptyState(
+                icon: AppIcons.people, title: c.tabMembers, compact: true),
+            builder: (members) => ListView(
+              padding: const EdgeInsets.symmetric(vertical: KSpace.s),
+              children: [
+                for (final m in members)
+                  ListTile(
+                    minTileHeight: 56,
+                    leading: CircleAvatar(
+                      backgroundColor: scheme.surfaceContainerHighest,
+                      backgroundImage: m.avatarUrl == null
+                          ? null
+                          : CachedNetworkImageProvider(m.avatarUrl!),
+                      child: m.avatarUrl == null
+                          ? Icon(AppIcons.person,
+                              size: 20, color: scheme.onSurfaceVariant)
+                          : null,
+                    ),
+                    title: Text(m.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    subtitle: m.username == null ? null : Text('@${m.username}'),
+                    trailing: ClubPill(
+                      c.rosterLabel(m.position, m.role),
+                      background:
+                          m.role == 'president' ? scheme.primaryContainer : null,
+                      foreground:
+                          m.role == 'president' ? scheme.onPrimaryContainer : null,
+                    ),
+                    onTap: () => context.goUser(m.userId),
+                  ),
+              ],
             ),
-        ],
-      ),
+          ),
+        ),
+        if (footer != null) SafeArea(top: false, child: footer),
+      ],
     );
   }
 }

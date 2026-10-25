@@ -41,7 +41,9 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.text('Pendaftaran Minggu Kolej dibuka'), findsOneWidget);
       expect(find.text('Kolej'), findsOneWidget);
-      expect(find.text('Official'), findsOneWidget);
+      // A club announces as itself; the app's Official badge is only for
+      // official accounts (verified profile), not for every club post.
+      expect(find.text('Official'), findsNothing);
       expect(find.text('Daftar sekarang'), findsOneWidget);
       expect(find.text('Lihat acara'), findsOneWidget);
       expect(find.textContaining('Jawatankuasa'), findsOneWidget);
@@ -52,9 +54,31 @@ void main() {
       await pumpAt(tester, size,
           Scaffold(body: AnnouncementCard(post: sampleAnnouncement(), onTap: () {})));
       expect(tester.takeException(), isNull);
-      expect(find.text('Kolej · Official'), findsOneWidget);
+      expect(find.text('Kolej · Official'), findsNothing);
+      expect(find.text('Kolej'), findsOneWidget);
     });
   }
+
+  testWidgets('an official account keeps the badge', (tester) async {
+    final post = {
+      ...samplePost(id: 'a2', title: 'Notis kolej'),
+      'is_announcement': true,
+      'announcement_category': 'kolej',
+      'body': 'Notis rasmi.',
+      'profiles': {'id': 'p1', 'username': 'jpk', 'display_name': 'JPK', 'is_verified': true},
+    };
+    await pumpAt(
+      tester,
+      kCompact,
+      Scaffold(
+        body: SingleChildScrollView(
+          child: AnnouncementView(data: AnnouncementData.fromPost(post)),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    expect(find.text('Official'), findsOneWidget);
+  });
 
   testWidgets('external action asks before leaving the app', (tester) async {
     await pumpAt(
