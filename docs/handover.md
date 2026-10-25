@@ -13,7 +13,7 @@ the end of the second session that day (PR #8 and #9 merged, two bugs fixed,
 | Branch | `deepseek/clubs-admin` — level with `origin/main` |
 | Last merge | PR #9 → `6da73ad` (1.7.7); before it PR #8 → `e491899` (1.7.2–1.7.6) |
 | Live | https://mykerawang-app.web.app — build `202610250823`, version **1.7.7** |
-| Tests | 446 Flutter tests green; `supabase/tests/forms/forms_test.mjs` 44 assertions green; analyzer has 18 info/warning findings, no errors |
+| Tests | 446 Flutter tests green; migration suites now actually run: moderation (all but 2 pre-existing), clubs 87, verification 13, forms 44; analyzer has 18 info/warning findings, no errors |
 | Latest migration | `20261026007100_event_forms.sql` — **written and tested, not applied to live**; before it `20261026006100_club_recruitment.sql` (live) |
 
 `main`, the branch and the live site are all at 1.7.7 (build `202610250823`).
@@ -145,7 +145,8 @@ firebase deploy --only hosting --project mykerawang-app
   `supabase/tests/moderation/node_modules`, but Node resolves a bare import from
   the *test file's* folder, so `node ../clubs/clubs_test.mjs` could not find it.
   Fixed with one junction at `supabase/tests/node_modules` (see How to work);
-  `node_modules/` is now in `.gitignore`.
+  `node_modules/` is now in `.gitignore`. With it, clubs (87 assertions) and
+  verification (13) run again — they had been silently unrunnable.
 - The PGlite stub's `event_participants` has **no `ON DELETE CASCADE`**, so a test
   that deletes an event must clear participants first — otherwise the FK blocks
   it and the failure looks like it belongs to the migration under test.
