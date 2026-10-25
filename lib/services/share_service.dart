@@ -9,8 +9,9 @@ import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../theme/app_themes.dart';
 
-/// Where deep links point when we're not running on the web.
-const String kAppBaseUrl = 'https://mykerawang-app.web.app';
+/// Where deep links point when we're not running on the web. On the web the
+/// share link uses the origin it is running on, so both hosts work.
+const String kAppBaseUrl = 'https://kerawang.my';
 
 class ShareService {
   
