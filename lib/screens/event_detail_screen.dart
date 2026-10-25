@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../services/comment_pins.dart';
 import '../services/moderation_service.dart';
 import 'package:mykerawang/services/share_service.dart';
@@ -8,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
+import '../l10n/form_strings.dart';
 import '../language_cubit.dart';
 import '../theme/app_themes.dart';
 import '../utils/app_nav.dart';
@@ -973,6 +975,14 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     );
   }
 
+  /// The KI report survey for this event: the editor opens the newest draft,
+  /// or offers the starting points when the event has none.
+  void _openReportForm() {
+    final id = _event['id'];
+    if (id == null) return;
+    context.push('/event/$id/form/edit');
+  }
+
   /// Contact + attendance, under the main action.
   Widget _secondaryActions(BuildContext context) {
     final s = context.l10n;
@@ -993,6 +1003,13 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
             icon: const Icon(AppIcons.verified, size: 18),
             label: Text(s.evAttendance),
+          ),
+          const SizedBox(height: KSpace.s),
+          OutlinedButton.icon(
+            onPressed: _openReportForm,
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            icon: const Icon(AppIcons.list, size: 18),
+            label: Text(s.formKiReport),
           ),
           if (!_registrationClosed && !_isClosed) ...[
             const SizedBox(height: KSpace.s),

@@ -16,6 +16,7 @@ import 'screens/follow_list_screen.dart';
 import 'screens/privacy_policy_screen.dart';
 import 'screens/tag_feed_screen.dart';
 import 'screens/events/checkin_screens.dart';
+import 'screens/events/form_editor_screen.dart';
 import 'screens/guest_views.dart';
 import 'screens/events_screen.dart';
 import 'screens/home_screen.dart';
@@ -255,6 +256,15 @@ GoRouter buildRouter() {
           eventId: state.pathParameters['id']!,
           token: state.uri.queryParameters['t'],
         ),
+      ),
+      GoRoute(
+        path: '/event/:id/form/edit',
+        // The KI report survey: a form, so leaving with unsaved input asks
+        // first (leaveFormRoute → FormGuard).
+        parentNavigatorKey: _rootKey,
+        onExit: leaveFormRoute,
+        builder: (context, state) =>
+            FormEditorScreen(eventId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/post/:id',

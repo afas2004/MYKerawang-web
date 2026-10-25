@@ -389,6 +389,91 @@ $$;
 revoke execute on function public.create_form_from_template(uuid, text) from public, anon;
 grant  execute on function public.create_form_from_template(uuid, text) to authenticated;
 
+-- Blank start: the editor's "from nothing" and "from a pasted list" paths both
+-- begin with an empty form, because every later write targets a form id.
+create or replace function public.create_blank_form(
+  p_event_id uuid,
+  p_title    text default null
+)
+returns uuid
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  v_uid   uuid := auth.uid();
+  v_event public.events;
+  v_form  uuid;
+begin
+  if v_uid is null then
+    raise exception 'FORM:login_required' using errcode = '42501';
+  end if;
+
+  select * into v_event from public.events where id = p_event_id;
+  if not found then
+    raise exception 'FORM:not_found' using errcode = 'P0001';
+  end if;
+  if not (v_event.organizer_id = v_uid
+          or public.is_admin()
+          or (v_event.club_id is not null and public.can_act_as_club(v_event.club_id))) then
+    raise exception 'FORM:not_allowed' using errcode = '42501';
+  end if;
+
+  if exists (select 1 from public.event_forms
+             where event_id = p_event_id and status = 'open') then
+    raise exception 'FORM:already_open' using errcode = 'P0001';
+  end if;
+
+  insert into public.event_forms (event_id, title, created_by)
+  values (p_event_id, coalesce(nullif(trim(p_title), ''), 'Borang program'), v_uid)
+  returning id into v_form;
+
+  return v_form;
+end;
+$$;
+
+revoke execute on function public.create_blank_form(uuid, text) from public, anon;
+grant  execute on function public.create_blank_form(uuid, text) to authenticated;
+
+-- What the event page needs to label its button: the newest form for the event
+-- (draft or open), or null. Managers only — a student never sees this.
+create or replace function public.event_form_summary(p_event_id uuid)
+returns jsonb
+language plpgsql security definer stable
+set search_path = public
+as $$
+declare
+  v_form public.event_forms;
+  v_n    int;
+begin
+  if auth.uid() is null then
+    return null;
+  end if;
+  if not exists (select 1 from public.events e
+                 where e.id = p_event_id
+                   and (e.organizer_id = auth.uid()
+                        or public.is_admin()
+                        or (e.club_id is not null and public.can_act_as_club(e.club_id)))) then
+    return null;
+  end if;
+
+  select * into v_form from public.event_forms
+  where event_id = p_event_id and status in ('draft', 'open')
+  order by created_at desc limit 1;
+  if not found then
+    return null;
+  end if;
+
+  select count(*) into v_n from public.form_responses where form_id = v_form.id;
+
+  return jsonb_build_object(
+    'id', v_form.id, 'status', v_form.status, 'title', v_form.title,
+    'responses', v_n, 'closes_at', v_form.closes_at);
+end;
+$$;
+
+revoke execute on function public.event_form_summary(uuid) from public, anon;
+grant  execute on function public.event_form_summary(uuid) to authenticated;
+
 -- ====================================================== the editor's write
 
 -- The whole field list in one call, so the client never has to keep three

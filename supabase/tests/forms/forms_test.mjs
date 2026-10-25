@@ -103,6 +103,11 @@ ok((await as(pres, `select count(*)::int n from form_templates_list()`))[0].n ==
   'template list is readable by a signed-in user');
 
 // ---------------------------------------------------------- creating
+ok((await as(pres, `select event_form_summary($1) j`, [ev]))[0].j === null,
+  'no form yet → the event summary is null');
+ok((await as(s1, `select event_form_summary($1) j`, [ev]))[0].j === null,
+  'a student gets no event summary');
+
 let e = await err(s1, `select create_form_from_template($1,'ki')`, [ev]);
 ok(e?.includes('FORM:not_allowed'), 'a student cannot create a form');
 e = await err(null, `select create_form_from_template($1,'ki')`, [ev], 'anon');
@@ -122,9 +127,20 @@ await q(`update form_template_fields set label='CHANGED' where template_id=$1 an
 ok((await q(`select label from form_fields where form_id=$1 and sort=60`, [form]))[0].label ===
   'KI1 Kemahiran Berkomunikasi', 'template edits do not rewrite a created form');
 
+const summ = (await as(officer, `select event_form_summary($1) j`, [ev]))[0].j;
+ok(summ !== null && summ.id === form && summ.status === 'draft' && summ.responses === 0,
+  'the summary points at the draft');
+
 e = await err(officer, `select create_form_from_template($1,'ki')`, [ev]);
 ok(e === null, 'a draft form may be created alongside');
-// (the draft is what we keep; the second one proves the open-form guard later)
+
+// blank start — the editor's "from nothing" and "from a pasted list" paths
+const blank = (await as(officer, `select create_blank_form($1,'Borang saya') f`, [ev]))[0].f;
+ok(!!blank, 'an officer creates a blank form');
+ok((await q(`select count(*)::int n from form_fields where form_id=$1`, [blank]))[0].n === 0,
+  'a blank form starts with no fields');
+e = await err(s1, `select create_blank_form($1,null)`, [ev]);
+ok(e?.includes('FORM:not_allowed'), 'a student cannot create a blank form');
 
 // ---------------------------------------------------------- the editor
 const fields = await q(`select * from form_fields where form_id=$1 order by sort`, [form]);

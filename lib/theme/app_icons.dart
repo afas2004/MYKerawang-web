@@ -30,6 +30,8 @@ abstract final class AppIcons {
   static const IconData forward = LucideIcons.arrowRight;
   static const IconData close = LucideIcons.x;
   static const IconData chevronRight = LucideIcons.chevronRight;
+  static const IconData up = LucideIcons.chevronUp;
+  static const IconData down = LucideIcons.chevronDown;
   static const IconData externalLink = LucideIcons.externalLink;
 
   // --- Content actions ---

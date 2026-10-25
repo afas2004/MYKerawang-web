@@ -1,15 +1,18 @@
 # KI event reports: design
 
-Status: **phase 1 shipped (server only), no UI yet.** Design written 2026-10-25
-against 1.7.7 (`6da73ad`) and rewritten twice the same day: once after the owner
-corrected the requirement (the KI report *is* the job; the builder merely
-extends it), and once after reading the two real documents —
+Status: **phases 1 and 2 shipped (server + editor), no answer page yet.** Design
+written 2026-10-25 against 1.7.7 (`6da73ad`) and rewritten twice the same day:
+once after the owner corrected the requirement (the KI report *is* the job; the
+builder merely extends it), and once after reading the two real documents —
 `BORANG KI QUIZ BAHASA ARAB (Responses).xlsx` (what a Google Form collected) and
 `LAPORAN PROGRAM QUIZ BAHASA ARAB.pdf` (what the club hands in).
 
-Phase 1 is `supabase/migrations/20261026007100_event_forms.sql` plus
-`supabase/tests/forms/forms_test.mjs` (44 assertions, green). **The migration is
-not applied to the live project yet** — nothing in the app calls it.
+Phase 1 is `supabase/migrations/20261026007100_event_forms.sql` (54 assertions in
+`supabase/tests/forms/forms_test.mjs`); phase 2 is
+`lib/screens/events/form_editor_screen.dart` plus `lib/services/form_service.dart`,
+`lib/utils/form_rules.dart` and `lib/l10n/form_strings.dart` (21 widget/unit
+tests). **The migration is not applied to the live project yet** — no screen the
+public can reach calls it until the answer page exists.
 
 ## What the paperwork actually is
 
@@ -258,11 +261,16 @@ into the Word report by hand.
    No UI. **Done** — `20261026007100_event_forms.sql` (five tables, the 28-row
    seeded template, `save_event_form`, publish/close, `form_public`,
    `submit_form_response`, `form_response_list`, `form_analysis`) and
-   `supabase/tests/forms/forms_test.mjs` (44 assertions, migrations applied
-   twice). **Not applied to the live project**, because nothing calls it yet.
+   `supabase/tests/forms/forms_test.mjs` (54 assertions, migrations applied
+   twice). **Not applied to the live project**, because nothing public calls it.
 2. **The editor** (start chooser, field list, save, publish) — a form can be
-   built, from nothing or from a template, and looked at.
-3. **The answer page.** A published form can be filled.
+   built, from nothing or from a template, and looked at. **Done**:
+   `/event/:id/form/edit`, reached from a "KI report" button on the event page
+   for the organiser. Server-side it also needed `create_blank_form()` (every
+   write targets a form id) and `event_form_summary()` (the event page's label).
+   Tests: `test/form_rules_test.dart` (15) and `test/form_editor_test.dart` (6,
+   against a fake `FormService`).
+3. **The answer page.** A published form can be filled. Next.
 4. **S1/S2/S3 screen + CSV export.**
 5. **`after_checkin` prompt**, and later the richer builder.
 

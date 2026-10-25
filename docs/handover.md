@@ -13,7 +13,7 @@ the end of the second session that day (PR #8 and #9 merged, two bugs fixed,
 | Branch | `deepseek/clubs-admin` — level with `origin/main` |
 | Last merge | PR #9 → `6da73ad` (1.7.7); before it PR #8 → `e491899` (1.7.2–1.7.6) |
 | Live | https://mykerawang-app.web.app — build `202610250823`, version **1.7.7** |
-| Tests | 446 Flutter tests green; migration suites now actually run: moderation (all but 2 pre-existing), clubs 87, verification 13, forms 44; analyzer has 18 info/warning findings, no errors |
+| Tests | 467 Flutter tests green; migration suites: moderation (all but 2 pre-existing), clubs 87, verification 13, forms 54; analyzer has 18 info/warning findings, no errors |
 | Latest migration | `20261026007100_event_forms.sql` — **written and tested, not applied to live**; before it `20261026006100_club_recruitment.sql` (live) |
 
 `main`, the branch and the live site are all at 1.7.7 (build `202610250823`).
@@ -87,6 +87,7 @@ the end of the second session that day (PR #8 and #9 merged, two bugs fixed,
 | Categories | `lib/utils/categories.dart` (seeds), `lib/services/category_service.dart`, `lib/widgets/category_picker.dart` |
 | Moderation | `lib/services/moderation_service.dart`, `lib/utils/moderation_logic.dart`, `lib/widgets/moderation_ui.dart` |
 | Navigation / back | `lib/router.dart`, `lib/utils/app_nav.dart`, `lib/utils/browser_history_{web,stub}.dart` |
+| Event forms / KI report | `supabase/migrations/20261026007100_event_forms.sql`, `lib/services/form_service.dart`, `lib/screens/events/form_editor_screen.dart`, `lib/utils/form_rules.dart`, `lib/l10n/form_strings.dart` |
 
 ## How to work
 
@@ -150,6 +151,16 @@ firebase deploy --only hosting --project mykerawang-app
 - The PGlite stub's `event_participants` has **no `ON DELETE CASCADE`**, so a test
   that deletes an event must clear participants first — otherwise the FK blocks
   it and the failure looks like it belongs to the migration under test.
+- **`app_strings.save` is `"SAVE"` and `cancel` is `"Cancel"`** — widget tests
+  that tap a dialog button must use the exact case (`find.widgetWithText(
+  FilledButton, 'SAVE')`), or the finder matches nothing and the failure looks
+  like a broken screen.
+- A `DropdownButtonFormField` needs `isExpanded: true` inside a narrow dialog,
+  and a bare `DropdownButton` with `isExpanded` needs a bounded width
+  (`Expanded`) — otherwise the dialog overflows on a 375 px phone.
+- Do not rewrite a Dart file with PowerShell `-replace` + `Set-Content`: it
+  mangled an en-dash into `â€“` in `form_editor_screen.dart`, twice. Use the
+  edit tool.
 - Two `moderation_test.mjs` assertions ("two reports → one open case" and
   "priority category hidden on first report") fail **without** the forms
   migration too. They are pre-existing; don't chase them while testing forms.
@@ -203,10 +214,18 @@ and the old `signInWithOAuth` path still compiles.
   students answer for themselves; responses are private to organiser + club
   officers + admins; the form is **optional to the QR** (`after_checkin`,
   default off).
-  Next: phase 2, the editor UI. The migration is **not applied to live**.
-  Five design questions remain at the end of the doc; the two that matter are
+  Next: **phase 3, the answer page** — a published form can be filled by
+  students. Then phase 4, the S1/S2/S3 screen and CSV export.
+  The migration is **not applied to live**; apply it when the answer page needs
+  it. Five design questions remain at the end of the doc; the two that matter are
   whether MPP's version ships as a second template, and whether the matric must
   stay editable (**4 of 13 respondents used Gmail**).
+- **KI editor (phase 2) is built**: `/event/:id/form/edit`, opened from a
+  "KI report" button on the event page for the organiser. Start chooser
+  (template / blank / pasted list), one plain list of questions with label, kind,
+  required, options, scale and analysis tag, up/down/delete, save and publish.
+  `save_event_form` reloads after saving so new questions get their ids — without
+  that, every save would insert another copy of each new question.
 - Recurring announcements (needs pg_cron or materialise-on-read).
 - Shared-link thumbnails need per-URL OG tags (SPA limitation; needs a function
   or prerender).
@@ -215,9 +234,9 @@ and the old `signInWithOAuth` path still compiles.
 
 1. Run the three Google sign-in checks above on the live 1.7.7. If any fails,
    revert the login commit and redeploy before anything else.
-2. Build **phase 2 of the KI reports: the editor** (start chooser → blank /
-   template / pasted CSV, one list of fields, save, publish), then the answer
-   page. Apply `20261026007100_event_forms.sql` to live when the first screen
-   needs it, not before. Or the captcha work first — that is the last code item
-   before inviting a club, and it needs a hCaptcha/Turnstile site key from the
-   owner.
+2. Build **phase 3 of the KI reports: the answer page** (`/event/:id/form`) —
+   render each field kind, submit through `submit_form_response`, show the
+   "you answered" state. Then phase 4, the S1/S2/S3 screen and CSV. Apply
+   `20261026007100_event_forms.sql` to live when the answer page is ready to try,
+   not before. Or the captcha work first — that is the last code item before
+   inviting a club, and it needs a hCaptcha/Turnstile site key from the owner.
