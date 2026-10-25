@@ -1,19 +1,21 @@
 # Launch checklist
 
-State as of 2026-10-25, build 1.7.x. Keep this short and true.
+State as of 2026-10-25, build `202610250823` (1.7.7). Keep this short and true.
 
 ## Before inviting the first club
 
-- [ ] **Custom SMTP (Resend or Brevo) wired into Supabase Auth.** The
-      built-in sender is capped at a couple of emails per hour for the whole
-      project; with Confirm-email on, that stalls any group signup. Auth →
-      SMTP settings. This is the one item that actually blocks a rollout.
-- [ ] **Anonymous sign-ins OFF** (Auth → User Signups). The app never uses
-      them; they bypass Confirm-email.
+- [x] **Custom SMTP (Resend) wired into Supabase Auth.** Done: `kerawang.my`
+      with DKIM + the `rsend`/`send` CNAMEs at Hostinger, DMARC `p=none`.
+      Confirmation mail verified received.
+- [x] **Anonymous sign-ins OFF** (Auth → User Signups). Verified off; the app
+      never used them.
 - [ ] **Rotate the database password.** It has appeared in chat logs and in
       the pooler URL.
 - [ ] **CAPTCHA** on auth (hCaptcha or Turnstile). Remember it applies to
-      sign-in as well as sign-up, so the login screen needs the widget too.
+      sign-in as well as sign-up, so the login screen needs the widget too —
+      and Google sign-in now launches its own redirect
+      (`replaceLocationForOAuth`), so the token has to ride `queryParams`
+      there rather than through `signInWithOAuth`.
 - [ ] **One dry run of attendance**: a real event, five people, the QR on a
       phone screen, campus wifi. Confirm the 20-second window survives real
       scanning.

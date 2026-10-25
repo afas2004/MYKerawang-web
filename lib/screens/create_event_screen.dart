@@ -11,7 +11,9 @@ import '../utils/adaptive.dart';
 import '../utils/formatters.dart';
 import '../utils/app_nav.dart';
 import '../utils/form_draft.dart';
-import '../widgets/category_picker.dart';
+import '../utils/announcement_rules.dart';
+import '../l10n/announce_strings.dart';
+import '../widgets/category_field.dart';
 import '../widgets/form_layout.dart';
 import '../widgets/media_picker_grid.dart';
 import '../widgets/restriction_gate.dart';
@@ -55,7 +57,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   // Registration + merit + contacts.
   bool _closeAtStart = true;
   bool _meritOffered = false;
-  bool _attendanceEnabled = false;
   bool _isAdminUser = false;
   String? _audience = 'uitm';
   final _capacityCtrl = TextEditingController();
@@ -63,6 +64,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final _meritNoteCtrl = TextEditingController();
   final _activityRefCtrl = TextEditingController();
   final _coOrganiserCtrl = TextEditingController();
+  final _picCtrl = TextEditingController();
+
+  /// Buttons with links, like an announcement's (max two). Each row keeps its
+  /// own controllers so editing an existing event repopulates them.
+  final List<_LinkRow> _links = [];
   final Map<String, TextEditingController> _contactCtrls = {
     for (final c in const ['whatsapp', 'telegram', 'instagram', 'email', 'link'])
       c: TextEditingController(),
@@ -106,10 +112,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       _feeCtrl.text = event['fee']?.toString() ?? '';
       _audience = (event['audience'] as String?) ?? 'uitm';
       _meritOffered = event['merit_offered'] == true;
-      _attendanceEnabled = event['attendance_enabled'] == true;
       _meritNoteCtrl.text = event['merit_note'] ?? '';
       _activityRefCtrl.text = event['activity_ref'] ?? '';
       _coOrganiserCtrl.text = event['co_organiser'] ?? '';
+      _picCtrl.text = event['pic'] ?? '';
+      for (final link in ActionLink.listFrom(event['action_links'])) {
+        _links.add(_LinkRow()..set(link.label, link.url));
+      }
       _loadContacts(event['id'] as String);
 
       // LOAD EXISTING MEDIA
@@ -247,6 +256,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     _locationController.dispose();
     _descController.dispose();
     _linkController.dispose();
+    _picCtrl.dispose();
+    for (final l in _links) {
+      l.dispose();
+    }
     FormGuard.clear();
     // Leaving on purpose (publish / discard / close) drops the draft; a
     // page reload never gets here, so the draft survives that.
@@ -258,10 +271,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     final s = context.l10nRead;
-    if (_mediaItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.addPhotoRequired)));
-      return;
-    }
+    // A photo is optional: an event without a cover still has a date block and
+    // every list renders it. (It used to be required, which made a seeded or
+    // quickly-created event impossible to open and re-save.)
     if (_categories.isEmpty) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(s.categoryRequired)));
@@ -331,7 +343,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         'merit_note': _nullIfEmpty(_meritNoteCtrl.text),
         'activity_ref': _nullIfEmpty(_activityRefCtrl.text),
         'co_organiser': _nullIfEmpty(_coOrganiserCtrl.text),
-        'attendance_enabled': _attendanceEnabled,
+        'pic': _nullIfEmpty(_picCtrl.text),
+        // Attendance is no longer a setting: the organiser takes it from the
+        // event page, so every new event has the door available.
+        if (widget.eventToEdit == null) 'attendance_enabled': true,
+        'action_links': [
+          for (final l in _links)
+            if (l.label.text.trim().isNotEmpty && l.url.text.trim().isNotEmpty)
+              {'label': l.label.text.trim(), 'url': l.url.text.trim()},
+        ],
       };
 
       if (widget.eventToEdit != null) {
@@ -343,7 +363,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         final insert = (_hostAs ?? const PostAsOption.self('')).applyTo(data, hasAnonymous: false);
         final newEvent = await supabase.from('events').insert(insert).select().single();
         await _saveContacts(newEvent['id'] as String);
-        await _processMentions(_descController.text, newEvent['id']);
+        // People mentioned in the description *or* in the cooperation line are
+        // told about the event; club names there are plain text on purpose.
+        await _processMentions(
+          '${_descController.text} ${_coOrganiserCtrl.text}',
+          newEvent['id'],
+        );
         // The form is replaced by the new event's page, so back from
         // there returns to where the user started, not to this form.
         if (mounted) {
@@ -466,16 +491,27 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                       isMultiLine: true,
                     ),
                   ),
+                  // Same light markup the announcement composer documents:
+                  // the event page renders the description with it.
+                  const SizedBox(height: KSpace.xs),
+                  Text(
+                    context.announceL10n.formattingHelp,
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                  _label(s.eventPic),
+                  _input(_picCtrl, s.eventPicHint),
                 ],
               ),
               FormSection(
                 title: s.category,
                 icon: AppIcons.filter,
                 children: [
-                  CategoryPicker(
+                  CategoryField(
                     kind: 'event',
                     value: _categories,
                     onChanged: (v) => setState(() => _categories = v),
+                    hintText: s.eventCategoryHint,
                   ),
                   const SizedBox(height: KSpace.xs),
                   Text(
@@ -483,6 +519,27 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     style: theme.textTheme.bodySmall
                         ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                   ),
+                ],
+              ),
+              FormSection(
+                title: s.eventButtons,
+                icon: AppIcons.link,
+                children: [
+                  Text(
+                    s.eventButtonsHint,
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                  for (var i = 0; i < _links.length; i++) _linkEditor(i),
+                  if (_links.length < kActionLinksMax)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () => setState(() => _links.add(_LinkRow())),
+                        icon: const Icon(AppIcons.create, size: 18),
+                        label: Text(s.eventAddButton),
+                      ),
+                    ),
                 ],
               ),
               FormSection(
@@ -571,17 +628,20 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     ],
                   ],
                   const SizedBox(height: 12),
-                  _input(_coOrganiserCtrl, s.evCoOrganiser,
-                      icon: AppIcons.people),
-                  const Divider(height: 32),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: _attendanceEnabled,
-                    onChanged: (v) => setState(() => _attendanceEnabled = v),
-                    title: Text(s.evAttendance),
-                    subtitle: Text(s.evAttendanceHint,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                  // "Dengan kerjasama": usually a club, sometimes a person.
+                  // Typing suggests both — clubs insert their name (a club has
+                  // no profile to @mention), people insert "@username".
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainer,
+                      borderRadius: KRadius.input,
+                    ),
+                    child: MentionInput(
+                      controller: _coOrganiserCtrl,
+                      hintText: s.evCoOrganiserHint,
+                      suggestClubs: true,
+                    ),
                   ),
                 ],
               ),
@@ -593,17 +653,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                       style: theme.textTheme.bodySmall
                           ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                   const SizedBox(height: KSpace.s),
-                  _input(_contactCtrls['whatsapp']!, 'WhatsApp',
-                      icon: AppIcons.email, keyboard: TextInputType.phone),
-                  const SizedBox(height: 10),
-                  _input(_contactCtrls['telegram']!, 'Telegram', icon: AppIcons.email),
-                  const SizedBox(height: 10),
-                  _input(_contactCtrls['instagram']!, 'Instagram', icon: AppIcons.email),
-                  const SizedBox(height: 10),
-                  _input(_contactCtrls['email']!, 'Email',
-                      icon: AppIcons.email, keyboard: TextInputType.emailAddress),
-                  const SizedBox(height: 10),
-                  _input(_contactCtrls['link']!, 'Link', icon: AppIcons.link),
+                  _channelField(_contactCtrls['whatsapp']!, 'WhatsApp',
+                      AppIcons.phone, TextInputType.phone),
+                  _channelField(_contactCtrls['telegram']!, 'Telegram',
+                      AppIcons.send),
+                  _channelField(_contactCtrls['instagram']!, 'Instagram',
+                      AppIcons.camera),
+                  _channelField(_contactCtrls['email']!, 'Email',
+                      AppIcons.email, TextInputType.emailAddress),
+                  _channelField(_contactCtrls['link']!, 'Link', AppIcons.link),
                 ],
               ),
             ],
@@ -681,6 +739,90 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     child: Text(text, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600))
   );
 
+  /// One contact channel: its icon, then the field. The channel is the label,
+  /// so the section reads as a list of actions rather than five anonymous
+  /// boxes.
+  Widget _channelField(TextEditingController c, String label, IconData icon,
+      [TextInputType? keyboard]) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest,
+              borderRadius: KRadius.input,
+            ),
+            child: Icon(icon, size: 18, color: scheme.primary),
+          ),
+          const SizedBox(width: KSpace.s),
+          Expanded(child: _input(c, label, keyboard: keyboard)),
+        ],
+      ),
+    );
+  }
+
+  /// One button row (label + url), validated exactly like an announcement's
+  /// action button — the same rules and the same error copy.
+  Widget _linkEditor(int i) {
+    final row = _links[i];
+    final a = context.announceL10n;
+    final issue = validateActionLink(row.label.text, row.url.text);
+    final labelIssue =
+        issue == ActionLinkIssue.emptyLabel || issue == ActionLinkIssue.labelTooLong;
+    final show = row.touched;
+
+    String? messageFor(ActionLinkIssue? issue) => switch (issue) {
+          ActionLinkIssue.emptyLabel => a.errActionEmptyLabel,
+          ActionLinkIssue.labelTooLong => a.errActionLabelTooLong.fill([kActionLabelMax]),
+          ActionLinkIssue.emptyUrl => a.errActionEmptyUrl,
+          ActionLinkIssue.notHttps => a.errActionNotHttps,
+          ActionLinkIssue.unknownRoute => a.errActionUnknownRoute,
+          ActionLinkIssue.badUrl => a.errActionBadUrl,
+          null => null,
+        };
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: KSpace.s),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 2,
+            child: TextFormField(
+              controller: row.label,
+              onChanged: (_) => setState(() => row.touched = true),
+              decoration: _inputDeco(a.actionLabel, Theme.of(context)).copyWith(
+                errorText: show && labelIssue ? messageFor(issue) : null,
+              ),
+            ),
+          ),
+          const SizedBox(width: KSpace.s),
+          Expanded(
+            flex: 3,
+            child: TextFormField(
+              controller: row.url,
+              onChanged: (_) => setState(() => row.touched = true),
+              keyboardType: TextInputType.url,
+              decoration: _inputDeco(a.actionUrlHint, Theme.of(context)).copyWith(
+                errorText: show && !labelIssue ? messageFor(issue) : null,
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: context.l10n.delete,
+            onPressed: () => setState(() => _links.removeAt(i).dispose()),
+            icon: Icon(AppIcons.delete,
+                size: 18, color: Theme.of(context).colorScheme.error),
+          ),
+        ],
+      ),
+    );
+  }
+
   String? Function(String?) _required(String field) {
     final message = context.l10n.fieldRequired.fill([field]);
     return (v) => (v == null || v.trim().isEmpty) ? message : null;
@@ -710,4 +852,22 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         borderRadius: KRadius.input,
         borderSide: BorderSide(color: t.colorScheme.primary, width: 2)),
   );
+}
+
+/// A button row's controllers. [touched] keeps the error quiet until the user
+/// has actually typed in the row.
+class _LinkRow {
+  final TextEditingController label = TextEditingController();
+  final TextEditingController url = TextEditingController();
+  bool touched = false;
+
+  void set(String labelText, String urlText) {
+    label.text = labelText;
+    url.text = urlText;
+  }
+
+  void dispose() {
+    label.dispose();
+    url.dispose();
+  }
 }

@@ -8,6 +8,13 @@ class MentionInput extends StatelessWidget {
   final bool isMultiLine;
   final bool reverseDirection; 
 
+  /// Also suggest **clubs** while typing, not just `@people`.
+  ///
+  /// A club has a handle but no profile, so `@kerawang` would mention nobody.
+  /// Where a field is meant to name a club (the event's co-organiser), the
+  /// suggestion inserts the club's name as text instead of a mention.
+  final bool suggestClubs;
+
   const MentionInput({
     super.key,
     required this.controller,
@@ -19,6 +26,7 @@ class MentionInput extends StatelessWidget {
     this.maxLines,
     this.autofocus = false,
     this.focusNode,
+    this.suggestClubs = false,
   });
 
   /// Lets callers focus the field (e.g. "Comment" on a post).
@@ -81,37 +89,66 @@ class MentionInput extends StatelessWidget {
 
         // 3. Extract the word
         final currentWord = text.substring(start, selection.baseOffset);
+        final isMention = currentWord.startsWith('@');
 
-        // 4. Check if it is a mention tag
-        if (currentWord.startsWith('@') && currentWord.length > 1) {
-          final query = currentWord.substring(1); 
-          
-          // Debugging Print (Check your Debug Console!)
-          debugPrint("Searching DB for: $query"); 
+        // A bare "@" is too broad to search on.
+        if (isMention && currentWord.length < 2) return null;
+        if (!isMention && !suggestClubs) return null;
+        if (!isMention && currentWord.length < 2) return null;
 
+        final query = isMention ? currentWord.substring(1) : currentWord;
+        final out = <Map<String, dynamic>>[];
+
+        // 4a. People, for an @mention.
+        if (isMention) {
           try {
             final res = await Supabase.instance.client
                 .from('profiles')
                 .select('id, username, avatar_url')
                 .ilike('username', '$query%')
                 .limit(5);
-            return List<Map<String, dynamic>>.from(res);
+            out.addAll(List<Map<String, dynamic>>.from(res));
           } catch (e) {
             debugPrint("DB Error: $e");
-            return null;
           }
         }
-        return null; 
+
+        // 4b. Clubs, by name or handle. These insert as a name, not a mention:
+        //      a club has no profile to notify.
+        if (suggestClubs) {
+          try {
+            final res = await Supabase.instance.client
+                .from('clubs')
+                .select('name, handle')
+                .eq('status', 'active')
+                .or('name.ilike.%$query%,handle.ilike.%$query%')
+                .limit(5);
+            out.addAll([
+              for (final c in List<Map<String, dynamic>>.from(res))
+                {...c, 'kind': 'club'},
+            ]);
+          } catch (e) {
+            debugPrint("Club search failed: $e");
+          }
+        }
+
+        return out.isEmpty ? null : out;
       },
 
       itemBuilder: (context, user) {
+        final isClub = user['kind'] == 'club';
         return ListTile(
           leading: CircleAvatar(
-            backgroundImage: user['avatar_url'] != null ? NetworkImage(user['avatar_url']) : null,
+            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+            backgroundImage:
+                !isClub && user['avatar_url'] != null ? NetworkImage(user['avatar_url']) : null,
             radius: 14,
-            child: user['avatar_url'] == null ? const Icon(Icons.person, size: 14) : null,
+            child: isClub
+                ? const Icon(Icons.groups, size: 14)
+                : (user['avatar_url'] == null ? const Icon(Icons.person, size: 14) : null),
           ),
-          title: Text(user['username'] ?? 'User'),
+          title: Text(isClub ? '${user['name']}' : (user['username'] ?? 'User')),
+          subtitle: isClub ? Text('@${user['handle']}') : null,
           dense: true,
         );
       },
@@ -127,11 +164,15 @@ class MentionInput extends StatelessWidget {
         }
         start++; 
 
-        final newText = text.replaceRange(start, selection.baseOffset, "@${user['username']} ");
+        // A club becomes its name; a person becomes "@username ".
+        final insert = user['kind'] == 'club'
+            ? '${user['name']} '
+            : "@${user['username']} ";
+        final newText = text.replaceRange(start, selection.baseOffset, insert);
         
         controller.value = TextEditingValue(
           text: newText,
-          selection: TextSelection.collapsed(offset: start + user['username'].toString().length + 2),
+          selection: TextSelection.collapsed(offset: start + insert.length),
         );
       },
     );

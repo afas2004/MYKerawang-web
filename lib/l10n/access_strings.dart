@@ -162,6 +162,77 @@ extension AccessStrings on AppStrings {
   String get evFee => _t("Fee (RM)", "Yuran (RM)", "Fee (RM)");
   String get evFeeHint => _t("Empty or 0 means free", "Kosong atau 0 bermaksud percuma", "Empty or 0 means free");
   String get evFeeFree => _t("Free", "Percuma", "Free");
+  // ---- composer: the two fields events were missing ----
+  String get eventPic => _t("Person in charge (optional)", "Pegawai bertanggungjawab (pilihan)", "Person in charge (optional)");
+  String get eventPicHint => _t("Name and phone", "Nama dan telefon", "Name and phone");
+  String get eventCategoryHint =>
+      _t("Type to search a category", "Taip untuk cari kategori", "Type to search a category");
+  String get eventButtons => _t("Buttons", "Butang", "Buttons");
+  String get eventButtonsHint => _t(
+      "Up to two: a form, a map, a registration page. https:// or an app route like /event/…",
+      "Maksimum dua: borang, peta, halaman pendaftaran. https:// atau laluan aplikasi seperti /event/…",
+      "Up to two: https:// or an app route.");
+  String get eventAddButton => _t("Add button", "Tambah butang", "Add button");
+  String get evPic =>
+      _t("Person in charge", "Pegawai bertanggungjawab", "Person in charge");
+  String get evManage => _t("Manage event", "Urus acara", "Manage event");
+  String get evManageSubtitle => _t(
+      "Attendance, reports and the door code",
+      "Kehadiran, laporan dan kod pintu",
+      "Attendance, reports and the door code");
+  String get evCheckinOpen =>
+      _t("Check-in is open", "Daftar masuk dibuka", "Check-in is open");
+  String get evCheckinOpenHint => _t(
+      "Scan the code at the door, or open the event on your phone.",
+      "Imbas kod di pintu, atau buka acara ini di telefon.",
+      "Scan the code at the door, or open the event on your phone.");
+  String get evLive => _t("Live now", "Sedang berlangsung", "Live now");
+
+  // ---- the take-attendance flow ----
+  String get evTakeAttendance =>
+      _t("Take attendance", "Ambil kehadiran", "Take attendance");
+  String get evStartTitle => _t("Take attendance", "Ambil kehadiran", "Take attendance");
+  String get evStartBody => _t(
+      "Students scan the code at the door. You can end it whenever you like.",
+      "Pelajar imbas kod di pintu. Anda boleh tamatkan bila-bila masa.",
+      "Students scan the code at the door.");
+  String get evAddKiQuestion => _t(
+      "Add the KI report to this check-in?",
+      "Tambah laporan KI pada daftar masuk ini?",
+      "Add the KI report to this check-in?");
+  String get evAddKiHint => _t(
+      "Students who check in are asked to answer the form straight afterwards.",
+      "Pelajar yang mendaftar masuk akan diminta menjawab borang selepas itu.",
+      "Students answer the form straight after checking in.");
+  String get evStart => _t("Start", "Mula", "Start");
+  String get evEndAttendance =>
+      _t("End attendance", "Tamatkan kehadiran", "End attendance");
+  String get evEndConfirmTitle =>
+      _t("End attendance?", "Tamatkan kehadiran?", "End attendance?");
+  String get evEndConfirmBody => _t(
+      "The code stops working and you'll see the totals. You can start again later.",
+      "Kod tidak lagi berfungsi dan anda akan nampak jumlah. Boleh mula semula nanti.",
+      "The code stops working. You can start again later.");
+  String get evAttendanceClosed =>
+      _t("Attendance closed", "Kehadiran ditutup", "Attendance closed");
+  String get evTotalAttendance =>
+      _t("Checked in", "Jumlah hadir", "Checked in");
+  String get evKiReports => _t("KI reports", "Laporan KI", "KI reports");
+  String get evWaitingFirstScan => _t(
+      "Waiting for the first scan", "Menunggu imbasan pertama", "Waiting for the first scan");
+  String evJustCheckedIn(String name) =>
+      _t("$name just checked in", "$name baru mendaftar masuk", "$name just checked in");
+  String get evExportAttendance =>
+      _t("Attendance CSV", "CSV kehadiran", "Attendance CSV");
+  String get evExportKi => _t("KI report CSV", "CSV laporan KI", "KI report CSV");
+  String get evExportBoth => _t("Both (2 files)", "Kedua-dua (2 fail)", "Both (2 files)");
+  String get evDone => _t("Done", "Selesai", "Done");
+  String get evExportFailed => _t(
+      "Could not export. Try again.", "Tidak dapat eksport. Cuba lagi.", "Could not export.");
+  String get evNoOpenFormYet => _t(
+      "Publish a KI form first, then take attendance with it.",
+      "Terbitkan borang KI dahulu, kemudian ambil kehadiran dengannya.",
+      "Publish a KI form first.");
   String get evAudience => _t("Open to", "Terbuka kepada", "Open to");
   String evAudienceLabel(String? v) => switch (v) {
         'kolej' => _t("This college", "Kolej ini", "This college"),
@@ -178,6 +249,10 @@ extension AccessStrings on AppStrings {
   String get evActivityRef => _t("Activity reference", "Rujukan aktiviti", "Activity reference");
   String get evCoOrganiser =>
       _t("With cooperation from", "Dengan kerjasama", "With cooperation from");
+  String get evCoOrganiserHint => _t(
+      "Type a club name, or @ for a person",
+      "Taip nama kelab, atau @ untuk orang",
+      "Type a club name, or @ for a person");
   String get evContacts => _t("Contact the organiser", "Hubungi penganjur", "Contact the organiser");
   String get evContactHint =>
       _t("Leave blank to hide a channel.", "Biarkan kosong untuk sembunyikan saluran.", "Leave blank to hide a channel.");

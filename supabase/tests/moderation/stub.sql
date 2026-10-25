@@ -27,7 +27,11 @@ create table public.posts (id uuid primary key default gen_random_uuid(), user_i
 create table public.comments (id uuid primary key default gen_random_uuid(), post_id uuid references public.posts(id),
   event_id uuid references public.events(id), user_id uuid references public.profiles(id), body text,
   is_anonymous boolean, created_at timestamptz default now());
-create table public.event_participants (event_id uuid references public.events(id), user_id uuid references public.profiles(id));
+-- The real table has a primary key on (event_id, user_id): check-in and the
+-- join button both rely on ON CONFLICT to dedupe. Without it here, a test can
+-- insert the same person twice and pass.
+create table public.event_participants (event_id uuid references public.events(id), user_id uuid references public.profiles(id),
+  primary key (event_id, user_id));
 create table public.followers (follower_id uuid, following_id uuid);
 create table public.reports (id uuid primary key default gen_random_uuid(), reporter_id uuid, target_id uuid,
   target_type text, reason text);

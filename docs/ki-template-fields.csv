@@ -1,0 +1,29 @@
+sort,kind,label,help,required,options,analysis,ki_code
+10,heading,Maklumat peserta,,,,,
+20,short_text,Nama penuh,Prefilled from your profile.,yes,,,
+30,student_id,Nombor matrik,Your UiTM student number.,yes,,,
+40,single_choice,Saya menyertai program ini sebagai,,yes,"{""choices"":[""Peserta"",""Penganjur""]}",,
+50,heading,Penilaian Kemahiran Insaniah — sebelum program,"Rate yourself before the programme. 1 = very low, 5 = very high.",,,,
+60,rating,KI1 Kemahiran Berkomunikasi,,yes,"{""min"":1,""max"":5}",ki_pre,1
+70,rating,KI2 Pemikiran Kritis dan Kemahiran Menyelesaikan Masalah,,yes,"{""min"":1,""max"":5}",ki_pre,2
+80,rating,KI3 Kemahiran Kerja Berpasukan,,yes,"{""min"":1,""max"":5}",ki_pre,3
+90,rating,KI4 Pembelajaran Berterusan dan Pengurusan Maklumat,,yes,"{""min"":1,""max"":5}",ki_pre,4
+100,rating,KI5 Kemahiran Keusahawanan,,yes,"{""min"":1,""max"":5}",ki_pre,5
+110,rating,KI6 Etika dan Moral Profesional,,yes,"{""min"":1,""max"":5}",ki_pre,6
+120,rating,KI7 Kemahiran Kepimpinan,,yes,"{""min"":1,""max"":5}",ki_pre,7
+130,heading,Penilaian Kemahiran Insaniah — selepas program,"Rate yourself after the programme, on the same scale.",,,,
+140,rating,KI1 Kemahiran Berkomunikasi,,yes,"{""min"":1,""max"":5}",ki_post,1
+150,rating,KI2 Pemikiran Kritis dan Kemahiran Menyelesaikan Masalah,,yes,"{""min"":1,""max"":5}",ki_post,2
+160,rating,KI3 Kemahiran Kerja Berpasukan,,yes,"{""min"":1,""max"":5}",ki_post,3
+170,rating,KI4 Pembelajaran Berterusan dan Pengurusan Maklumat,,yes,"{""min"":1,""max"":5}",ki_post,4
+180,rating,KI5 Kemahiran Keusahawanan,,yes,"{""min"":1,""max"":5}",ki_post,5
+190,rating,KI6 Etika dan Moral Profesional,,yes,"{""min"":1,""max"":5}",ki_post,6
+200,rating,KI7 Kemahiran Kepimpinan,,yes,"{""min"":1,""max"":5}",ki_post,7
+210,heading,Maklum balas program,"1 = very poor, 5 = very good.",,,,
+220,rating,Pengisian program,,yes,"{""min"":1,""max"":5}",feedback,
+230,rating,Persembahan multimedia,,yes,"{""min"":1,""max"":5}",feedback,
+240,rating,Lokasi program,,yes,"{""min"":1,""max"":5}",feedback,
+250,rating,Aturcara dan pengendalian program,,yes,"{""min"":1,""max"":5}",feedback,
+260,rating,Mutu makanan dan minuman,,yes,"{""min"":1,""max"":5}",feedback,
+270,rating,Keseluruhan mutu aktiviti,,yes,"{""min"":1,""max"":5}",feedback,
+280,long_text,Cadangan / maklum balas,,no,,,

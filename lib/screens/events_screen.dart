@@ -14,6 +14,7 @@ import '../widgets/profile_avatar_action.dart';
 import '../widgets/shell_actions.dart';
 import '../services/category_service.dart';
 import '../utils/categories.dart';
+import '../utils/event_live.dart';
 import '../utils/formatters.dart';
 import '../utils/roles.dart';
 import '../widgets/error_state.dart';
@@ -375,6 +376,10 @@ class EventCard extends StatelessWidget {
                         _Pill(cancelled ? s.cancelled : s.ended, muted: true)
                       else if (countdown != null)
                         CountdownChip(countdown),
+                      // The door is open: the one thing worth knowing about an
+                      // event you are standing next to.
+                      if (!closed && checkinOpen(event))
+                        _Pill(s.evCheckinOpen),
                       if (goingCount != null && goingCount! > 0)
                         _iconLine(AppIcons.people, s.goingCount.fill([goingCount]), meta, scheme,
                             shrink: true),

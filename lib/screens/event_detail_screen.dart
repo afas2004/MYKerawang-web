@@ -1,16 +1,22 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../services/comment_pins.dart';
+import '../services/form_service.dart';
 import '../services/moderation_service.dart';
 import 'package:mykerawang/services/share_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
+import '../l10n/form_strings.dart';
 import '../language_cubit.dart';
 import '../theme/app_themes.dart';
 import '../utils/app_nav.dart';
+import '../utils/announcement_rules.dart';
+import '../utils/attendance_rules.dart';
+import '../utils/event_live.dart';
 import '../utils/formatters.dart';
 import '../utils/feedback.dart';
 import '../utils/guest_access.dart';
@@ -19,11 +25,12 @@ import '../utils/roles.dart';
 import '../widgets/comment_tile.dart';
 import 'events_screen.dart' show CountdownChip, DateBlock, eventCountdown, isOfficialProfile;
 import '../widgets/mention_text.dart';
+import '../widgets/announcement_view.dart' show FormattedBody, openAnnouncementLink;
 import '../widgets/status_badge.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/tap_card.dart';
 import 'gallery_view_screen.dart';
-import 'events/attendance_screen.dart';
+import 'events/attendance_live_screen.dart';
 import 'events/checkin_screens.dart';
 import '../widgets/restriction_gate.dart';
 import '../widgets/save_button.dart';
@@ -67,6 +74,8 @@ class _EventDetailScreenState extends State<EventDetailScreen>
 
   @override
   void dispose() {
+    final channel = _peopleChannel;
+    if (channel != null) Supabase.instance.client.removeChannel(channel);
     _heroController.dispose();
     _commentCtrl.dispose();
     super.dispose();
@@ -78,6 +87,39 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     _event = widget.event;
     _commentsStream = _fetchCommentsStream();
     _fetchEventDetails();
+    _loadOpenForm();
+    _loadContacts();
+  }
+
+  /// The event's published form, if any, for the "answer" entry point.
+  String? _openFormId;
+
+  /// The organiser's contact channels, as buttons.
+  List<ContactLink> _contacts = const [];
+
+  Future<void> _loadOpenForm() async {
+    try {
+      final id = await FormService.instance.openFormId('${_event['id']}');
+      if (mounted) setState(() => _openFormId = id);
+    } catch (e) {
+      // Not signed in, or the forms migration is not applied yet: no button.
+      debugPrint('No open form: $e');
+    }
+  }
+
+  /// Signed-in readers get the organiser's channels; guests see a sign-in
+  /// prompt instead (the RPC refuses them, by design).
+  Future<void> _loadContacts() async {
+    if (!isLoggedIn) return;
+    try {
+      final rows = await Supabase.instance.client
+          .rpc('event_contact', params: {'p_event_id': '${_event['id']}'});
+      final list = List<Map<String, dynamic>>.from(rows as List);
+      if (!mounted) return;
+      setState(() => _contacts = list.isEmpty ? const [] : contactLinks(list.first));
+    } catch (e) {
+      debugPrint('No contacts: $e');
+    }
   }
 
   Future<void> _fetchEventDetails() async {
@@ -131,9 +173,61 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         });
       }
       if (userId != null) _fetchFollowingGoing(userId);
+      _watchParticipants();
     } catch (e) {
       debugPrint("Error fetching details: $e");
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  /// Keeps "N attending" honest while people join, leave or check in.
+  ///
+  /// Realtime is best-effort: guests have no session (no socket), and a project
+  /// without replication enabled simply never fires, so every value here is
+  /// re-read rather than patched.
+  RealtimeChannel? _peopleChannel;
+
+  void _watchParticipants() {
+    final supabase = Supabase.instance.client;
+    if (supabase.auth.currentSession == null || _peopleChannel != null) return;
+    _peopleChannel = supabase
+        .channel('event-people-${_event['id']}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'event_participants',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'event_id',
+            value: '${_event['id']}',
+          ),
+          callback: (_) => _refreshCounts(),
+        )
+        .subscribe();
+  }
+
+  Future<void> _refreshCounts() async {
+    final supabase = Supabase.instance.client;
+    try {
+      final int count;
+      if (isLoggedIn) {
+        count = await supabase
+            .from('event_participants')
+            .count(CountOption.exact)
+            .eq('event_id', _event['id']);
+      } else {
+        final row = await supabase
+            .from('event_participant_counts')
+            .select('participant_count')
+            .eq('event_id', _event['id'])
+            .maybeSingle();
+        count = (row?['participant_count'] as num?)?.toInt() ?? 0;
+      }
+      if (mounted && count != _participantCount) {
+        setState(() => _participantCount = count);
+      }
+    } catch (e) {
+      debugPrint('Count refresh failed: $e');
     }
   }
 
@@ -906,7 +1000,8 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         e['capacity'] != null ||
         e['merit_offered'] == true ||
         '${e['activity_ref'] ?? ''}'.isNotEmpty ||
-        '${e['co_organiser'] ?? ''}'.isNotEmpty;
+        '${e['co_organiser'] ?? ''}'.isNotEmpty ||
+        '${e['pic'] ?? ''}'.isNotEmpty;
   }
 
   Widget _eventFactsCard(BuildContext context) {
@@ -939,6 +1034,8 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     if (ref.isNotEmpty) rows.add((AppIcons.link, s.evActivityRef, ref));
     final co = '${e['co_organiser'] ?? ''}'.trim();
     if (co.isNotEmpty) rows.add((AppIcons.people, s.evCoOrganiser, co));
+    final pic = '${e['pic'] ?? ''}'.trim();
+    if (pic.isNotEmpty) rows.add((AppIcons.person, s.evPic, pic));
 
     if (rows.isEmpty) return const SizedBox.shrink();
     return KCard(
@@ -973,36 +1070,92 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     );
   }
 
+  /// The KI report survey for this event: the editor opens the newest draft,
+  /// or offers the starting points when the event has none.
+  void _openReportForm() {
+    final id = _event['id'];
+    if (id == null) return;
+    context.push('/event/$id/form/edit');
+  }
+
+  /// The same form, as a student fills it in.
+  void _openAnswerForm() {
+    final id = _event['id'];
+    if (id == null) return;
+    context.push('/event/$id/form');
+  }
+
   /// Contact + attendance, under the main action.
   Widget _secondaryActions(BuildContext context) {
     final s = context.l10n;
-    final attendanceOn = _event['attendance_enabled'] == true;
+    final live = checkinOpen(_event);
+    final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        OutlinedButton.icon(
-          onPressed: _showContacts,
-          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-          icon: const Icon(AppIcons.email, size: 18),
-          label: Text(s.evContacts),
-        ),
-        if (_isOwner) ...[
-          const SizedBox(height: KSpace.s),
-          OutlinedButton.icon(
-            onPressed: _openAttendance,
-            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-            icon: const Icon(AppIcons.verified, size: 18),
-            label: Text(s.evAttendance),
-          ),
-          if (!_registrationClosed && !_isClosed) ...[
-            const SizedBox(height: KSpace.s),
-            TextButton.icon(
-              onPressed: _closeRegistration,
-              icon: const Icon(AppIcons.lock, size: 18),
-              label: Text(s.evCloseNow),
+        // The door is open: say so, everywhere the event appears.
+        if (live) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: KSpace.m, vertical: KSpace.s),
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer,
+              borderRadius: BorderRadius.circular(12),
             ),
-          ],
-        ] else if (attendanceOn) ...[
+            child: Row(
+              children: [
+                Icon(AppIcons.qrCode, size: 18, color: scheme.onPrimaryContainer),
+                const SizedBox(width: KSpace.s),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.evCheckinOpen,
+                        style: TextStyle(
+                          color: scheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                      Text(
+                        s.evCheckinOpenHint,
+                        style: TextStyle(
+                            color: scheme.onPrimaryContainer, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: KSpace.s),
+        ],
+        // Contact is a row of buttons, not a sheet you have to read. A guest
+        // has nothing to open until they sign in, so they get one prompt.
+        if (_contacts.isNotEmpty)
+          Wrap(
+            spacing: KSpace.s,
+            runSpacing: KSpace.s,
+            children: [
+              for (final c in _contacts)
+                OutlinedButton.icon(
+                  onPressed: () => _openContact(c),
+                  icon: Icon(_contactIcon(c.channel), size: 18),
+                  label: Text(c.label),
+                ),
+            ],
+          )
+        else if (!isLoggedIn)
+          OutlinedButton.icon(
+            onPressed: () => requireLogin(context),
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            icon: const Icon(AppIcons.email, size: 18),
+            label: Text(s.evContacts),
+          ),
+        // Only people who are there need the door: the button appears for the
+        // event's own window, not for the whole lifetime of the page.
+        if (!_isOwner && live) ...[
           const SizedBox(height: KSpace.s),
           FilledButton.tonalIcon(
             onPressed: _startCheckIn,
@@ -1011,92 +1164,121 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             label: Text(s.evCheckIn),
           ),
         ],
+        if (!_isOwner && _openFormId != null) ...[
+          const SizedBox(height: KSpace.s),
+          OutlinedButton.icon(
+            onPressed: _openAnswerForm,
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            icon: const Icon(AppIcons.list, size: 18),
+            label: Text(s.formAnswerTitle),
+          ),
+        ],
+        // The rest of the organiser's controls, one level down: the page itself
+        // only leads with the door.
+        if (_isOwner) ...[
+          const SizedBox(height: KSpace.s),
+          OutlinedButton.icon(
+            onPressed: _openManageSheet,
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            icon: const Icon(AppIcons.settings, size: 18),
+            label: Text(s.evManage),
+          ),
+        ],
       ],
     );
   }
 
-  Future<void> _showContacts() async {
+  IconData _contactIcon(String channel) => switch (channel) {
+        'whatsapp' => AppIcons.people,
+        'telegram' => AppIcons.send,
+        'instagram' => AppIcons.camera,
+        'email' => AppIcons.email,
+        _ => AppIcons.link,
+      };
+
+  /// The organiser's settings: edit the event, the KI report, closing
+  /// registration. Attendance is the page's own action, and whether the KI form
+  /// is asked is decided when attendance starts, so neither is duplicated here.
+  Future<void> _openManageSheet() async {
     final s = context.l10nRead;
     final scheme = Theme.of(context).colorScheme;
-    List<Map<String, dynamic>> rows;
+
+    // The form the door would ask, if one is open.
+    FormDoc? form;
     try {
-      final r = await Supabase.instance.client
-          .rpc('event_contact', params: {'p_event_id': _event['id']});
-      rows = List<Map<String, dynamic>>.from(r as List);
+      final summary = await FormService.instance.summary('${_event['id']}');
+      if (summary != null) {
+        form = (await FormService.instance.load(summary.id)).doc;
+      }
     } catch (e) {
-      if (mounted) showErrorWithRetry(context, e, onRetry: _showContacts);
-      return;
+      debugPrint('No form for the manage sheet: $e');
     }
     if (!mounted) return;
-    final c = rows.isEmpty ? <String, dynamic>{} : rows.first;
-    final channels = <String, (IconData, String)>{
-      'whatsapp': (AppIcons.people, 'WhatsApp'),
-      'telegram': (AppIcons.link, 'Telegram'),
-      'instagram': (AppIcons.camera, 'Instagram'),
-      'email': (AppIcons.email, 'Email'),
-      'link': (AppIcons.link, 'Link'),
-    };
-    final available = [
-      for (final e in channels.entries)
-        if ('${c[e.key] ?? ''}'.trim().isNotEmpty) e,
-    ];
 
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-              child: Text(s.evContacts,
-                  style: Theme.of(ctx).textTheme.titleLarge),
-            ),
-            if (available.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(s.evContactNone,
-                    style: TextStyle(color: scheme.onSurfaceVariant)),
-              )
-            else
-              for (final e in available)
+      isScrollControlled: true,
+      builder: (ctx) {
+        final doc = form;
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
                 ListTile(
-                  leading: Icon(e.value.$1),
-                  title: Text(e.value.$2),
-                  subtitle: Text('${c[e.key]}'),
+                  leading: Icon(AppIcons.settings, color: scheme.primary),
+                  title: Text(s.evManage, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(s.evManageSubtitle),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(AppIcons.edit),
+                  title: Text(s.edit),
                   onTap: () {
-                    final url = _contactUrl(e.key, '${c[e.key]}');
-                    if (url != null) {
-                      launchUrl(Uri.parse(url),
-                          mode: LaunchMode.externalApplication);
+                    Navigator.pop(ctx);
+                    _editEvent();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(AppIcons.list),
+                  title: Text(s.formKiReport),
+                  subtitle: Text(doc == null ? s.formNoOpenFormToAsk : doc.title),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    if (doc == null) {
+                      _openReportForm();
+                    } else {
+                      context.push('/event/${_event['id']}/form/responses');
                     }
                   },
                 ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+                if (!_registrationClosed && !_isClosed)
+                  ListTile(
+                    leading: const Icon(AppIcons.lock),
+                    title: Text(s.evCloseNow),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _closeRegistration();
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
-  static String? _contactUrl(String channel, String value) {
-    final v = value.trim();
-    if (v.isEmpty) return null;
-    switch (channel) {
-      case 'whatsapp':
-        final digits = v.replaceAll(RegExp(r'[^0-9]'), '');
-        return digits.isEmpty ? null : 'https://wa.me/$digits';
-      case 'telegram':
-        if (v.startsWith('http')) return v;
-        return 'https://t.me/${v.replaceFirst('@', '')}';
-      case 'instagram':
-        if (v.startsWith('http')) return v;
-        return 'https://instagram.com/${v.replaceFirst('@', '')}';
-      case 'email':
-        return 'mailto:$v';
-      default:
-        return v.startsWith('http') ? v : 'https://$v';
+  /// A contact button opens the channel straight away — no sheet, no list.
+  Future<void> _openContact(ContactLink link) async {
+    final uri = Uri.tryParse(link.url);
+    if (uri == null) return;
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (mounted) showErrorWithRetry(context, e);
     }
   }
 
@@ -1132,12 +1314,65 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     }
   }
 
-  void _openAttendance() {    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => AttendanceScreen(
-        eventId: '${_event['id']}',
-        title: '${_event['title'] ?? ''}',
+  /// "Take attendance": ask whether the KI form comes with it, then open the
+  /// door. The choice is the only thing that needed asking; the rest is a
+  /// session the organiser ends when the queue is gone.
+  Future<void> _startAttendanceFlow() async {
+    final s = context.l10nRead;
+
+    FormDoc? form;
+    try {
+      final summary = await FormService.instance.summary('${_event['id']}');
+      if (summary != null) {
+        form = (await FormService.instance.load(summary.id)).doc;
+      }
+    } catch (e) {
+      debugPrint('No form for attendance: $e');
+    }
+    if (!mounted) return;
+
+    final choice = await showDialog<_AttendanceChoice>(
+      context: context,
+      builder: (ctx) => _AttendanceStartDialog(
+        hasForm: form != null,
+        initialKi: form?.afterCheckin ?? false,
       ),
-    ));
+    );
+    if (choice == null || !mounted) return;
+
+    if (choice.withKi && form == null) {
+      // There is nothing to ask after check-in yet.
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(s.evNoOpenFormYet)));
+      _openReportForm();
+      return;
+    }
+
+    // The door and the report stay in step: whatever was chosen here is what
+    // the check-in success screen reads.
+    if (form != null && form.afterCheckin != choice.withKi) {
+      try {
+        await FormService.instance.setAfterCheckin(form.id, choice.withKi);
+      } catch (e) {
+        debugPrint('Could not set after-checkin: $e');
+      }
+    }
+    if (!mounted) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AttendanceLiveScreen(
+          eventId: '${_event['id']}',
+          title: '${_event['title'] ?? ''}',
+          withKi: choice.withKi,
+          formId: form?.id,
+        ),
+      ),
+    );
+    if (mounted) {
+      // Re-read: people checked in while the door was open.
+      _refreshCounts();
+    }
   }
 
   void _startCheckIn() {
@@ -1192,11 +1427,13 @@ class _EventDetailScreenState extends State<EventDetailScreen>
   Widget _primaryAction(BuildContext context) {
     final s = context.l10n;
     if (_isOwner) {
+      // Attendance is the thing an organiser opens this page for while the
+      // event is running, so it is the page's action — not a settings row.
       return FilledButton.icon(
-        onPressed: _editEvent,
+        onPressed: _startAttendanceFlow,
         style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-        icon: const Icon(AppIcons.edit, size: 18),
-        label: Text(s.edit),
+        icon: const Icon(AppIcons.qrCode, size: 18),
+        label: Text(s.evTakeAttendance),
       );
     }
     // Already-joined people can still leave a cancelled event; nobody can
@@ -1349,11 +1586,41 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         const SizedBox(height: KSpace.s),
         SizedBox(
           width: double.infinity,
-          child: MentionText(
-            raw.trim().isEmpty ? s.noDetails : raw,
-            style: theme.textTheme.bodyLarge?.copyWith(height: 1.5, color: scheme.onSurface),
-          ),
+          child: raw.trim().isEmpty
+              ? MentionText(
+                  s.noDetails,
+                  style: theme.textTheme.bodyLarge?.copyWith(height: 1.5, color: scheme.onSurface),
+                )
+              // Same light markup as an announcement: paragraphs, "- " bullets,
+              // **bold**, and https links become tappable. The composer
+              // documents it right under the field.
+              : FormattedBody(
+                  raw,
+                  style: theme.textTheme.bodyLarge?.copyWith(height: 1.5, color: scheme.onSurface),
+                ),
         ),
+        if (ActionLink.listFrom(_event['action_links']).isNotEmpty) ...[
+          const SizedBox(height: KSpace.m),
+          Wrap(
+            spacing: KSpace.s,
+            runSpacing: KSpace.s,
+            children: [
+              for (var i = 0;
+                  i < ActionLink.listFrom(_event['action_links']).length;
+                  i++)
+                (i == 0 ? FilledButton.icon : OutlinedButton.icon)(
+                  onPressed: () => openAnnouncementLink(
+                      context, ActionLink.listFrom(_event['action_links'])[i].url),
+                  icon: Icon(
+                      ActionLink.listFrom(_event['action_links'])[i].isInternal
+                          ? AppIcons.forward
+                          : AppIcons.externalLink,
+                      size: 18),
+                  label: Text(ActionLink.listFrom(_event['action_links'])[i].label),
+                ),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -1532,6 +1799,73 @@ class _TypeToConfirmDialogState extends State<_TypeToConfirmDialog> {
             foregroundColor: scheme.onError,
           ),
           child: Text(widget.confirmLabel),
+        ),
+      ],
+    );
+  }
+}
+
+/// What "Start" was tapped with.
+class _AttendanceChoice {
+  final bool withKi;
+  const _AttendanceChoice(this.withKi);
+}
+
+/// The one question before the door opens: is the KI report part of this?
+class _AttendanceStartDialog extends StatefulWidget {
+  final bool hasForm;
+  final bool initialKi;
+
+  const _AttendanceStartDialog({required this.hasForm, required this.initialKi});
+
+  @override
+  State<_AttendanceStartDialog> createState() => _AttendanceStartDialogState();
+}
+
+class _AttendanceStartDialogState extends State<_AttendanceStartDialog> {
+  late bool _withKi = widget.hasForm && widget.initialKi;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return AlertDialog(
+      icon: const Icon(AppIcons.qrCode),
+      title: Text(s.evStartTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(s.evStartBody, style: theme.textTheme.bodyMedium),
+          const SizedBox(height: KSpace.l),
+          if (widget.hasForm)
+            Container(
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: SwitchListTile(
+                value: _withKi,
+                onChanged: (v) => setState(() => _withKi = v),
+                title: Text(s.evAddKiQuestion, style: const TextStyle(fontSize: 14)),
+                subtitle: Text(s.evAddKiHint,
+                    style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+              ),
+            )
+          else
+            Text(
+              s.evNoOpenFormYet,
+              style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(s.cancel)),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _AttendanceChoice(_withKi)),
+          child: Text(s.evStart),
         ),
       ],
     );
