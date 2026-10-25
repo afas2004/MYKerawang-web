@@ -67,6 +67,12 @@ class FakeFormService implements FormService {
           {required Map<String, dynamic> answers, String? role}) async {}
 
   @override
+  Future<FormAnalysis> analysis(String formId) async => const FormAnalysis();
+
+  @override
+  Future<List<FormResponse>> responses(String formId) async => const [];
+
+  @override
   Future<void> save(FormDoc doc) async {
     saved.add(doc);
     // The server assigns ids; emulate it so the reload after a save is honest.

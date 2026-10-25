@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../l10n/form_strings.dart';
@@ -293,6 +294,12 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          if (doc != null)
+            IconButton(
+              tooltip: s.formResponsesTitle,
+              icon: const Icon(AppIcons.list),
+              onPressed: () => context.push('/event/${widget.eventId}/form/responses'),
+            ),
           if (doc != null && !_readOnly)
             IconButton(
               tooltip: s.formSave,

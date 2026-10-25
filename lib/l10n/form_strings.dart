@@ -148,6 +148,36 @@ extension FormStrings on AppStrings {
       _t("This event has no form yet.", "Acara ini belum ada borang.", "This event has no form yet.");
   String get formEditThis => _t("Edit form", "Sunting borang", "Edit form");
 
+  // ---- the analysis (S1 / S2 / S3) ----
+  String get formResponsesTitle => _t("Responses", "Jawapan", "Responses");
+  String get formNoResponses => _t(
+      "No answers yet. Share the form with participants.",
+      "Belum ada jawapan. Kongsi borang dengan peserta.",
+      "No answers yet.");
+  String get formS1Title => _t(
+      "S1 — Participants, KI before and after",
+      "S1 — Peserta, KI sebelum dan selepas",
+      "S1 — Participants, before and after");
+  String get formS2Title =>
+      _t("S2 — Organisers, KI after the programme", "S2 — Penganjur, KI selepas program", "S2 — Organisers");
+  String get formS3Title =>
+      _t("S3 — Programme feedback", "S3 — Maklum balas program", "S3 — Programme feedback");
+  String get formBefore => _t("Before", "Sebelum", "Before");
+  String get formAfter => _t("After", "Selepas", "After");
+  String get formMean => _t("Mean", "Min", "Mean");
+  String get formDelta => _t("Change", "Beza", "Change");
+  String get formCopyTable => _t("Copy table", "Salin jadual", "Copy table");
+  String get formCopied => _t("Copied to the clipboard", "Disalin ke papan klip", "Copied");
+  String get formExportCsv => _t("Export CSV", "Eksport CSV", "Export CSV");
+  String get formCsvSaved => _t("CSV downloaded", "CSV dimuat turun", "CSV downloaded");
+  String get formRespondents =>
+      _t("Who answered", "Siapa yang menjawab", "Who answered");
+  String get formSuggestions =>
+      _t("Suggestions and comments", "Cadangan dan maklum balas", "Suggestions and comments");
+  String get formPeople => _t("people", "orang", "people");
+  String get formPeserta => _t("Participant", "Peserta", "Participant");
+  String get formPenganjur => _t("Organiser", "Penganjur", "Organiser");
+
   // ---- problems ----
   String formIssueText(String code) => switch (code) {
         'label_required' => _t("A question needs a label.", "Soalan perlu label.", "A question needs a label."),

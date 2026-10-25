@@ -118,6 +118,86 @@ class FormView {
   bool get answered => mine != null;
 }
 
+/// One KI element in S1 or S2.
+class KiMean {
+  final int kiCode;
+  final String label;
+  final int nBefore;
+  final double? meanBefore;
+  final int nAfter;
+  final double? meanAfter;
+  final double? delta;
+
+  const KiMean({
+    required this.kiCode,
+    required this.label,
+    this.nBefore = 0,
+    this.meanBefore,
+    this.nAfter = 0,
+    this.meanAfter,
+    this.delta,
+  });
+}
+
+/// One programme-feedback item in S3.
+class FeedbackMean {
+  final String fieldId;
+  final String label;
+  final int n;
+  final double? mean;
+
+  const FeedbackMean({
+    required this.fieldId,
+    required this.label,
+    this.n = 0,
+    this.mean,
+  });
+}
+
+/// `form_analysis()`: the three "analisa Excel" the HEP report asks for.
+class FormAnalysis {
+  final int peserta;
+  final int penganjur;
+
+  /// Peserta, before and after, per KI element.
+  final List<KiMean> s1;
+
+  /// Penganjur, after, per KI element.
+  final List<KiMean> s2;
+
+  /// Peserta feedback, per item.
+  final List<FeedbackMean> s3;
+
+  const FormAnalysis({
+    this.peserta = 0,
+    this.penganjur = 0,
+    this.s1 = const [],
+    this.s2 = const [],
+    this.s3 = const [],
+  });
+
+  bool get isEmpty => peserta == 0 && penganjur == 0;
+}
+
+/// One person's answers.
+class FormResponse {
+  final String userId;
+  final String displayName;
+  final String? studentId;
+  final String role;
+  final DateTime? submittedAt;
+  final Map<String, dynamic> answers;
+
+  const FormResponse({
+    required this.userId,
+    required this.displayName,
+    this.studentId,
+    this.role = 'peserta',
+    this.submittedAt,
+    this.answers = const {},
+  });
+}
+
 /// The editor's and answer page's data source. Swappable so widget tests never
 /// touch Supabase: `FormService.instance = FakeFormService()`.
 abstract class FormService {
@@ -149,6 +229,12 @@ abstract class FormService {
     required Map<String, dynamic> answers,
     String? role,
   });
+
+  /// S1, S2, S3 — already reduced to means by the server.
+  Future<FormAnalysis> analysis(String formId);
+
+  /// Every answer, for the table and the CSV.
+  Future<List<FormResponse>> responses(String formId);
 
   static FormService instance = const SupabaseFormService();
 
@@ -257,4 +343,64 @@ class SupabaseFormService implements FormService {
         'p_role': role ?? 'peserta',
         'p_answers': answers,
       });
+
+  @override
+  Future<FormAnalysis> analysis(String formId) async {
+    final raw = await _db.rpc('form_analysis', params: {'p_form_id': formId});
+    final all = Map<String, dynamic>.from((raw as Map?) ?? const {});
+    final counts = Map<String, dynamic>.from((all['responses'] as Map?) ?? const {});
+
+    double? num_(dynamic v) => v == null ? null : (v as num).toDouble();
+    int int_(dynamic v) => v == null ? 0 : (v as num).toInt();
+
+    List<KiMean> ki(Object? list) => [
+          for (final e in (list as List?) ?? const [])
+            if (e is Map)
+              KiMean(
+                kiCode: int_(e['ki_code']),
+                label: '${e['label'] ?? ''}',
+                nBefore: int_(e['n_before']),
+                meanBefore: num_(e['mean_before']),
+                nAfter: int_(e['n_after']),
+                meanAfter: num_(e['mean_after']),
+                delta: num_(e['delta']),
+              ),
+        ];
+
+    return FormAnalysis(
+      peserta: int_(counts['peserta']),
+      penganjur: int_(counts['penganjur']),
+      s1: ki(all['s1']),
+      s2: ki(all['s2']),
+      s3: [
+        for (final e in (all['s3'] as List?) ?? const [])
+          if (e is Map)
+            FeedbackMean(
+              fieldId: '${e['field_id'] ?? ''}',
+              label: '${e['label'] ?? ''}',
+              n: int_(e['n']),
+              mean: num_(e['mean']),
+            ),
+      ],
+    );
+  }
+
+  @override
+  Future<List<FormResponse>> responses(String formId) async {
+    final rows = await _db.rpc('form_response_list', params: {'p_form_id': formId}) as List;
+    return [
+      for (final e in rows)
+        if (e is Map)
+          FormResponse(
+            userId: '${e['user_id']}',
+            displayName: '${e['display_name'] ?? e['username'] ?? ''}',
+            studentId: e['student_id'] as String?,
+            role: '${e['role'] ?? 'peserta'}',
+            submittedAt: DateTime.tryParse('${e['submitted_at'] ?? ''}'),
+            answers: e['answers'] is Map
+                ? Map<String, dynamic>.from(e['answers'] as Map)
+                : const {},
+          ),
+    ];
+  }
 }

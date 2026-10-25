@@ -51,6 +51,12 @@ class FakeAnswerService implements FormService {
   Future<void> publish(String formId) => throw UnimplementedError();
 
   @override
+  Future<FormAnalysis> analysis(String formId) async => const FormAnalysis();
+
+  @override
+  Future<List<FormResponse>> responses(String formId) async => const [];
+
+  @override
   Future<void> submit(String formId,
       {required Map<String, dynamic> answers, String? role}) async {
     submitted = answers;

@@ -1,18 +1,23 @@
 # KI event reports: design
 
-Status: **phases 1–3 shipped (server, editor, answer page), no analysis screen
-yet.** Design written 2026-10-25 against 1.7.7 (`6da73ad`) and rewritten twice the
-same day: once after the owner corrected the requirement (the KI report *is* the
-job; the builder merely extends it), and once after reading the two real
-documents — `BORANG KI QUIZ BAHASA ARAB (Responses).xlsx` (what a Google Form
-collected) and `LAPORAN PROGRAM QUIZ BAHASA ARAB.pdf` (what the club hands in).
+Status: **phases 1–4 shipped (server, editor, answer page, analysis), no
+`after_checkin` prompt yet.** Design written 2026-10-25 against 1.7.7 (`6da73ad`)
+and rewritten twice the same day: once after the owner corrected the requirement
+(the KI report *is* the job; the builder merely extends it), and once after
+reading the two real documents — `BORANG KI QUIZ BAHASA ARAB (Responses).xlsx`
+(what a Google Form collected) and `LAPORAN PROGRAM QUIZ BAHASA ARAB.pdf` (what
+the club hands in).
 
-Phase 1 is `supabase/migrations/20261026007100_event_forms.sql` (58 assertions in
-`supabase/tests/forms/forms_test.mjs`); phase 2 is the editor
-(`lib/screens/events/form_editor_screen.dart`); phase 3 is the answer page
-(`lib/screens/events/event_form_screen.dart`). Client tests: 15 rules, 6 editor,
-7 answer. **The migration is not applied to the live project yet** — nothing a
-real student can reach calls it until the event page is deployed with it.
+- Phase 1 — `supabase/migrations/20261026007100_event_forms.sql`
+  (58 assertions in `supabase/tests/forms/forms_test.mjs`).
+- Phase 2 — the editor (`form_editor_screen.dart`).
+- Phase 3 — the answer page (`event_form_screen.dart`).
+- Phase 4 — the analysis screen (`form_responses_screen.dart`) and
+  `lib/utils/form_csv.dart`: S1/S2/S3 with their means and `n`, copy-to-clipboard
+  tables for the Word report, and the response CSV.
+
+Client tests: 15 rules, 8 CSV/TSV, 6 editor, 7 answer, 4 analysis. **The
+migration is not applied to the live project yet.**
 
 ## What the paperwork actually is
 
@@ -276,7 +281,15 @@ into the Word report by hand.
    from a student address, shows an existing answer with "Update answers", and
    gives guests the sign-in bar rather than a blank rejection. Needed one more
    RPC: `event_open_form()` — the manager-only summary is no use to a student.
-4. **S1/S2/S3 screen + CSV export.** Next — this is the part the club hands in.
+4. **S1/S2/S3 screen + CSV export.** **Done**:
+   `/event/:id/form/responses`, reached from the list icon in the editor's app
+   bar. Three tables (S1 per KI element with before/after and the change, S2 the
+   organiser after-state, S3 feedback), each with a copy button that yields
+   tab-separated numbers ready to paste into the Word report; a bar per mean with
+   its `n`; the free-text suggestions with their authors; the respondent list;
+   and the CSV download. `lib/utils/form_csv.dart` builds both artefacts, pure
+   and tested, so the CSV columns and the copied tables cannot drift from the
+   fields.
 5. **`after_checkin` prompt**, and later the richer builder.
 
 ## Tests
