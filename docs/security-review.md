@@ -193,10 +193,18 @@ The migration replaces the `images` policies with:
 
 ```
 read    anon, authenticated          bucket_id = 'images'
-insert  authenticated                bucket_id = 'images' and owner = auth.uid()
+insert  authenticated                bucket_id = 'images'          (not owner-checked — see below)
 update  authenticated, using/check   bucket_id = 'images' and owner = auth.uid()
 delete  authenticated, using         bucket_id = 'images' and owner = auth.uid()
 ```
+
+`insert` deliberately does **not** check `owner`: `owner` is written by the
+storage API, and if a deployment ever left it null an owner-checked insert would
+refuse every upload. Insert alone cannot touch an existing object (every path is
+timestamped), and `x-upsert` is `INSERT … ON CONFLICT DO UPDATE`, which needs the
+update policy too — that is what stops one user overwriting another's image by
+guessing a path. Objects with no owner degrade to "cleanup skipped", never to a
+failed upload.
 
 `avatars` is deliberately untouched: adding permissive policies would make it
 *looser* (permissive policies OR together).
@@ -465,7 +473,7 @@ fixes in §10 are deployed — which they are not.
 | Database rows (`profiles`, `posts`, `comments`, `events`, `listings`) | **No anonymous path** — no delete grant or policy for `anon` | Own rows only per the policies in the repo (`posts_delete_own`, `comments_delete_own`). Others' rows: unknown if a dashboard-only `DELETE … using (true)` exists → preflight §9 now flags `DELETE` | `/rest/v1/posts` with anon key: delete returns 0 rows |
 | Tables / schema | **No.** PostgREST exposes no DDL, no `TRUNCATE`, no `DROP` | same | API surface |
 | Another account's data | **No** | `delete_my_account` only for self (it does cascade onto some rows linked to your content — M8) | `20261019003200` |
-| Storage quota / your bill | **Yes** — unlimited anonymous uploads until C1 is fixed | — | Measured upload |
+| Storage quota / your bill | **Yes, until C1 is fixed** — unlimited anonymous uploads; afterwards signed-in users only | same, no per-user cap | Measured upload |
 | Availability | Not found — no unbounded expensive query | — | — |
 
 So: **no destructive attack on the database itself.** The one destructive

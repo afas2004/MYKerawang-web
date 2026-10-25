@@ -180,6 +180,20 @@ const ownInsert = await as(me,
    values ('images', 'posts/mine.jpg', $1) returning id`, [me]);
 ok(ownInsert.length === 1, 'a signed-in user can upload to images');
 
+// The upload must not depend on storage stamping `owner`: if it were null, an
+// owner-checked INSERT policy would refuse every upload. Insert is therefore
+// bucket-only, and update/delete carry the ownership check.
+const nullOwnerInsert = await as(me,
+  `insert into storage.objects (bucket_id, name, owner)
+   values ('images', 'posts/no-owner.jpg', null) returning id`);
+ok(nullOwnerInsert.length === 1,
+  'upload still works when owner is not stamped');
+
+const nullOwnerDelete = await as(me,
+  `delete from storage.objects where id = $1 returning id`, [nullOwnerInsert[0].id]);
+ok(nullOwnerDelete.length === 0,
+  'an object with no owner cannot be deleted by a user (cleanup skipped, not broken)');
+
 const foreignUpdate = await as(other,
   `update storage.objects set name = 'stolen.jpg'
    where id = $1 returning id`, [ownInsert[0].id]);

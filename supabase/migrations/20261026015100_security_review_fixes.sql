@@ -252,17 +252,24 @@ begin
     execute format('drop policy %I on storage.objects', pol.polname);
   end loop;
 
-  -- insert: any signed-in user, any path (the client generates the name)
+  -- Insert: any signed-in user, any path. Deliberately NOT owner-checked:
+  -- `owner` is written by the storage API, and if a deployment ever stored it
+  -- as null an owner check here would refuse every upload. The app generates
+  -- the object name itself and never overwrites an existing one (every path
+  -- carries a timestamp), so insert alone cannot touch another user's object.
   if not exists (select 1 from pg_policy where polrelid = 'storage.objects'::regclass
                  and polname = 'images_insert') then
     create policy "images_insert" on storage.objects
       for insert to authenticated
-      with check (bucket_id = 'images' and owner = auth.uid());
+      with check (bucket_id = 'images');
   end if;
 
-  -- update/delete: only the uploader's own objects. `owner` is set by the
-  -- storage API from the JWT; objects uploaded before this migration keep
-  -- their existing owner and stay replaceable by that same user.
+  -- Update/delete: only the uploader's own objects. `owner` is set by the
+  -- storage API from the JWT. If an object has no owner (uploaded before auth
+  -- was enforced), nobody but the service role can replace or delete it — that
+  -- degrades to "cleanup skipped", never to a failed upload.
+  -- `x-upsert` is INSERT … ON CONFLICT DO UPDATE, so it needs this policy too:
+  -- that is what stops one user overwriting another's image by guessing a path.
   if not exists (select 1 from pg_policy where polrelid = 'storage.objects'::regclass
                  and polname = 'images_update') then
     create policy "images_update" on storage.objects
@@ -278,6 +285,10 @@ begin
       using (bucket_id = 'images' and owner = auth.uid());
   end if;
 
+  -- Read stays as it was: public URLs never consult this policy (they are
+  -- served by the public object endpoint), but listing remains possible. It is
+  -- harmless once writes are closed, and removing it is a bigger change than
+  -- this fix needs.
   if not exists (select 1 from pg_policy where polrelid = 'storage.objects'::regclass
                  and polname = 'images_read') then
     create policy "images_read" on storage.objects
