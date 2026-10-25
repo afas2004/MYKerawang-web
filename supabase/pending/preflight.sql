@@ -92,3 +92,49 @@ where schemaname = 'public'
      or (cmd in ('ALL', 'UPDATE', 'DELETE') and (qual is null or qual = 'true'))
       )
 order by tablename, cmd, policyname;
+
+-- ====================================================== THE SUMMARY (last)
+-- The SQL editor shows the result of the LAST statement, so this is the one
+-- you will see after running the whole file. Six rows. Every number should be
+-- 0. Anything above 0: send me this table and I will read it for you.
+select '1. forms the new caps would block' as check_name,
+       (select count(*) from public.event_forms
+         where length(title) > 120 or length(coalesce(intro, '')) > 500) as rows_found,
+       '0 = safe to apply the caps' as meaning
+union all
+select '2. form fields the caps would block',
+       (select count(*) from public.form_fields f
+         where length(coalesce(f.help, '')) > 300
+            or (jsonb_typeof(f.options -> 'choices') = 'array'
+                and exists (select 1 from jsonb_array_elements_text(f.options -> 'choices') c
+                             where length(c) > 60))),
+       '0 = safe to apply the caps'
+union all
+select '3. verified addresses off the student domain',
+       (select count(*) from public.student_verifications
+         where status = 'verified'
+           and lower(split_part(email::text, '@', 2))
+               is distinct from lower(ltrim((select student_domain from public.access_settings where id), '@'))),
+       '0 = safe; otherwise only future edits are blocked'
+union all
+select '4. write/delete policies with no ownership check',
+       (select count(*) from pg_policies
+         where schemaname = 'public' and permissive = 'PERMISSIVE'
+           and tablename in ('profiles', 'posts', 'comments', 'events', 'listings',
+                             'reports', 'event_participants', 'club_members', 'form_responses')
+           and ((cmd = 'INSERT' and (with_check is null or with_check = 'true'))
+             or (cmd in ('ALL', 'UPDATE', 'DELETE') and (qual is null or qual = 'true')))),
+       '0 = the review gap is closed; above 0 = send me section 9'
+union all
+select '5. images objects with no owner',
+       (select count(*) from storage.objects
+         where bucket_id = 'images' and owner is null),
+       'informational: these can no longer be deleted by users'
+union all
+select '6. old permissive images policies left behind',
+       (select count(*) from pg_policy
+         where polrelid = 'storage.objects'::regclass
+           and polname not like 'images\_%'
+           and coalesce(pg_get_expr(polqual, polrelid), '') || ' ' ||
+               coalesce(pg_get_expr(polwithcheck, polrelid), '') ilike '%images%'),
+       '0 = the storage fix is complete';
