@@ -4,6 +4,8 @@
 /// Kept out of the widgets so the rules are testable without a browser.
 library;
 
+import 'text_rules.dart' show csvSafe;
+
 /// The part of a name worth showing on a door screen.
 ///
 /// "NURUL ARISSA BINTI AZIZ" → "Nurul Arissa". Everything from `bin` / `binti`
@@ -47,7 +49,7 @@ String attendanceCsv(List<Map<String, dynamic>> rows) {
 }
 
 String _cell(Object? value) {
-  final s = value == null ? '' : '$value';
+  final s = csvSafe(value == null ? '' : '$value');
   final needsQuotes =
       s.contains(',') || s.contains('"') || s.contains('\n') || s.contains('\r');
   return needsQuotes ? '"${s.replaceAll('"', '""')}"' : s;

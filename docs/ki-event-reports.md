@@ -206,6 +206,32 @@ server is authoritative; its message is shown as-is through `describeWriteError`
 | Required | present and non-empty; a heading is never required |
 | Analysis tags | `ki_code` only on `ki_pre` / `ki_post`, exactly one per field; `feedback` carries none; at most 7 `ki_pre` and 7 `ki_post` per template |
 
+### Text, cleaned and capped on the way in
+
+`lib/utils/text_rules.dart` is the client half of that contract: the inputs
+enforce the cap while typing, so nobody types 3,000 characters and is told at
+the end. Label 200, title 120, introduction 500, help 300, one choice 60 (at
+most 40 choices). `cleanLine` drops control characters, collapses whitespace
+and trims — a pasted multi-line label cannot become a three-line heading;
+`cleanBlock` keeps paragraphs for the introduction; `cleanChoices` drops
+blanks and duplicates. Both screens and the save path use the same functions.
+
+### What leaves the app is a spreadsheet
+
+Answers are exported as CSV and the S1/S2/S3 tables are copied as TSV, both
+opened in Excel and pasted into Word. A cell starting with `=`, `+`, `-` or `@`
+is a formula there, so every exported cell goes through `csvSafe`: a leading
+apostrophe forces text, except for plain numbers (`-5` stays a number). This
+covers the response CSV, the attendance CSV and the copied tables. It is the
+only injection surface that matters here — Flutter draws text, it does not
+render markup, so answers cannot script the page.
+
+**Not** done on the server: title, introduction, help text and the choice
+strings themselves are stored as sent (the RPC only caps the label and the
+answers). The write path is organiser-only, and the client caps all of them;
+enforcing it against a crafted RPC call would mean another `form_check_field`
+migration.
+
 ## Attendance link: optional
 
 `checkin_with_token` is untouched. When `after_checkin` is on **and** a survey is

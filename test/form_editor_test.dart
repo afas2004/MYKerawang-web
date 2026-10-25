@@ -158,8 +158,54 @@ void main() {
     expect(fake.saved.single.fields.single.kiCode, 1);
   });
 
-  testWidgets('a question with no label is not saved', (tester) async {
+  testWidgets("a choice question's options can be renamed", (tester) async {
     final fake = FakeFormService(
+      summaryValue: const FormSummary(id: 'f1', title: 'Laporan KI', status: 'draft'),
+      initial: draft(fields: const [
+        FormFieldSpec(
+          kind: 'single_choice',
+          label: 'Saya menyertai sebagai',
+          required: true,
+          choices: ['Peserta', 'Penganjur'],
+        ),
+      ]),
+    );
+    FormService.instance = fake;
+
+    await pumpAt(tester, kCompact, const FormEditorScreen(eventId: 'e1'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const ValueKey('option-0')), '  Ahli  ');
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('option-1')), 'AJK');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Save'));
+    await tester.pumpAndSettle();
+
+    // Cleaned on the way out: trimmed, in order, the rest untouched.
+    expect(fake.saved.single.fields.single.choices, ['Ahli', 'AJK']);
+  });
+
+  testWidgets('a label past 200 characters is cut, not rejected later', (tester) async {
+    final fake = FakeFormService(
+      summaryValue: const FormSummary(id: 'f1', title: 'Laporan KI', status: 'draft'),
+      initial: draft(),
+    );
+    FormService.instance = fake;
+
+    await pumpAt(tester, kCompact, const FormEditorScreen(eventId: 'e1'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.text('KI1 Komunikasi'), 'A' * 250);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Save'));
+    await tester.pumpAndSettle();
+
+    expect(fake.saved.single.fields.single.label.length, 200);
+  });
+
+  testWidgets('a question with no label is not saved', (tester) async {    final fake = FakeFormService(
       summaryValue: const FormSummary(id: 'f1', title: 'Laporan KI', status: 'draft'),
       initial: draft(),
     );

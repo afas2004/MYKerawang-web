@@ -12,6 +12,7 @@ import '../../utils/app_nav.dart';
 import '../../utils/feedback.dart';
 import '../../utils/form_rules.dart';
 import '../../utils/guest_access.dart';
+import '../../utils/text_rules.dart';
 import '../../widgets/form_style.dart';
 import '../../widgets/restriction_gate.dart';
 
@@ -717,6 +718,9 @@ class _AnswerField extends StatelessWidget {
           enabled: enabled,
           minLines: 4,
           maxLines: 8,
+          // The counter stays visible here: a long answer is the one place a
+          // limit is worth watching while typing.
+          maxLength: kLongAnswerMax,
           onChanged: onText,
           decoration: _decoration(context, error, hintText: ''),
         );
@@ -742,15 +746,24 @@ class _AnswerField extends StatelessWidget {
           'email' => TextInputType.emailAddress,
           _ => TextInputType.text,
         };
+        final formatters = switch (field.kind) {
+          'student_id' => [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(12),
+            ],
+          'number' => [FilteringTextInputFormatter.allow(RegExp(r'[0-9.\-]'))],
+          _ => null,
+        };
         body = TextField(
           key: ValueKey('input-${field.id}'),
           controller: controller,
           focusNode: focusNode,
           enabled: enabled,
           keyboardType: keyboard,
-          inputFormatters: field.kind == 'student_id'
-              ? [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(12)]
-              : null,
+          inputFormatters: formatters,
+          // Mirrors submit_form_response: 200 for a one-line answer.
+          maxLength: kShortAnswerMax,
+          buildCounter: quietCounter,
           onChanged: onText,
           decoration: _decoration(context, error, hintText: field.kind == 'email' ? 'name@example.com' : ''),
         );

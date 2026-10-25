@@ -12,6 +12,7 @@ import '../../utils/app_nav.dart';
 import '../../utils/feedback.dart';
 import '../../utils/form_rules.dart';
 import '../../utils/responsive.dart';
+import '../../utils/text_rules.dart';
 import '../../widgets/form_style.dart';
 import '../../widgets/restriction_gate.dart';
 
@@ -211,8 +212,10 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
     setState(() => _saving = true);
     try {
       await FormService.instance.save(doc.copyWith(
-        title: _titleCtrl.text.trim().isEmpty ? doc.title : _titleCtrl.text.trim(),
-        intro: _introCtrl.text.trim(),
+        title: cleanLine(_titleCtrl.text).isEmpty
+            ? doc.title
+            : cleanLine(_titleCtrl.text),
+        intro: cleanBlock(_introCtrl.text),
         requireRsvp: _requireRsvp,
         afterCheckin: _afterCheckin,
         fields: _specs,
@@ -295,7 +298,9 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
         required: kind == 'heading' ? false : base.required,
         clearAnalysis: !keepAnalysis,
         choices: kChoiceKinds.contains(kind)
-            ? (base.choices.length < 2 ? const ['Option 1', 'Option 2'] : base.choices)
+            // Seeded blank, not "Option 1": the placeholder shows the shape,
+            // and the check below asks for real options before publishing.
+            ? (base.choices.length < 2 ? const ['', ''] : base.choices)
             : const [],
       ),
     );
@@ -579,6 +584,8 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
                 controller: _titleCtrl,
                 enabled: !_readOnly,
                 onChanged: (_) => _markDirty(),
+                maxLength: kFormTitleMax,
+                buildCounter: quietCounter,
                 style: Theme.of(context)
                     .textTheme
                     .titleLarge
@@ -595,6 +602,10 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
                 controller: _introCtrl,
                 enabled: !_readOnly,
                 onChanged: (_) => _markDirty(),
+                maxLength: kFormIntroMax,
+                buildCounter: quietCounter,
+                maxLines: 3,
+                minLines: 1,
                 style: Theme.of(context)
                     .textTheme
                     .bodyMedium
@@ -919,6 +930,8 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
       controller: row.label,
       enabled: !_readOnly,
       onChanged: (_) => _markDirty(),
+      maxLength: kFormLabelMax,
+      buildCounter: quietCounter,
       style: heading
           ? Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)
           : Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
@@ -946,6 +959,8 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
         _markDirty();
         setState(() {});
       },
+      maxLength: kFormHelpMax,
+      buildCounter: quietCounter,
       style: Theme.of(context).textTheme.bodySmall,
       decoration: InputDecoration(
         isDense: true,
@@ -1101,14 +1116,15 @@ class _Row {
 
   bool get isHeading => spec.kind == 'heading';
 
-  /// What a save sends: the controllers are the truth for the text.
+  /// What a save sends: the controllers are the truth for the text, cleaned
+  /// the same way every time ([cleanLine], [cleanChoices]).
   FormFieldSpec get value => FormFieldSpec(
         id: spec.id,
         kind: spec.kind,
-        label: label.text.trim(),
-        help: help.text.trim().isEmpty ? null : help.text.trim(),
+        label: cleanLine(label.text),
+        help: help.text.trim().isEmpty ? null : cleanLine(help.text),
         required: spec.required,
-        choices: spec.choices,
+        choices: cleanChoices(spec.choices),
         min: spec.min,
         max: spec.max,
         analysis: spec.analysis,
@@ -1228,8 +1244,13 @@ class _RowStrip extends StatelessWidget {
   }
 }
 
-/// The choices of a choice field, editable where they are read.
-class _ChoiceEditor extends StatelessWidget {
+/// The choices of a choice field: each one is a field you can type in, with
+/// its own remove button. (The first version of this rewrite could only add
+/// and delete options, never name them — that was a regression.)
+///
+/// The controllers live here, not in the parent: a keystroke updates the row,
+/// which rebuilds, and rebuilding must not reset what is being typed.
+class _ChoiceEditor extends StatefulWidget {
   final List<String> choices;
   final bool readOnly;
   final ValueChanged<List<String>> onChanged;
@@ -1241,32 +1262,123 @@ class _ChoiceEditor extends StatelessWidget {
   });
 
   @override
+  State<_ChoiceEditor> createState() => _ChoiceEditorState();
+}
+
+class _ChoiceEditorState extends State<_ChoiceEditor> {
+  late List<TextEditingController> _ctrls = _controllersFor(widget.choices);
+
+  List<TextEditingController> _controllersFor(List<String> choices) =>
+      [for (final c in choices) TextEditingController(text: c)];
+
+  @override
+  void didUpdateWidget(covariant _ChoiceEditor old) {
+    super.didUpdateWidget(old);
+    // Only when the number of options changes from outside (add / remove /
+    // a reload). Typing leaves the length alone, so the text is untouched.
+    if (old.choices.length != widget.choices.length) {
+      for (final c in _ctrls) {
+        c.dispose();
+      }
+      _ctrls = _controllersFor(widget.choices);
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final c in _ctrls) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _set(int i, String value) {
+    final next = [...widget.choices];
+    while (next.length <= i) {
+      next.add('');
+    }
+    next[i] = value;
+    widget.onChanged(next);
+  }
+
+  void _remove(int i) {
+    widget.onChanged([...widget.choices]..removeAt(i));
+  }
+
+  @override
   Widget build(BuildContext context) {
     final s = context.l10n;
     return Wrap(
-      spacing: KSpace.xs + 2,
-      runSpacing: KSpace.xs + 2,
+      spacing: KSpace.s,
+      runSpacing: KSpace.s,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        for (var i = 0; i < choices.length; i++)
-          InputChip(
-            label: Text(choices[i]),
-            onDeleted: readOnly
-                ? null
-                : () {
-                    final next = [...choices]..removeAt(i);
-                    onChanged(next);
-                  },
-            visualDensity: VisualDensity.compact,
-          ),
-        if (!readOnly)
+        for (var i = 0; i < _ctrls.length; i++) _option(context, i),
+        if (!widget.readOnly)
           ActionChip(
             avatar: const Icon(AppIcons.create, size: 14),
             label: Text(s.formAddOption),
             visualDensity: VisualDensity.compact,
-            onPressed: () => onChanged([...choices, 'Option ${choices.length + 1}']),
+            onPressed: widget.choices.length >= kChoiceCountMax
+                ? null
+                : () => widget.onChanged([...widget.choices, '']),
           ),
       ],
+    );
+  }
+
+  Widget _option(BuildContext context, int i) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: 168,
+      height: 34,
+      padding: const EdgeInsets.only(left: KSpace.s + 2, right: 2),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        borderRadius: KRadius.small,
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              key: ValueKey('option-$i'),
+              controller: _ctrls[i],
+              enabled: !widget.readOnly,
+              maxLength: kChoiceMax,
+              maxLines: 1,
+              style: const TextStyle(fontSize: 12.5),
+              decoration: InputDecoration(
+                isDense: true,
+                filled: false,
+                border: InputBorder.none,
+                counterText: '',
+                hintText: '${context.l10nRead.formFieldChoices} ${i + 1}',
+                hintStyle: const TextStyle(fontSize: 12),
+                contentPadding: const EdgeInsets.symmetric(vertical: KSpace.s),
+              ),
+              onChanged: (v) => _set(i, v),
+            ),
+          ),
+          if (!widget.readOnly)
+            IconButton(
+              onPressed: () => _remove(i),
+              tooltip: context.l10nRead.delete,
+              icon: const Icon(AppIcons.close, size: 13),
+              color: scheme.onSurfaceVariant,
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.standard,
+              constraints: const BoxConstraints.tightFor(width: 26, height: 26),
+              style: IconButton.styleFrom(
+                minimumSize: const Size(26, 26),
+                maximumSize: const Size(26, 26),
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.standard,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
