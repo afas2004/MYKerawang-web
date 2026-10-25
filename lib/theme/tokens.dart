@@ -99,6 +99,11 @@ class KTokens extends ThemeExtension<KTokens> {
   /// Keyboard focus ring colour (≥3:1 against surfaces).
   final Color focusRing;
 
+  /// The third analysis colour, beside primary (purple) and gold: programme
+  /// feedback in the form editor and answer page. Contrast-checked against the
+  /// surfaces it is used on, like [gold].
+  final Color feedback;
+
   /// Card outline at rest and on hover.
   final Color cardBorder;
   final Color cardBorderHover;
@@ -122,6 +127,7 @@ class KTokens extends ThemeExtension<KTokens> {
     required this.cardBorderHover,
     required this.skeletonBase,
     required this.skeletonHighlight,
+    required this.feedback,
     this.elevationRest = 0,
     this.elevationRaised = 3,
   });
@@ -147,6 +153,7 @@ class KTokens extends ThemeExtension<KTokens> {
         cardBorderHover: scheme.outline,
         skeletonBase: scheme.surfaceContainerHighest,
         skeletonHighlight: scheme.surfaceContainer,
+        feedback: scheme.secondary,
       );
 
   @override
@@ -161,6 +168,7 @@ class KTokens extends ThemeExtension<KTokens> {
     Color? cardBorderHover,
     Color? skeletonBase,
     Color? skeletonHighlight,
+    Color? feedback,
     double? elevationRest,
     double? elevationRaised,
   }) =>
@@ -175,6 +183,7 @@ class KTokens extends ThemeExtension<KTokens> {
         cardBorderHover: cardBorderHover ?? this.cardBorderHover,
         skeletonBase: skeletonBase ?? this.skeletonBase,
         skeletonHighlight: skeletonHighlight ?? this.skeletonHighlight,
+        feedback: feedback ?? this.feedback,
         elevationRest: elevationRest ?? this.elevationRest,
         elevationRaised: elevationRaised ?? this.elevationRaised,
       );
@@ -195,6 +204,7 @@ class KTokens extends ThemeExtension<KTokens> {
       skeletonBase: Color.lerp(skeletonBase, other.skeletonBase, t)!,
       skeletonHighlight:
           Color.lerp(skeletonHighlight, other.skeletonHighlight, t)!,
+      feedback: Color.lerp(feedback, other.feedback, t)!,
       elevationRest: d(elevationRest, other.elevationRest),
       elevationRaised: d(elevationRaised, other.elevationRaised),
     );

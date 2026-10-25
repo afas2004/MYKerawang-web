@@ -5,21 +5,31 @@ import '../../l10n/app_strings.dart';
 import '../../l10n/form_strings.dart';
 import '../../language_cubit.dart';
 import '../../services/form_service.dart';
+import '../../theme/app_icons.dart';
 import '../../theme/tokens.dart';
 import '../../utils/adaptive.dart';
 import '../../utils/app_nav.dart';
 import '../../utils/feedback.dart';
 import '../../utils/form_rules.dart';
 import '../../utils/responsive.dart';
-import '../../theme/app_icons.dart';
+import '../../widgets/form_style.dart';
 import '../../widgets/restriction_gate.dart';
 
-/// The form editor: pick a starting point, then one plain list of questions.
+/// The form editor: one row per question, and every setting a question has is
+/// on that row.
 ///
-/// Deliberately small — label, kind, required, options, scale, analysis tag,
-/// move, delete. No drag-and-drop, no sections, no live preview: the published
-/// form is the preview. `save_event_form()` writes the whole list at once, and
-/// the server refuses the changes that would change what a past answer meant.
+/// The previous editor kept the question's settings (type, scale, options,
+/// counting tag, KI element, required) behind a dialog, so the only way to
+/// answer "what does this form actually measure?" was to open 28 dialogs and
+/// remember each one. Here the row carries all of it: the controls line up
+/// down the list, and a row that is not counted says so instead of hiding the
+/// controls it does not have.
+///
+/// Reordering has both affordances: drag the handle (a `ReorderableListView`),
+/// or use the arrows — same list, two ways in.
+///
+/// `save_event_form()` still writes the whole list at once, and the server
+/// still refuses the changes that would alter what a past answer meant.
 class FormEditorScreen extends StatefulWidget {
   final String eventId;
 
@@ -38,7 +48,9 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
   final _introCtrl = TextEditingController();
 
   FormDoc? _doc;
-  List<FormFieldSpec> _fields = [];
+  List<_Row> _rows = [];
+  List<FieldProblem> _problems = const [];
+
   bool _requireRsvp = false;
   bool _afterCheckin = false;
 
@@ -48,7 +60,6 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
   bool _dirty = false;
 
   List<FormTemplate> _templates = const [];
-  List<FieldProblem> _problems = const [];
   Object? _error;
 
   bool get _readOnly => _doc != null && _doc!.status == 'closed';
@@ -63,6 +74,9 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
   @override
   void dispose() {
     FormGuard.clear();
+    for (final r in _rows) {
+      r.dispose();
+    }
     _titleCtrl.dispose();
     _introCtrl.dispose();
     super.dispose();
@@ -105,8 +119,11 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
   }
 
   void _apply(FormDoc doc) {
+    for (final r in _rows) {
+      r.dispose();
+    }
     _doc = doc;
-    _fields = List.of(doc.fields);
+    _rows = [for (final f in doc.fields) _Row(f)];
     _requireRsvp = doc.requireRsvp;
     _afterCheckin = doc.afterCheckin;
     _titleCtrl.text = doc.title;
@@ -114,6 +131,8 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
     _dirty = false;
     _problems = const [];
   }
+
+  List<FormFieldSpec> get _specs => [for (final r in _rows) r.value];
 
   Future<void> _start(Future<String> Function() create) async {
     setState(() => _saving = true);
@@ -133,7 +152,8 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
     }
   }
 
-  Future<void> _startBlank() => _start(() => FormService.instance.createBlank(widget.eventId));
+  Future<void> _startBlank() =>
+      _start(() => FormService.instance.createBlank(widget.eventId));
 
   Future<void> _startTemplate(String slug) =>
       _start(() => FormService.instance.createFromTemplate(widget.eventId, slug));
@@ -159,7 +179,10 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
       if (!mounted) return;
       _apply(view.doc);
       setState(() {
-        _fields = paste.fields;
+        for (final r in _rows) {
+          r.dispose();
+        }
+        _rows = [for (final f in paste.fields) _Row(f)];
         _problems = paste.problems;
         _dirty = true;
         _choosing = false;
@@ -178,7 +201,7 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
     final doc = _doc;
     if (doc == null) return false;
 
-    final problems = checkFields(_fields);
+    final problems = checkFields(_specs);
     setState(() => _problems = problems);
     if (problems.isNotEmpty) {
       if (!quiet) _toast(context.l10nRead.formIssueText(problems.first.code));
@@ -192,7 +215,7 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
         intro: _introCtrl.text.trim(),
         requireRsvp: _requireRsvp,
         afterCheckin: _afterCheckin,
-        fields: _fields,
+        fields: _specs,
       ));
       // New fields only get their ids when they come back, and the next save
       // matches on those ids — without this reload every save would insert
@@ -247,35 +270,132 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
 
   // ------------------------------------------------------------------ editing
 
-  void _changed(VoidCallback change) {
+  /// A text change: one rebuild to show the dirty state, no re-layout per key.
+  void _markDirty() {
+    if (_dirty) return;
+    setState(() => _dirty = true);
+  }
+
+  void _edit(int index, FormFieldSpec next) {
     setState(() {
-      change();
+      _rows[index].spec = next;
       _dirty = true;
       _problems = const [];
     });
   }
 
-  Future<void> _editField(int index) async {
-    final s = context.l10nRead;
-    final result = await showDialog<FormFieldSpec>(
-      context: context,
-      builder: (_) => _FieldSheet(field: _fields[index], strings: s),
+  void _setKind(int index, String kind) {
+    final base = _rows[index].value;
+    final keepAnalysis = kind == 'rating';
+    _edit(
+      index,
+      _with(
+        base,
+        kind: kind,
+        required: kind == 'heading' ? false : base.required,
+        clearAnalysis: !keepAnalysis,
+        choices: kChoiceKinds.contains(kind)
+            ? (base.choices.length < 2 ? const ['Option 1', 'Option 2'] : base.choices)
+            : const [],
+      ),
     );
-    if (result == null || !mounted) return;
-    _changed(() => _fields[index] = result);
+  }
+
+  void _setAnalysis(int index, String? analysis) {
+    final base = _rows[index].value;
+    final needsCode = analysis == 'ki_pre' || analysis == 'ki_post';
+    _edit(
+      index,
+      _with(
+        base,
+        analysis: analysis,
+        clearAnalysis: analysis == null,
+        kiCode: needsCode ? (base.kiCode ?? _firstFreeKi(analysis!)) : null,
+        clearKi: !needsCode,
+      ),
+    );
+  }
+
+  /// The first KI element not already used in this phase, so tagging a row
+  /// usually needs no second tap.
+  int _firstFreeKi(String analysis) {
+    final taken = {
+      for (final r in _rows)
+        if (r.spec.analysis == analysis && r.spec.kiCode != null) r.spec.kiCode!,
+    };
+    for (var i = 1; i <= 7; i++) {
+      if (!taken.contains(i)) return i;
+    }
+    return 1;
   }
 
   void _move(int index, int delta) {
     final to = index + delta;
-    if (to < 0 || to >= _fields.length) return;
-    _changed(() {
-      final f = _fields.removeAt(index);
-      _fields.insert(to, f);
+    if (to < 0 || to >= _rows.length) return;
+    setState(() {
+      final row = _rows.removeAt(index);
+      _rows.insert(to, row);
+      _dirty = true;
+      _problems = const [];
     });
   }
 
-  List<String> _problemsFor(int index) =>
-      [for (final p in _problems) if (p.index == index) p.code];
+  void _onReorder(int oldIndex, int newIndex) {
+    setState(() {
+      if (newIndex > oldIndex) newIndex--;
+      final row = _rows.removeAt(oldIndex);
+      _rows.insert(newIndex, row);
+      _dirty = true;
+      _problems = const [];
+    });
+  }
+
+  void _duplicate(int index) {
+    final src = _rows[index].value;
+    final copy = FormFieldSpec(
+      kind: src.kind,
+      label: '${src.label} (copy)',
+      help: src.help,
+      required: src.required,
+      choices: [...src.choices],
+      min: src.min,
+      max: src.max,
+      analysis: src.analysis,
+      kiCode: src.kiCode,
+    );
+    setState(() {
+      _rows.insert(index + 1, _Row(copy));
+      _dirty = true;
+      _problems = const [];
+    });
+  }
+
+  void _delete(int index) {
+    setState(() {
+      _rows.removeAt(index).dispose();
+      _dirty = true;
+      _problems = const [];
+    });
+  }
+
+  void _add({String kind = 'short_text', String label = ''}) {
+    setState(() {
+      _rows.add(_Row(FormFieldSpec(kind: kind, label: label)));
+      _dirty = true;
+      _problems = const [];
+    });
+  }
+
+  /// The analysis tag of the section a row belongs to: the first tagged
+  /// question at or after it, stopping at the next heading.
+  String? _laneAnalysis(int index) {
+    for (var i = index; i < _rows.length; i++) {
+      if (i > index && _rows[i].isHeading) break;
+      final a = _rows[i].spec.analysis;
+      if (a != null) return a;
+    }
+    return null;
+  }
 
   // --------------------------------------------------------------------- build
 
@@ -287,7 +407,7 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
     return Scaffold(
       appBar: appBarConstrained(
         context,
-        maxWidth: Responsive.detailMaxWidth,
+        maxWidth: 1180,
         title: Text(
           s.formEditorTitle,
           maxLines: 1,
@@ -305,7 +425,8 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
               tooltip: s.formSave,
               onPressed: _saving ? null : () => _save(),
               icon: _saving
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(
+                      width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(AppIcons.check),
             ),
           if (doc != null && doc.isDraft)
@@ -378,97 +499,1202 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
   // -------------------------------------------------------------------- editor
 
   Widget _editor(BuildContext context, FormDoc doc) {
-    final s = context.l10n;
-    final canAdd = (_fields.length < kMaxFormFields) && !_readOnly;
+    final wide = MediaQuery.sizeOf(context).width >= 1000;
+    final numbers = <int, int>{};
+    var n = 0;
+    for (var i = 0; i < _rows.length; i++) {
+      if (!_rows[i].isHeading) numbers[i] = ++n;
+    }
+
+    final list = ReorderableListView.builder(
+      buildDefaultDragHandles: false,
+      onReorder: _onReorder,
+      itemCount: _rows.length,
+      header: _aboveList(context, doc, wide),
+      footer: _belowList(context),
+      padding: EdgeInsets.fromLTRB(wide ? KSpace.xl : KSpace.l, KSpace.l, wide ? KSpace.xl : KSpace.l, KSpace.xxl),
+      itemBuilder: (ctx, i) => _rowTile(ctx, i, numbers: numbers, wide: wide),
+    );
+
+    if (!wide) {
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: Responsive.feedMaxWidth),
+          child: list,
+        ),
+      );
+    }
+
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: Responsive.feedMaxWidth),
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.l, KSpace.l, KSpace.xxl),
+        constraints: const BoxConstraints(maxWidth: 1180),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (!doc.isDraft) _StatusLine(status: doc.status, strings: s),
-            TextField(
-              controller: _titleCtrl,
-              enabled: !_readOnly,
-              onChanged: (_) => _changed(() {}),
-              decoration: InputDecoration(labelText: s.formTitleLabel),
-              textInputAction: TextInputAction.next,
-            ),
-            const SizedBox(height: KSpace.m),
-            TextField(
-              controller: _introCtrl,
-              enabled: !_readOnly,
-              onChanged: (_) => _changed(() {}),
-              maxLines: 2,
-              decoration: InputDecoration(labelText: s.formIntroLabel),
-            ),
-            const SizedBox(height: KSpace.s),
-            SwitchListTile(
-              value: _requireRsvp,
-              onChanged: _readOnly ? null : (v) => _changed(() => _requireRsvp = v),
-              contentPadding: EdgeInsets.zero,
-              title: Text(s.formRequireRsvp, style: Theme.of(context).textTheme.bodyMedium),
-            ),
-            SwitchListTile(
-              value: _afterCheckin,
-              onChanged: _readOnly ? null : (v) => _changed(() => _afterCheckin = v),
-              contentPadding: EdgeInsets.zero,
-              title: Text(s.formAfterCheckin, style: Theme.of(context).textTheme.bodyMedium),
-            ),
-            const Divider(height: KSpace.xl),
-            if (_fields.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: KSpace.l),
-                child: Text(s.formNoFields, style: Theme.of(context).textTheme.bodyMedium),
+            Expanded(child: list),
+            SizedBox(
+              width: 328,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.only(top: KSpace.l, right: KSpace.xl, bottom: KSpace.xxl),
+                child: _rail(context),
               ),
-            for (var i = 0; i < _fields.length; i++)
-              _FieldTile(
-                field: _fields[i],
-                index: i,
-                problems: _problemsFor(i),
-                readOnly: _readOnly,
-                isFirst: i == 0,
-                isLast: i == _fields.length - 1,
-                onEdit: () => _editField(i),
-                onUp: () => _move(i, -1),
-                onDown: () => _move(i, 1),
-                onDelete: () => _changed(() => _fields.removeAt(i)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _aboveList(BuildContext context, FormDoc doc, bool wide) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, KSpace.m),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerLowest,
+            borderRadius: KRadius.card,
+            border: Border.all(color: scheme.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  _StatusChip(status: doc.status),
+                ],
               ),
-            if (canAdd) ...[
+              const SizedBox(height: KSpace.s),
+              TextField(
+                controller: _titleCtrl,
+                enabled: !_readOnly,
+                onChanged: (_) => _markDirty(),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.2),
+                decoration: InputDecoration(
+                  isDense: true,
+                  filled: false,
+                  border: InputBorder.none,
+                  hintText: s.formTitleLabel,
+                  contentPadding: const EdgeInsets.symmetric(vertical: KSpace.xs),
+                ),
+              ),
+              TextField(
+                controller: _introCtrl,
+                enabled: !_readOnly,
+                onChanged: (_) => _markDirty(),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: scheme.onSurfaceVariant),
+                decoration: InputDecoration(
+                  isDense: true,
+                  filled: false,
+                  border: InputBorder.none,
+                  hintText: s.formIntroLabel,
+                  contentPadding: const EdgeInsets.symmetric(vertical: KSpace.xs),
+                ),
+              ),
               const SizedBox(height: KSpace.m),
-              OutlinedButton.icon(
-                onPressed: () => _changed(() => _fields.add(blankField())),
-                icon: const Icon(AppIcons.create, size: 18),
-                label: Text(s.formAddField),
-                style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+              _SummaryChips(specs: _specs),
+              const SizedBox(height: KSpace.m),
+              Divider(height: 1, color: scheme.outlineVariant),
+              const SizedBox(height: KSpace.m),
+              Wrap(
+                spacing: KSpace.s,
+                runSpacing: KSpace.s,
+                children: [
+                  _SettingChip(
+                    label: s.formRequireRsvp,
+                    value: _requireRsvp,
+                    onChanged: _readOnly ? null : (v) => _editSetting(() => _requireRsvp = v),
+                  ),
+                  _SettingChip(
+                    label: s.formAfterCheckin,
+                    value: _afterCheckin,
+                    onChanged: _readOnly ? null : (v) => _editSetting(() => _afterCheckin = v),
+                  ),
+                ],
               ),
             ],
-            if (_problems.any((p) => p.index < 0)) ...[
-              const SizedBox(height: KSpace.m),
-              for (final p in _problems.where((p) => p.index < 0))
-                Padding(
-                  padding: const EdgeInsets.only(bottom: KSpace.xs),
+          ),
+        ),
+        if (!wide) ...[
+          const SizedBox(height: KSpace.m),
+          _CompactChecks(specs: _specs),
+        ],
+        const SizedBox(height: KSpace.m),
+      ],
+    );
+  }
+
+  void _editSetting(VoidCallback change) {
+    setState(() {
+      change();
+      _dirty = true;
+    });
+  }
+
+  Widget _rail(BuildContext context) {
+    final s = context.l10n;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _RailCard(
+          title: s.formMeasuresTitle,
+          sub: s.formMeasuresSub,
+          child: _CoverageCard(specs: _specs),
+        ),
+        const SizedBox(height: KSpace.m),
+        _RailCard(
+          title: s.formChecksTitle,
+          sub: s.formChecksSub,
+          child: _ChecksCard(specs: _specs),
+        ),
+      ],
+    );
+  }
+
+  Widget _belowList(BuildContext context) {
+    final s = context.l10n;
+    final canAdd = _rows.length < kMaxFormFields && !_readOnly;
+    final global = [for (final p in _problems) if (p.index < 0) p];
+
+    return Padding(
+      padding: const EdgeInsets.only(top: KSpace.m),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (canAdd)
+            Wrap(
+              spacing: KSpace.s,
+              runSpacing: KSpace.s,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => _add(),
+                  icon: const Icon(AppIcons.create, size: 18),
+                  label: Text(s.formAddField),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => _add(kind: 'heading', label: ''),
+                  icon: const Icon(AppIcons.list, size: 18),
+                  label: Text(s.formSection),
+                ),
+              ],
+            ),
+          for (final p in global)
+            Padding(
+              padding: const EdgeInsets.only(top: KSpace.s),
+              child: Text(
+                s.formIssueText(p.code),
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------- one question
+
+  Widget _rowTile(
+    BuildContext context,
+    int index, {
+    required Map<int, int> numbers,
+    required bool wide,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    final row = _rows[index];
+    final style = AnalysisStyle.of(context, _laneAnalysis(index));
+    final problems = [
+      for (final p in _problems)
+        if (p.index == index) p.code,
+    ];
+
+    return Container(
+      key: ValueKey(row.key),
+      decoration: BoxDecoration(
+        color: row.isHeading ? style.soft : null,
+        border: Border(
+          left: BorderSide(color: style.accent, width: 3),
+          bottom: BorderSide(color: scheme.outlineVariant),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 28,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 18),
+              child: Text(
+                row.isHeading ? '' : '${numbers[index] ?? ''}',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(KSpace.xs, KSpace.s, KSpace.s, KSpace.m),
+              child: _rowContent(context, index, row, style, problems, wide),
+            ),
+          ),
+          _RowStrip(
+            index: index,
+            count: _rows.length,
+            readOnly: _readOnly,
+            onMove: _move,
+            onDuplicate: _duplicate,
+            onDelete: _delete,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _rowContent(
+    BuildContext context,
+    int index,
+    _Row row,
+    AnalysisStyle style,    List<String> problems,
+    bool wide,
+  ) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final f = row.spec;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (row.isHeading)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 7),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: style.accent.withValues(alpha: 0.14),
+                    borderRadius: KRadius.small,
+                  ),
                   child: Text(
-                    s.formIssueText(p.code),
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    s.formSection.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                      color: style.ink,
+                    ),
                   ),
                 ),
+              ),
+              Expanded(child: _labelField(context, row)),
             ],
+          )
+        else
+          _labelField(context, row),
+        if (row.helpOpen || row.help.text.isNotEmpty) _helpField(context, row),
+        const SizedBox(height: KSpace.s),
+        if (!row.isHeading)
+          Wrap(
+            spacing: KSpace.s,
+            runSpacing: KSpace.s,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _menu(
+                context,
+                width: 126,
+                value: f.kind,
+                options: [for (final k in kFormKinds) (k, s.formKindLabel(k))],
+                onChanged: _readOnly ? null : (k) => _setKind(index, k),
+              ),
+              if (f.isRating) ...[
+                _menu(
+                  context,
+                  width: 118,
+                  value: f.analysis ?? '',
+                  options: [
+                    ('', s.formTagNone),
+                    ('ki_pre', s.formTagKiPreShort),
+                    ('ki_post', s.formTagKiPostShort),
+                    ('feedback', s.formTagFeedbackShort),
+                  ],
+                  onChanged: _readOnly
+                      ? null
+                      : (v) => _setAnalysis(index, v.isEmpty ? null : v),
+                  background: style.soft,
+                  foreground: style.ink,
+                  border: f.analysis == null ? scheme.outlineVariant : Colors.transparent,
+                ),
+                if (f.analysis == 'ki_pre' || f.analysis == 'ki_post')
+                  _menu(
+                    context,
+                    width: 74,
+                    value: '${f.kiCode ?? 1}',
+                    options: [for (var i = 1; i <= 7; i++) ('$i', 'KI$i')],
+                    onChanged: _readOnly
+                        ? null
+                        : (v) => _edit(index, f.copyWith(kiCode: int.parse(v))),
+                  ),
+                _menu(
+                  context,
+                  width: 74,
+                  value: '${f.max}',
+                  options: [for (var v = 2; v <= 10; v++) ('$v', '1–$v')],
+                  onChanged: _readOnly
+                      ? null
+                      : (v) => _edit(index, f.copyWith(max: int.parse(v))),
+                ),
+              ] else
+                _notCounted(context),
+              _RequiredChip(
+                value: f.required,
+                onChanged: _readOnly ? null : (v) => _edit(index, f.copyWith(required: v)),
+              ),
+              if (!row.helpOpen && row.help.text.isEmpty && !_readOnly)
+                TextButton(
+                  onPressed: () => setState(() => row.helpOpen = true),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: KSpace.s),
+                    minimumSize: const Size(0, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(s.formAddHelp, style: const TextStyle(fontSize: 11.5)),
+                ),
+            ],
+          ),
+        if (f.isChoice)
+          Padding(
+            padding: const EdgeInsets.only(top: KSpace.s),
+            child: _ChoiceEditor(
+              choices: f.choices,
+              readOnly: _readOnly,
+              onChanged: (choices) => _edit(index, f.copyWith(choices: choices)),
+            ),
+          ),
+        if (problems.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: KSpace.s),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(AppIcons.warning, size: 13, color: scheme.error),
+                const SizedBox(width: KSpace.xs),
+                Expanded(
+                  child: Text(
+                    s.formIssueText(problems.first),
+                    style: TextStyle(fontSize: 11.5, color: scheme.error),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _labelField(BuildContext context, _Row row) {
+    final scheme = Theme.of(context).colorScheme;
+    final heading = row.isHeading;
+    return TextField(
+      controller: row.label,
+      enabled: !_readOnly,
+      onChanged: (_) => _markDirty(),
+      style: heading
+          ? Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)
+          : Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+      decoration: InputDecoration(
+        isDense: true,
+        filled: false,
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        hintText: heading ? context.l10nRead.formSection : context.l10nRead.formFieldLabel,
+        hintStyle: TextStyle(color: scheme.onSurfaceVariant.withValues(alpha: 0.7)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: KSpace.xs, vertical: KSpace.s),
+        focusedBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: scheme.primary, width: 2),
+        ),
+      ),
+    );
+  }
+
+  Widget _helpField(BuildContext context, _Row row) {
+    final scheme = Theme.of(context).colorScheme;
+    return TextField(
+      controller: row.help,
+      enabled: !_readOnly,
+      onChanged: (_) {
+        _markDirty();
+        setState(() {});
+      },
+      style: Theme.of(context).textTheme.bodySmall,
+      decoration: InputDecoration(
+        isDense: true,
+        filled: false,
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        hintText: context.l10nRead.formFieldHelp,
+        hintStyle: TextStyle(color: scheme.onSurfaceVariant.withValues(alpha: 0.7)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: KSpace.xs, vertical: 2),
+      ),
+    );
+  }
+
+  Widget _notCounted(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: context.l10nRead.formOnlyRatingsCounted,
+      child: Container(
+        height: 32,
+        padding: const EdgeInsets.symmetric(horizontal: KSpace.m),
+        decoration: BoxDecoration(
+          borderRadius: KRadius.small,
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              context.l10nRead.formTagNone,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// A compact select: same shape and size as the mockup's pill, but a
+  /// `MenuAnchor` so a long option list does not stretch the row.
+  Widget _menu(
+    BuildContext context, {
+    required double width,
+    required String value,
+    required List<(String, String)> options,
+    required ValueChanged<String>? onChanged,
+    Color? background,
+    Color? foreground,
+    Color? border,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    final fg = foreground ?? scheme.onSurface;
+    final label = options.firstWhere((o) => o.$1 == value, orElse: () => options.first).$2;
+
+    return MenuAnchor(
+      alignmentOffset: const Offset(0, 34),
+      menuChildren: [
+        for (final o in options)
+          MenuItemButton(
+            onPressed: onChanged == null ? null : () => onChanged(o.$1),
+            leadingIcon: o.$1 == value
+                ? Icon(AppIcons.check, size: 15, color: scheme.primary)
+                : const SizedBox(width: 15, height: 15),
+            child: Text(o.$2),
+          ),
+      ],
+      builder: (context, controller, _) => SizedBox(
+        width: width,
+        height: 32,
+        child: Material(
+          clipBehavior: Clip.antiAlias,
+          color: background ?? scheme.surfaceContainerLowest,
+          shape: RoundedRectangleBorder(
+            borderRadius: KRadius.small,
+            side: BorderSide(color: border ?? scheme.outlineVariant),
+          ),
+          child: InkWell(
+            onTap: onChanged == null
+                ? null
+                : () => controller.isOpen ? controller.close() : controller.open(),
+            child: Padding(
+              padding: const EdgeInsets.only(left: KSpace.s + 1, right: KSpace.xs + 2),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: fg),
+                    ),
+                  ),
+                  Icon(AppIcons.down, size: 13, color: fg.withValues(alpha: 0.7)),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-// --------------------------------------------------------------------- pieces
+// ---------------------------------------------------------------------- pieces
 
-/// Dialog content width: 520 on a wide window, the window less its own insets
-/// on a phone (AlertDialog does not shrink a fixed-width child).
-double _dialogWidth(BuildContext context) {
-  final available = MediaQuery.sizeOf(context).width - 96;
-  if (available >= 520) return 520;
-  return available < 200 ? 200 : available;
+/// A copy of [f] with the named parts replaced. [FormFieldSpec.copyWith] keeps
+/// a value when the argument is null, which cannot express "clear the KI code",
+/// so the editor uses this instead.
+FormFieldSpec _with(
+  FormFieldSpec f, {
+  String? kind,
+  String? label,
+  String? help,
+  bool? required,
+  List<String>? choices,
+  int? min,
+  int? max,
+  String? analysis,
+  int? kiCode,
+  bool clearAnalysis = false,
+  bool clearKi = false,
+}) =>
+    FormFieldSpec(
+      id: f.id,
+      kind: kind ?? f.kind,
+      label: label ?? f.label,
+      help: help ?? f.help,
+      required: required ?? f.required,
+      choices: choices ?? f.choices,
+      min: min ?? f.min,
+      max: max ?? f.max,
+      analysis: clearAnalysis ? null : (analysis ?? f.analysis),
+      kiCode: (clearAnalysis || clearKi) ? null : (kiCode ?? f.kiCode),
+    );
+
+/// One question in the editor, with its own text controllers.
+///
+/// Rows outlive a [FormFieldSpec] (immutable, replaced on every change) and
+/// own a stable key, which the reorderable list needs to follow a row as it
+/// moves.
+class _Row {
+  _Row(this.spec) : key = ++_seq {
+    label = TextEditingController(text: spec.label);
+    help = TextEditingController(text: spec.help ?? '');
+  }
+
+  static int _seq = 0;
+
+  final int key;
+  late FormFieldSpec spec;
+  late final TextEditingController label;
+  late final TextEditingController help;
+  bool helpOpen = false;
+
+  bool get isHeading => spec.kind == 'heading';
+
+  /// What a save sends: the controllers are the truth for the text.
+  FormFieldSpec get value => FormFieldSpec(
+        id: spec.id,
+        kind: spec.kind,
+        label: label.text.trim(),
+        help: help.text.trim().isEmpty ? null : help.text.trim(),
+        required: spec.required,
+        choices: spec.choices,
+        min: spec.min,
+        max: spec.max,
+        analysis: spec.analysis,
+        kiCode: spec.kiCode,
+      );
+
+  void dispose() {
+    label.dispose();
+    help.dispose();
+  }
+}
+
+/// The control strip at the card's edge: drag handle, arrows, duplicate and
+/// delete, in one group that sits in the same place on every row.
+class _RowStrip extends StatelessWidget {
+  final int index;
+  final int count;
+  final bool readOnly;
+  final void Function(int index, int delta) onMove;
+  final void Function(int index) onDuplicate;
+  final void Function(int index) onDelete;
+
+  const _RowStrip({
+    required this.index,
+    required this.count,
+    required this.readOnly,
+    required this.onMove,
+    required this.onDuplicate,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: 62,
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        border: Border(left: BorderSide(color: scheme.outlineVariant)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!readOnly)
+            ReorderableDragStartListener(
+              index: index,
+              child: Tooltip(
+                message: s.formDragHint,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.grab,
+                  child: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: Icon(
+                      AppIcons.drag,
+                      size: 15,
+                      color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _stripButton(
+                context,
+                AppIcons.up,
+                s.formMoveUp,
+                !readOnly && index > 0 ? () => onMove(index, -1) : null,
+              ),
+              _stripButton(
+                context,
+                AppIcons.down,
+                s.formMoveDown,
+                !readOnly && index < count - 1 ? () => onMove(index, 1) : null,
+              ),
+            ],
+          ),
+          if (!readOnly)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _stripButton(context, AppIcons.copy, s.formDuplicate, () => onDuplicate(index)),
+                _stripButton(context, AppIcons.delete, s.delete, () => onDelete(index), danger: true),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _stripButton(
+    BuildContext context,
+    IconData icon,
+    String tooltip,
+    VoidCallback? onPressed, {
+    bool danger = false,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return IconButton(
+      onPressed: onPressed,
+      tooltip: tooltip,
+      icon: Icon(icon, size: 15),
+      color: danger ? scheme.error : scheme.onSurfaceVariant,
+      style: IconButton.styleFrom(
+        minimumSize: const Size(28, 28),
+        maximumSize: const Size(28, 28),
+        padding: EdgeInsets.zero,
+        visualDensity: VisualDensity.standard,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+    );
+  }
+}
+
+/// The choices of a choice field, editable where they are read.
+class _ChoiceEditor extends StatelessWidget {
+  final List<String> choices;
+  final bool readOnly;
+  final ValueChanged<List<String>> onChanged;
+
+  const _ChoiceEditor({
+    required this.choices,
+    required this.readOnly,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    return Wrap(
+      spacing: KSpace.xs + 2,
+      runSpacing: KSpace.xs + 2,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        for (var i = 0; i < choices.length; i++)
+          InputChip(
+            label: Text(choices[i]),
+            onDeleted: readOnly
+                ? null
+                : () {
+                    final next = [...choices]..removeAt(i);
+                    onChanged(next);
+                  },
+            visualDensity: VisualDensity.compact,
+          ),
+        if (!readOnly)
+          ActionChip(
+            avatar: const Icon(AppIcons.create, size: 14),
+            label: Text(s.formAddOption),
+            visualDensity: VisualDensity.compact,
+            onPressed: () => onChanged([...choices, 'Option ${choices.length + 1}']),
+          ),
+      ],
+    );
+  }
+}
+
+/// "Required" as a pill: the switch and the word are one tap target, and the
+/// state reads without the colour.
+class _RequiredChip extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  const _RequiredChip({required this.value, this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: value ? scheme.primaryContainer : Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: KRadius.pill,
+        side: BorderSide(color: value ? Colors.transparent : scheme.outlineVariant),
+      ),
+      child: InkWell(
+        borderRadius: KRadius.pill,
+        onTap: onChanged == null ? null : () => onChanged!(!value),
+        child: Container(
+          height: 32,
+          padding: const EdgeInsets.only(left: KSpace.xs + 1, right: KSpace.m),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                width: 30,
+                height: 18,
+                padding: const EdgeInsets.all(2),
+                alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+                decoration: BoxDecoration(
+                  color: value ? scheme.primary : scheme.outlineVariant,
+                  borderRadius: KRadius.pill,
+                ),
+                child: Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerLowest,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              const SizedBox(width: KSpace.s),
+              Text(
+                value ? s.formFieldRequired : s.formOptional,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: value ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The header switches (RSVP / after check-in), same pill language.
+class _SettingChip extends StatelessWidget {
+  final String label;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  const _SettingChip({required this.label, required this.value, this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: value ? scheme.primaryContainer : Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: KRadius.pill,
+        side: BorderSide(color: value ? Colors.transparent : scheme.outlineVariant),
+      ),
+      child: InkWell(
+        borderRadius: KRadius.pill,
+        onTap: onChanged == null ? null : () => onChanged!(!value),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: KSpace.m, vertical: KSpace.s),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                value ? AppIcons.check : AppIcons.create,
+                size: 14,
+                color: value ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: KSpace.s),
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: value ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The counts across the top: what this form collects, at a glance.
+class _SummaryChips extends StatelessWidget {
+  final List<FormFieldSpec> specs;
+  const _SummaryChips({required this.specs});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final tokens = KTokens.of(context);
+
+    int count(String? analysis) =>
+        specs.where((f) => f.analysis == analysis).length;
+
+    final questions = specs.where((f) => f.isAnswerable).length;
+    final required = specs.where((f) => f.required && f.isAnswerable).length;
+
+    Widget chip(String label, {Color? dot}) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: KSpace.m - 2, vertical: 5),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHighest,
+            borderRadius: KRadius.pill,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (dot != null) ...[
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        );
+
+    return Wrap(
+      spacing: KSpace.xs + 2,
+      runSpacing: KSpace.xs + 2,
+      children: [
+        chip('$questions ${s.formQuestionsShort}'),
+        chip('${count('ki_pre')} ${s.formCountedBeforeShort}', dot: scheme.primary),
+        chip('${count('ki_post')} ${s.formCountedAfterShort}', dot: scheme.tertiary),
+        chip('${count('feedback')} ${s.formCountedFeedbackShort}', dot: tokens.feedback),
+        chip('$required ${s.formFieldRequired.toLowerCase()}'),
+      ],
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final String status;
+  const _StatusChip({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final (label, colour) = switch (status) {
+      'open' => (s.formOpen, scheme.primary),
+      'closed' => (s.formClosed, scheme.error),
+      _ => (s.formDraft, scheme.tertiary),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: KSpace.s, vertical: 3),
+      decoration: BoxDecoration(
+        color: colour.withValues(alpha: 0.14),
+        borderRadius: KRadius.pill,
+      ),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          fontSize: 9.5,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.7,
+          color: colour,
+        ),
+      ),
+    );
+  }
+}
+
+// ------------------------------------------------------------------ the rail
+
+class _CoverageCard extends StatelessWidget {
+  final List<FormFieldSpec> specs;
+  const _CoverageCard({required this.specs});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final tokens = KTokens.of(context);
+
+    final before = {
+      for (final f in specs)
+        if (f.analysis == 'ki_pre' && f.kiCode != null) f.kiCode!,
+    };
+    final after = {
+      for (final f in specs)
+        if (f.analysis == 'ki_post' && f.kiCode != null) f.kiCode!,
+    };
+    final pairs = [for (var i = 1; i <= 7; i++) if (before.contains(i) && after.contains(i)) i].length;
+
+    Widget dot(bool on, Color colour) => Container(
+          width: 11,
+          height: 11,
+          decoration: BoxDecoration(
+            color: on ? colour : Colors.transparent,
+            shape: BoxShape.circle,
+            border: Border.all(color: on ? colour : scheme.outlineVariant, width: 1.5),
+          ),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                s.formElementLabel.toUpperCase(),
+                style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, letterSpacing: 0.8, color: scheme.onSurfaceVariant),
+              ),
+            ),
+            SizedBox(
+              width: 46,
+              child: Text(s.formBefore.toUpperCase(),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, letterSpacing: 0.6, color: scheme.onSurfaceVariant)),
+            ),
+            SizedBox(
+              width: 46,
+              child: Text(s.formAfter.toUpperCase(),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, letterSpacing: 0.6, color: scheme.onSurfaceVariant)),
+            ),
+          ],
+        ),
+        for (var i = 1; i <= 7; i++)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.7))),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text('KI$i',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: scheme.onSurface)),
+                ),
+                SizedBox(width: 46, child: Center(child: dot(before.contains(i), scheme.primary))),
+                SizedBox(width: 46, child: Center(child: dot(after.contains(i), scheme.tertiary))),
+              ],
+            ),
+          ),
+        const SizedBox(height: KSpace.s),
+        Row(
+          children: [
+            Expanded(
+              child: Text('S3 · ${s.formTagFeedback}',
+                  style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+            ),
+            Text('${specs.where((f) => f.analysis == 'feedback').length}',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: tokens.feedback)),
+          ],
+        ),
+        const SizedBox(height: KSpace.xs),
+        Row(
+          children: [
+            Expanded(
+              child: Text(s.formPairsLabel,
+                  style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+            ),
+            Text('$pairs / 7',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: pairs == 7 ? tokens.feedback : scheme.tertiary,
+                )),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Every publish-time check, in one place: the rail, the narrow strip and the
+/// publish dialog all read this.
+List<(bool, String)> _formChecks(BuildContext context, List<FormFieldSpec> specs) {
+  final s = context.l10n;
+
+  final questions = specs.where((f) => f.isAnswerable).length;
+  final missingLabels = specs.where((f) => f.label.trim().isEmpty).length;
+  final dupes = specs.where((f) {
+    if (f.analysis != 'ki_pre' && f.analysis != 'ki_post') return false;
+    return specs
+        .where((o) => o != f && o.analysis == f.analysis && o.kiCode == f.kiCode)
+        .isNotEmpty;
+  }).length;
+  final before = {
+    for (final f in specs)
+      if (f.analysis == 'ki_pre') f.kiCode,
+  };
+  final orphan = [
+    for (final f in specs)
+      if (f.analysis == 'ki_post' && !before.contains(f.kiCode)) f.kiCode,
+  ].whereType<int>().toSet().toList()
+    ..sort();
+
+  return [
+    (
+      missingLabels == 0,
+      missingLabels == 0 ? s.formCheckLabels : s.formCheckMissingLabels(missingLabels),
+    ),
+    (dupes == 0, dupes == 0 ? s.formCheckDupes : s.formCheckDupesCount(dupes)),
+    (orphan.isEmpty, orphan.isEmpty ? s.formCheckPairs : s.formCheckOrphan(orphan.join(', '))),
+    (questions <= kMaxFormFields, s.formCheckBudget(questions)),
+  ];
+}
+
+class _ChecksCard extends StatelessWidget {
+  final List<FormFieldSpec> specs;
+  final bool onlyFailing;
+
+  const _ChecksCard({required this.specs, this.onlyFailing = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final tokens = KTokens.of(context);
+    final checks = [
+      for (final c in _formChecks(context, specs))
+        if (!onlyFailing || !c.$1) c,
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final c in checks)
+          Padding(
+            padding: const EdgeInsets.only(bottom: KSpace.s),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 16,
+                  height: 16,
+                  margin: const EdgeInsets.only(top: 1),
+                  decoration: BoxDecoration(
+                    color: (c.$1 ? tokens.feedback : scheme.tertiary).withValues(alpha: 0.14),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    c.$1 ? AppIcons.check : AppIcons.warning,
+                    size: 10,
+                    color: c.$1 ? tokens.feedback : scheme.tertiary,
+                  ),
+                ),
+                const SizedBox(width: KSpace.s),
+                Expanded(
+                  child: Text(
+                    c.$2,
+                    style: TextStyle(fontSize: 12, height: 1.35, color: scheme.onSurfaceVariant),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// -------------------------------------------------------------------- pieces
+
+/// The checks on a narrow window: one line when there is nothing to fix, the
+/// failing checks only when there is. A full list above the questions on a
+/// phone would push the form itself below the fold.
+class _CompactChecks extends StatelessWidget {
+  final List<FormFieldSpec> specs;
+  const _CompactChecks({required this.specs});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final tokens = KTokens.of(context);
+    final failing = _formChecks(context, specs).where((c) => !c.$1).toList();
+
+    if (failing.isEmpty) {
+      return Row(
+        children: [
+          Icon(AppIcons.check, size: 15, color: tokens.feedback),
+          const SizedBox(width: KSpace.s),
+          Expanded(
+            child: Text(s.formReadyToPublish,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+          ),
+        ],
+      );
+    }
+
+    return _RailCard(
+      title: s.formChecksTitle,
+      child: _ChecksCard(specs: specs, onlyFailing: true),
+    );
+  }
 }
 
 class _StartCard extends StatelessWidget {
@@ -489,10 +1715,10 @@ class _StartCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Material(
       color: scheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: KRadius.card,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: KRadius.card,
         child: Padding(
           padding: const EdgeInsets.all(KSpace.l),
           child: Row(
@@ -516,143 +1742,6 @@ class _StartCard extends StatelessWidget {
                 ),
               ),
               Icon(AppIcons.chevronRight, size: 18, color: scheme.onSurfaceVariant),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusLine extends StatelessWidget {
-  final String status;
-  final AppStrings strings;
-  const _StatusLine({required this.status, required this.strings});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final label = switch (status) {
-      'open' => strings.formOpen,
-      'closed' => strings.formClosed,
-      _ => strings.formDraft,
-    };
-    return Padding(
-      padding: const EdgeInsets.only(bottom: KSpace.s),
-      child: Row(
-        children: [
-          Icon(AppIcons.info, size: 16, color: scheme.onSurfaceVariant),
-          const SizedBox(width: KSpace.xs),
-          Text(label, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13)),
-        ],
-      ),
-    );
-  }
-}
-
-class _FieldTile extends StatelessWidget {
-  final FormFieldSpec field;
-  final int index;
-  final List<String> problems;
-  final bool readOnly;
-  final bool isFirst;
-  final bool isLast;
-  final VoidCallback onEdit;
-  final VoidCallback onUp;
-  final VoidCallback onDown;
-  final VoidCallback onDelete;
-
-  const _FieldTile({
-    required this.field,
-    required this.index,
-    required this.problems,
-    required this.readOnly,
-    required this.isFirst,
-    required this.isLast,
-    required this.onEdit,
-    required this.onUp,
-    required this.onDown,
-    required this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final s = context.l10n;
-    final scheme = Theme.of(context).colorScheme;
-    final bad = problems.isNotEmpty;
-    final bits = <String>[
-      s.formKindLabel(field.kind),
-      if (field.required && field.kind != 'heading') s.formFieldRequired,
-      if (field.analysis == 'ki_pre') 'KI ${field.kiCode} · ${s.formTagKiPre}',
-      if (field.analysis == 'ki_post') 'KI ${field.kiCode} · ${s.formTagKiPost}',
-      if (field.analysis == 'feedback') s.formTagFeedback,
-    ];
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: KSpace.s),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: bad ? scheme.error : scheme.outlineVariant),
-      ),
-      child: InkWell(
-        onTap: readOnly ? null : onEdit,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.s, KSpace.xs, KSpace.s),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      field.label.trim().isEmpty
-                          ? s.formIssueText(FormIssue.labelRequired)
-                          : field.label,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            fontWeight: field.kind == 'heading' ? FontWeight.w700 : null,
-                          ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      bits.join(' · '),
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: bad ? scheme.error : scheme.onSurfaceVariant),
-                    ),
-                    if (bad)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(
-                          s.formIssueText(problems.first),
-                          style: TextStyle(color: scheme.error, fontSize: 12),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              if (!readOnly) ...[
-                IconButton(
-                  tooltip: s.formMoveUp,
-                  onPressed: isFirst ? null : onUp,
-                  icon: const Icon(AppIcons.up, size: 18),
-                  visualDensity: VisualDensity.compact,
-                ),
-                IconButton(
-                  tooltip: s.formMoveDown,
-                  onPressed: isLast ? null : onDown,
-                  icon: const Icon(AppIcons.down, size: 18),
-                  visualDensity: VisualDensity.compact,
-                ),
-                IconButton(
-                  tooltip: s.delete,
-                  onPressed: onDelete,
-                  icon: Icon(AppIcons.delete, size: 18, color: scheme.error),
-                  visualDensity: VisualDensity.compact,
-                ),
-              ],
             ],
           ),
         ),
@@ -738,202 +1827,52 @@ class _PasteDialogState extends State<_PasteDialog> {
   }
 }
 
-/// One field, edited in a dialog. Returns the new spec, or null on cancel.
-class _FieldSheet extends StatefulWidget {
-  final FormFieldSpec field;
-  final AppStrings strings;
-  const _FieldSheet({required this.field, required this.strings});
-
-  @override
-  State<_FieldSheet> createState() => _FieldSheetState();
+/// Dialog content width: 520 on a wide window, the window less its own insets
+/// on a phone (AlertDialog does not shrink a fixed-width child).
+double _dialogWidth(BuildContext context) {
+  final available = MediaQuery.sizeOf(context).width - 96;
+  if (available >= 520) return 520;
+  return available < 200 ? 200 : available;
 }
 
-class _FieldSheetState extends State<_FieldSheet> {
-  late final TextEditingController _label;
-  late final TextEditingController _help;
-  late final TextEditingController _choices;
-  late String _kind;
-  late bool _required;
-  late int _min;
-  late int _max;
-  String? _analysis;
-  int? _kiCode;
+/// The rail's two cards, styled the same way.
+class _RailCard extends StatelessWidget {
+  final String title;
+  final String? sub;
+  final Widget child;
 
-  @override
-  void initState() {
-    super.initState();
-    final f = widget.field;
-    _label = TextEditingController(text: f.label);
-    _help = TextEditingController(text: f.help ?? '');
-    _choices = TextEditingController(text: f.choices.join('\n'));
-    _kind = f.kind;
-    _required = f.required;
-    _min = f.min;
-    _max = f.max;
-    _analysis = f.analysis;
-    _kiCode = f.kiCode;
-  }
-
-  @override
-  void dispose() {
-    _label.dispose();
-    _help.dispose();
-    _choices.dispose();
-    super.dispose();
-  }
-
-  void _setKind(String kind) {
-    setState(() {
-      _kind = kind;
-      if (kind != 'rating') {
-        _analysis = null;
-        _kiCode = null;
-      }
-      if (kind == 'heading') _required = false;
-    });
-  }
-
-  void _setAnalysis(String? analysis) {
-    setState(() {
-      _analysis = analysis;
-      if (analysis == null || analysis == 'feedback') _kiCode = null;
-      if (analysis == 'ki_pre' || analysis == 'ki_post') _kiCode ??= 1;
-    });
-  }
+  const _RailCard({required this.title, this.sub, required this.child});
 
   @override
   Widget build(BuildContext context) {
-    final s = widget.strings;
-    final isRating = _kind == 'rating';
-    final isChoice = kChoiceKinds.contains(_kind);
-
-    return AlertDialog(
-      title: Text(s.formFieldLabel),
-      content: SizedBox(
-        width: _dialogWidth(context),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: _label,
-                autofocus: true,
-                decoration: InputDecoration(labelText: s.formFieldLabel),
-              ),
-              const SizedBox(height: KSpace.m),
-              DropdownButtonFormField<String>(
-                isExpanded: true,
-                initialValue: _kind,
-                decoration: InputDecoration(labelText: s.formFieldKind),
-                items: [
-                  for (final k in kFormKinds)
-                    DropdownMenuItem(value: k, child: Text(s.formKindLabel(k))),
-                ],
-                onChanged: (k) => k == null ? null : _setKind(k),
-              ),
-              const SizedBox(height: KSpace.m),
-              TextField(
-                controller: _help,
-                decoration: InputDecoration(labelText: s.formFieldHelp),
-              ),
-              if (isChoice) ...[
-                const SizedBox(height: KSpace.m),
-                TextField(
-                  controller: _choices,
-                  minLines: 3,
-                  maxLines: 8,
-                  decoration: InputDecoration(
-                    labelText: s.formFieldChoices,
-                    helperText: s.formFieldChoicesHint,
-                  ),
-                ),
-              ],
-              if (isRating) ...[
-                const SizedBox(height: KSpace.m),
-                Row(
-                  children: [
-                    Text(s.formFieldScale),
-                    const SizedBox(width: KSpace.m),
-                    Expanded(
-                      child: DropdownButton<int>(
-                        isExpanded: true,
-                        value: _max,
-                        items: [
-                          for (var v = 2; v <= 10; v++)
-                            DropdownMenuItem(value: v, child: Text('1 – $v')),
-                        ],
-                        onChanged: (v) => setState(() => _max = v ?? _max),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: KSpace.s),
-                DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  initialValue: _analysis ?? 'none',
-                  decoration: InputDecoration(labelText: s.formFieldAnalysis),
-                  items: [
-                    DropdownMenuItem(value: 'none', child: Text(s.formTagNone)),
-                    DropdownMenuItem(value: 'ki_pre', child: Text(s.formTagKiPre)),
-                    DropdownMenuItem(value: 'ki_post', child: Text(s.formTagKiPost)),
-                    DropdownMenuItem(value: 'feedback', child: Text(s.formTagFeedback)),
-                  ],
-                  onChanged: (v) => _setAnalysis(v == 'none' ? null : v),
-                ),
-                if (_analysis == 'ki_pre' || _analysis == 'ki_post') ...[
-                  const SizedBox(height: KSpace.s),
-                  DropdownButtonFormField<int>(
-                    isExpanded: true,
-                    initialValue: _kiCode ?? 1,
-                    decoration: InputDecoration(labelText: s.formFieldKiCode),
-                    items: [
-                      for (var i = 1; i <= 7; i++)
-                        DropdownMenuItem(value: i, child: Text('KI$i')),
-                    ],
-                    onChanged: (v) => setState(() => _kiCode = v),
-                  ),
-                ],
-              ],
-              const SizedBox(height: KSpace.s),
-              SwitchListTile(
-                value: _required,
-                onChanged: _kind == 'heading' ? null : (v) => setState(() => _required = v),
-                contentPadding: EdgeInsets.zero,
-                title: Text(s.formFieldRequired),
-              ),
-            ],
-          ),
-        ),
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(KSpace.l),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        borderRadius: KRadius.card,
+        border: Border.all(color: scheme.outlineVariant),
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text(s.cancel)),
-        FilledButton(
-          onPressed: () {
-            final choices = _choices.text
-                .split(RegExp(r'\r?\n'))
-                .map((c) => c.trim())
-                .where((c) => c.isNotEmpty)
-                .toList();
-            Navigator.pop(
-              context,
-              widget.field.copyWith(
-                kind: _kind,
-                label: _label.text.trim(),
-                help: _help.text.trim().isEmpty ? null : _help.text.trim(),
-                required: _required,
-                choices: choices,
-                min: _min,
-                max: _max,
-                analysis: _analysis,
-                kiCode: _kiCode,
-                clearAnalysis: _analysis == null,
-              ),
-            );
-          },
-          child: Text(s.save),
-        ),
-      ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title.toUpperCase(),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.8,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          if (sub != null) ...[
+            const SizedBox(height: KSpace.xs),
+            Text(sub!, style: Theme.of(context).textTheme.bodySmall),
+          ],
+          const SizedBox(height: KSpace.m),
+          child,
+        ],
+      ),
     );
   }
 }

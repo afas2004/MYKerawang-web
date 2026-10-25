@@ -45,6 +45,10 @@ class AppThemeSpec {
   /// The single accent: prices, verified, pinned. Used sparingly.
   final Color gold;
 
+  /// The third analysis colour: programme feedback in the KI form editor and
+  /// answer page, beside [primary] (KI before) and [gold] (KI after).
+  final Color feedback;
+
   final Color text;
 
   /// Secondary text (captions, metadata).
@@ -61,6 +65,7 @@ class AppThemeSpec {
     required this.elevated,
     required this.primary,
     required this.gold,
+    required this.feedback,
     required this.text,
     required this.textMuted,
     required this.border,
@@ -77,6 +82,7 @@ const Map<AppTheme, AppThemeSpec> kThemeSpecs = {
     elevated: Color(0xFFFFFFFF),
     primary: Color(0xFF5B3E96),
     gold: Color(0xFFE9A21B),
+    feedback: Color(0xFF16786B),
     text: Color(0xFF16141D),
     textMuted: Color(0xFF5E5A6B),
     border: Color(0xFFE5E3EC),
@@ -90,6 +96,7 @@ const Map<AppTheme, AppThemeSpec> kThemeSpecs = {
     elevated: Color(0xFFFFFFFF),
     primary: Color(0xFF4E3680),
     gold: Color(0xFFC98A1E),
+    feedback: Color(0xFF146C60),
     text: Color(0xFF1F1A16),
     textMuted: Color(0xFF615849),
     border: Color(0xFFE9E2D6),
@@ -103,6 +110,7 @@ const Map<AppTheme, AppThemeSpec> kThemeSpecs = {
     elevated: Color(0xFF221F2A),
     primary: Color(0xFFA48BEA),
     gold: Color(0xFFE8C062),
+    feedback: Color(0xFF6FD3C4),
     text: Color(0xFFF1EFF6),
     textMuted: Color(0xFFA9A4B8),
     border: Color(0xFF2B2833),
@@ -203,6 +211,7 @@ ThemeData buildAppTheme(AppTheme theme) {
     cardBorderHover: Color.lerp(spec.border, spec.textMuted, 0.35)!,
     skeletonBase: fillHigh,
     skeletonHighlight: spec.surface,
+    feedback: _ensureOnBoth(spec.feedback, spec.background, spec.surface, 4.5),
   );
 
   final base = ThemeData(useMaterial3: true, colorScheme: scheme);

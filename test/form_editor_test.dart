@@ -127,6 +127,8 @@ void main() {
 
     expect(fake.templateCalls, 1);
     expect(find.text('KI1 Komunikasi'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Cadangan'), 220,
+        scrollable: find.byType(Scrollable).first);
     expect(find.text('Cadangan'), findsOneWidget);
   });
 
@@ -140,15 +142,8 @@ void main() {
     await pumpAt(tester, kCompact, const FormEditorScreen(eventId: 'e1'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('KI1 Komunikasi'));
-    await tester.pumpAndSettle();
-
-    final dialogField = find
-        .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
-        .first;
-    await tester.enterText(dialogField, 'KI1 Komunikasi (baharu)');
-    // app_strings.save is "SAVE" (uppercase, the house style for form buttons)
-    await tester.tap(find.widgetWithText(FilledButton, 'SAVE'));
+    // The question is edited on its own row: there is no dialog to open.
+    await tester.enterText(find.text('KI1 Komunikasi'), 'KI1 Komunikasi (baharu)');
     await tester.pumpAndSettle();
 
     expect(find.text('KI1 Komunikasi (baharu)'), findsOneWidget);
@@ -173,6 +168,10 @@ void main() {
     await pumpAt(tester, kCompact, const FormEditorScreen(eventId: 'e1'));
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(find.text('Add question'), 220,
+        scrollable: find.byType(Scrollable).first);
+    await tester.ensureVisible(find.text('Add question'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Add question'));
     await tester.pumpAndSettle();
 
@@ -199,7 +198,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(fake.published, isTrue);
-    expect(find.text('Open'), findsOneWidget);
+    expect(find.text('OPEN'), findsOneWidget);
   });
 
   testWidgets('a pasted list fills the editor', (tester) async {
@@ -222,8 +221,11 @@ void main() {
 
     expect(fake.blankCalls, 1);
     expect(find.text('Nama penuh'), findsOneWidget);
+    // The list scrolls: bring the pasted second question into view.
+    await tester.scrollUntilVisible(find.text('KI2 Pemikiran kritis'), 200,
+        scrollable: find.byType(Scrollable).first);
     expect(find.text('KI2 Pemikiran kritis'), findsOneWidget);
-    expect(find.textContaining('KI 2'), findsOneWidget);
+    expect(find.textContaining('KI2'), findsWidgets);
   });
 
   testWidgets('a read-only (closed) form cannot be edited', (tester) async {
@@ -233,7 +235,7 @@ void main() {
     await pumpAt(tester, kCompact, const FormEditorScreen(eventId: 'e1', formId: 'f1'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Closed'), findsOneWidget);
+    expect(find.text('CLOSED'), findsOneWidget);
     expect(find.text('Add question'), findsNothing);
     expect(find.byTooltip('Save'), findsNothing);
   });
