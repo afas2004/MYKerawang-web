@@ -13,8 +13,8 @@ the end of the second session that day (PR #8 and #9 merged, two bugs fixed,
 | Branch | `deepseek/clubs-admin` — level with `origin/main` |
 | Last merge | PR #9 → `6da73ad` (1.7.7); before it PR #8 → `e491899` (1.7.2–1.7.6) |
 | Live | https://mykerawang-app.web.app — build `202610250823`, version **1.7.7** |
-| Tests | 446 Flutter tests green; analyzer has 18 info/warning findings, no errors |
-| Latest migration | `20261026006100_club_recruitment.sql` (applied to live) |
+| Tests | 446 Flutter tests green; `supabase/tests/forms/forms_test.mjs` 44 assertions green; analyzer has 18 info/warning findings, no errors |
+| Latest migration | `20261026007100_event_forms.sql` — **written and tested, not applied to live**; before it `20261026006100_club_recruitment.sql` (live) |
 
 `main`, the branch and the live site are all at 1.7.7 (build `202610250823`).
 
@@ -35,13 +35,14 @@ the end of the second session that day (PR #8 and #9 merged, two bugs fixed,
   back to "Announcement" or "Thread" when there is no headline).
 - **Google sign-in leaves no history entry** (see below — unverified on a
   real browser).
-- **Released 1.7.7** (build `202610250823`) and **wrote `docs/ki-event-reports.md`**
-  plus **`docs/ki-template-fields.csv`**, the design for the KI event report and
-  the survey behind it. No form code was written. This took three passes: the
-  first got the requirement wrong (a builder with a KI example), the owner
-  corrected it (the KI report *is* the requirement, the builder merely extends
-  it), and the third pass is grounded in the two real documents the owner
-  supplied — a Google-Form export and the finished L2-HEP/PKP/21 PDF.
+- **Released 1.7.7** (build `202610250823`), then **designed and built phase 1 of
+  the KI event reports**: `docs/ki-event-reports.md`, `docs/ki-template-fields.csv`
+  (the survey as data), `20261026007100_event_forms.sql` and a 44-assertion test.
+  The design took three passes — the first got the requirement wrong (a builder
+  with a KI example), the owner corrected it (the KI report *is* the requirement),
+  and the third is grounded in the two real documents the owner supplied. The
+  owner then corrected again: templates are only **options**, picked and **edited
+  in a simple editor**, with CSV as another way to fill that editor.
 
 ## Infrastructure
 
@@ -96,9 +97,15 @@ flutter test
 
 # migrations (need PGlite once)
 cd supabase/tests/moderation; npm i --no-save @electric-sql/pglite@0.2.17
-node moderation_test.mjs ../../..          # applies every migration twice
-node ../clubs/clubs_test.mjs ../../..      # run from supabase/tests (pglite resolves there)
-node ../verification/verification_test.mjs ../..
+node moderation_test.mjs ../../../     # applies every migration twice
+# The other tests import pglite directly, and ESM resolves from the TEST FILE's
+# folder, so a copy must exist one level up. One junction, done once:
+#   New-Item -ItemType Junction -Path supabase/tests/node_modules `
+#     -Target (Resolve-Path supabase/tests/moderation/node_modules)
+cd supabase/tests
+node clubs/clubs_test.mjs ../..        # (this command never worked as documented
+node verification/verification_test.mjs ../..   #  until the junction existed)
+node forms/forms_test.mjs ../..        # event forms: template, editor, S1/S2/S3
 
 # deploy: bump BOTH places, then build/stamp/deploy
 #   pubspec.yaml version: 1.7.x+N
@@ -134,6 +141,17 @@ firebase deploy --only hosting --project mykerawang-app
   `getOAuthSignInUrl` and calls `replaceLocationForOAuth` (push a spare entry,
   then `location.replace`) so Google never survives in the back stack. Web-only;
   the stub returns false on mobile and the library path runs as before.
+- **The migration tests never ran as documented.** PGlite was installed only in
+  `supabase/tests/moderation/node_modules`, but Node resolves a bare import from
+  the *test file's* folder, so `node ../clubs/clubs_test.mjs` could not find it.
+  Fixed with one junction at `supabase/tests/node_modules` (see How to work);
+  `node_modules/` is now in `.gitignore`.
+- The PGlite stub's `event_participants` has **no `ON DELETE CASCADE`**, so a test
+  that deletes an event must clear participants first — otherwise the FK blocks
+  it and the failure looks like it belongs to the migration under test.
+- Two `moderation_test.mjs` assertions ("two reports → one open case" and
+  "priority category hidden on first report") fail **without** the forms
+  migration too. They are pre-existing; don't chase them while testing forms.
 
 ## Open work
 
@@ -165,24 +183,29 @@ and the old `signInWithOAuth` path still compiles.
 - Event PIC field + tag clubs/people as collaborators.
 - Registration toggle on the event page after publishing, with instant QR and a
   "add a form?" prompt.
-- **KI event reports, then a form builder.** Designed, not built — see
+- **KI event reports.** Phase 1 (server) is **built and tested**; see
   `docs/ki-event-reports.md`, with the survey itself as data in
   `docs/ki-template-fields.csv` (28 rows, generated from the owner's Google-Form
-  export). The requirement, as corrected by the owner: every club hands in a
-  Kemahiran Insaniah report after **every** event, under L2-HEP/PKP/21, within 14
-  days, and the field set is already fixed — so the first thing built is a
-  **template the organiser picks**, not a builder.
-  The document settles: the app owns the *survey* and the three analyses
-  (**S1 Peserta**, **S2 Penganjur**, **S3 feedback** — the "analisa Excel" the
-  report asks for), not the report PDF; templates are data and multiple, because
-  versions differ (MPP's is extended); template fields carry `ki_code` /
-  `analysis` tags so the averages are computable whatever the wording; ratings are
-  a first-class kind; students answer for themselves; responses are private to
-  organiser + club officers + admins; the form is **optional to the QR**
-  (`after_checkin`, default off); questions import, responses do not.
-  Five questions still need answers before phase 1 — the important ones are
-  whether to seed MPP's version too, and whether the matric must stay editable
-  because **4 of 13 respondents used Gmail**.
+  export). Files: `supabase/migrations/20261026007100_event_forms.sql` and
+  `supabase/tests/forms/forms_test.mjs`.
+  The requirement, as corrected by the owner: every club hands in a Kemahiran
+  Insaniah report after **every** event, under L2-HEP/PKP/21, within 14 days, and
+  the field set is already fixed — so a **template is a starting point** the
+  organiser picks, then **edits in a deliberately simple editor** (one list of
+  fields; no drag-and-drop, no sections). CSV/paste is the other way to get
+  questions in; it fills the same editor, which is why there is no server-side
+  template authoring.
+  The app owns the *survey* and the three analyses (**S1 Peserta**,
+  **S2 Penganjur**, **S3 feedback** — the "analisa Excel" the report asks for),
+  not the report PDF. Template fields carry `ki_code` / `analysis` tags so the
+  averages are computable whatever the wording; ratings are a first-class kind;
+  students answer for themselves; responses are private to organiser + club
+  officers + admins; the form is **optional to the QR** (`after_checkin`,
+  default off).
+  Next: phase 2, the editor UI. The migration is **not applied to live**.
+  Five design questions remain at the end of the doc; the two that matter are
+  whether MPP's version ships as a second template, and whether the matric must
+  stay editable (**4 of 13 respondents used Gmail**).
 - Recurring announcements (needs pg_cron or materialise-on-read).
 - Shared-link thumbnails need per-URL OG tags (SPA limitation; needs a function
   or prerender).
@@ -191,8 +214,9 @@ and the old `signInWithOAuth` path still compiles.
 
 1. Run the three Google sign-in checks above on the live 1.7.7. If any fails,
    revert the login commit and redeploy before anything else.
-2. Answer the five open questions in `docs/ki-event-reports.md`, then build
-   phase 1 (schema + `form_analysis` + the seeded template from
-   `docs/ki-template-fields.csv` + `forms_test.mjs`, no UI). Or the captcha work
-   first — that is the last code item before inviting a club, and it needs a
-   hCaptcha/Turnstile site key from the owner.
+2. Build **phase 2 of the KI reports: the editor** (start chooser → blank /
+   template / pasted CSV, one list of fields, save, publish), then the answer
+   page. Apply `20261026007100_event_forms.sql` to live when the first screen
+   needs it, not before. Or the captcha work first — that is the last code item
+   before inviting a club, and it needs a hCaptcha/Turnstile site key from the
+   owner.

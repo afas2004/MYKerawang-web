@@ -70,3 +70,6 @@ android/build/
 # Real student data supplied for design work (names, matric numbers). Never commit.
 /BORANG KI QUIZ BAHASA ARAB (Responses).xlsx
 /LAPORAN PROGRAM QUIZ BAHASA ARAB.pdf
+
+# Node test harness dependencies (PGlite).
+node_modules/

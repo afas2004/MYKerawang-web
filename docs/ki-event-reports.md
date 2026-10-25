@@ -1,11 +1,15 @@
 # KI event reports: design
 
-Status: **design only — no schema, no UI.** Written 2026-10-25 against 1.7.7
-(`6da73ad`), and rewritten the same day after reading the two real documents:
+Status: **phase 1 shipped (server only), no UI yet.** Design written 2026-10-25
+against 1.7.7 (`6da73ad`) and rewritten twice the same day: once after the owner
+corrected the requirement (the KI report *is* the job; the builder merely
+extends it), and once after reading the two real documents —
 `BORANG KI QUIZ BAHASA ARAB (Responses).xlsx` (what a Google Form collected) and
 `LAPORAN PROGRAM QUIZ BAHASA ARAB.pdf` (what the club hands in).
 
-Earlier drafts of this file guessed. This one is grounded in those documents.
+Phase 1 is `supabase/migrations/20261026007100_event_forms.sql` plus
+`supabase/tests/forms/forms_test.mjs` (44 assertions, green). **The migration is
+not applied to the live project yet** — nothing in the app calls it.
 
 ## What the paperwork actually is
 
@@ -69,9 +73,9 @@ Two things the workbook itself shows, which the design has to respect:
 
 | | |
 |---|---|
-| **MVP** | The survey end to end, and the three analyses: pick a template on the event, students answer, the organiser sees S1/S2/S3 and exports the CSV. |
-| **Needed early** | More than one template, because versions differ — and a club must be able to get a new version in **without a release**. |
-| **Extension** | A field-by-field builder with drag/reorder. |
+| **MVP** | The survey end to end, and the three analyses: create the survey on the event (from a template, from a pasted question list, or blank), edit it in a simple editor, publish, students answer, the organiser sees S1/S2/S3 and exports the CSV. |
+| **Needed early** | The **editor**. A template is only a starting point — "they will select that and edit". There is no path where a club hands in a form it did not at least look at. |
+| **Extension** | A richer builder: per-field help text UI, sections, conditional fields, duplicate. |
 | **Out of scope** | The report prose (1.0 outcomes, 3.3 suggestions, 4.0 effectiveness), the budget, the timetable, the participant-list formatting. The club keeps producing those in Word as it does now. |
 
 ## Decisions
@@ -80,8 +84,10 @@ Two things the workbook itself shows, which the design has to respect:
 |---|---|---|
 | **The survey is the unit, not the report** | The app owns the questionnaire, the responses and the three analyses. The PDF stays with the club. | The report is half prose and half an officer's signature; reproducing it would be a document generator, not a feature. The part that hurts — collating 13 spreadsheets by hand — is exactly the survey. |
 | **Templates are data, and multiple** | `form_templates` + fields, seeded with the club's KI version now; **another version is a new template row, not a release**. | The owner confirmed versions differ (MPP's is extended). If adding a version needed a deploy, the feature would be useless within a club year. |
-| **A template is created by pasting a question list** | Admin pastes a question list (CSV or tab-separated) to create or revise a template. No drag-and-drop in phase 1. | The stated reason for import was "copy-paste questions is hard". That is a *template authoring* problem, and a paste box solves it. |
-| **Fields carry an analysis tag** | Each field may be tagged `analysis` = `ki_pre` / `ki_post` / `feedback`, plus `ki_code` 1–7 for the KI ones. | This is what makes S1/S2/S3 computable no matter how a version words or orders its questions. Without tags the app would guess from labels — and the source form already has two questions numbered "6)". |
+| **The app offers options, not policy** | Three ways in — **blank**, **a template**, or **a pasted question list (CSV)** — and all three land in the same editor. The shipped templates are starting points, never a fixed form. | "We only just give them options. If they want to use templates, they select that and edit." A club that must hand in a slightly different version is the normal case, not the exception. |
+| **A template is copied, then edited** | Picking a template copies its fields into the event's form; every subsequent edit is to that copy. | Nothing a club edits can change the template other clubs see, and a correction to a template cannot rewrite a form that already has answers. |
+| **The editor is deliberately plain** | A list of fields with: label, kind, required, options (for choices), scale (for ratings), analysis tag (for ratings), and move up/down, add, delete. No drag-and-drop, no sections, no live preview beyond opening the draft. | "The editor just simple one." Everything the analyses need is settable; everything that needs a diagram is out. |
+| **Fields carry an analysis tag** | Each field may be tagged `analysis` = `ki_pre` / `ki_post` / `feedback`, plus `ki_code` 1–7 for the KI ones — and the tag is **editable in the editor**, on the row itself. | This is what makes S1/S2/S3 computable no matter how a version words or orders its questions. Without tags the app would guess from labels — and the source form already has two questions numbered "6)". |
 | **Ratings are a first-class field kind** | `kind = 'rating'`, with `options {"min":1,"max":5}`. Not a bare number field. | The analysis is means of 1–5 ratings; a generic number field would let 7 and 0 into the average. |
 | **Who answers** | **Students answer for themselves** (owner's decision). The role — Peserta or Penganjur — is **derived**: club officer or event committee → Penganjur, otherwise Peserta, correctable by the respondent. | The Google Form asked, and 5 of 13 respondents said Penganjur. Deriving removes a question and a class of error; the overview still needs an override because a committee member may attend as a participant. |
 | **Three analyses, one definition** | `form_analysis(p_form_id)` returns S1/S2/S3 computed server-side; the screen and the CSV both read it. | "They will process the CSV themselves, but we can count the average rating ourselves too" — the averages must agree with the export, so they are computed once. |
@@ -144,14 +150,19 @@ House pattern: `security definer`, `set search_path = public`, explicit
 
 | Function | Who | Does |
 |---|---|---|
-| `form_templates_list()` | signed in | Active templates for the chooser. |
-| `import_form_template(p_slug, p_name, p_rows jsonb)` | admin | Turns a pasted question list into a template + fields. Validates kinds, options, analysis tags. |
-| `create_form_from_template(p_event_id, p_template_slug)` | organiser, `can_act_as_club`, admin | **MVP entry point.** Draft form + copied fields. Refuses if an open form exists. |
-| `publish_form` / `close_form` | same | `draft → open → closed`; publish validates the field set. |
+| `form_templates_list()` | signed in | Active templates for the "start from" chooser. |
+| `create_form_from_template(p_event_id, p_template_slug)` | organiser, `can_act_as_club`, admin | Creates a **draft** form with the template's fields copied in, then opens it in the editor. |
+| **`save_event_form(p_form_id, p_form jsonb, p_fields jsonb)`** | same | The **editor's** single write: title/intro/deadline/toggles plus the whole field list (add, remove, reorder, relabel, retag). Validates and refuses the changes listed under "Editing a live form". A blank form starts here too, with `p_fields = []`. |
+| `publish_form(p_form_id)` / `close_form(p_form_id)` | same | `draft → open → closed`; publish validates the field set and its analysis tags. |
 | `form_public(p_form_id)` | anyone incl. guests | Form + fields + the caller's own response + `can_answer` (+ reason). Never anyone else's data. |
 | `submit_form_response(p_form_id, p_for_user, p_role, p_answers)` | signed in | The only write: open + deadline + `require_rsvp` + validation, upsert. |
 | `form_response_list(p_form_id)` | organiser, `is_club_officer`, admin | Rows + profile + answers, for the table and the CSV. |
 | **`form_analysis(p_form_id)`** | same | **S1, S2, S3** — see below. One definition for screen and export. |
+
+There is **no server-side template authoring**. A pasted question list is parsed
+on the client into the same `p_fields` payload `save_event_form` already takes, so
+CSV import needs no RPC of its own and the editor is the single validation point.
+Only admins can change a shipped template, and only by migration.
 
 `submit_form_response` calls `require_verified('form_submit')`; add that
 capability to `verification_required` and to the `mod_guard_write` trigger on
@@ -192,21 +203,50 @@ server is authoritative; its message is shown as-is through `describeWriteError`
 `checkin_with_token` is untouched. When `after_checkin` is on **and** a survey is
 open, the success screen offers it as a skippable next step. Nothing gates.
 
+## The editor — what "simple" means
+
+One screen, one list. Opening it asks **what to start from**: blank, a shipped
+template, or a pasted question list. All three produce the same editable list.
+
+Each row:
+
+| Control | Notes |
+|---|---|
+| Label | the question, 1–200 chars |
+| Kind | short / long text, rating, single choice, multi choice, number, date, email, phone, matric, consent, heading |
+| Required | on/off (never for a heading) |
+| Options | only for choices: add/remove option rows |
+| Scale | only for ratings: min and max (default 1–5) |
+| Analysis | only for ratings: none / KI before / KI after / feedback, plus KI1–KI7 when it is a KI field |
+| Up / Down / Delete | reordering, and removal |
+
+Not in it: drag-and-drop, sections, help-text editing, conditional fields,
+duplicate-field, live preview. The published form is the preview.
+
+Pasting a question list is the only bulk path: one question per line, with the
+same columns as `docs/ki-template-fields.csv` (`kind, label, required, options,
+analysis, ki_code`). It fills the list and stops — the editor is where any of it
+gets fixed, which is why there is no server-side import.
+
+Once the form has answers, the editor shows those rows read-only rather than
+hiding them, and disables the destructions listed under "Editing a live form".
+
 ## Client plan
 
 | Piece | File |
 |---|---|
 | Service | `lib/services/form_service.dart` |
-| Pick a template, create the survey | `lib/screens/events/form_create_screen.dart` |
+| Start-from chooser + field editor | `lib/screens/events/form_editor_screen.dart` |
 | Answer page | `lib/screens/events/event_form_screen.dart` |
 | Responses + S1/S2/S3 + CSV | `lib/screens/events/form_responses_screen.dart` |
 | KI before/after bars | `lib/widgets/ki_chart.dart` (drawn, no chart package) |
 | Per-kind inputs | `lib/widgets/form_field_input.dart` |
-| Pure rules | `lib/utils/form_rules.dart` |
+| Pure rules + CSV/paste parsing | `lib/utils/form_rules.dart` |
 | Copy (en/ms, ja→en) | `lib/l10n/form_strings.dart` |
 
-Routes `/event/:id/form` and `/event/:id/form/responses`; add the first to
-`backFallbackFor` (→ event page) and to the guest paths.
+Routes `/event/:id/form/edit` (organiser), `/event/:id/form` (answer) and
+`/event/:id/form/responses`. Add the answer route to `backFallbackFor` (→ event
+page) and to the guest paths.
 
 The analysis screen is the point of the feature: three compact tables (S1, S2, S3)
 plus the free-text list, each with a copy button, because the numbers get typed
@@ -214,16 +254,23 @@ into the Word report by hand.
 
 ## Phases
 
-1. **Schema + analyses + a seeded KI template + `forms_test.mjs`.** No UI. The
-   numbers are the deliverable; prove them first.
-2. **Answer page + create-from-template.** A survey exists and students fill it.
-3. **S1/S2/S3 screen + CSV export.**
-4. **Template paste-import** (so a new club version needs no release), then the
-   builder, then the `after_checkin` prompt.
+1. **Schema + RPCs + `form_analysis` + the seeded KI template + `forms_test.mjs`.**
+   No UI. **Done** — `20261026007100_event_forms.sql` (five tables, the 28-row
+   seeded template, `save_event_form`, publish/close, `form_public`,
+   `submit_form_response`, `form_response_list`, `form_analysis`) and
+   `supabase/tests/forms/forms_test.mjs` (44 assertions, migrations applied
+   twice). **Not applied to the live project**, because nothing calls it yet.
+2. **The editor** (start chooser, field list, save, publish) — a form can be
+   built, from nothing or from a template, and looked at.
+3. **The answer page.** A published form can be filled.
+4. **S1/S2/S3 screen + CSV export.**
+5. **`after_checkin` prompt**, and later the richer builder.
 
 ## Tests
 
-`supabase/tests/forms/forms_test.mjs` (house harness, migrations applied twice):
+`supabase/tests/forms/forms_test.mjs` (house harness, migrations applied twice).
+Run it from `supabase/tests` — `node forms/forms_test.mjs ../..` — see the
+handover for why that directory now needs its own `node_modules`:
 
 1. the seeded KI template has 7 `ki_pre`, 7 `ki_post`, 6 `feedback` fields, KI1–7;
 2. creating from a template **copies** fields; editing the template afterwards
@@ -255,9 +302,10 @@ renders the fixture means, CSV header order.
 
 ## Open questions
 
-1. **Which template versions ship first?** Your Bahasa Arab one is the seed, taken
-   from the workbook. Say if the MPP extended version should be seeded too, or
-   added later by paste-import (recommended — it exercises that path).
+1. **How many starting options ship?** This design ships **one** (your Bahasa
+   Arab KI form, from the CSV) plus blank and paste — on the reasoning that a
+   club that wants MPP's version pastes it in and edits. Say if MPP's should be a
+   second shipped option instead; it is one more entry in the seed, no code.
 2. **Is `Pilih` (Peserta / Penganjur) derived or asked?** This design derives it
    from club office and lets the respondent correct it; the Google Form asked.
 3. **Nombor Matrik** — the workbook exports it as a float (`2023837334.0`), a
