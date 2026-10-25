@@ -122,6 +122,20 @@ extension FormStrings on AppStrings {
 
   // ---- answering ----
   String get formAnswerTitle => _t("Program form", "Borang program", "Program form");
+  String get formAnswerKiNow =>
+      _t("Answer the KI form", "Jawab borang KI", "Answer the KI form");
+  String get formAskAfterCheckin => _t(
+      "Ask the KI form after check-in",
+      "Minta borang KI selepas daftar masuk",
+      "Ask the KI form after check-in");
+  String get formAskAfterCheckinHint => _t(
+      "Students see it once, right after they check in.",
+      "Pelajar nampak sekali, selepas mereka daftar masuk.",
+      "Students see it once, right after they check in.");
+  String get formNoOpenFormToAsk => _t(
+      "Publish a form first, then you can offer it after check-in.",
+      "Terbitkan borang dahulu, kemudian boleh tawarkan selepas daftar masuk.",
+      "Publish a form first.");
   String get formAnswerSend => _t("Submit", "Hantar", "Submit");
   String get formAnswerUpdate => _t("Update answers", "Kemas kini jawapan", "Update answers");
   String get formAnswerThanks => _t(

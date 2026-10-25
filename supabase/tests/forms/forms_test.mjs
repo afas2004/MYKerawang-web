@@ -196,6 +196,18 @@ ok((await as(null, `select event_open_form($1) f`, [ev], 'anon'))[0].f === form,
 e = await err(officer, `select publish_form($1)`, [form]);
 ok(e?.includes('FORM:not_draft'), 'publishing twice is refused');
 
+// ---------------------------------------------------------- after check-in
+ok((await q(`select after_checkin from event_forms where id=$1`, [form]))[0].after_checkin === false,
+  'a form is not offered after check-in unless asked');
+await as(officer, `select set_form_after_checkin($1, true)`, [form]);
+ok((await q(`select after_checkin from event_forms where id=$1`, [form]))[0].after_checkin === true,
+  'the organiser can turn the after-check-in offer on');
+e = await err(s1, `select set_form_after_checkin($1, false)`, [form]);
+ok(e?.includes('FORM:not_allowed'), 'a student cannot flip it');
+await as(officer, `select set_form_after_checkin($1, false)`, [form]);
+ok((await q(`select after_checkin from event_forms where id=$1`, [form]))[0].after_checkin === false,
+  'and off again');
+
 // ---------------------------------------------------------- answering
 const live = await q(`select * from form_fields where form_id=$1 order by sort`, [form]);
 const answerable = live.filter((f) => f.kind !== 'heading');

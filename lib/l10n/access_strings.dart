@@ -175,6 +175,18 @@ extension AccessStrings on AppStrings {
   String get eventAddButton => _t("Add button", "Tambah butang", "Add button");
   String get evPic =>
       _t("Person in charge", "Pegawai bertanggungjawab", "Person in charge");
+  String get evManage => _t("Manage event", "Urus acara", "Manage event");
+  String get evManageSubtitle => _t(
+      "Attendance, reports and the door code",
+      "Kehadiran, laporan dan kod pintu",
+      "Attendance, reports and the door code");
+  String get evCheckinOpen =>
+      _t("Check-in is open", "Daftar masuk dibuka", "Check-in is open");
+  String get evCheckinOpenHint => _t(
+      "Scan the code at the door, or open the event on your phone.",
+      "Imbas kod di pintu, atau buka acara ini di telefon.",
+      "Scan the code at the door, or open the event on your phone.");
+  String get evLive => _t("Live now", "Sedang berlangsung", "Live now");
   String get evAudience => _t("Open to", "Terbuka kepada", "Open to");
   String evAudienceLabel(String? v) => switch (v) {
         'kolej' => _t("This college", "Kolej ini", "This college"),

@@ -57,6 +57,9 @@ class FakeAnswerService implements FormService {
   Future<List<FormResponse>> responses(String formId) async => const [];
 
   @override
+  Future<void> setAfterCheckin(String formId, bool on) async {}
+
+  @override
   Future<void> submit(String formId,
       {required Map<String, dynamic> answers, String? role}) async {
     submitted = answers;

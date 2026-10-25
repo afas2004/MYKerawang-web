@@ -290,7 +290,10 @@ into the Word report by hand.
    and the CSV download. `lib/utils/form_csv.dart` builds both artefacts, pure
    and tested, so the CSV columns and the copied tables cannot drift from the
    fields.
-5. **`after_checkin` prompt**, and later the richer builder.
+5. **`after_checkin` prompt** — **done**: the check-in success screen offers the
+   form once when the open form has `after_checkin` and the caller has not
+   answered yet; the organiser turns it on from Manage event
+   (`set_form_after_checkin`) or in the editor. Then the richer builder.
 
 ## Tests
 

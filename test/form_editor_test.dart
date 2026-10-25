@@ -73,6 +73,9 @@ class FakeFormService implements FormService {
   Future<List<FormResponse>> responses(String formId) async => const [];
 
   @override
+  Future<void> setAfterCheckin(String formId, bool on) async {}
+
+  @override
   Future<void> save(FormDoc doc) async {
     saved.add(doc);
     // The server assigns ids; emulate it so the reload after a save is honest.

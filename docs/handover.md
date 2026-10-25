@@ -12,15 +12,16 @@ the end of the second session that day (PR #8 and #9 merged, two bugs fixed,
 | Worktree used | `.deepseek/worktrees/clubs-admin` (the one to reopen) |
 | Branch | `deepseek/clubs-admin` — 11 commits ahead of `origin/main`, pushed |
 | Last merge | PR #9 → `6da73ad` (1.7.7); before it PR #8 → `e491899` (1.7.2–1.7.6) |
-| Live | https://mykerawang-app.web.app — build `202610251047`, version **1.7.9** |
-| Tests | 490 Flutter tests green; migration suites: moderation (all but 2 pre-existing), clubs 87, verification 13, forms 58, event links 10, attendance 15; analyzer has 18 info/warning findings, no errors |
-| Latest migration | `20261026009100_fix_checkin_token.sql` — **written, tested, NOT applied to live**. Before it: `20261026008100_event_links_pic.sql` and `20261026007100_event_forms.sql`, both **applied** (the seed event exists and the app writes `pic`/`action_links`). |
+| Live | https://mykerawang-app.web.app — build `202610251109`, version **1.8.0** |
+| Tests | 496 Flutter tests green; migration suites: moderation (all but 2 pre-existing), clubs 87, verification 13, forms 62, event links 10, attendance 15; analyzer has 18 info/warning findings, no errors |
+| Latest migration | `20261026010100_form_after_checkin.sql` — **written, tested, NOT applied to live**. Applied: `20261026009100` (attendance fix — the QR works now), `20261026008100` (event links + PIC), `20261026007100` (event forms), plus the KI test-event seed. |
 
-`main` is at 1.7.7; the live site is at **1.7.9** (build `202610251047`) with the
-forms screens and the rebuilt event composer. The forms and event-links
-migrations **are** applied; the **attendance fix is not** — until
-`20261026009100_fix_checkin_token.sql` is pasted, the attendance screen shows
-`column reference "expires_at" is ambiguous`. Merge at the next natural stop.
+`main` is at 1.7.7; the live site is at **1.8.0** (build `202610251109`) with the
+forms screens, the rebuilt event composer and the organiser manage sheet. All
+migrations are applied **except** `20261026010100_form_after_checkin.sql`, which
+only the manage sheet's "ask the KI form after check-in" switch needs — until it
+is pasted, that switch reports an error (the same setting still works in the form
+editor, which writes it through `save_event_form`). Merge at the next natural stop.
 
 ## What changed this session
 
@@ -120,8 +121,8 @@ node forms/forms_test.mjs ../..        # event forms: template, editor, S1/S2/S3
 # re-running never duplicates the KI template.
 #
 # Pending against live:
-#   supabase/migrations/20261026009100_fix_checkin_token.sql
-#   (the forms + event-links migrations and the KI test-event seed are applied)
+#   supabase/migrations/20261026010100_form_after_checkin.sql
+#   (everything before it, including the attendance fix and the seed, is applied)
 
 # deploy: bump BOTH places, then build/stamp/deploy
 #   pubspec.yaml version: 1.7.x+N
@@ -279,6 +280,19 @@ and the old `signInWithOAuth` path still compiles.
   - **person in charge** (`events.pic`), shown in the facts card.
   Tests: `test/category_field_test.dart` (4) and
   `supabase/tests/events/events_links_test.mjs` (10).
+- **The organiser's page is one button again.** Attendance, the report, closing
+  registration and the edit all live behind **Manage event** (a bottom sheet), so
+  the page shows students and organisers the same thing. The check-in button is
+  no longer permanent: it appears to non-organisers only inside the check-in
+  window (`lib/utils/event_live.dart`, 15 minutes before the start until the end),
+  and that window also drives a **Check-in is open** banner on the event page and
+  a chip on the event card in the list.
+- **Counts update live**: the event page subscribes to `event_participants` and
+  re-reads the count on any change (best-effort: guests have no socket).
+- **Check-in now leads to the KI form.** When the open form was published with
+  `after_checkin`, the success screen offers "Answer the KI form" once, instead
+  of leaving a button on the page that does nothing. The switch lives in Manage
+  event (`set_form_after_checkin`, or the form editor's own toggle).
 - Recurring announcements (needs pg_cron or materialise-on-read).
 - Shared-link thumbnails need per-URL OG tags (SPA limitation; needs a function
   or prerender).

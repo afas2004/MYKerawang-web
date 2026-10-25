@@ -15,6 +15,7 @@ import '../language_cubit.dart';
 import '../theme/app_themes.dart';
 import '../utils/app_nav.dart';
 import '../utils/announcement_rules.dart';
+import '../utils/event_live.dart';
 import '../utils/formatters.dart';
 import '../utils/feedback.dart';
 import '../utils/guest_access.dart';
@@ -72,6 +73,8 @@ class _EventDetailScreenState extends State<EventDetailScreen>
 
   @override
   void dispose() {
+    final channel = _peopleChannel;
+    if (channel != null) Supabase.instance.client.removeChannel(channel);
     _heroController.dispose();
     _commentCtrl.dispose();
     super.dispose();
@@ -150,9 +153,61 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         });
       }
       if (userId != null) _fetchFollowingGoing(userId);
+      _watchParticipants();
     } catch (e) {
       debugPrint("Error fetching details: $e");
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  /// Keeps "N attending" honest while people join, leave or check in.
+  ///
+  /// Realtime is best-effort: guests have no session (no socket), and a project
+  /// without replication enabled simply never fires, so every value here is
+  /// re-read rather than patched.
+  RealtimeChannel? _peopleChannel;
+
+  void _watchParticipants() {
+    final supabase = Supabase.instance.client;
+    if (supabase.auth.currentSession == null || _peopleChannel != null) return;
+    _peopleChannel = supabase
+        .channel('event-people-${_event['id']}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'event_participants',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'event_id',
+            value: '${_event['id']}',
+          ),
+          callback: (_) => _refreshCounts(),
+        )
+        .subscribe();
+  }
+
+  Future<void> _refreshCounts() async {
+    final supabase = Supabase.instance.client;
+    try {
+      final int count;
+      if (isLoggedIn) {
+        count = await supabase
+            .from('event_participants')
+            .count(CountOption.exact)
+            .eq('event_id', _event['id']);
+      } else {
+        final row = await supabase
+            .from('event_participant_counts')
+            .select('participant_count')
+            .eq('event_id', _event['id'])
+            .maybeSingle();
+        count = (row?['participant_count'] as num?)?.toInt() ?? 0;
+      }
+      if (mounted && count != _participantCount) {
+        setState(() => _participantCount = count);
+      }
+    } catch (e) {
+      debugPrint('Count refresh failed: $e');
     }
   }
 
@@ -1013,40 +1068,58 @@ class _EventDetailScreenState extends State<EventDetailScreen>
   /// Contact + attendance, under the main action.
   Widget _secondaryActions(BuildContext context) {
     final s = context.l10n;
-    final attendanceOn = _event['attendance_enabled'] == true;
+    final live = checkinOpen(_event);
+    final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // The door is open: say so, everywhere the event appears.
+        if (live) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: KSpace.m, vertical: KSpace.s),
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(AppIcons.qrCode, size: 18, color: scheme.onPrimaryContainer),
+                const SizedBox(width: KSpace.s),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.evCheckinOpen,
+                        style: TextStyle(
+                          color: scheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                      Text(
+                        s.evCheckinOpenHint,
+                        style: TextStyle(
+                            color: scheme.onPrimaryContainer, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: KSpace.s),
+        ],
         OutlinedButton.icon(
           onPressed: _showContacts,
           style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
           icon: const Icon(AppIcons.email, size: 18),
           label: Text(s.evContacts),
         ),
-        if (_isOwner) ...[
-          const SizedBox(height: KSpace.s),
-          OutlinedButton.icon(
-            onPressed: _openAttendance,
-            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-            icon: const Icon(AppIcons.verified, size: 18),
-            label: Text(s.evAttendance),
-          ),
-          const SizedBox(height: KSpace.s),
-          OutlinedButton.icon(
-            onPressed: _openReportForm,
-            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-            icon: const Icon(AppIcons.list, size: 18),
-            label: Text(s.formKiReport),
-          ),
-          if (!_registrationClosed && !_isClosed) ...[
-            const SizedBox(height: KSpace.s),
-            TextButton.icon(
-              onPressed: _closeRegistration,
-              icon: const Icon(AppIcons.lock, size: 18),
-              label: Text(s.evCloseNow),
-            ),
-          ],
-        ] else if (attendanceOn) ...[
+        // Only people who are there need the door: the button appears for the
+        // event's own window, not for the whole lifetime of the page.
+        if (!_isOwner && live) ...[
           const SizedBox(height: KSpace.s),
           FilledButton.tonalIcon(
             onPressed: _startCheckIn,
@@ -1055,16 +1128,123 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             label: Text(s.evCheckIn),
           ),
         ],
-        if (_openFormId != null && !_isOwner) ...[
+        if (!_isOwner && _openFormId != null) ...[
           const SizedBox(height: KSpace.s),
-          FilledButton.tonalIcon(
+          OutlinedButton.icon(
             onPressed: _openAnswerForm,
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
             icon: const Icon(AppIcons.list, size: 18),
             label: Text(s.formAnswerTitle),
           ),
         ],
       ],
+    );
+  }
+
+  /// The organiser's one stop: edit, attendance, the report, closing
+  /// registration, and whether the report is asked after check-in.
+  Future<void> _openManageSheet() async {
+    final s = context.l10nRead;
+    final scheme = Theme.of(context).colorScheme;
+
+    // The form the door would ask, if one is open.
+    FormDoc? form;
+    try {
+      final summary = await FormService.instance.summary('${_event['id']}');
+      if (summary != null) {
+        form = (await FormService.instance.load(summary.id)).doc;
+      }
+    } catch (e) {
+      debugPrint('No form for the manage sheet: $e');
+    }
+    if (!mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (ctx) {
+        final doc = form;
+        return StatefulBuilder(
+          builder: (ctx, setSheet) => SafeArea(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: Icon(AppIcons.settings, color: scheme.primary),
+                    title: Text(s.evManage, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Text(s.evManageSubtitle),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(AppIcons.edit),
+                    title: Text(s.edit),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _editEvent();
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(AppIcons.verified),
+                    title: Text(s.evAttendance),
+                    subtitle: Text(s.attendingCount.fill(['$_participantCount'])),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _openAttendance();
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(AppIcons.list),
+                    title: Text(s.formKiReport),
+                    subtitle: Text(doc == null ? s.formNoOpenFormToAsk : doc.title),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      if (doc == null) {
+                        _openReportForm();
+                      } else {
+                        context.push('/event/${_event['id']}/form/responses');
+                      }
+                    },
+                  ),
+                  if (!_registrationClosed && !_isClosed)
+                    ListTile(
+                      leading: const Icon(AppIcons.lock),
+                      title: Text(s.evCloseNow),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _closeRegistration();
+                      },
+                    ),
+                  const Divider(height: 1),
+                  if (doc != null)
+                    SwitchListTile(
+                      value: doc.afterCheckin,
+                      title: Text(s.formAskAfterCheckin),
+                      subtitle: Text(s.formAskAfterCheckinHint),
+                      onChanged: (on) async {
+                        setSheet(() => form = doc.copyWith(afterCheckin: on));
+                        try {
+                          await FormService.instance.setAfterCheckin(doc.id, on);
+                        } catch (e) {
+                          setSheet(() => form = doc);
+                          if (mounted) showErrorWithRetry(context, e);
+                        }
+                      },
+                    )
+                  else
+                    ListTile(
+                      leading: const Icon(AppIcons.info),
+                      title: Text(s.formNoOpenFormToAsk,
+                          style: TextStyle(color: scheme.onSurfaceVariant)),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1245,11 +1425,14 @@ class _EventDetailScreenState extends State<EventDetailScreen>
   Widget _primaryAction(BuildContext context) {
     final s = context.l10n;
     if (_isOwner) {
+      // One action for the organiser. Everything else — attendance, the report,
+      // closing registration — lives behind it, so the page a student sees and
+      // the page the organiser sees are the same page.
       return FilledButton.icon(
-        onPressed: _editEvent,
+        onPressed: _openManageSheet,
         style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-        icon: const Icon(AppIcons.edit, size: 18),
-        label: Text(s.edit),
+        icon: const Icon(AppIcons.settings, size: 18),
+        label: Text(s.evManage),
       );
     }
     // Already-joined people can still leave a cancelled event; nobody can

@@ -236,6 +236,9 @@ abstract class FormService {
   /// Every answer, for the table and the CSV.
   Future<List<FormResponse>> responses(String formId);
 
+  /// The organiser's "ask this form after check-in" switch.
+  Future<void> setAfterCheckin(String formId, bool on);
+
   static FormService instance = const SupabaseFormService();
 
   @visibleForTesting
@@ -330,6 +333,11 @@ class SupabaseFormService implements FormService {
   @override
   Future<void> publish(String formId) =>
       _db.rpc('publish_form', params: {'p_form_id': formId});
+
+  @override
+  Future<void> setAfterCheckin(String formId, bool on) =>
+      _db.rpc('set_form_after_checkin',
+          params: {'p_form_id': formId, 'p_on': on});
 
   @override
   Future<void> submit(

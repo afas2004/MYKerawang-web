@@ -5,7 +5,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../l10n/access_strings.dart';
 import '../../l10n/app_strings.dart';
+import '../../l10n/form_strings.dart';
 import '../../language_cubit.dart';
+import '../../services/form_service.dart';
 import '../../services/student_verification.dart';
 import '../../theme/app_icons.dart';
 import '../../utils/moderation_logic.dart';
@@ -147,10 +149,31 @@ class _CheckinPageState extends State<CheckinPage> {
   String? _message;
   bool _ok = false;
 
+  /// The event's open form, when the organiser asked for it after check-in.
+  String? _formId;
+
   @override
   void initState() {
     super.initState();
     _redeem();
+  }
+
+  /// The KI report is the reason the club collects attendance at all, so when
+  /// the form was published with `after_checkin`, this is the moment it is
+  /// offered — once, on the success screen, not as another button on the page.
+  Future<void> _loadFormOffer() async {
+    try {
+      final id = await FormService.instance.openFormId(widget.eventId);
+      if (id == null) return;
+      final view = await FormService.instance.load(id);
+      if (!mounted) return;
+      if (view.doc.afterCheckin && view.canAnswer && !view.answered) {
+        setState(() => _formId = id);
+      }
+    } catch (e) {
+      // No forms migration, or a network hiccup: the check-in still stands.
+      debugPrint('No check-in form offer: $e');
+    }
   }
 
   Future<void> _redeem() async {
@@ -172,6 +195,7 @@ class _CheckinPageState extends State<CheckinPage> {
         _message = res == 'already' ? s.evAlreadyIn : s.evCheckedIn;
         _loading = false;
       });
+      await _loadFormOffer();
     } catch (e) {
       if (!mounted) return;
       final code = parseModError(e)?.code;
@@ -210,10 +234,25 @@ class _CheckinPageState extends State<CheckinPage> {
                         textAlign: TextAlign.center,
                         style: theme.textTheme.titleMedium),
                     const SizedBox(height: KSpace.l),
-                    FilledButton(
-                      onPressed: () => context.go('/event/${widget.eventId}'),
-                      child: Text(s.viewEvent),
-                    ),
+                    if (_formId != null) ...[
+                      FilledButton.icon(
+                        onPressed: () =>
+                            context.go('/event/${widget.eventId}/form'),
+                        style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(48)),
+                        icon: const Icon(AppIcons.list, size: 18),
+                        label: Text(s.formAnswerKiNow),
+                      ),
+                      const SizedBox(height: KSpace.s),
+                      TextButton(
+                        onPressed: () => context.go('/event/${widget.eventId}'),
+                        child: Text(s.viewEvent),
+                      ),
+                    ] else
+                      FilledButton(
+                        onPressed: () => context.go('/event/${widget.eventId}'),
+                        child: Text(s.viewEvent),
+                      ),
                     if (!_ok) ...[
                       const SizedBox(height: KSpace.s),
                       TextButton(

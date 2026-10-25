@@ -68,6 +68,9 @@ class FakeResponsesService implements FormService {
 
   @override
   Future<List<FormResponse>> responses(String formId) async => responsesValue;
+
+  @override
+  Future<void> setAfterCheckin(String formId, bool on) async {}
 }
 
 void main() {
