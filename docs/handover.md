@@ -12,8 +12,8 @@ the end of the second session that day (PR #8 and #9 merged, two bugs fixed,
 | Worktree used | `.deepseek/worktrees/clubs-admin` (the one to reopen) |
 | Branch | `deepseek/clubs-admin` — 11 commits ahead of `origin/main`, pushed |
 | Last merge | PR #9 → `6da73ad` (1.7.7); before it PR #8 → `e491899` (1.7.2–1.7.6) |
-| Live | https://mykerawang-app.web.app — build `202610251109`, version **1.8.0** |
-| Tests | 496 Flutter tests green; migration suites: moderation (all but 2 pre-existing), clubs 87, verification 13, forms 62, event links 10, attendance 15; analyzer has 18 info/warning findings, no errors |
+| Live | https://mykerawang-app.web.app — build `202610251134`, version **1.8.1** |
+| Tests | 506 Flutter tests green; migration suites: moderation (all but 2 pre-existing), clubs 87, verification 13, forms 62, event links 10, attendance 15; analyzer has 17 info/warning findings, no errors |
 | Latest migration | `20261026010100_form_after_checkin.sql` — **written, tested, NOT applied to live**. Applied: `20261026009100` (attendance fix — the QR works now), `20261026008100` (event links + PIC), `20261026007100` (event forms), plus the KI test-event seed. |
 
 `main` is at 1.7.7; the live site is at **1.8.0** (build `202610251109`) with the
@@ -280,19 +280,34 @@ and the old `signInWithOAuth` path still compiles.
   - **person in charge** (`events.pic`), shown in the facts card.
   Tests: `test/category_field_test.dart` (4) and
   `supabase/tests/events/events_links_test.mjs` (10).
-- **The organiser's page is one button again.** Attendance, the report, closing
-  registration and the edit all live behind **Manage event** (a bottom sheet), so
-  the page shows students and organisers the same thing. The check-in button is
-  no longer permanent: it appears to non-organisers only inside the check-in
-  window (`lib/utils/event_live.dart`, 15 minutes before the start until the end),
-  and that window also drives a **Check-in is open** banner on the event page and
-  a chip on the event card in the list.
+- **Taking attendance is a flow, not a toggle.** The event page's action for the
+  organiser is **Take attendance**, which asks one question — *add the KI report?*
+  — and then opens the door:
+  `lib/screens/events/attendance_live_screen.dart`. That screen is the rotating
+  code with a **running count** and **the last person in** (given name only, cut
+  at bin/binti: `shortAttendeeName` in `lib/utils/attendance_rules.dart`), and a
+  single **End attendance** button. Ending shows an animated summary — total
+  attendance, KI reports when the form was part of the session — with three
+  exports: attendance CSV, KI CSV, or both as **two separate files**.
+  The old `attendance_screen.dart` (a switch beside the QR) is deleted, and the
+  attendance toggle is gone from the event composer (new events are created with
+  `attendance_enabled = true`).
+- **Contact is buttons, not a sheet.** `contactLinks()` turns the organiser's
+  channels into WhatsApp / Telegram / Instagram / Email / Link buttons that open
+  straight away; guests get one sign-in prompt instead.
+- **Manage event** now holds only what is left: Edit, KI report, Close
+  registration. Attendance and the after-check-in choice are no longer duplicated
+  there.
+- The check-in button is not permanent: non-organisers see it only inside the
+  check-in window (`lib/utils/event_live.dart`, 15 minutes before the start until
+  the end), and that window also drives a **Check-in is open** banner on the event
+  page and a chip on the event card in the list.
 - **Counts update live**: the event page subscribes to `event_participants` and
   re-reads the count on any change (best-effort: guests have no socket).
-- **Check-in now leads to the KI form.** When the open form was published with
-  `after_checkin`, the success screen offers "Answer the KI form" once, instead
-  of leaving a button on the page that does nothing. The switch lives in Manage
-  event (`set_form_after_checkin`, or the form editor's own toggle).
+- **Check-in now leads to the KI form.** When the form was started with the KI
+  option, the check-in success screen offers "Answer the KI form" once. The
+  choice is made in the Take-attendance dialog, which writes
+  `after_checkin` through `set_form_after_checkin`.
 - Recurring announcements (needs pg_cron or materialise-on-read).
 - Shared-link thumbnails need per-URL OG tags (SPA limitation; needs a function
   or prerender).

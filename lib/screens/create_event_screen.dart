@@ -57,7 +57,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   // Registration + merit + contacts.
   bool _closeAtStart = true;
   bool _meritOffered = false;
-  bool _attendanceEnabled = false;
   bool _isAdminUser = false;
   String? _audience = 'uitm';
   final _capacityCtrl = TextEditingController();
@@ -113,7 +112,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       _feeCtrl.text = event['fee']?.toString() ?? '';
       _audience = (event['audience'] as String?) ?? 'uitm';
       _meritOffered = event['merit_offered'] == true;
-      _attendanceEnabled = event['attendance_enabled'] == true;
       _meritNoteCtrl.text = event['merit_note'] ?? '';
       _activityRefCtrl.text = event['activity_ref'] ?? '';
       _coOrganiserCtrl.text = event['co_organiser'] ?? '';
@@ -346,12 +344,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         'activity_ref': _nullIfEmpty(_activityRefCtrl.text),
         'co_organiser': _nullIfEmpty(_coOrganiserCtrl.text),
         'pic': _nullIfEmpty(_picCtrl.text),
+        // Attendance is no longer a setting: the organiser takes it from the
+        // event page, so every new event has the door available.
+        if (widget.eventToEdit == null) 'attendance_enabled': true,
         'action_links': [
           for (final l in _links)
             if (l.label.text.trim().isNotEmpty && l.url.text.trim().isNotEmpty)
               {'label': l.label.text.trim(), 'url': l.url.text.trim()},
         ],
-        'attendance_enabled': _attendanceEnabled,
       };
 
       if (widget.eventToEdit != null) {
@@ -625,16 +625,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   const SizedBox(height: 12),
                   _input(_coOrganiserCtrl, s.evCoOrganiser,
                       icon: AppIcons.people),
-                  const Divider(height: 32),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: _attendanceEnabled,
-                    onChanged: (v) => setState(() => _attendanceEnabled = v),
-                    title: Text(s.evAttendance),
-                    subtitle: Text(s.evAttendanceHint,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                  ),
                 ],
               ),
               FormSection(
