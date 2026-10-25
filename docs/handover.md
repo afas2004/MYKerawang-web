@@ -20,8 +20,8 @@ the end of the second session that day (PR #8 and #9 merged, two bugs fixed,
 
 ## What changed this session
 
-- **Merged** the branch (PR #8, merge commit `e491899`), so `main` matches
-  what is running.
+- **Merged** the branch twice: PR #8 (`e491899`, 1.7.2–1.7.6) and PR #9
+  (`6da73ad`, 1.7.7), so `main` matches what is running.
 - **Announcement Edit/Delete are the author's alone** (was: admins and owners
   too). `update_my_post` and `delete_my_post` both require
   `user_id = auth.uid()`, so the buttons were dead for everyone else — they
@@ -35,6 +35,8 @@ the end of the second session that day (PR #8 and #9 merged, two bugs fixed,
   back to "Announcement" or "Thread" when there is no headline).
 - **Google sign-in leaves no history entry** (see below — unverified on a
   real browser).
+- **Released 1.7.7** (build `202610250823`) and **wrote `docs/form-builder.md`**,
+  the design pass the form builder was waiting on. No form code was written.
 
 ## Infrastructure
 
@@ -158,9 +160,14 @@ and the old `signInWithOAuth` path still compiles.
 - Event PIC field + tag clubs/people as collaborators.
 - Registration toggle on the event page after publishing, with instant QR and a
   "add a form?" prompt.
-- **Form builder** (the big one): `event_forms` / `form_fields` / `form_responses`,
-  CSV import, public form page, linked to the attendance QR. Needs a design pass:
-  per-event vs reusable, response privacy, require RSVP before answering.
+- **Form builder** (the big one): designed, not built — see
+  `docs/form-builder.md`. That document settles per-event vs reusable
+  (per-event, copy to reuse), response privacy (organiser + club officers +
+  admins, never a public view), and the RSVP gate (per-form toggle, default on
+  when the event has capacity). Five questions at its end still need answers
+  before phase 1: what CSV import imports, sign-in-only answers, whether club
+  officers see PII, whether feedback is a separate form, and whether the
+  questions themselves may be public.
 - Recurring announcements (needs pg_cron or materialise-on-read).
 - Shared-link thumbnails need per-URL OG tags (SPA limitation; needs a function
   or prerender).
@@ -169,6 +176,7 @@ and the old `signInWithOAuth` path still compiles.
 
 1. Run the three Google sign-in checks above on the live 1.7.7. If any fails,
    revert the login commit and redeploy before anything else.
-2. Then either the captcha work (the last code item before inviting a club —
-   it needs a hCaptcha/Turnstile site key) or the form builder, with a design
-   document before any UI.
+2. Answer the four open questions in `docs/form-builder.md`, then build phase 1
+   of it (schema + RPCs + `forms_test.mjs`, no UI). Or the captcha work first —
+   that is the last code item before inviting a club, and it needs a
+   hCaptcha/Turnstile site key from the owner.
