@@ -13,13 +13,15 @@ the end of the second session that day (PR #8 and #9 merged, two bugs fixed,
 | Branch | `deepseek/clubs-admin` — 11 commits ahead of `origin/main`, pushed |
 | Last merge | PR #9 → `6da73ad` (1.7.7); before it PR #8 → `e491899` (1.7.2–1.7.6) |
 | Live | https://mykerawang-app.web.app — build `202610251011`, version **1.7.8** |
-| Tests | 486 Flutter tests green; migration suites: moderation (all but 2 pre-existing), clubs 87, verification 13, forms 58; analyzer has 18 info/warning findings, no errors |
-| Latest migration | `20261026007100_event_forms.sql` — **written, tested, NOT applied to live**; before it `20261026006100_club_recruitment.sql` (live) |
+| Tests | 490 Flutter tests green; migration suites: moderation (all but 2 pre-existing), clubs 87, verification 13, forms 58, events 10; analyzer has 18 info/warning findings, no errors |
+| Latest migration | `20261026008100_event_links_pic.sql` — **written, tested, NOT applied to live**; before it `20261026007100_event_forms.sql` (also not applied), then `20261026006100_club_recruitment.sql` (live) |
 
 `main` is at 1.7.7; the live site is at **1.7.8** (build `202610251011`) with the
-forms screens. The migration they need is not applied yet, so the forms UI stays
-hidden — the event page's `event_open_form()` call fails and is swallowed by
-design. Merge at the next natural stop.
+forms screens. **Two migrations are waiting to be applied** (see How to work):
+the forms one and the event-links one. The forms UI hides itself until the first
+runs; the event composer **writes `pic`/`action_links`**, so the second must be
+applied before a build with that composer is deployed — otherwise creating any
+event fails with a missing column. Merge at the next natural stop.
 
 ## What changed this session
 
@@ -117,6 +119,13 @@ node forms/forms_test.mjs ../..        # event forms: template, editor, S1/S2/S3
 # Paste the whole file, Run. Every migration here is re-runnable, so a second
 # run is safe. The seed guard (a `not exists` on the template's fields) means
 # re-running never duplicates the KI template.
+#
+# Pending against live, in this order:
+#   1. supabase/migrations/20261026007100_event_forms.sql
+#   2. supabase/migrations/20261026008100_event_links_pic.sql
+#   3. supabase/seed/2026-10-25_ki_test_event.sql   (a past event to test with)
+# The composer writes pic/action_links, so 2 must run before a build that has
+# it is deployed, or creating an event fails on a missing column.
 
 # deploy: bump BOTH places, then build/stamp/deploy
 #   pubspec.yaml version: 1.7.x+N
@@ -250,6 +259,16 @@ and the old `signInWithOAuth` path still compiles.
   with its `n`, the free-text suggestions and the respondent list, and the CSV
   download. `lib/utils/form_csv.dart` holds both artefacts as pure functions, so
   the CSV columns and the copied tables cannot drift from the questions.
+- **Event composer caught up with the announcement one**:
+  - the description documents and renders the same light markup (`**bold**`,
+    `- ` bullets, https links) — the event page now uses `FormattedBody`;
+  - **categories are a text field with autocomplete** (`CategoryField`) instead
+    of a wall of chips, with the chosen ones as removable chips underneath;
+  - **buttons with links** (max 2, `events.action_links`), same validation as an
+    announcement's action buttons, rendered on the event page;
+  - **person in charge** (`events.pic`), shown in the facts card.
+  Tests: `test/category_field_test.dart` (4) and
+  `supabase/tests/events/events_links_test.mjs` (10).
 - Recurring announcements (needs pg_cron or materialise-on-read).
 - Shared-link thumbnails need per-URL OG tags (SPA limitation; needs a function
   or prerender).

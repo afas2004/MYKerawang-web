@@ -11,7 +11,9 @@ import '../utils/adaptive.dart';
 import '../utils/formatters.dart';
 import '../utils/app_nav.dart';
 import '../utils/form_draft.dart';
-import '../widgets/category_picker.dart';
+import '../utils/announcement_rules.dart';
+import '../l10n/announce_strings.dart';
+import '../widgets/category_field.dart';
 import '../widgets/form_layout.dart';
 import '../widgets/media_picker_grid.dart';
 import '../widgets/restriction_gate.dart';
@@ -63,6 +65,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final _meritNoteCtrl = TextEditingController();
   final _activityRefCtrl = TextEditingController();
   final _coOrganiserCtrl = TextEditingController();
+  final _picCtrl = TextEditingController();
+
+  /// Buttons with links, like an announcement's (max two). Each row keeps its
+  /// own controllers so editing an existing event repopulates them.
+  final List<_LinkRow> _links = [];
   final Map<String, TextEditingController> _contactCtrls = {
     for (final c in const ['whatsapp', 'telegram', 'instagram', 'email', 'link'])
       c: TextEditingController(),
@@ -110,6 +117,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       _meritNoteCtrl.text = event['merit_note'] ?? '';
       _activityRefCtrl.text = event['activity_ref'] ?? '';
       _coOrganiserCtrl.text = event['co_organiser'] ?? '';
+      _picCtrl.text = event['pic'] ?? '';
+      for (final link in ActionLink.listFrom(event['action_links'])) {
+        _links.add(_LinkRow()..set(link.label, link.url));
+      }
       _loadContacts(event['id'] as String);
 
       // LOAD EXISTING MEDIA
@@ -247,6 +258,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     _locationController.dispose();
     _descController.dispose();
     _linkController.dispose();
+    _picCtrl.dispose();
+    for (final l in _links) {
+      l.dispose();
+    }
     FormGuard.clear();
     // Leaving on purpose (publish / discard / close) drops the draft; a
     // page reload never gets here, so the draft survives that.
@@ -331,6 +346,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         'merit_note': _nullIfEmpty(_meritNoteCtrl.text),
         'activity_ref': _nullIfEmpty(_activityRefCtrl.text),
         'co_organiser': _nullIfEmpty(_coOrganiserCtrl.text),
+        'pic': _nullIfEmpty(_picCtrl.text),
+        'action_links': [
+          for (final l in _links)
+            if (l.label.text.trim().isNotEmpty && l.url.text.trim().isNotEmpty)
+              {'label': l.label.text.trim(), 'url': l.url.text.trim()},
+        ],
         'attendance_enabled': _attendanceEnabled,
       };
 
@@ -466,16 +487,27 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                       isMultiLine: true,
                     ),
                   ),
+                  // Same light markup the announcement composer documents:
+                  // the event page renders the description with it.
+                  const SizedBox(height: KSpace.xs),
+                  Text(
+                    context.announceL10n.formattingHelp,
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                  _label(s.eventPic),
+                  _input(_picCtrl, s.eventPicHint),
                 ],
               ),
               FormSection(
                 title: s.category,
                 icon: AppIcons.filter,
                 children: [
-                  CategoryPicker(
+                  CategoryField(
                     kind: 'event',
                     value: _categories,
                     onChanged: (v) => setState(() => _categories = v),
+                    hintText: s.eventCategoryHint,
                   ),
                   const SizedBox(height: KSpace.xs),
                   Text(
@@ -483,6 +515,27 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     style: theme.textTheme.bodySmall
                         ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                   ),
+                ],
+              ),
+              FormSection(
+                title: s.eventButtons,
+                icon: AppIcons.link,
+                children: [
+                  Text(
+                    s.eventButtonsHint,
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                  for (var i = 0; i < _links.length; i++) _linkEditor(i),
+                  if (_links.length < kActionLinksMax)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () => setState(() => _links.add(_LinkRow())),
+                        icon: const Icon(AppIcons.create, size: 18),
+                        label: Text(s.eventAddButton),
+                      ),
+                    ),
                 ],
               ),
               FormSection(
@@ -681,6 +734,64 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     child: Text(text, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600))
   );
 
+  /// One button row (label + url), validated exactly like an announcement's
+  /// action button — the same rules and the same error copy.
+  Widget _linkEditor(int i) {
+    final row = _links[i];
+    final a = context.announceL10n;
+    final issue = validateActionLink(row.label.text, row.url.text);
+    final labelIssue =
+        issue == ActionLinkIssue.emptyLabel || issue == ActionLinkIssue.labelTooLong;
+    final show = row.touched;
+
+    String? messageFor(ActionLinkIssue? issue) => switch (issue) {
+          ActionLinkIssue.emptyLabel => a.errActionEmptyLabel,
+          ActionLinkIssue.labelTooLong => a.errActionLabelTooLong.fill([kActionLabelMax]),
+          ActionLinkIssue.emptyUrl => a.errActionEmptyUrl,
+          ActionLinkIssue.notHttps => a.errActionNotHttps,
+          ActionLinkIssue.unknownRoute => a.errActionUnknownRoute,
+          ActionLinkIssue.badUrl => a.errActionBadUrl,
+          null => null,
+        };
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: KSpace.s),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 2,
+            child: TextFormField(
+              controller: row.label,
+              onChanged: (_) => setState(() => row.touched = true),
+              decoration: _inputDeco(a.actionLabel, Theme.of(context)).copyWith(
+                errorText: show && labelIssue ? messageFor(issue) : null,
+              ),
+            ),
+          ),
+          const SizedBox(width: KSpace.s),
+          Expanded(
+            flex: 3,
+            child: TextFormField(
+              controller: row.url,
+              onChanged: (_) => setState(() => row.touched = true),
+              keyboardType: TextInputType.url,
+              decoration: _inputDeco(a.actionUrlHint, Theme.of(context)).copyWith(
+                errorText: show && !labelIssue ? messageFor(issue) : null,
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: context.l10n.delete,
+            onPressed: () => setState(() => _links.removeAt(i).dispose()),
+            icon: Icon(AppIcons.delete,
+                size: 18, color: Theme.of(context).colorScheme.error),
+          ),
+        ],
+      ),
+    );
+  }
+
   String? Function(String?) _required(String field) {
     final message = context.l10n.fieldRequired.fill([field]);
     return (v) => (v == null || v.trim().isEmpty) ? message : null;
@@ -710,4 +821,22 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         borderRadius: KRadius.input,
         borderSide: BorderSide(color: t.colorScheme.primary, width: 2)),
   );
+}
+
+/// A button row's controllers. [touched] keeps the error quiet until the user
+/// has actually typed in the row.
+class _LinkRow {
+  final TextEditingController label = TextEditingController();
+  final TextEditingController url = TextEditingController();
+  bool touched = false;
+
+  void set(String labelText, String urlText) {
+    label.text = labelText;
+    url.text = urlText;
+  }
+
+  void dispose() {
+    label.dispose();
+    url.dispose();
+  }
 }

@@ -162,6 +162,19 @@ extension AccessStrings on AppStrings {
   String get evFee => _t("Fee (RM)", "Yuran (RM)", "Fee (RM)");
   String get evFeeHint => _t("Empty or 0 means free", "Kosong atau 0 bermaksud percuma", "Empty or 0 means free");
   String get evFeeFree => _t("Free", "Percuma", "Free");
+  // ---- composer: the two fields events were missing ----
+  String get eventPic => _t("Person in charge (optional)", "Pegawai bertanggungjawab (pilihan)", "Person in charge (optional)");
+  String get eventPicHint => _t("Name and phone", "Nama dan telefon", "Name and phone");
+  String get eventCategoryHint =>
+      _t("Type to search a category", "Taip untuk cari kategori", "Type to search a category");
+  String get eventButtons => _t("Buttons", "Butang", "Buttons");
+  String get eventButtonsHint => _t(
+      "Up to two: a form, a map, a registration page. https:// or an app route like /event/…",
+      "Maksimum dua: borang, peta, halaman pendaftaran. https:// atau laluan aplikasi seperti /event/…",
+      "Up to two: https:// or an app route.");
+  String get eventAddButton => _t("Add button", "Tambah butang", "Add button");
+  String get evPic =>
+      _t("Person in charge", "Pegawai bertanggungjawab", "Person in charge");
   String get evAudience => _t("Open to", "Terbuka kepada", "Open to");
   String evAudienceLabel(String? v) => switch (v) {
         'kolej' => _t("This college", "Kolej ini", "This college"),

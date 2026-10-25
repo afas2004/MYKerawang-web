@@ -75,6 +75,21 @@ event_attendance      (event_id, user_id, channel, checked_in_at)
   verified address) + checked-in time — the format the eMerit application
   wants. Manual check-in by the organiser stays available for walk-ups.
 
+## Phase 6 — composer gaps closed
+
+| Field | Type | Notes |
+|---|---|---|
+| `action_links` | jsonb, `[{label,url}]`, max 2 | The same buttons an announcement carries: `https://` or an app route (`/event/…`). Guarded by a trigger (`EVENT:bad_link`, `EVENT:too_many_links`, `EVENT:link_not_https`), so the database does not trust the client. |
+| `pic` | text | Person in charge — a name and number. Shown in the facts card, not in a separate section. |
+
+Both are **nullable/defaulted**, so an event without them behaves exactly as
+before. The composer also gained the announcement's light markup for the
+description (`**bold**`, `- ` bullets, https links) and a category field with
+autocomplete instead of a wall of chips.
+
+Migration: `20261026008100_event_links_pic.sql`; tests:
+`supabase/tests/events/events_links_test.mjs` (10 assertions).
+
 ## Phase 5 — announcement cover
 
 `posts.cover_aspect` = `16:9` (default) or `1:1`. Composer gets a two-option

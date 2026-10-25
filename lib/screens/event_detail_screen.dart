@@ -14,6 +14,7 @@ import '../l10n/form_strings.dart';
 import '../language_cubit.dart';
 import '../theme/app_themes.dart';
 import '../utils/app_nav.dart';
+import '../utils/announcement_rules.dart';
 import '../utils/formatters.dart';
 import '../utils/feedback.dart';
 import '../utils/guest_access.dart';
@@ -22,6 +23,7 @@ import '../utils/roles.dart';
 import '../widgets/comment_tile.dart';
 import 'events_screen.dart' show CountdownChip, DateBlock, eventCountdown, isOfficialProfile;
 import '../widgets/mention_text.dart';
+import '../widgets/announcement_view.dart' show FormattedBody, openAnnouncementLink;
 import '../widgets/status_badge.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/tap_card.dart';
@@ -923,7 +925,8 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         e['capacity'] != null ||
         e['merit_offered'] == true ||
         '${e['activity_ref'] ?? ''}'.isNotEmpty ||
-        '${e['co_organiser'] ?? ''}'.isNotEmpty;
+        '${e['co_organiser'] ?? ''}'.isNotEmpty ||
+        '${e['pic'] ?? ''}'.isNotEmpty;
   }
 
   Widget _eventFactsCard(BuildContext context) {
@@ -956,6 +959,8 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     if (ref.isNotEmpty) rows.add((AppIcons.link, s.evActivityRef, ref));
     final co = '${e['co_organiser'] ?? ''}'.trim();
     if (co.isNotEmpty) rows.add((AppIcons.people, s.evCoOrganiser, co));
+    final pic = '${e['pic'] ?? ''}'.trim();
+    if (pic.isNotEmpty) rows.add((AppIcons.person, s.evPic, pic));
 
     if (rows.isEmpty) return const SizedBox.shrink();
     return KCard(
@@ -1397,11 +1402,41 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         const SizedBox(height: KSpace.s),
         SizedBox(
           width: double.infinity,
-          child: MentionText(
-            raw.trim().isEmpty ? s.noDetails : raw,
-            style: theme.textTheme.bodyLarge?.copyWith(height: 1.5, color: scheme.onSurface),
-          ),
+          child: raw.trim().isEmpty
+              ? MentionText(
+                  s.noDetails,
+                  style: theme.textTheme.bodyLarge?.copyWith(height: 1.5, color: scheme.onSurface),
+                )
+              // Same light markup as an announcement: paragraphs, "- " bullets,
+              // **bold**, and https links become tappable. The composer
+              // documents it right under the field.
+              : FormattedBody(
+                  raw,
+                  style: theme.textTheme.bodyLarge?.copyWith(height: 1.5, color: scheme.onSurface),
+                ),
         ),
+        if (ActionLink.listFrom(_event['action_links']).isNotEmpty) ...[
+          const SizedBox(height: KSpace.m),
+          Wrap(
+            spacing: KSpace.s,
+            runSpacing: KSpace.s,
+            children: [
+              for (var i = 0;
+                  i < ActionLink.listFrom(_event['action_links']).length;
+                  i++)
+                (i == 0 ? FilledButton.icon : OutlinedButton.icon)(
+                  onPressed: () => openAnnouncementLink(
+                      context, ActionLink.listFrom(_event['action_links'])[i].url),
+                  icon: Icon(
+                      ActionLink.listFrom(_event['action_links'])[i].isInternal
+                          ? AppIcons.forward
+                          : AppIcons.externalLink,
+                      size: 18),
+                  label: Text(ActionLink.listFrom(_event['action_links'])[i].label),
+                ),
+            ],
+          ),
+        ],
       ],
     );
   }
