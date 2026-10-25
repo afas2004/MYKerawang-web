@@ -12,16 +12,14 @@ the end of the second session that day (PR #8 and #9 merged, two bugs fixed,
 | Worktree used | `.deepseek/worktrees/clubs-admin` (the one to reopen) |
 | Branch | `deepseek/clubs-admin` — 11 commits ahead of `origin/main`, pushed |
 | Last merge | PR #9 → `6da73ad` (1.7.7); before it PR #8 → `e491899` (1.7.2–1.7.6) |
-| Live | https://mykerawang-app.web.app — build `202610251153`, version **1.8.2** |
+| Live | https://mykerawang-app.web.app — build `202610251557`, version **1.8.3** |
 | Tests | 516 Flutter tests green; migration suites: moderation (all but 2 pre-existing), clubs 87, verification 13, forms 62, event links 10, attendance 15; analyzer has 17 info/warning findings, no errors |
-| Latest migration | `20261026011100_checkin_does_not_join.sql` — **written, tested, NOT applied to live**. Applied: `20261026010100` (after-check-in switch), `20261026009100` (attendance fix), `20261026008100` (event links + PIC), `20261026007100` (event forms), plus the KI test-event seed. |
+| Latest migration | `20261026011100_checkin_does_not_join.sql` — **applied to live** (owner confirmed), as are `20261026010100`, `20261026009100`, `20261026008100`, `20261026007100` and the KI seed. **Nothing is pending.** |
 
-`main` is at 1.7.7; the live site is at **1.8.0** (build `202610251109`) with the
-forms screens, the rebuilt event composer and the organiser manage sheet. All
-migrations are applied **except** `20261026010100_form_after_checkin.sql`, which
-only the manage sheet's "ask the KI form after check-in" switch needs — until it
-is pasted, that switch reports an error (the same setting still works in the form
-editor, which writes it through `save_event_form`). Merge at the next natural stop.
+`main` is at 1.7.7; the live site is at **1.8.3** (build `202610251557`) with the
+forms screens, the rebuilt event composer, the attendance flow and the guided
+answer page. **Every migration is applied and nothing is pending.** The branch is
+a long way ahead of `main` — merge at the next natural stop.
 
 ## What changed this session
 
@@ -323,6 +321,16 @@ and the old `signInWithOAuth` path still compiles.
   flows — validation timing, error copy, progress, progressive disclosure, one
   number one meaning, animation limits, and the English/Malay requirement — with
   the sources they came from and where each lives in the code.
+- **"With cooperation from" takes mentions, and suggests clubs.** The field was
+  a plain text input. It is now a `MentionInput(suggestClubs: true)`: typing an
+  `@` suggests people and inserts `@username`; typing anything else suggests
+  **active clubs** by name or handle and inserts the club's **name** — a club has
+  a handle but **no profile**, so `@club` would notify nobody. People mentioned
+  there get the same event notification as the description
+  (`_processMentions` scans both).
+- **The composer's contact channels read as rows**, one icon per channel
+  (WhatsApp, Telegram, Instagram, Email, Link — they all used the email icon
+  before), instead of five anonymous boxes.
 - Recurring announcements (needs pg_cron or materialise-on-read).
 - Shared-link thumbnails need per-URL OG tags (SPA limitation; needs a function
   or prerender).

@@ -249,6 +249,10 @@ extension AccessStrings on AppStrings {
   String get evActivityRef => _t("Activity reference", "Rujukan aktiviti", "Activity reference");
   String get evCoOrganiser =>
       _t("With cooperation from", "Dengan kerjasama", "With cooperation from");
+  String get evCoOrganiserHint => _t(
+      "Type a club name, or @ for a person",
+      "Taip nama kelab, atau @ untuk orang",
+      "Type a club name, or @ for a person");
   String get evContacts => _t("Contact the organiser", "Hubungi penganjur", "Contact the organiser");
   String get evContactHint =>
       _t("Leave blank to hide a channel.", "Biarkan kosong untuk sembunyikan saluran.", "Leave blank to hide a channel.");

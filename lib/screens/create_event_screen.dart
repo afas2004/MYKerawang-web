@@ -363,7 +363,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         final insert = (_hostAs ?? const PostAsOption.self('')).applyTo(data, hasAnonymous: false);
         final newEvent = await supabase.from('events').insert(insert).select().single();
         await _saveContacts(newEvent['id'] as String);
-        await _processMentions(_descController.text, newEvent['id']);
+        // People mentioned in the description *or* in the cooperation line are
+        // told about the event; club names there are plain text on purpose.
+        await _processMentions(
+          '${_descController.text} ${_coOrganiserCtrl.text}',
+          newEvent['id'],
+        );
         // The form is replaced by the new event's page, so back from
         // there returns to where the user started, not to this form.
         if (mounted) {
@@ -623,8 +628,21 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     ],
                   ],
                   const SizedBox(height: 12),
-                  _input(_coOrganiserCtrl, s.evCoOrganiser,
-                      icon: AppIcons.people),
+                  // "Dengan kerjasama": usually a club, sometimes a person.
+                  // Typing suggests both — clubs insert their name (a club has
+                  // no profile to @mention), people insert "@username".
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainer,
+                      borderRadius: KRadius.input,
+                    ),
+                    child: MentionInput(
+                      controller: _coOrganiserCtrl,
+                      hintText: s.evCoOrganiserHint,
+                      suggestClubs: true,
+                    ),
+                  ),
                 ],
               ),
               FormSection(
@@ -635,17 +653,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                       style: theme.textTheme.bodySmall
                           ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                   const SizedBox(height: KSpace.s),
-                  _input(_contactCtrls['whatsapp']!, 'WhatsApp',
-                      icon: AppIcons.email, keyboard: TextInputType.phone),
-                  const SizedBox(height: 10),
-                  _input(_contactCtrls['telegram']!, 'Telegram', icon: AppIcons.email),
-                  const SizedBox(height: 10),
-                  _input(_contactCtrls['instagram']!, 'Instagram', icon: AppIcons.email),
-                  const SizedBox(height: 10),
-                  _input(_contactCtrls['email']!, 'Email',
-                      icon: AppIcons.email, keyboard: TextInputType.emailAddress),
-                  const SizedBox(height: 10),
-                  _input(_contactCtrls['link']!, 'Link', icon: AppIcons.link),
+                  _channelField(_contactCtrls['whatsapp']!, 'WhatsApp',
+                      AppIcons.phone, TextInputType.phone),
+                  _channelField(_contactCtrls['telegram']!, 'Telegram',
+                      AppIcons.send),
+                  _channelField(_contactCtrls['instagram']!, 'Instagram',
+                      AppIcons.camera),
+                  _channelField(_contactCtrls['email']!, 'Email',
+                      AppIcons.email, TextInputType.emailAddress),
+                  _channelField(_contactCtrls['link']!, 'Link', AppIcons.link),
                 ],
               ),
             ],
@@ -722,6 +738,32 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     padding: EdgeInsets.only(bottom: 8, top: topPad),
     child: Text(text, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600))
   );
+
+  /// One contact channel: its icon, then the field. The channel is the label,
+  /// so the section reads as a list of actions rather than five anonymous
+  /// boxes.
+  Widget _channelField(TextEditingController c, String label, IconData icon,
+      [TextInputType? keyboard]) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest,
+              borderRadius: KRadius.input,
+            ),
+            child: Icon(icon, size: 18, color: scheme.primary),
+          ),
+          const SizedBox(width: KSpace.s),
+          Expanded(child: _input(c, label, keyboard: keyboard)),
+        ],
+      ),
+    );
+  }
 
   /// One button row (label + url), validated exactly like an announcement's
   /// action button — the same rules and the same error copy.
