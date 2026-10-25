@@ -95,6 +95,25 @@ void main() {
     });
   });
 
+  group('page title', () {
+    String title(Map<String, dynamic> post) =>
+        postPageTitle(post, thread: 'Thread', announcement: 'Announcement');
+
+    test('the headline leads, for announcements and posts alike', () {
+      expect(title({'title': 'Kelas tambahan'}), 'Kelas tambahan');
+      expect(title({'title': 'Kelas tambahan', 'is_announcement': true}),
+          'Kelas tambahan');
+    });
+
+    test('untrimmed and missing headlines fall back by kind', () {
+      expect(title({'title': '   '}), 'Thread');
+      expect(title({'title': null}), 'Thread');
+      expect(title({}), 'Thread');
+      expect(title({'is_announcement': true}), 'Announcement');
+      expect(title({'is_announcement': true, 'title': '  '}), 'Announcement');
+    });
+  });
+
   group('light formatting', () {
     test('paragraphs and bullets', () {
       final blocks = parseBody('Hello kolej\nline two\n\n- one\n• two\n* three\n\nBye');

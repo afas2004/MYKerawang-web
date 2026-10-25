@@ -14,12 +14,12 @@ void main() {
   setUp(installFeedHooks);
   tearDown(resetFeedHooks);
 
-  Widget page(Map<String, dynamic> post, {bool manage = false}) => Scaffold(
+  Widget page(Map<String, dynamic> post, {bool mine = false}) => Scaffold(
         body: PostDetailLayout(
           post: AnnouncementDetailHead(
             post: post,
             linkedEvent: sampleEvent('e1'),
-            canManage: manage,
+            mine: mine,
             onEdit: () {},
             onDelete: () {},
           ),
@@ -31,12 +31,13 @@ void main() {
 
   for (final size in [kCompact, kExpanded]) {
     testWidgets('announcement detail at ${size.width.toInt()} px', (tester) async {
-      await pumpAt(tester, size, page(sampleAnnouncement(comments: false), manage: true));
+      await pumpAt(tester, size, page(sampleAnnouncement(comments: false), mine: true));
       expect(tester.takeException(), isNull);
       expect(find.byType(AnnouncementView), findsOneWidget);
       expect(find.text('Comments are off for this announcement'), findsOneWidget);
       expect(find.text('composer'), findsNothing);
       expect(find.text('Edit'), findsOneWidget);
+      expect(find.byTooltip('Delete'), findsOneWidget);
       expect(find.byType(CommentTile), findsNothing);
     });
   }
@@ -46,5 +47,16 @@ void main() {
     expect(find.text('composer'), findsOneWidget);
     expect(find.text('Comments are off for this announcement'), findsNothing);
     expect(find.text('Edit'), findsNothing);
+  });
+
+  // Regression: an officer or an admin who didn't write the announcement
+  // used to get Edit here, and the RPC refused it. Someone else's
+  // announcement is share-only.
+  testWidgets('someone else\'s announcement offers Share but not Edit/Delete',
+      (tester) async {
+    await pumpAt(tester, kCompact, page(sampleAnnouncement(), mine: false));
+    expect(find.text('Edit'), findsNothing);
+    expect(find.byTooltip('Delete'), findsNothing);
+    expect(find.byTooltip('Share'), findsOneWidget);
   });
 }

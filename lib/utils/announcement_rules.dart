@@ -163,6 +163,21 @@ bool showInHomeFeed(Map<String, dynamic> post, {DateTime? now}) {
 /// Comments default to on; announcements may turn them off.
 bool commentsEnabled(Map<String, dynamic> post) => post['comments_enabled'] != false;
 
+/// The app bar title of a post's page: the post's own headline, or a
+/// generic label for one that has none.
+///
+/// [thread] is the fallback for an ordinary post, [announcement] for an
+/// announcement without a headline.
+String postPageTitle(
+  Map<String, dynamic> post, {
+  required String thread,
+  required String announcement,
+}) {
+  final title = '${post['title'] ?? ''}'.trim();
+  if (title.isNotEmpty) return title;
+  return post['is_announcement'] == true ? announcement : thread;
+}
+
 // ---------------------------------------------------------------- formatting
 
 /// Light formatting for announcement bodies: blank-line paragraphs,
