@@ -10,15 +10,14 @@ remembered.
 |---|---|
 | Repo | `C:\src\project\Flutter\MYKerawang-web` |
 | Worktree to reopen | `.deepseek/worktrees/clubs-admin` |
-| Branch | `deepseek/clubs-admin` — clean, pushed, **17 commits ahead of `origin/main`** |
-| `origin/main` | still 1.7.7. The branch has never been merged since PR #9. |
+| Branch | `deepseek/clubs-admin` — clean, pushed, merged into `main` as **PR #10** |
+| `origin/main` | **1.8.3** — level with the branch and with production (this closed the gap left open since PR #9) |
 | Live | https://mykerawang-app.web.app — build `202610251557`, version **1.8.3** |
 | Tests | **516** Flutter tests green; analyzer 17 info/warnings, **no errors** |
 | Migrations | **all applied to live**, nothing pending (see the table below) |
 | Supabase | project `zxjuqpqzyzmegdjttzyz` |
 
-The branch is deployed but not merged, so production is ahead of `main`. Merge at
-the next natural stop; nothing on the branch needs the database to roll back.
+Production, `main` and the branch are all at 1.8.3; carry on from the branch.
 
 ## First thing to ask the owner
 
@@ -199,8 +198,6 @@ stays editable — 4 of 13 respondents signed in with Gmail).
 ## Suggested next session
 
 1. Ask what is wrong on the edit/create page, and fix that specifically.
-2. Merge the branch into `main` — production has been ahead of `main` for 17
-   commits.
-3. Then either the feed's "check-in is open" indicator (small), or the launch ops
+2. Then either the feed's "check-in is open" indicator (small), or the launch ops
    that are actually blocking a first club: DB password rotation, captcha, a real
    attendance dry run.
