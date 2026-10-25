@@ -2,7 +2,7 @@
 
 Written 2026-10-25. Everything below was verified, not remembered. Updated at
 the end of the second session that day (PR #8 and #9 merged, two bugs fixed,
-1.7.7 released).
+1.7.7 and 1.7.8 released).
 
 ## Where things stand
 
@@ -10,13 +10,16 @@ the end of the second session that day (PR #8 and #9 merged, two bugs fixed,
 |---|---|
 | Repo | `C:\src\project\Flutter\MYKerawang-web` |
 | Worktree used | `.deepseek/worktrees/clubs-admin` (the one to reopen) |
-| Branch | `deepseek/clubs-admin` — level with `origin/main` |
+| Branch | `deepseek/clubs-admin` — 11 commits ahead of `origin/main`, pushed |
 | Last merge | PR #9 → `6da73ad` (1.7.7); before it PR #8 → `e491899` (1.7.2–1.7.6) |
-| Live | https://mykerawang-app.web.app — build `202610250823`, version **1.7.7** |
+| Live | https://mykerawang-app.web.app — build `202610251011`, version **1.7.8** |
 | Tests | 486 Flutter tests green; migration suites: moderation (all but 2 pre-existing), clubs 87, verification 13, forms 58; analyzer has 18 info/warning findings, no errors |
-| Latest migration | `20261026007100_event_forms.sql` — **written and tested, not applied to live**; before it `20261026006100_club_recruitment.sql` (live) |
+| Latest migration | `20261026007100_event_forms.sql` — **written, tested, NOT applied to live**; before it `20261026006100_club_recruitment.sql` (live) |
 
-`main`, the branch and the live site are all at 1.7.7 (build `202610250823`).
+`main` is at 1.7.7; the live site is at **1.7.8** (build `202610251011`) with the
+forms screens. The migration they need is not applied yet, so the forms UI stays
+hidden — the event page's `event_open_form()` call fails and is swallowed by
+design. Merge at the next natural stop.
 
 ## What changed this session
 
@@ -108,6 +111,13 @@ node clubs/clubs_test.mjs ../..        # (this command never worked as documente
 node verification/verification_test.mjs ../..   #  until the junction existed)
 node forms/forms_test.mjs ../..        # event forms: template, editor, S1/S2/S3
 
+# applying a migration to LIVE: there is no Supabase CLI, no psql and no DB
+# password in this environment, so it is a dashboard paste:
+#   https://supabase.com/dashboard/project/zxjuqpqzyzmegdjttzyz/sql/new
+# Paste the whole file, Run. Every migration here is re-runnable, so a second
+# run is safe. The seed guard (a `not exists` on the template's fields) means
+# re-running never duplicates the KI template.
+
 # deploy: bump BOTH places, then build/stamp/deploy
 #   pubspec.yaml version: 1.7.x+N
 #   lib/services/update_service.dart appVersion
@@ -158,9 +168,10 @@ firebase deploy --only hosting --project mykerawang-app
 - A `DropdownButtonFormField` needs `isExpanded: true` inside a narrow dialog,
   and a bare `DropdownButton` with `isExpanded` needs a bounded width
   (`Expanded`) — otherwise the dialog overflows on a 375 px phone.
-- Do not rewrite a Dart file with PowerShell `-replace` + `Set-Content`: it
-  mangled an en-dash into `â€“` in `form_editor_screen.dart`, twice. Use the
-  edit tool.
+- Do not rewrite a text file with PowerShell `Get-Content -Raw | Set-Content`: it
+  double-encodes non-ASCII (an em-dash came back as four visible bytes) in this
+  file and twice in `form_editor_screen.dart`. Use the edit tool; if a file does
+  get mangled, `.deepseek/fix_mojibake.py <file>` reverses the sequences.
 - Two `moderation_test.mjs` assertions ("two reports → one open case" and
   "priority category hidden on first report") fail **without** the forms
   migration too. They are pre-existing; don't chase them while testing forms.
@@ -173,7 +184,7 @@ captcha (remember it covers sign-in too — **and it will interact with the OAut
 launch above**, since the captcha token rides in `queryParams`); invite the
 first club.
 
-**Deployed on 1.7.7 but not verified on a real browser yet:** The Google sign-in
+**Deployed on 1.7.7 and 1.7.8 but not verified on a real browser yet:** The Google sign-in
 history fix. There is no widget test for it (`location` is not reachable from a
 test), so check it on the live build, in this order:
 
@@ -245,7 +256,7 @@ and the old `signInWithOAuth` path still compiles.
 
 ## Suggested next session
 
-1. Run the three Google sign-in checks above on the live 1.7.7. If any fails,
+1. Run the three Google sign-in checks above on the live build (1.7.8). If any fails,
    revert the login commit and redeploy before anything else.
 2. Ship the forms work: apply `20261026007100_event_forms.sql` to live, bump to
    1.7.8 and deploy, then walk the loop on the live site — create a report from
