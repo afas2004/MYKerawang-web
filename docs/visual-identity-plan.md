@@ -356,3 +356,31 @@ No phase touches `supabase/`.
    the deploy until the whole identity is in?
 10. **Hallmark itself:** install it to audit `web/index.html` and any future
     marketing / landing page, or just use its checklist (this plan)?
+
+---
+
+## 8. Art board review (2026-10-28)
+
+The mockups live in `art-board/` (served locally; third-party art, not committed).
+The user liked every proposal on it, with one change and a request for more:
+
+- **Songket goes to the edges only.** A band across the middle of a screen looked
+  off. Songket now appears as a hem: top and bottom of the welcome screen, under
+  the app bar on the error page, the bottom edge of a club cover, the top edge of
+  an official card. Never mid-content, never as a texture.
+- **Added to the board** (proposals, not decided):
+  - backgrounds: plain paper everywhere, faint 8-point star on login and banners,
+    pucuk rebung on plum for covers, motif-on-colour for owner-chosen banners
+  - containers: hairline card, official card (songket hem and cut corner),
+    event ticket, market price tag, announcement category rail
+  - buttons, chips and badges in plum, with marigold as the one accent button
+    per screen
+  - motion: like burst, follow toggle, wau pull-to-refresh, list stagger, plum
+    shimmer, RSVP stamp, splash hem, sliding tabs (`flutter_animate`, BSD-3)
+  - profile page: banner, faculty and kolej chips, club avatars, and a "Gaya
+    profil" sheet (six accent colours, banner style, motif)
+  - club page: club colour, a motif or handle-generated cover (the geopattern
+    idea, MIT), and an officer "Rupa kelab" sheet
+- **Database:** user- and club-chosen colours and covers need new columns, so a
+  migration. That waits for the club registry/pin work. Until then the look is
+  derived from category and handle, with no database change.
