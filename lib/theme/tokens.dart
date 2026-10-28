@@ -82,10 +82,14 @@ class KMotion {
 /// Theme-dependent brand roles, attached to ThemeData as an extension.
 @immutable
 class KTokens extends ThemeExtension<KTokens> {
-  /// The one accent (amber/gold), used sparingly: prices, verified,
-  /// pinned/official markers, as icon or fill. For accent *text* use
-  /// `colorScheme.tertiary` (AA-safe on every surface).
+  /// The one accent (the logo's marigold), used sparingly: prices,
+  /// verified, pinned/official markers, the one accent button per screen —
+  /// as icon or fill. For accent *text* use `colorScheme.tertiary` (AA-safe
+  /// on every surface). The name predates the marigold.
   final Color gold;
+
+  /// Text / icons on a [gold] fill (white or near-black, whichever passes).
+  final Color onAccent;
 
   /// Deprecated with the lattice motif (which now renders nothing).
   /// Kept for API compatibility; equals [gold].
@@ -128,6 +132,7 @@ class KTokens extends ThemeExtension<KTokens> {
     required this.skeletonBase,
     required this.skeletonHighlight,
     required this.feedback,
+    required this.onAccent,
     this.elevationRest = 0,
     this.elevationRaised = 3,
   });
@@ -154,6 +159,7 @@ class KTokens extends ThemeExtension<KTokens> {
         skeletonBase: scheme.surfaceContainerHighest,
         skeletonHighlight: scheme.surfaceContainer,
         feedback: scheme.secondary,
+        onAccent: scheme.onTertiary,
       );
 
   @override
@@ -169,6 +175,7 @@ class KTokens extends ThemeExtension<KTokens> {
     Color? skeletonBase,
     Color? skeletonHighlight,
     Color? feedback,
+    Color? onAccent,
     double? elevationRest,
     double? elevationRaised,
   }) =>
@@ -184,6 +191,7 @@ class KTokens extends ThemeExtension<KTokens> {
         skeletonBase: skeletonBase ?? this.skeletonBase,
         skeletonHighlight: skeletonHighlight ?? this.skeletonHighlight,
         feedback: feedback ?? this.feedback,
+        onAccent: onAccent ?? this.onAccent,
         elevationRest: elevationRest ?? this.elevationRest,
         elevationRaised: elevationRaised ?? this.elevationRaised,
       );
@@ -205,6 +213,7 @@ class KTokens extends ThemeExtension<KTokens> {
       skeletonHighlight:
           Color.lerp(skeletonHighlight, other.skeletonHighlight, t)!,
       feedback: Color.lerp(feedback, other.feedback, t)!,
+      onAccent: Color.lerp(onAccent, other.onAccent, t)!,
       elevationRest: d(elevationRest, other.elevationRest),
       elevationRaised: d(elevationRaised, other.elevationRaised),
     );

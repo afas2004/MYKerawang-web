@@ -85,7 +85,10 @@ flutter:
 
   assets:
     - assets/logo_mark.jpg # 600px centre crop of MyKerawang.png (kept as source art)
-    - assets/illustrations/ # unDraw spot illustrations (see LICENSE.md there)
+    - assets/illustrations/people/ # Open Peeps / Open Doodles, CC0 (see assets/illustrations/LICENSE.md)
+    - assets/illustrations/emoji/ # Fluent Emoji, MIT
+    - assets/brand/ # songket hem, CC0 (see assets/brand/LICENSE.md)
+    - assets/brand/motifs/ # WP25 Malaysia stitch drawings, CC BY 4.0
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

@@ -31,6 +31,7 @@ void main() {
             (c.onPrimaryContainer, c.primaryContainer),
         'onSecondaryContainer / secondaryContainer':
             (c.onSecondaryContainer, c.secondaryContainer),
+        'onAccent / accent fill (accent button)': (k.onAccent, k.gold),
         'error / background': (c.error, c.surface),
         'onError / error': (c.onError, c.error),
       };
