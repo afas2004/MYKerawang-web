@@ -227,7 +227,28 @@ node events/attendance_flow_test.mjs ../..  # 15
 
 # deploy
 .\deploy_web.bat
+
+# apply pending migrations (asks for the DB password, masked)
+.\db_push.ps1              # dry run, then confirm
+.\db_push.ps1 -Repair      # first time only: record pasted migrations as applied
 ```
+
+### The migrations route on this machine
+
+- The Supabase CLI is **not on PATH**; run it as `npx --no-install supabase` (v2.122.0 is
+  in the npx cache) or through `db_push.ps1`.
+- **`--linked` is broken** for this project: the CLI creates a temporary
+  `cli_login_postgres` role and a leftover one makes it fail with
+  `permission denied to alter role … only roles with CREATEROLE and ADMIN option`.
+  `--dry-run` fails the same way. A direct connection string avoids the whole path.
+- **Connection string** (project is in **South Asia / Mumbai**):
+  `postgresql://postgres.zxjuqpqzyzmegdjttzyz:<password>@aws-1-ap-south-1.pooler.supabase.com:5432/postgres`
+  `aws-1` is the right host — `aws-0` answers `tenant/user … not found`. The direct
+  `db.<ref>.supabase.co` has no A record (IPv6 only).
+- **The history trap**: everything before `20261026015100` was pasted into the
+  dashboard, so `supabase_migrations.schema_migrations` may be empty and a plain
+  `db push` would replay ~51 files. `db_push.ps1 -Repair` records them as applied
+  first; the script always dry-runs and shows the plan before touching anything.
 
 Two moderation assertions fail **without** the new migrations too ("two
 reports → one open case", "priority category hidden on first report") —
