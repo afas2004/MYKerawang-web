@@ -384,3 +384,46 @@ The user liked every proposal on it, with one change and a request for more:
 - **Database:** user- and club-chosen colours and covers need new columns, so a
   migration. That waits for the club registry/pin work. Until then the look is
   derived from category and handle, with no database change.
+
+---
+
+## 9. Built (2026-10-29) — what to review
+
+Commits `8e71a0c`, `f369eb7`, `0bf95d6` on `claude/visual-identity-plan-35c529`.
+`flutter test`: 577 passing. Checked in a browser at 320, 375, 768 and 1280 px,
+Kampus and Songket Noir (brand gallery + the real login page). The locked spec
+is [design.md](design.md). Not deployed, nothing pushed, no migrations.
+
+### Please look at these
+
+1. **The logo is still the raster crop** (`assets/logo_mark.jpg`), now in a
+   rounded tile instead of a circle. A vector redraw of the K is still needed;
+   web icons (`web/icons/*`) are unchanged.
+2. **Fonts load at runtime** (Google Fonts), so the first second shows a
+   fallback font before Fraunces / Jakarta arrive. Bundling the font files
+   would remove the flash; it was not in scope.
+3. **Bundle size**: the five stitch motifs add ~1.4 MB of SVG (gzip helps a
+   lot on Firebase Hosting). If that matters, they can be simplified further.
+4. **Club and profile choices are derived, not chosen**: colour from category,
+   cover from handle, profile banner/ring from user id. The "Gaya profil" and
+   "Rupa kelab" sheets need new columns (a migration) and were not built.
+5. **Clubs files were touched** (`club_page_screen.dart`, `club_widgets.dart`,
+   `club_directory_screen.dart`, small diffs). The other agent's registry/pin
+   work on the same branch may conflict there when merged.
+6. **Tone**: the 404 copy "Wau terputus tali" / "The kite string snapped", the
+   error "Ada benang terputus", and Noir peeps drawn as light lines.
+7. **No like button exists**, so the diamond burst went on **Save**.
+8. **Not seen live** (needs sign-in): feed, hub, events, market, profile and
+   club pages with real data. Their widgets were checked in the gallery and by
+   the layout tests; a signed-in pass on a staging build is still worth doing.
+9. **Not done**: chips with the diamond dot, a full-height category rail on
+   announcement cards (it's a short rail by the label), deleting the dead
+   lattice code, removing the 63 hard-coded font sizes.
+
+### How to look
+
+```
+flutter build web -t lib/dev/brand_gallery_main.dart -o build/gallery --pwa-strategy none
+```
+then serve `build/gallery` (the session used `python -m http.server`).
+Deploys still go through `deploy_web.bat` only.
