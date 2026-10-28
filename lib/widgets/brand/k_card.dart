@@ -68,7 +68,10 @@ class _KCardState extends State<KCard> {
     final theme = Theme.of(context);
     final k = KTokens.of(context);
     final motion = KMotion.of(context);
-    final radius = widget.borderRadius ?? KRadius.card;
+    final outerRadius = widget.borderRadius ?? KRadius.card;
+    // Inside an official frame the frame owns the shape (and clips to it),
+    // so the card itself stays square-cornered — no nested-card look.
+    final radius = widget.official ? BorderRadius.zero : outerRadius;
     final interactive = widget.onTap != null || widget.onLongPress != null;
     final hovered = interactive && _hovered;
 
@@ -90,9 +93,10 @@ class _KCardState extends State<KCard> {
       decoration: BoxDecoration(
         color: widget.color ?? theme.cardColor,
         borderRadius: radius,
-        border: Border.all(
-          color: hovered ? k.cardBorderHover : k.cardBorder,
-        ),
+        // Official cards take their outline from the frame around them.
+        border: widget.official
+            ? null
+            : Border.all(color: hovered ? k.cardBorderHover : k.cardBorder),
       ),
       // Focus ring painted on top so it never shifts the layout.
       foregroundDecoration: _focused
@@ -111,7 +115,7 @@ class _KCardState extends State<KCard> {
 
     if (widget.official) {
       card = OfficialFrame(
-        borderRadius: radius,
+        borderRadius: outerRadius,
         label: widget.officialLabel,
         icon: widget.officialIcon,
         child: card,

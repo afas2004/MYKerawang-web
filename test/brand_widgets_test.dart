@@ -176,6 +176,12 @@ void main() {
     for (final m in AppMotif.values) {
       expect(File(m.asset).existsSync(), isTrue, reason: m.asset);
     }
+    // Path data must keep numbers apart: "0.30.5" (two numbers merged by a
+    // careless minifier) silently breaks the whole drawing on web.
+    final merged = RegExp(r'\d\.\d+\.\d');
+    for (final a in {...assets, for (final m in AppMotif.values) m.asset, SongketHem.asset}) {
+      expect(merged.hasMatch(File(a).readAsStringSync()), isFalse, reason: a);
+    }
   });
 
   test('illustration recolour follows the theme (ink, fill, accent)', () {

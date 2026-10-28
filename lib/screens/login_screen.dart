@@ -365,7 +365,7 @@ class _BrandPanel extends StatelessWidget {
     return ColoredBox(
       color: scheme.primaryContainer,
       child: _LoginGround(
-        strength: 0.12,
+        strength: 0.08,
         child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(KSpace.xxl + KSpace.l),

@@ -114,10 +114,12 @@ const _emoji = 'assets/illustrations/emoji';
 
 final Map<AppIllo, List<_Layer>> _scenes = {
   AppIllo.notFound: [
-    const _Motif(AppMotif.wauBulan, left: 146, top: 2, size: 86),
-    const _Line([Offset(156, 74), Offset(138, 88), Offset(120, 100)], dashed: true),
-    const _Line([Offset(102, 110), Offset(94, 118), Offset(86, 128)], dashed: true),
-    const _Person('peep-standing-5', left: 22, height: 176, aspect: 680 / 304),
+    // The kite drifts off, tilted, its string trailing loose in the air…
+    const _Motif(AppMotif.wauBulan, left: 160, top: 0, size: 72, angle: 0.45),
+    const _Line([Offset(176, 62), Offset(168, 84), Offset(178, 100), Offset(170, 116)], dashed: true),
+    // …and the student is left holding a slack end.
+    const _Line([Offset(80, 100), Offset(104, 118), Offset(96, 146), Offset(112, 172)]),
+    const _Person('peep-standing-5', left: 14, height: 176, aspect: 680 / 304),
   ],
   AppIllo.emptyFeed: [
     const _Person('peep-sitting-2', left: 22, height: 150, aspect: 521 / 346),
@@ -151,8 +153,8 @@ final Map<AppIllo, List<_Layer>> _scenes = {
   ],
   AppIllo.login: [
     const _Motif(AppMotif.wauBulan, left: 148, top: 6, size: 76),
-    const _Line([Offset(160, 66), Offset(130, 96), Offset(98, 112)], dashed: true),
-    const _Person('peep-standing-5', left: 34, height: 176, aspect: 680 / 304),
+    const _Line([Offset(162, 66), Offset(128, 92), Offset(98, 104)]),
+    const _Person('peep-standing-12', left: 40, height: 172, aspect: 710 / 255),
   ],
   AppIllo.error: [
     const _Hem(left: 0, top: 0, width: 150, height: 8),
