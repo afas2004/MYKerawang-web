@@ -21,6 +21,11 @@ abstract final class KPalette {
 
   /// A stable colour for [key] (a handle, an id), the same on every device.
   static Color forKey(String key) => all[stableHash(key) % all.length];
+
+  /// [c] as a line or edge on the current theme: lifted on dark themes so a
+  /// thin stroke of it still reads against near-black.
+  static Color onTheme(Color c, Brightness b) =>
+      b == Brightness.dark ? Color.lerp(c, Colors.white, 0.45)! : c;
 }
 
 /// FNV-1a: a small, stable string hash (Dart's `hashCode` differs per run).

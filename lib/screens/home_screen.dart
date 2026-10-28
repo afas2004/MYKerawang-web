@@ -325,15 +325,15 @@ class FeedView extends StatelessWidget {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              SliverAppBar(
-                floating: true,
-                snap: true,
+              // Kepala kain: Home's band is plum.
+              KBand.sliverAppBar(
+                context,
+                tone: KBand.home,
                 title: Text(
                   AppStrings.appName,
                   style: theme.textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w700),
+                      ?.copyWith(fontWeight: FontWeight.w700, color: KBand.onBand),
                 ),
-                centerTitle: false,
                 actions: actions,
               ),
 

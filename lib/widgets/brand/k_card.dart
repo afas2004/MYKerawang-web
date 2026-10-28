@@ -41,6 +41,10 @@ class KCard extends StatefulWidget {
   /// Read by screen readers instead of the merged child text.
   final String? semanticLabel;
 
+  /// A 4 px colour edge along the top (the author's or club's colour), the
+  /// "kain card" selvedge. Ignored on [official] cards, which have the hem.
+  final Color? edgeColor;
+
   const KCard({
     super.key,
     required this.child,
@@ -53,6 +57,7 @@ class KCard extends StatefulWidget {
     this.borderRadius,
     this.color,
     this.semanticLabel,
+    this.edgeColor,
   });
 
   @override
@@ -76,6 +81,16 @@ class _KCardState extends State<KCard> {
     final hovered = interactive && _hovered;
 
     Widget content = Padding(padding: widget.padding, child: widget.child);
+    if (widget.edgeColor != null && !widget.official) {
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ExcludeSemantics(child: SizedBox(height: 4, child: ColoredBox(color: widget.edgeColor!))),
+          content,
+        ],
+      );
+    }
     if (interactive) {
       content = InkWell(
         onTap: widget.onTap,

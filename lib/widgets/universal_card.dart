@@ -32,6 +32,20 @@ class UniversalCard extends StatelessWidget {
             : formatEventRange(start, parseLocal(data['end_datetime'])))
         : formatPrice(data['price']);
 
+    // No photo: a cover generated from the item (never an empty grey box),
+    // with the date stub on events.
+    final generated = BrandCover(
+      seed: '${data['id'] ?? title}',
+      child: isEvent && start != null
+          ? Align(
+              alignment: Alignment.bottomLeft,
+              child: Padding(
+                padding: const EdgeInsets.all(KSpace.s),
+                child: _MiniStub(date: start),
+              ),
+            )
+          : null,
+    );
     final photo = image != null && image.isNotEmpty
         ? CachedNetworkImage(
             imageUrl: image,
@@ -40,16 +54,9 @@ class UniversalCard extends StatelessWidget {
             fadeInDuration: const Duration(milliseconds: 200),
             placeholder: (_, __) =>
                 ColoredBox(color: scheme.surfaceContainerHighest),
-            errorWidget: (_, __, ___) => ColoredBox(
-              color: scheme.surfaceContainerHighest,
-              child: Icon(AppIcons.photo, color: scheme.onSurfaceVariant),
-            ),
+            errorWidget: (_, __, ___) => generated,
           )
-        : ColoredBox(
-            color: scheme.surfaceContainerHighest,
-            child: Icon(isEvent ? AppIcons.events : AppIcons.market,
-                size: 32, color: scheme.onSurfaceVariant),
-          );
+        : generated;
 
     final text = Padding(
       padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.s, KSpace.m, KSpace.m),
@@ -96,6 +103,38 @@ class UniversalCard extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// Month over day, white on plum, for an event cover with no photo.
+class _MiniStub extends StatelessWidget {
+  final DateTime date;
+  const _MiniStub({required this.date});
+
+  static const _months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.28),
+        borderRadius: KRadius.small,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: KSpace.s, vertical: KSpace.xs),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_months[date.month - 1],
+                style: theme.textTheme.labelSmall?.copyWith(color: Colors.white, height: 1.1)),
+            Text('${date.day}',
+                style: theme.textTheme.titleLarge?.copyWith(color: Colors.white, height: 1.05)),
+          ],
+        ),
       ),
     );
   }

@@ -105,7 +105,9 @@ class _EventsViewState extends State<EventsView>
         return LayoutBuilder(builder: (context, constraints) {
           final withFilterColumn = constraints.maxWidth >= _kFilterColumnFrom;
           return Scaffold(
-            appBar: AppBar(
+            appBar: KBand.appBar(
+              context,
+              tone: KBand.events,
               title: Text(s.navEvents),
               actions: [
                 const ShellSearchButton(),

@@ -92,7 +92,9 @@ class _MarketplaceViewState extends State<MarketplaceView>
         return LayoutBuilder(builder: (context, constraints) {
           final sidePanel = constraints.maxWidth >= _kSidePanelFrom;
           return Scaffold(
-            appBar: AppBar(
+            appBar: KBand.appBar(
+              context,
+              tone: KBand.market,
               title: Text(s.marketplaceTitle),
               actions: [
                 const ShellClubsButton(),
@@ -341,12 +343,9 @@ class MarketCard extends StatelessWidget {
                   color: isSold ? scheme.outline : null,
                   colorBlendMode: isSold ? BlendMode.saturation : null,
                   placeholder: (_, __) => ColoredBox(color: scheme.surfaceContainerHighest),
-                  errorWidget: (_, __, ___) => ColoredBox(
-                    color: scheme.surfaceContainerHighest,
-                    child: Center(
-                      child: Icon(AppIcons.photo, color: scheme.onSurfaceVariant, size: 28),
-                    ),
-                  ),
+                  // No photo (or a broken one): a cover generated from the
+                  // listing, never an empty grey box.
+                  errorWidget: (_, __, ___) => BrandCover(seed: '${item['id'] ?? title}'),
                 ),
                 if (badge != null)
                   Positioned(top: KSpace.s, left: KSpace.s, child: StatusBadge(badge)),

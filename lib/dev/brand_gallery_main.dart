@@ -18,6 +18,7 @@ import '../theme/app_themes.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/error_state.dart';
 import '../widgets/linear_refresher.dart';
+import '../widgets/universal_card.dart';
 
 void main() => runApp(const BrandGallery());
 
@@ -129,6 +130,42 @@ class _PageState extends State<_Page> {
         onRefresh: () => Future.delayed(const Duration(seconds: 2)),
         child: ListView(
           children: [
+            section('Header bands (kepala kain)', [
+              for (final (name, tone) in [('Home', KBand.home), ('News', KBand.news), ('Market', KBand.market), ('Events', KBand.events)]) ...[
+                SizedBox(
+                  height: kToolbarHeight + KBand.hemHeight,
+                  child: KBand.appBar(context, tone: tone, title: Text(name), actions: [
+                    IconButton(onPressed: () {}, icon: const Icon(AppIcons.search)),
+                    IconButton(onPressed: () {}, icon: const Icon(AppIcons.notifications)),
+                  ]),
+                ),
+                const SizedBox(height: KSpace.m),
+              ],
+            ]),
+            section('Kain cards and photo-less items', [
+              for (final (who, seed) in [('Amir Hakim', 'u-amir'), ('Nur Aisyah', 'u-aisyah'), ('Anonymous', '')]) ...[
+                KCard(
+                  onTap: () {},
+                  edgeColor: seed.isEmpty
+                      ? theme.colorScheme.outlineVariant
+                      : KPalette.onTheme(KPalette.forKey(seed), theme.brightness),
+                  child: Text('$who: Ada sesiapa nak join study group Kalkulus malam ni? Bilik tutorial 3, Blok B.'),
+                ),
+                const SizedBox(height: KSpace.m),
+              ],
+              SizedBox(
+                height: 196,
+                child: ListView(scrollDirection: Axis.horizontal, children: [
+                  for (final d in [
+                    {'id': 'e1', 'title': 'Malam Apresiasi KMI 2026', 'start_datetime': now.add(const Duration(days: 16)).toIso8601String()},
+                    {'id': 'e2', 'title': 'Bengkel Pengurusan Kewangan', 'start_datetime': now.add(const Duration(days: 23)).toIso8601String()},
+                    {'id': 'l1', 'title': 'Kipas meja (macam baru)', 'price': 35},
+                    {'id': 'l2', 'title': 'Baju kurung labuh, saiz M', 'price': 45},
+                  ])
+                    Container(width: 220, margin: const EdgeInsets.only(right: KSpace.m, bottom: KSpace.s), child: UniversalCard(data: d, onTap: () {})),
+                ]),
+              ),
+            ]),
             section('Hidden pages and empty states', [
               grid(300, [
                 for (final i in AppIllo.values)

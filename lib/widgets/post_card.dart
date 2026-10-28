@@ -341,10 +341,22 @@ class _PostCardState extends State<PostCard> {
         officialLabel: pinned ? context.l10n.mod.pinned : null,
         padding: EdgeInsets.zero,
         onTap: widget.onTap,
+        edgeColor: _edgeColor(context, post),
         child: content,
       ),
     );
   }
+}
+
+/// The kain-card edge: the author's colour (the same one their profile
+/// banner and ring use), or a quiet grey for anonymous posts.
+Color _edgeColor(BuildContext context, Map<String, dynamic> post) {
+  final theme = Theme.of(context);
+  if (post['is_anonymous'] == true) return theme.colorScheme.outlineVariant;
+  final raw = post['profiles'];
+  final profile = raw is List && raw.isNotEmpty ? raw.first : (raw is Map ? raw : null);
+  final seed = '${profile?['id'] ?? post['user_id'] ?? profile?['username'] ?? post['id']}';
+  return KPalette.onTheme(KPalette.forKey(seed), theme.brightness);
 }
 
 /// Avatar 40 · name (semibold) ✓ role · @handle · time — one line.

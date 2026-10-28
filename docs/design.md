@@ -43,6 +43,13 @@ bottom of a generated cover, the top of an official card, under the error
 scene's top. Never across the middle of content, never as a texture.
 (`identity_rules_test.dart` keeps the asset behind `SongketHem`.)
 
+## Header bands (kepala kain) — `KBand`
+
+The four main tabs' app bars are a band of colour with a faint star pattern
+and a songket hem on the lower edge: Home plum, News biru laut, Market jingga,
+Events hijau pucuk (deepened on dark themes). Under the band the page stays
+plain. Other screens keep the plain app bar.
+
 ## Patterns — `KPattern`
 
 Star (bintang lapan), pucuk rebung, tabur; drawn in code, clipped to their box.
@@ -53,12 +60,13 @@ photo. Feed, hub, market, events and admin stay plain.
 
 | Content | Shape | Widget |
 |---|---|---|
-| Normal post / card | 1 px hairline, 16 px corners | `KCard` |
+| Normal card | 1 px hairline, 16 px corners | `KCard` |
+| Post | kain card: 4 px top edge in the author's colour (grey when anonymous) | `KCard(edgeColor:)` |
 | Official / pinned | songket hem on top, marigold hairline, cut top-right corner | `OfficialFrame` (via `KCard(official:)`) |
 | Event date | ticket stub, plum, perforated edge | `DateBlock` |
 | Market price | marigold hanging tag | `PriceTag` |
 | Announcement category | colour rail | `categoryColor` |
-| No photo | generated cover | `BrandCover`, `ClubCover` |
+| No photo (events, listings, clubs, announcements) | generated cover; events add a date stub — never a grey box | `BrandCover`, `ClubCover`, `UniversalCard` |
 
 ## Illustration — `AppIllustration`
 

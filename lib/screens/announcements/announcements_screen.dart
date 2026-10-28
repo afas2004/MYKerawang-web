@@ -101,7 +101,9 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   Widget build(BuildContext context) {
     final s = context.l10n;
     return Scaffold(
-      appBar: AppBar(
+      appBar: KBand.appBar(
+        context,
+        tone: KBand.news,
         title: Text(s.hub.title),
         actions: [
           const ShellSearchButton(),
