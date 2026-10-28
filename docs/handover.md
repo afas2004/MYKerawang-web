@@ -10,22 +10,21 @@ database.
 |---|---|
 | Repo | `C:\src\project\Flutter\MYKerawang-web` |
 | Worktree to reopen | `.deepseek/worktrees/clubs-admin` |
-| Branch | `deepseek/clubs-admin` — clean, **6 commits ahead of `origin`** |
-| Live | https://kerawang.my — build `202610251841`, version **1.9.1** (+26) |
-| **Production is behind the branch** | the security-review commit is not deployed (it is docs + a pending migration; no client behaviour change beyond guards) |
-| Tests | **556** Flutter tests green; analyzer 17 info/warnings, **no errors** |
-| Migrations | all applied, including tonight's storage limits |
+| Branch | `deepseek/clubs-admin` — clean, pushed |
+| Live | https://kerawang.my — build `202610282014`, version **1.9.2** (+27) |
+| Tests | **563** Flutter tests green; analyzer 16 info/warnings, **no errors** |
+| Migrations | two pending, both listed below: `20261026015100` (security review) and `20261028120000` (club review) |
 | Supabase | project `zxjuqpqzyzmegdjttzyz` |
 
 ## Do this first: deploy
 
-**Done on 2026-10-25.** Production is now 1.9.1+26 / build `202610251841`
+**Done on 2026-10-28.** Production is now 1.9.2+27 / build `202610282014`
 (verified from `https://kerawang.my/build.json`, `version.json` and the string in
-`main.dart.js`). The six commits below are live. To redeploy:
+`main.dart.js`; `mykerawang-app.web.app` serves the same build). To redeploy:
 
 ```powershell
-# pubspec.yaml           version: 1.9.1+26
-# lib/services/update_service.dart   appVersion = '1.9.1'
+# pubspec.yaml           version: 1.9.2+27
+# lib/services/update_service.dart   appVersion = '1.9.2'
 cd C:\src\project\Flutter\MYKerawang-web\.deepseek\worktrees\clubs-admin
 .\deploy_web.bat          # builds, stamps build.json/index/bootstrap, deploys
 ```
@@ -34,6 +33,37 @@ Then verify **from the site**, not the log: `https://kerawang.my/build.json`,
 `version.json`, and the id inside `main.dart.js`. Note that headless Edge
 cannot render the wasm build (it stalls on the splash for a local copy too), so
 a visual check needs a real browser.
+
+## The 2026-10-28 club review
+
+Four findings; three fixed here, one left to the owner.
+
+| # | Finding | Fix |
+|---|---|---|
+| 1 | A **rejected** club request kept `registry_id`, and every later check treats a non-null id as claimed — so one bogus application could burn a registry entry for ever, while the rejection notice promised "you can register again". | `admin_decide_club_request` nulls `registry_id` on reject, plus a one-time release of rows already stuck. **Migration — owner runs `db push`.** |
+| 2 | The club page's pinned post could be missing: `ClubService.posts` ordered by `is_pinned` (the *global* admin pin, ascending) and limited to 30, so a club pin older than the 30 newest fell outside the window. | Pinned rows are now fetched **separately** (`is_club_pinned` true), then the rest by date — inclusion no longer depends on the limit. Split rule extracted to `lib/utils/club_posts.dart` with tests. |
+| 4 | `club_pinned_until` / `club_pinned_by` were not in `mod_guard_pin_columns`, so an officer's own session could insert a permanent club pin past the cap, and pin as anyone. | Guard redefined for all four pin columns; trigger recreates with the club columns in its `update of` list. **Same migration.** |
+| — | Smaller: `/admin/clubs/registry` ignored the admin PIN lock; roster notice credited officers; the handle preview fell back to a name-derived handle the server never assigns; two unused imports. | Registry screen now asks for the PIN and resets on the idle timer; notice says **the president**; `registryHandlePreview` mirrors `register_club` (`club` + code when short); imports removed. |
+
+**Still open, needs a product decision:** `add_club_member` puts someone on a
+club's **public** roster without asking them — they only get a notification. Keep
+it (president-managed roster) or switch to an invitation the person accepts?
+
+Verify after `db push` (owner, SQL editor):
+
+```sql
+-- #1 nothing left stuck
+select r.code, r.name, c.handle from clubs c
+  join club_registry r on r.id = c.registry_id where c.status = 'rejected';
+-- #2 clubs with more than 30 posts (were affected by the page bug)
+select club_id, count(*) from posts
+  where club_id is not null and not is_hidden group by club_id having count(*) > 30;
+-- #4 club pins that were not set through the button
+select id, club_id, club_pinned_until, club_pinned_by from posts
+ where club_pinned_until is not null
+   and (club_pinned_by is null
+        or club_pinned_until > now() + make_interval(days => (select pin_duration_days from moderation_settings where id)));
+```
 
 ## What tonight's six commits do
 
@@ -75,6 +105,7 @@ https and Firebase sends HSTS (one year).
 | `20261026011100_checkin_does_not_join.sql` | A check-in no longer inserts into `event_participants` |
 | `20261026014100_storage_image_limits.sql` | `images` and `avatars` buckets: `allowed_mime_types` (jpeg/png/webp/gif) and a 5 MB `file_size_limit`. Applied 2026-10-25. |
 | `20261026015100_security_review_fixes.sql` | **NOT APPLIED YET.** Form text caps, hidden-event counts, exact signup domain, verification-domain trigger, execute grants, and the `images` bucket write policies. Apply before the club year — see `docs/security-review.md`. |
+| `20261028120000_club_review_fixes.sql` | **NOT APPLIED YET — owner runs `db push`.** Three club-review fixes: a **rejected** request releases its registry entry (`admin_decide_club_request` + one-time release of stuck rows), the **pin guard covers the club columns** (`club_pinned_until`/`club_pinned_by` were insertable straight from the client), and the roster notice credits **the president** rather than "officers". The app half of that review (club page pinned-post window, registry PIN lock, handle preview) is in 1.9.2. |
 
 Seeded data: `supabase/seed/2026-10-25_ki_test_event.sql` created **Malam Ujian
 KI** — the event to test the whole report loop on. Re-runnable.

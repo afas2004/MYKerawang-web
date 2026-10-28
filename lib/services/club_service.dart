@@ -247,11 +247,16 @@ String suggestHandle(String name) {
 
 /// Mirrors register_club's page-handle derivation from the official code
 /// (before the uniqueness suffix). Pure, for the registration preview.
+///
+/// The database strips to `[A-Za-z0-9_]`, cuts to 24 characters, and when what
+/// is left is shorter than 3 it prefixes "club" (`v_base := 'club' || v_base`).
+/// The preview used to fall back to a handle built from the *name*, which told
+/// the applicant a handle the server would never give them.
 String registryHandlePreview(String code, String name) {
-  final base = code.replaceAll(RegExp(r'[^A-Za-z0-9_]'), '');
+  final source = code.trim().isEmpty ? name : code;
+  final base = source.replaceAll(RegExp(r'[^A-Za-z0-9_]'), '');
   final cut = base.length > 24 ? base.substring(0, 24) : base;
-  if (cut.length < 3) return suggestHandle(name);
-  return cut;
+  return cut.length < 3 ? 'club$cut' : cut;
 }
 
 /// President first, then officers, then members; each by join date.
@@ -456,14 +461,33 @@ class ClubService {
       _db.rpc('club_unpin_post', params: {'p_post_id': postId});
 
   // ---- content of a club page
-  static Future<List<Map<String, dynamic>>> posts(String clubId, {int limit = 30}) async =>
-      List<Map<String, dynamic>>.from(await _db
-          .from('posts_public')
-          .select('*')
-          .eq('club_id', clubId)
-          .order('is_pinned')
-          .order('created_at', ascending: false)
-          .limit(limit));
+  //
+  // The page lifts `is_club_pinned` rows into their own slot, so they are
+  // fetched on their own instead of hoping they land inside the newest N. A
+  // club post pinned months ago used to fall outside that window and vanish;
+  // ordering by `is_pinned` (the GLOBAL admin pin, ascending) could also push
+  // admin-pinned posts past the cut.
+  static Future<List<Map<String, dynamic>>> posts(String clubId, {int limit = 30}) async {
+    final pinned = List<Map<String, dynamic>>.from(await _db
+        .from('posts_public')
+        .select('*')
+        .eq('club_id', clubId)
+        .eq('is_club_pinned', true)
+        .order('created_at', ascending: false));
+
+    final remaining = limit - pinned.length;
+    if (remaining <= 0) return pinned;
+
+    final rest = List<Map<String, dynamic>>.from(await _db
+        .from('posts_public')
+        .select('*')
+        .eq('club_id', clubId)
+        .eq('is_club_pinned', false)
+        .order('created_at', ascending: false)
+        .limit(remaining));
+
+    return [...pinned, ...rest];
+  }
 
   static Future<List<Map<String, dynamic>>> events(String clubId) async =>
       List<Map<String, dynamic>>.from(await _db

@@ -6,6 +6,7 @@ import '../../language_cubit.dart';
 import '../../l10n/access_strings.dart';
 import '../../services/club_service.dart';
 import '../../utils/app_nav.dart';
+import '../../utils/club_posts.dart';
 import '../../widgets/brand/brand.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/post_card.dart';
@@ -465,8 +466,9 @@ class _PostsTab extends StatelessWidget {
       future: future,
       empty: BrandEmptyState(illo: AppIllo.emptyFeed, title: c.noAnnouncements, compact: true),
       builder: (posts) {
-        final pinned = posts.where((p) => p['is_club_pinned'] == true).toList();
-        final rest = posts.where((p) => p['is_club_pinned'] != true).toList();
+        final sections = splitClubPosts(posts);
+        final pinned = sections.pinned;
+        final rest = sections.rest;
         return ListView(
           padding: const EdgeInsets.symmetric(vertical: KSpace.s),
           children: [

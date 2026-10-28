@@ -39,6 +39,17 @@ void main() {
       expect(validateHandle(suggestHandle('A very long club name that keeps going on')), isNull);
     });
 
+    test('registryHandlePreview matches what register_club will actually assign', () {
+      // strip punctuation, keep case
+      expect(registryHandlePreview('HEP/2024/042', 'Debate Society'), 'HEP2024042');
+      // a short code gets the "club" prefix, exactly like `v_base := 'club' || v_base`
+      expect(registryHandlePreview('A/B', 'Debate Society'), 'clubAB');
+      // cut to 24 before the prefix check
+      expect(registryHandlePreview('HEP/2024/${'9' * 30}', 'X'), 'HEP2024${'9' * 17}');
+      // an empty code falls back to the name, as the database's coalesce does
+      expect(registryHandlePreview('', 'Debate Society'), 'DebateSociety');
+    });
+
     test('cleanUsername strips @ and spaces', () {
       expect(cleanUsername('  @@aiman '), 'aiman');
     });

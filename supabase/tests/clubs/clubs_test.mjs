@@ -130,6 +130,30 @@ await as(admin, `select admin_decide_club_request($1, false, 'No proof attached'
 ok((await q(`select role from profiles where id=$1`, [legacy.pending]))[0].role === 'student', 'legacy club_pending → student on rejection');
 ok((await q(`select count(*)::int n from moderation_log where action in ('club_approved','club_rejected')`))[0].n === 2, 'decisions logged');
 
+// ------------------------------------- rejection releases the registry entry
+// A rejected request used to keep registry_id, and every later check treats a
+// non-null id as "claimed" — so one bogus application could burn an entry for
+// ever. See 20261028120000_club_review_fixes.sql.
+const regAstro = (await as(admin, `select admin_save_club_registry(null,'HEP/2024/043','Astronomy Club','FSKM','academic',true) id`))[0].id;
+const astro = (await as(bob, `select register_club($1,'astro@gmail.com','president','[]'::jsonb) j`, [regAstro]))[0].j.id;
+ok((await as(carol, `select club_registry_open() j`))[0].j.every((x) => x.id !== regAstro),
+  'a pending request holds its registry entry while it waits');
+e = await err(admin, `select admin_decide_club_request($1, false, 'Not the registered body')`, [astro]);
+ok(e === null, 'admin rejects that request');
+ok((await q(`select registry_id from clubs where id=$1`, [astro]))[0].registry_id === null,
+  'rejection releases the registry entry');
+ok((await as(carol, `select club_registry_open() j`))[0].j.some((x) => x.id === regAstro),
+  'the entry is back in the picker for everyone');
+ok((await q(`select body from notifications where user_id=$1 and type='club' and data->>'kind'='club_rejected' order by created_at desc limit 1`, [bob]))[0].body.includes('register again'),
+  'the rejection notice still promises they can try again — and now that is true');
+
+const astro2 = (await as(carol, `select register_club($1,'astro2@gmail.com','president','[]'::jsonb) j`, [regAstro]))[0].j.id;
+await as(admin, `select admin_decide_club_request($1, true, null)`, [astro2]);
+const a2 = (await q(`select status, registry_id from clubs where id=$1`, [astro2]))[0];
+ok(a2.status === 'active' && a2.registry_id === regAstro, 'someone else can register it, and approval links it');
+ok((await q(`select count(*)::int n from clubs where registry_id = $1`, [regAstro]))[0].n === 1,
+  'exactly one club ends up holding the entry');
+
 // Guests read active clubs and members.
 ok((await as(null, `select count(*)::int n from clubs where id=$1`, [debate], 'anon'))[0].n === 1, 'guest reads active club');
 ok((await as(null, `select count(*)::int n from club_members where club_id=$1`, [debate], 'anon'))[0].n === 1, 'guest reads member list');
@@ -151,6 +175,8 @@ ok(e?.includes('CLUB:not_president'), 'only president adds members');
 await as(alice, `select add_club_member($1,'carol','treasurer')`, [debate]);
 ok((await q(`select role, position from club_members where club_id=$1 and user_id=$2`, [debate, carol]))[0].position === 'treasurer', 'member added with position');
 ok((await as(carol, `select can_act_as_club($1) c`, [debate]))[0].c === false, 'member cannot act as club');
+ok((await q(`select body from notifications where user_id=$1 and data->>'kind'='club_member_added' order by created_at desc limit 1`, [carol]))[0].body.includes('The president can give you a position'),
+  'the roster notice credits the president, not officers');
 e = await err(alice, `select add_club_member($1,'carol',null)`, [debate]);
 ok(e?.includes('CLUB:already_member'), 'no duplicate members');
 await as(alice, `select set_club_member_position($1,$2,'secretary')`, [debate, carol]);
@@ -229,6 +255,21 @@ ok((await as(null, `select is_club_pinned from posts_public where id=$1`, [cp2],
 e = await err(carol, `select club_pin_post($1)`, [cp.id]);
 ok(e?.includes('CLUB:not_officer'), 'non-officers cannot club-pin');
 
+// The club pin columns are RPC-only, exactly like the global ones: a raw insert
+// or update from an officer's own session must not stick.
+const sneaky = (await as(bob, `insert into posts (user_id, title, club_id, club_pinned_until, club_pinned_by) values ($1,'Sneaky pin',$2, now() + interval '3650 days', $1) returning id`, [bob, debate]))[0].id;
+const sneak = (await q(`select club_pinned_until, club_pinned_by from posts where id=$1`, [sneaky]))[0];
+ok(sneak.club_pinned_until === null && sneak.club_pinned_by === null,
+  'a raw insert cannot set the club pin');
+await as(bob, `update posts set club_pinned_until = now() + interval '3650 days', club_pinned_by = $2 where id=$1`, [cp.id, alice]);
+const sneak2 = (await q(`select club_pinned_until, club_pinned_by from posts where id=$1`, [cp.id]))[0];
+ok(sneak2.club_pinned_until === null && sneak2.club_pinned_by === null,
+  'a raw update cannot set the club pin either');
+await as(bob, `select club_pin_post($1)`, [cp.id]);
+ok((await q(`select club_pinned_by from posts where id=$1`, [cp.id]))[0].club_pinned_by === bob,
+  'the club pin RPC still pins, and records who did it');
+await as(bob, `select club_unpin_post($1)`, [cp.id]);
+
 // ---------------------------------------------------------- transfer / remove
 e = await err(alice, `select remove_officer($1,$2)`, [debate, alice]);
 ok(e?.includes('CLUB:president_must_transfer'), 'president cannot just leave');
@@ -253,6 +294,26 @@ await as(admin, `select admin_set_club_status($1,'suspended','Spam')`, [debate])
 ok((await as(bob, `select can_act_as_club($1) c`, [debate]))[0].c === false, 'suspended club cannot publish');
 ok((await as(null, `select club from posts_public where id=$1`, [cp.id], 'anon'))[0].club === null, 'suspended club hidden on posts');
 ok((await as(admin, `select admin_queue_summary() s`))[0].s.club_requests === 0, 'queue summary counts pending clubs');
+
+// ------------------------------------------- the release is safe to re-run
+// The one-time `registry_id = null where status = 'rejected'` must not unlink a
+// club that is approved (the harness already applied the file twice at boot; this
+// proves it again with real rows in place).
+await db.exec(read(path.join(mig, '20261028120000_club_review_fixes.sql')));
+ok((await q(`select registry_id from clubs where id=$1`, [debate]))[0].registry_id === regDebate,
+  're-running the release leaves approved clubs linked');
+ok((await q(`select registry_id from clubs where id=$1`, [astro2]))[0].registry_id === regAstro,
+  'and leaves the second approved club linked too');
+ok((await q(`select count(*)::int n from clubs where status='rejected' and registry_id is not null`))[0].n === 0,
+  'no rejected club holds a registry entry');
+const trg = (await q(`select pg_get_triggerdef(oid) d from pg_trigger where tgname='trg_mod_guard_pin_columns'`))[0].d;
+ok(/club_pinned_until/.test(trg) && /club_pinned_by/.test(trg) && /update of/i.test(trg),
+  'the recreated trigger fires for the club pin columns too');
+// The club was suspended further up, so reactivate it to prove the RPC path
+// still passes through the redefined guard.
+await as(admin, `select admin_set_club_status($1,'active','Re-run check')`, [debate]);
+ok((await err(bob, `select club_pin_post($1)`, [cp.id])) === null,
+  'the pin RPC survives the guard being redefined');
 
 console.log(failures ? `\n${failures} FAILURES` : '\nALL PASSED');
 process.exit(failures ? 1 : 0);
