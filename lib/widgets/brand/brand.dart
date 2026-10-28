@@ -15,6 +15,7 @@ export 'app_motif.dart';
 export 'brand_cover.dart';
 export 'brand_empty_state.dart';
 export 'k_card.dart';
+export 'k_motion.dart';
 export 'k_pattern.dart';
 export 'k_skeleton.dart';
 export 'kerawang_lattice.dart';

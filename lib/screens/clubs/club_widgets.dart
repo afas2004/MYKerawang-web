@@ -7,12 +7,64 @@ import '../../widgets/brand/brand.dart';
 import 'club_strings.dart';
 
 /// Rounded-square club logo with an initial when there's no image.
+/// A club's colour until officers can choose one (that needs a database
+/// column): from its category, else from its handle. Always one of the six
+/// brand colours, all safe under white text.
+Color clubColor(Club club) => switch (club.category) {
+      'academic' => KPalette.plum,
+      'arts' => KPalette.jingga,
+      'sports' => KPalette.hijauPucuk,
+      'religious' => KPalette.hijauPucuk,
+      'volunteer' => KPalette.merahSaga,
+      'tech' => KPalette.biruLaut,
+      'business' => KPalette.kelabuArang,
+      _ => KPalette.forKey(club.handle),
+    };
+
+/// The stitch motif on a club's generated cover, where its category has an
+/// obvious one; otherwise the pattern alone.
+AppMotif? clubMotif(Club club) => switch (club.category) {
+      'arts' => AppMotif.wauBulan,
+      'sports' => AppMotif.wauKucing,
+      'business' => AppMotif.nasiLemak,
+      _ => null,
+    };
+
+/// A club's cover: its photo, or a cover generated from its handle in the
+/// club colour, with the category motif and a songket hem.
+class ClubCover extends StatelessWidget {
+  final Club club;
+  const ClubCover({super.key, required this.club});
+
+  @override
+  Widget build(BuildContext context) {
+    final generated = BrandCover(
+      seed: club.handle,
+      color: clubColor(club),
+      motif: clubMotif(club),
+      hem: true,
+    );
+    final url = club.coverUrl;
+    if (url == null || url.isEmpty) return generated;
+    return CachedNetworkImage(
+      imageUrl: url,
+      fit: BoxFit.cover,
+      placeholder: (_, __) => generated,
+      errorWidget: (_, __, ___) => generated,
+    );
+  }
+}
+
 class ClubLogo extends StatelessWidget {
   final String? url;
   final String name;
   final double size;
 
-  const ClubLogo({super.key, required this.url, required this.name, this.size = 48});
+  /// Fill behind the initial when there's no logo (the club colour);
+  /// the soft primary tint when null.
+  final Color? color;
+
+  const ClubLogo({super.key, required this.url, required this.name, this.size = 48, this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -23,12 +75,12 @@ class ClubLogo extends StatelessWidget {
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: radius),
+      decoration: BoxDecoration(color: color ?? scheme.primaryContainer, borderRadius: radius),
       child: Text(initial,
           style: Theme.of(context)
               .textTheme
               .titleLarge
-              ?.copyWith(color: scheme.onPrimaryContainer, fontSize: size * 0.42)),
+              ?.copyWith(color: color != null ? Colors.white : scheme.onPrimaryContainer, fontSize: size * 0.42)),
     );
     if (url == null || url!.isEmpty) return fallback;
     return ClipRRect(

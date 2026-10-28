@@ -607,7 +607,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                   _organiserRow(context),
                 ],
                 const SizedBox(height: KSpace.l),
-                _primaryAction(context),
+                KStampSwitcher(child: _primaryAction(context)),
                 const SizedBox(height: KSpace.m),
                 _secondaryActions(context),
               ],
@@ -702,7 +702,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         border: Border(top: BorderSide(color: scheme.outlineVariant)),
       ),
       padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, KSpace.m),
-      child: SafeArea(top: false, child: _primaryAction(context)),
+      child: SafeArea(top: false, child: KStampSwitcher(child: _primaryAction(context))),
     );
   }
 
@@ -1457,6 +1457,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     // newly join.
     if (_isJoined) {
       return OutlinedButton.icon(
+        key: const ValueKey('joined'),
         onPressed: _toggleJoin,
         style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
         icon: const Icon(AppIcons.calendarJoined, size: 18),
@@ -1464,10 +1465,12 @@ class _EventDetailScreenState extends State<EventDetailScreen>
       );
     }
     return FilledButton.icon(
+      key: const ValueKey('join'),
       onPressed: (_isClosed || _registrationClosed || _isFullAtCapacity)
           ? null
           : _toggleJoin,
-      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+      // The page's one accent action.
+      style: accentButtonStyle(context, minimumSize: const Size.fromHeight(52)),
       icon: Icon(_isCancelled ? AppIcons.cancel : AppIcons.calendarAdd, size: 18),
       label: Text(_isCancelled
           ? s.cancelled

@@ -472,6 +472,11 @@ ThemeData buildAppTheme(AppTheme theme) {
       labelColor: spec.text,
       unselectedLabelColor: muted,
       indicatorColor: primary,
+      // A rounded 3 px bar that slides between tabs.
+      indicator: UnderlineTabIndicator(
+        borderSide: BorderSide(color: primary, width: 3),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+      ),
       dividerColor: spec.border,
       labelStyle: finalText.titleSmall,
       unselectedLabelStyle: finalText.titleSmall,

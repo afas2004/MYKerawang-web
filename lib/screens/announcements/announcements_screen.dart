@@ -226,6 +226,19 @@ String categoryLabel(AppStrings s, AnnouncementCategory c) => switch (c) {
       AnnouncementCategory.general => s.hub.catGeneral,
     };
 
+/// Each category's colour, from the brand palette. Used for the card rail
+/// and the no-photo cover; lifted on dark themes so the rail still reads.
+Color categoryColor(AnnouncementCategory c, [Brightness b = Brightness.light]) {
+  final base = switch (c) {
+    AnnouncementCategory.kolej => KPalette.plum,
+    AnnouncementCategory.jpk => KPalette.biruLaut,
+    AnnouncementCategory.club => KPalette.jingga,
+    AnnouncementCategory.event => KPalette.hijauPucuk,
+    AnnouncementCategory.general => KPalette.kelabuArang,
+  };
+  return b == Brightness.dark ? Color.lerp(base, Colors.white, 0.45)! : base;
+}
+
 IconData categoryIcon(AnnouncementCategory c) => switch (c) {
       AnnouncementCategory.kolej => AppIcons.official,
       AnnouncementCategory.jpk => AppIcons.people,
@@ -435,26 +448,21 @@ class _HeroSlide extends StatelessWidget {
   }
 }
 
-/// No cover photo: a tinted card with the category's icon.
+/// No cover photo: the category's colour with a generated pattern and the
+/// category's icon (no gradient placeholder).
 class _CategoryCover extends StatelessWidget {
   final AnnouncementCategory category;
   const _CategoryCover({required this.category});
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [scheme.primary, Color.lerp(scheme.primary, Colors.black, 0.35)!],
-        ),
-      ),
+    return BrandCover(
+      seed: 'announcement-${category.dbValue}',
+      color: categoryColor(category),
       child: Align(
         alignment: const Alignment(0.85, -0.6),
         child: Icon(categoryIcon(category),
-            size: 56, color: kOnPhoto.withValues(alpha: 0.25)),
+            size: 56, color: kOnPhoto.withValues(alpha: 0.3)),
       ),
     );
   }
@@ -752,8 +760,18 @@ class AnnouncementCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(children: [
-                      Text(categoryLabel(s, a.category).toUpperCase(),
-                          style: theme.textTheme.labelSmall
+                      // Category colour rail.
+                      Container(
+                        width: 4,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: categoryColor(a.category, theme.brightness),
+                          borderRadius: const BorderRadius.all(Radius.circular(2)),
+                        ),
+                      ),
+                      const SizedBox(width: KSpace.s),
+                      Text(categoryLabel(s, a.category),
+                          style: theme.textTheme.labelMedium
                               ?.copyWith(color: scheme.tertiary)),
                       const SizedBox(width: KSpace.s),
                       Flexible(

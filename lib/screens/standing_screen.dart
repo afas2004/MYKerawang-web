@@ -64,7 +64,7 @@ class _StandingScreenState extends State<StandingScreen> {
           if (snap.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snap.hasError) return ErrorState(onRetry: _reload);
+          if (snap.hasError) return ErrorState(onRetry: _reload, plain: true);
           return RefreshIndicator(
             onRefresh: () async => _reload(),
             child: StandingView(

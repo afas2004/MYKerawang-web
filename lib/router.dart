@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'language_cubit.dart';
+import 'l10n/brand_strings.dart';
 import 'screens/announcements/announcements_screen.dart';
 import 'screens/create_event_screen.dart';
 import 'screens/create_listing_screen.dart';
@@ -37,7 +38,7 @@ import 'utils/app_nav.dart';
 import 'utils/guest_access.dart';
 import 'utils/responsive.dart';
 import 'widgets/app_sidebar.dart';
-import 'widgets/brand/brand.dart' show KRadius;
+import 'widgets/brand/brand.dart' show AppIllo, BrandEmptyState, KRadius;
 import 'screens/admin/moderation_routes.dart';
 
 /// Notifies the router whenever Supabase auth state changes, so the
@@ -489,20 +490,16 @@ GoRouter buildRouter() {
       ...clubRoutes(_rootKey).map(_withHistoryAwareExit),
     ],
 
+    // The lost page: the kite's string snapped.
     errorBuilder: (context, state) => Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.explore_off_outlined, size: 48),
-            const SizedBox(height: 12),
-            Text(context.l10n.pageNotFound),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: () => context.go('/home'),
-              child: Text(context.l10n.goHome),
-            ),
-          ],
+      body: Semantics(
+        label: context.l10n.pageNotFound,
+        child: BrandEmptyState(
+          illo: AppIllo.notFound,
+          title: context.l10n.brand.lostTitle,
+          message: context.l10n.brand.lostBody,
+          actionLabel: context.l10n.goHome,
+          onAction: () => context.go('/home'),
         ),
       ),
     ),

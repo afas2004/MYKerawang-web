@@ -231,7 +231,7 @@ class _EventsViewState extends State<EventsView>
               ? SliverList.separated(
                   itemCount: events.length,
                   separatorBuilder: (_, __) => const SizedBox(height: KSpace.m),
-                  itemBuilder: (_, i) => card(events[i]),
+                  itemBuilder: (_, i) => i < 6 ? KEntrance(index: i, child: card(events[i])) : card(events[i]),
                 )
               : SliverGrid.builder(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -428,8 +428,9 @@ class EventCard extends StatelessWidget {
   }
 }
 
-/// Date block: short month over the day number. Shared by the list card
-/// and the event page.
+/// Date block: short month over the day number, as a ticket stub — solid
+/// plum with a perforated right edge. Shared by the list card and the event
+/// page.
 class DateBlock extends StatelessWidget {
   final DateTime date;
   final bool muted;
@@ -443,25 +444,46 @@ class DateBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final bg = muted ? scheme.surfaceContainerHighest : scheme.primaryContainer;
-    final fg = muted ? scheme.onSurfaceVariant : scheme.onPrimaryContainer;
-    return Container(
-      width: size,
-      padding: const EdgeInsets.symmetric(vertical: KSpace.s),
-      decoration: BoxDecoration(color: bg, borderRadius: KRadius.input),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(_month.format(date).toUpperCase(),
-              style: theme.textTheme.labelSmall
-                  ?.copyWith(color: fg, letterSpacing: 0.8, fontWeight: FontWeight.w600)),
-          Text('${date.day}',
-              style: theme.textTheme.headlineSmall
-                  ?.copyWith(color: fg, fontWeight: FontWeight.w700, height: 1.15)),
-        ],
+    final bg = muted ? scheme.surfaceContainerHighest : scheme.primary;
+    final fg = muted ? scheme.onSurfaceVariant : scheme.onPrimary;
+    return ClipPath(
+      clipper: const TicketStubClipper(),
+      child: Container(
+        width: size,
+        padding: const EdgeInsets.symmetric(vertical: KSpace.s),
+        decoration: BoxDecoration(color: bg, borderRadius: KRadius.input),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_month.format(date).toUpperCase(),
+                style: theme.textTheme.labelSmall
+                    ?.copyWith(color: fg, letterSpacing: 0.4, fontWeight: FontWeight.w600)),
+            Text('${date.day}',
+                style: theme.textTheme.headlineSmall
+                    ?.copyWith(color: fg, fontWeight: FontWeight.w700, height: 1.15)),
+          ],
+        ),
       ),
     );
   }
+}
+
+/// A ticket's torn edge: small half-circle bites down the right side.
+class TicketStubClipper extends CustomClipper<Path> {
+  const TicketStubClipper();
+
+  @override
+  Path getClip(Size size) {
+    const r = 2.5, step = 9.0;
+    final holes = Path();
+    for (double y = step / 2 + 2; y < size.height - 2; y += step) {
+      holes.addOval(Rect.fromCircle(center: Offset(size.width, y), radius: r));
+    }
+    return Path.combine(PathOperation.difference, Path()..addRect(Offset.zero & size), holes);
+  }
+
+  @override
+  bool shouldReclip(TicketStubClipper oldClipper) => false;
 }
 
 /// Organiser name; clubs, staff and verified accounts get the verified

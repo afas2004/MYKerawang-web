@@ -4,6 +4,7 @@ import '../l10n/social_strings.dart';
 import '../language_cubit.dart';
 import '../theme/app_icons.dart';
 import '../services/saved_items.dart';
+import 'brand/k_motion.dart';
 
 export '../services/saved_items.dart' show SavedType;
 
@@ -82,9 +83,12 @@ class _SaveButtonState extends State<SaveButton> {
           tooltip: saved ? s.unsave : s.save,
           iconSize: widget.iconSize,
           onPressed: _busy ? null : _toggle,
-          icon: Icon(
-            saved ? AppIcons.saved : AppIcons.save,
-            color: widget.color ?? (saved ? scheme.primary : null),
+          icon: KLikeBurst(
+            active: saved,
+            child: Icon(
+              saved ? AppIcons.saved : AppIcons.save,
+              color: widget.color ?? (saved ? scheme.primary : null),
+            ),
           ),
         );
       },

@@ -19,6 +19,7 @@ import 'services/known_accounts.dart';
 import 'services/saved_items.dart';
 import 'services/unread_notifications.dart';
 import 'services/update_service.dart';
+import 'services/art_credits.dart';
 import 'widgets/update_banner.dart';
 import 'l10n/account_strings.dart';
 import 'l10n/app_strings.dart';
@@ -70,6 +71,9 @@ void main() async {
 
   // Web: poll for newer deploys so phones don't sit on a stale build.
   UpdateService.instance.start();
+
+  // Credit the bundled illustrations on the licences page.
+  registerArtCredits();
 
   runApp(const MyApp());
 }

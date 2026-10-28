@@ -294,6 +294,7 @@ class _CasesTabState extends State<CasesTab> with AutomaticKeepAliveClientMixin 
               header,
               Expanded(
                 child: ErrorState(
+                  plain: true,
                   onRetry: _reload,
                   message: modErrorText(context, snap.error!, fallback: context.l10n.connectionError),
                 ),

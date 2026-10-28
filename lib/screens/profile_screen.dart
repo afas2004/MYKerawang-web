@@ -544,12 +544,21 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     final scheme = theme.colorScheme;
     final avatarUrl = p['avatar_url'] as String?;
     final name = displayNameFor(s, p);
+    // Each person's banner and ring colour, generated from their id until
+    // profiles can store a chosen style (needs a database column).
+    final seed = '${p['id'] ?? p['username'] ?? name}';
+    final ring = KPalette.forKey(seed);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.l, KSpace.l, KSpace.l),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          ClipRRect(
+            borderRadius: KRadius.card,
+            child: SizedBox(height: 88, child: BrandCover(seed: seed, color: ring)),
+          ),
+          const SizedBox(height: KSpace.l),
           Row(
             children: [
               Semantics(
@@ -561,17 +570,29 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                       ? null
                       // Full original image, uncropped (BoxFit.contain)
                       : () => showImagePreview(context, url: avatarUrl),
-                  child: CircleAvatar(
-                    radius: 44,
-                    backgroundColor: scheme.primaryContainer,
-                    foregroundColor: scheme.onPrimaryContainer,
-                    backgroundImage:
-                        avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                    child: avatarUrl == null
-                        ? Text(name.characters.first.toUpperCase(),
-                            style: theme.textTheme.headlineMedium
-                                ?.copyWith(color: scheme.onPrimaryContainer))
-                        : null,
+                  // The ring is the person's colour.
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                          width: 2.5,
+                          color: theme.brightness == Brightness.dark
+                              ? Color.lerp(ring, Colors.white, 0.45)!
+                              : ring),
+                    ),
+                    child: CircleAvatar(
+                      radius: 44,
+                      backgroundColor: scheme.primaryContainer,
+                      foregroundColor: scheme.onPrimaryContainer,
+                      backgroundImage:
+                          avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                      child: avatarUrl == null
+                          ? Text(name.characters.first.toUpperCase(),
+                              style: theme.textTheme.headlineMedium
+                                  ?.copyWith(color: scheme.onPrimaryContainer))
+                          : null,
+                    ),
                   ),
                 ),
               ),
@@ -673,19 +694,23 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         label: Text(s.editProfile),
       );
     }
-    if (_isFollowing) {
-      return FilledButton.tonalIcon(
-        style: FilledButton.styleFrom(minimumSize: minSize),
-        onPressed: _toggleFollow,
-        icon: const Icon(AppIcons.following, size: 18),
-        label: Text(s.following),
-      );
-    }
-    return FilledButton.icon(
-      style: FilledButton.styleFrom(minimumSize: minSize),
-      onPressed: _toggleFollow,
-      icon: const Icon(AppIcons.follow, size: 18),
-      label: Text(s.follow),
+    // Follow ⇄ Following lands like a stamp.
+    return KStampSwitcher(
+      child: _isFollowing
+          ? FilledButton.tonalIcon(
+              key: const ValueKey('following'),
+              style: FilledButton.styleFrom(minimumSize: minSize),
+              onPressed: _toggleFollow,
+              icon: const Icon(AppIcons.following, size: 18),
+              label: Text(s.following),
+            )
+          : FilledButton.icon(
+              key: const ValueKey('follow'),
+              style: FilledButton.styleFrom(minimumSize: minSize),
+              onPressed: _toggleFollow,
+              icon: const Icon(AppIcons.follow, size: 18),
+              label: Text(s.follow),
+            ),
     );
   }
 

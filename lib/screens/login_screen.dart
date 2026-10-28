@@ -145,10 +145,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 ],
               );
             }
-            return SafeArea(
+            return _LoginGround(
+              child: SafeArea(
               child: Center(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 420),
                     child: Column(
@@ -161,6 +162,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
+              ),
               ),
             );
           }),
@@ -362,7 +364,9 @@ class _BrandPanel extends StatelessWidget {
     final scheme = theme.colorScheme;
     return ColoredBox(
       color: scheme.primaryContainer,
-      child: Center(
+      child: _LoginGround(
+        strength: 0.12,
+        child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(KSpace.xxl + KSpace.l),
           child: ConstrainedBox(
@@ -388,7 +392,36 @@ class _BrandPanel extends StatelessWidget {
             ),
           ),
         ),
+        ),
       ),
+    );
+  }
+}
+
+/// The login ground: a faint 8-point star field with a songket hem along the
+/// top and bottom edges, like the borders of a kain. The pattern sits
+/// behind everything and the hems on the edges, so neither covers content.
+class _LoginGround extends StatelessWidget {
+  final Widget child;
+  final double strength;
+  const _LoginGround({required this.child, this.strength = 0.07});
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: KPattern(
+            kind: KPatternKind.star8,
+            color: primary.withValues(alpha: strength),
+            cell: 40,
+          ),
+        ),
+        Positioned.fill(child: child),
+        const Positioned(left: 0, right: 0, top: 0, child: SongketHem(height: 10)),
+        const Positioned(left: 0, right: 0, bottom: 0, child: SongketHem(height: 10)),
+      ],
     );
   }
 }

@@ -14,6 +14,8 @@ import '../l10n/account_strings.dart';
 import '../language_cubit.dart';
 import '../l10n/shell_strings.dart';
 import '../l10n/social_strings.dart';
+import '../l10n/brand_strings.dart';
+import '../widgets/app_logo.dart';
 import '../l10n/moderation_strings.dart';
 import '../services/account_data.dart';
 import '../services/moderation_service.dart';
@@ -360,6 +362,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: Text(s.social.privacyPolicySub),
                     trailing: const Icon(AppIcons.chevronRight),
                     onTap: () => context.goPrivacyPolicy(),
+                  ),
+                  ListTile(
+                    leading: const Icon(AppIcons.sparkle),
+                    title: Text(s.brand.openSourceCredits),
+                    subtitle: Text(s.brand.openSourceCreditsSub),
+                    trailing: const Icon(AppIcons.chevronRight),
+                    onTap: () => showLicensePage(
+                      context: context,
+                      applicationName: AppStrings.appName,
+                      applicationIcon: const Padding(
+                        padding: EdgeInsets.all(KSpace.s),
+                        child: AppLogo(size: 56),
+                      ),
+                    ),
                   ),
                   ListTile(
                     leading: _exporting

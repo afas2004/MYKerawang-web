@@ -279,17 +279,11 @@ class _ClubPageViewState extends State<ClubPageView> {
                   height: 140,
                   margin: const EdgeInsets.symmetric(horizontal: KSpace.l),
                   decoration: BoxDecoration(
-                    color: scheme.primaryContainer,
+                    color: clubColor(club),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   clipBehavior: Clip.antiAlias,
-                  child: club.coverUrl == null
-                      ? null
-                      : CachedNetworkImage(
-                          imageUrl: club.coverUrl!,
-                          fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => const SizedBox.shrink(),
-                        ),
+                  child: ClubCover(club: club),
                 ),
                 Positioned(
                   left: KSpace.xl,
@@ -300,7 +294,7 @@ class _ClubPageViewState extends State<ClubPageView> {
                       color: theme.scaffoldBackgroundColor,
                       borderRadius: BorderRadius.circular(26),
                     ),
-                    child: ClubLogo(url: club.logoUrl, name: club.name, size: 80),
+                    child: ClubLogo(url: club.logoUrl, name: club.name, size: 80, color: clubColor(club)),
                   ),
                 ),
               ],
@@ -340,17 +334,21 @@ class _ClubPageViewState extends State<ClubPageView> {
                     children: [
                       if (widget.signedIn && club.isActive)
                         Expanded(
-                          child: _following
-                              ? OutlinedButton.icon(
-                                  onPressed: _busy ? null : _toggleFollow,
-                                  icon: const Icon(AppIcons.following, size: 18),
-                                  label: Text(c.following),
-                                )
-                              : FilledButton.icon(
-                                  onPressed: _busy ? null : _toggleFollow,
-                                  icon: const Icon(AppIcons.follow, size: 18),
-                                  label: Text(c.follow),
-                                ),
+                          child: KStampSwitcher(
+                            child: _following
+                                ? OutlinedButton.icon(
+                                    key: const ValueKey('following'),
+                                    onPressed: _busy ? null : _toggleFollow,
+                                    icon: const Icon(AppIcons.following, size: 18),
+                                    label: Text(c.following),
+                                  )
+                                : FilledButton.icon(
+                                    key: const ValueKey('follow'),
+                                    onPressed: _busy ? null : _toggleFollow,
+                                    icon: const Icon(AppIcons.follow, size: 18),
+                                    label: Text(c.follow),
+                                  ),
+                          ),
                         ),
                       if (officer) ...[
                         if (widget.signedIn && club.isActive) const SizedBox(width: KSpace.s),

@@ -244,7 +244,8 @@ class _MarketplaceViewState extends State<MarketplaceView>
               itemCount: state.items.length,
               itemBuilder: (context, index) {
                 final item = state.items[index];
-                return MarketCard(item: item, onTap: () => context.goItem(item));
+                final card = MarketCard(item: item, onTap: () => context.goItem(item));
+                return index < 8 ? KEntrance(index: index, child: card) : card;
               },
             ),
           ),
@@ -364,13 +365,7 @@ class MarketCard extends StatelessWidget {
                       style: theme.textTheme.titleSmall?.copyWith(
                           color: isSold ? scheme.onSurfaceVariant : scheme.onSurface)),
                   const Spacer(),
-                  Text(price,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                          color: isSold ? scheme.onSurfaceVariant : scheme.tertiary,
-                          decoration: isSold ? TextDecoration.lineThrough : null,
-                          fontWeight: FontWeight.w700)),
+                  PriceTag(price, sold: isSold),
                 ],
               ),
             ),
@@ -379,6 +374,61 @@ class MarketCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The market's price, as a hanging tag: marigold, a notched left end with
+/// a string hole. Sold items get a muted, struck-through tag.
+class PriceTag extends StatelessWidget {
+  final String price;
+  final bool sold;
+  const PriceTag(this.price, {super.key, this.sold = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final k = KTokens.of(context);
+    final bg = sold ? scheme.surfaceContainerHighest : k.accent;
+    final fg = sold ? scheme.onSurfaceVariant : k.onAccent;
+    return ClipPath(
+      clipper: const _TagClipper(),
+      child: Container(
+        color: bg,
+        padding: const EdgeInsets.fromLTRB(KSpace.l, 2, KSpace.s + 2, 2),
+        child: Text(price,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleSmall?.copyWith(
+                color: fg,
+                decoration: sold ? TextDecoration.lineThrough : null,
+                decorationColor: fg,
+                fontWeight: FontWeight.w700)),
+      ),
+    );
+  }
+}
+
+class _TagClipper extends CustomClipper<Path> {
+  const _TagClipper();
+
+  @override
+  Path getClip(Size size) {
+    final notch = size.height / 2;
+    final tag = Path()
+      ..moveTo(notch * 0.8, 0)
+      ..lineTo(size.width - 4, 0)
+      ..quadraticBezierTo(size.width, 0, size.width, 4)
+      ..lineTo(size.width, size.height - 4)
+      ..quadraticBezierTo(size.width, size.height, size.width - 4, size.height)
+      ..lineTo(notch * 0.8, size.height)
+      ..lineTo(0, notch)
+      ..close();
+    final hole = Path()..addOval(Rect.fromCircle(center: Offset(notch * 0.95, notch), radius: 2.2));
+    return Path.combine(PathOperation.difference, tag, hole);
+  }
+
+  @override
+  bool shouldReclip(_TagClipper oldClipper) => false;
 }
 
 // ---------------------------------------------------------------------------
