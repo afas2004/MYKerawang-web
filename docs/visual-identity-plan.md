@@ -339,7 +339,9 @@ No phase touches `supabase/`.
    style, (b) drop illustrations and use type-led empty states with the mark, or
    (c) keep unDraw for now and do it later? Open-licence sources, the hidden
    pages that need art, and a page-by-page proposal are in
-   [illustration-sources.md](illustration-sources.md).
+   [illustration-sources.md](illustration-sources.md). *Partly decided
+   2026-10-28: people in the new art are built on **Open Peeps** (CC0); still
+   open: whether the set replaces unDraw now or later.*
 5. **The logo redraw:** who makes the vector K? You or a designer from the
    original art, or should I trace a first version for you to approve? The current
    file is AI-generated raster, so check usage rights / originality before it

@@ -55,7 +55,7 @@ other states reuse the existing enum names, so their 24 call sites don't change.
 | Source | Licence (verified) | What fits us | Caveats |
 |---|---|---|---|
 | **Open Peeps** by Pablo Stanley, openpeeps.com | **CC0** (on the site) | Hand-drawn mix-and-match people; SVG + PNG; recolourable. Base for our students | The site lists hair options but **no head coverings**: we draw tudung / songkok parts ourselves (CC0 allows it) |
-| **Humaaans** by Pablo Stanley, humaaans.com | **CC0** (on the site) | Flat modular people (poses, outfits). Cleaner, more "app" than Open Peeps | Same: add tudung / baju kurung parts. Pick **one** of Peeps or Humaaans, not both |
+| ~~**Humaaans**~~ by Pablo Stanley, humaaans.com | **CC0** (on the site) | Flat modular people | **Not used:** Open Peeps chosen (one people style only) |
 | **Open Doodles** by Pablo Stanley, opendoodles.com | **CC0**, "no need to credit" | 33 loose sketches: reading, sitting-reading, coffee, chilling, meditating, selfie, running | Small set; good for no-notifications / no-results moods |
 | **Malay songket patterns** by EmpAhmadK, Wikimedia Commons (`Malay songket pattern - Delatar/Muktamad/Perseri.svg`) | **CC0** (Commons record) | Real Malay songket motifs as SVG, one colour, so they recolour cleanly to plum/marigold | Only 3 files. Use as bands/edges (sparingly: the lattice was retired as noise) |
 | **Fluent Emoji** by Microsoft, github.com/microsoft/fluentui-emoji | **MIT** (repo) | Flat / Color / High-Contrast / 3D SVGs. Confirmed present: *Woman student*, *Man student*, ***Woman with headscarf*** (6 skin tones), *Graduation cap*, *Backpack*, *Open book*, *Books*, *Kite*, *Mosque*, *Cooked rice*, *Calendar*, *Shopping bags*, *Magnifying glass*, *Locked*, *No entry*, *Ghost*, *Sleeping face*, *Wilted flower*, *Satellite antenna*, *Party popper*, *Sparkles*, *Construction* | Use **Flat** or **High Contrast** only, small (≤48px), never mixed with scenes in the same view. The 3D style clashes with line art |
@@ -91,8 +91,8 @@ Mixed sources only look intentional if they share rules:
   (primary), marigold (accent), one neutral fill. Extend the map in
   `AppIllustration.recolor()` (it already swaps unDraw's `#6c63ff`). The WP25
   drawings and songket patterns are single-colour, so they map to plum in one line.
-- **People in line art, culture in stitch.** Characters from Open Peeps (or
-  Humaaans) in the ink line; cultural objects in the songket-stitch texture. That
+- **People in line art, culture in stitch.** Characters from Open Peeps in the
+  ink line; cultural objects in the songket-stitch texture. That
   contrast *is* the "modern student + tradition" story.
 - **Representation:** UiTM is a Bumiputera campus. Most characters should wear
   tudung / baju kurung / baju Melayu, plus casual campus wear (hoodie, lanyard,
@@ -123,7 +123,11 @@ Mixed sources only look intentional if they share rules:
 
 ## 5. Questions for you
 
-1. **People kit:** Open Peeps (hand-drawn, warmer) or Humaaans (flat, cleaner)?
+1. ~~**People kit:** Open Peeps or Humaaans?~~ **Decided 2026-10-28: Open
+   Peeps.** Humaaans is dropped, so we don't mix two people styles. First task
+   when Phase 5 starts: download the CC0 kit and check its head/accessory parts
+   for any head covering (its site lists only hair), then draw the missing
+   tudung / songkok / baju kurung / baju Melayu parts in the Peeps line style.
 2. OK to carry a **credit line** (CC BY) for the WP25 Malaysia drawings, or CC0
    only?
 3. Who draws the **tudung / baju kurung / songkok** parts? Me in SVG, for you to
