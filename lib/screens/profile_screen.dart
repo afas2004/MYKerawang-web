@@ -225,7 +225,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
-        backgroundColor: theme.scaffoldBackgroundColor,
+        backgroundColor: theme.colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: DefaultTabController(
           length: 2,
@@ -411,7 +411,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                       Tab(icon: const Icon(AppIcons.save, size: 20), text: s.social.saved, height: 60),
                   ],
                 ),
-                background: theme.scaffoldBackgroundColor,
+                background: theme.colorScheme.surface,
                 divider: scheme.outlineVariant,
               ),
             ),
@@ -586,7 +586,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       // A page-coloured collar so it sits cleanly on the banner.
-                      color: theme.scaffoldBackgroundColor,
+                      color: theme.colorScheme.surface,
                       border: Border.all(
                           width: 2.5,
                           color: theme.brightness == Brightness.dark

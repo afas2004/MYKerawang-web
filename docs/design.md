@@ -5,6 +5,25 @@ doesn't drift back to the generic default. Background and reasoning:
 [visual-identity-plan.md](visual-identity-plan.md), sources and licences:
 [illustration-sources.md](illustration-sources.md).
 
+## The layers (Round 3)
+
+1. **One ground.** `KGround` sits behind the router: "Corak kampus", twelve
+   line drawings (wau, ketupat, bunga raya, 8-point star, songket diamond,
+   book, graduation cap, teh tarik, music, pencil, football, bicycle) at 6 %
+   in the theme primary, like Telegram/WhatsApp chat wallpapers. The theme's
+   scaffold background is transparent so it shows everywhere; opaque
+   page-coloured fills use `colorScheme.surface`.
+2. **A framed screen.** App bar = kepala kain (`KBand`: solid plum on every
+   main tab, songket hem below, no pattern). Nav bar = kaki kain
+   (`CompactNavBar`: songket hem on top, plum diamond Create, marigold
+   diamond above the active tab).
+3. **Plain figures.** Cards are plain surfaces with the hairline. The
+   author's colour is a thin ring on the post avatar, not a card edge.
+4. **Special things keep one special shape** (table below).
+5. **No photo = a calm tint** (`KTintCover`): a soft wash of the item's
+   colour and one drawing from the ground's set. Patterns are reserved for
+   profile banners and club covers, which are those owners' identity.
+
 ## Personality
 
 A campus noticeboard with craft: warm, local, a little formal where it's
@@ -43,30 +62,31 @@ bottom of a generated cover, the top of an official card, under the error
 scene's top. Never across the middle of content, never as a texture.
 (`identity_rules_test.dart` keeps the asset behind `SongketHem`.)
 
-## Header bands (kepala kain) — `KBand`
+## Header band (kepala kain) — `KBand`
 
-The four main tabs' app bars are a band of colour with a faint star pattern
-and a songket hem on the lower edge: Home plum, News biru laut, Market jingga,
-Events hijau pucuk (deepened on dark themes). Under the band the page stays
-plain. Other screens keep the plain app bar.
+The four main tabs' app bars are solid plum (deepened on dark themes) with a
+songket hem on the lower edge and a 20 px title. No pattern: the ground has
+the drawings. Other screens keep the plain app bar.
 
 ## Patterns — `KPattern`
 
 Star (bintang lapan), pucuk rebung, tabur; drawn in code, clipped to their box.
-Only on grounds with nothing else to say: login, banners, covers with no
-photo. Feed, hub, market, events and admin stay plain.
+Only on profile banners and club covers. Everything else gets its texture
+from the one ground.
 
 ## Shapes that mean something
 
 | Content | Shape | Widget |
 |---|---|---|
 | Normal card | 1 px hairline, 16 px corners | `KCard` |
-| Post | kain card: 4 px top edge in the author's colour (grey when anonymous) | `KCard(edgeColor:)` |
+| Post | plain card; author's colour as a thin avatar ring (grey when anonymous) | `PostCard` |
 | Official / pinned | songket hem on top, marigold hairline, cut top-right corner | `OfficialFrame` (via `KCard(official:)`) |
 | Event date | ticket stub, plum, perforated edge | `DateBlock` |
 | Market price | marigold hanging tag | `PriceTag` |
 | Announcement category | colour rail | `categoryColor` |
-| No photo (events, listings, clubs, announcements) | generated cover; events add a date stub — never a grey box | `BrandCover`, `ClubCover`, `UniversalCard` |
+| No photo (events, listings) | soft tint + one drawing; events add a date stub — never a grey box | `KTintCover` |
+| No photo (clubs, profiles) | pattern cover with songket hem (their identity) | `ClubCover`, `BrandCover` |
+| No photo (announcement hero) | solid category colour + its icon | `_CategoryCover` |
 
 ## Illustration — `AppIllustration`
 

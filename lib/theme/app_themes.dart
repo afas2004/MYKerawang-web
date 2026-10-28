@@ -277,7 +277,9 @@ ThemeData buildAppTheme(AppTheme theme) {
   return base.copyWith(
     extensions: [tokens],
     textTheme: finalText,
-    scaffoldBackgroundColor: spec.background,
+    // Transparent so the one ground (KGround, behind the router) shows
+    // through every page. Opaque page-coloured fills use colorScheme.surface.
+    scaffoldBackgroundColor: Colors.transparent,
     canvasColor: spec.background,
     cardColor: spec.surface,
     dividerColor: spec.border,

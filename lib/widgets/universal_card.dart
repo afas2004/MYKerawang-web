@@ -32,10 +32,13 @@ class UniversalCard extends StatelessWidget {
             : formatEventRange(start, parseLocal(data['end_datetime'])))
         : formatPrice(data['price']);
 
-    // No photo: a cover generated from the item (never an empty grey box),
-    // with the date stub on events.
-    final generated = BrandCover(
-      seed: '${data['id'] ?? title}',
+    // No photo: a soft wash of the item's colour with one drawing from the
+    // ground's set (never an empty grey box), and the date stub on events.
+    final seed = '${data['id'] ?? title}';
+    final generated = KTintCover(
+      seed: seed,
+      color: KPalette.forKey(seed),
+      glyphs: isEvent ? eventGlyphs : listingGlyphs,
       child: isEvent && start != null
           ? Align(
               alignment: Alignment.bottomLeft,
@@ -108,6 +111,10 @@ class UniversalCard extends StatelessWidget {
   }
 }
 
+/// Drawings that suit an event / a listing cover.
+const eventGlyphs = ['wau', 'note', 'ball', 'cap', 'star', 'bungaraya'];
+const listingGlyphs = ['book', 'tea', 'pencil', 'bike', 'songket', 'ketupat'];
+
 /// Month over day, white on plum, for an event cover with no photo.
 class _MiniStub extends StatelessWidget {
   final DateTime date;
@@ -120,9 +127,8 @@ class _MiniStub extends StatelessWidget {
     final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.28),
+        color: theme.colorScheme.primary,
         borderRadius: KRadius.small,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: KSpace.s, vertical: KSpace.xs),
@@ -130,9 +136,11 @@ class _MiniStub extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(_months[date.month - 1],
-                style: theme.textTheme.labelSmall?.copyWith(color: Colors.white, height: 1.1)),
+                style: theme.textTheme.labelSmall
+                    ?.copyWith(color: theme.colorScheme.onPrimary, height: 1.1)),
             Text('${date.day}',
-                style: theme.textTheme.titleLarge?.copyWith(color: Colors.white, height: 1.05)),
+                style: theme.textTheme.titleLarge
+                    ?.copyWith(color: theme.colorScheme.onPrimary, height: 1.05)),
           ],
         ),
       ),

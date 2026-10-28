@@ -168,6 +168,35 @@ void main() {
     });
   }
 
+  for (final theme in AppTheme.values) {
+    testWidgets('the ground and tint covers render (${theme.name})', (tester) async {
+      tester.view.physicalSize = const Size(375, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(
+        theme: buildAppTheme(theme),
+        builder: (context, child) => KGround(child: child!),
+        home: Scaffold(
+          body: Column(children: [
+            for (final h in [24.0, 64.0, 140.0])
+              SizedBox(height: h, width: 200, child: KTintCover(seed: 'x$h', color: KPalette.biruLaut)),
+          ]),
+        ),
+      ));
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(find.byType(KGlyph), findsNWidgets(3));
+    });
+  }
+
+  test('every ground drawing is in the tile', () {
+    final svg = KGround.tileSvg(const Color(0xFF5E1A4F), 0.06);
+    for (final g in KGround.glyphs.values) {
+      expect(svg, contains(g));
+    }
+  });
+
   test('every scene asset is bundled', () {
     final assets = {for (final i in AppIllo.values) ...AppIllustration.assetsOf(i)};
     for (final a in assets) {

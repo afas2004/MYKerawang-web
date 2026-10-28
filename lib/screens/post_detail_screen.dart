@@ -693,7 +693,7 @@ class CommentComposer extends StatelessWidget {
     final fs = context.feedL10n;
 
     return Material(
-      color: theme.scaffoldBackgroundColor,
+      color: theme.colorScheme.surface,
       elevation: 0,
       child: Container(
         decoration: BoxDecoration(

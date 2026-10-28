@@ -310,7 +310,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 520, maxHeight: 760),
                   child: Material(
-                    color: theme.scaffoldBackgroundColor,
+                    color: theme.colorScheme.surface,
                     elevation: 0,
                     clipBehavior: Clip.antiAlias,
                     shape: RoundedRectangleBorder(

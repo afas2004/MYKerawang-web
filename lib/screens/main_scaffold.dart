@@ -284,11 +284,11 @@ class ShellFrame extends StatelessWidget {
   }
 }
 
-/// Phone bottom bar in the Material 3 NavigationBar style: Home,
-/// Announcements, Create, Market, Events. Each slot is the same height —
-/// icon in a pill indicator over a label. Create is a filled accent pill in
-/// the middle slot (it opens the create sheet; guests are asked to log in
-/// first). Search has no slot; it's in the tab app bars. Profile is
+/// Phone bottom bar, the "kaki kain" (foot of the kain) to the app bar's
+/// head: a songket hem along its top edge, then Home, Announcements, Create,
+/// Market, Events. The active tab is plum with a small marigold diamond
+/// above it; Create is a plum diamond in the middle slot (it opens the
+/// create sheet; guests are asked to log in first). Search has no slot; it's in the tab app bars. Profile is
 /// reached from [ProfileAvatarAction] in the app bars.
 class CompactNavBar extends StatelessWidget {
   final int currentIndex;
@@ -319,12 +319,22 @@ class CompactNavBar extends StatelessWidget {
       container: true,
       label: s.shell.mainNavigation,
       child: Material(
-        color: scheme.surfaceContainer,
+        color: scheme.surfaceContainerLowest,
         child: SafeArea(
           top: false,
           child: SizedBox(
             height: height,
-            child: Row(
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  child: SongketHem(height: 7, color: scheme.primary.withValues(alpha: 0.55)),
+                ),
+                Positioned.fill(
+                  top: 7,
+                  child: Row(
               children: [
                 tab(ShellBranch.home),
                 tab(ShellBranch.announcements),
@@ -340,6 +350,9 @@ class CompactNavBar extends StatelessWidget {
                 ),
                 tab(ShellBranch.market),
                 tab(ShellBranch.events),
+              ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -372,12 +385,10 @@ class _BarItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final Color? pill = accent
-        ? scheme.primary
-        : (selected ? scheme.primaryContainer : null);
     final Color fg = accent
         ? scheme.onPrimary
-        : (selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant);
+        : (selected ? scheme.primary : scheme.onSurfaceVariant);
+    final motion = KMotion.of(context);
 
     return Semantics(
       button: true,
@@ -395,26 +406,66 @@ class _BarItem extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              AnimatedContainer(
-                duration: KMotion.of(context).medium,
-                curve: KMotion.curve,
-                width: 64,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: pill,
-                  borderRadius: KRadius.pill,
+              if (accent)
+                // Create: a plum diamond, in the same 32 px slot as the tab
+                // icons so every label shares one baseline.
+                SizedBox(
+                  width: 64,
+                  height: 32,
+                  child: Center(
+                    child: Transform.rotate(
+                  angle: 0.785398,
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: scheme.primary,
+                      borderRadius: const BorderRadius.all(Radius.circular(9)),
+                    ),
+                    child: Transform.rotate(
+                      angle: -0.785398,
+                      child: Icon(icon, color: fg, size: 20),
+                    ),
+                  ),
+                    ),
+                  ),
+                )
+              else
+                SizedBox(
+                  width: 64,
+                  height: 32,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(selected ? selectedIcon : icon, color: fg, size: 22),
+                      // The active tab's marigold diamond.
+                      Positioned(
+                        top: -4,
+                        child: AnimatedScale(
+                          scale: selected ? 1 : 0,
+                          duration: motion.medium,
+                          curve: KMotion.curve,
+                          child: Transform.rotate(
+                            angle: 0.785398,
+                            child: Container(width: 6, height: 6, color: KTokens.of(context).accent),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Icon(selected ? selectedIcon : icon, color: fg, size: 22),
-              ),
               const SizedBox(height: KSpace.xs),
               Text(
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.labelMedium?.copyWith(
-                  color: selected || accent
-                      ? scheme.onSurface
-                      : scheme.onSurfaceVariant,
+                  color: selected
+                      ? scheme.primary
+                      : accent
+                          ? scheme.onSurface
+                          : scheme.onSurfaceVariant,
                   fontWeight:
                       selected || accent ? FontWeight.w600 : FontWeight.w500,
                 ),

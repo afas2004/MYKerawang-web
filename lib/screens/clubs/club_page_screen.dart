@@ -222,7 +222,7 @@ class _ClubPageViewState extends State<ClubPageView> {
                   tabAlignment: TabAlignment.start,
                   tabs: [for (final t in tabs) Tab(text: t)],
                 ),
-                Theme.of(context).scaffoldBackgroundColor,
+                Theme.of(context).colorScheme.surface,
               ),
             ),
           ],
@@ -291,7 +291,7 @@ class _ClubPageViewState extends State<ClubPageView> {
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: theme.scaffoldBackgroundColor,
+                      color: theme.colorScheme.surface,
                       borderRadius: BorderRadius.circular(26),
                     ),
                     child: ClubLogo(url: club.logoUrl, name: club.name, size: 80, color: clubColor(club)),

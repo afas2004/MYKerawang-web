@@ -316,7 +316,6 @@ class FeedView extends StatelessWidget {
     final topPadding = MediaQuery.paddingOf(context).top + kToolbarHeight;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
       body: LinearRefresher(
         onRefresh: onRefresh,
         offset: topPadding,
@@ -331,8 +330,10 @@ class FeedView extends StatelessWidget {
                 tone: KBand.home,
                 title: Text(
                   AppStrings.appName,
-                  style: theme.textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w700, color: KBand.onBand),
+                  // 20 px so the wordmark fits beside four actions on a
+                  // 360 px phone.
+                  style: theme.textTheme.titleLarge?.copyWith(
+                      fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.3, color: KBand.onBand),
                 ),
                 actions: actions,
               ),

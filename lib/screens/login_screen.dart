@@ -365,7 +365,6 @@ class _BrandPanel extends StatelessWidget {
     return ColoredBox(
       color: scheme.primaryContainer,
       child: _LoginGround(
-        strength: 0.08,
         child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(KSpace.xxl + KSpace.l),
@@ -398,26 +397,17 @@ class _BrandPanel extends StatelessWidget {
   }
 }
 
-/// The login ground: a faint 8-point star field with a songket hem along the
-/// top and bottom edges, like the borders of a kain. The pattern sits
-/// behind everything and the hems on the edges, so neither covers content.
+/// The login frame: a songket hem along the top and bottom edges, like the
+/// head and foot of a kain. The drawings behind come from the app's one
+/// ground (KGround); the hems sit on the edges, so neither covers content.
 class _LoginGround extends StatelessWidget {
   final Widget child;
-  final double strength;
-  const _LoginGround({required this.child, this.strength = 0.07});
+  const _LoginGround({required this.child});
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
     return Stack(
       children: [
-        Positioned.fill(
-          child: KPattern(
-            kind: KPatternKind.star8,
-            color: primary.withValues(alpha: strength),
-            cell: 40,
-          ),
-        ),
         Positioned.fill(child: child),
         const Positioned(left: 0, right: 0, top: 0, child: SongketHem(height: 10)),
         const Positioned(left: 0, right: 0, bottom: 0, child: SongketHem(height: 10)),

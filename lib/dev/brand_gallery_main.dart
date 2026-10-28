@@ -40,6 +40,7 @@ class _BrandGalleryState extends State<BrandGallery> {
         debugShowCheckedModeBanner: false,
         title: 'MYKerawang brand gallery',
         theme: buildAppTheme(_theme),
+        builder: (context, child) => KGround(child: child!),
         home: _Page(theme: _theme, onTheme: (t) => setState(() => _theme = t)),
       ),
     );
@@ -142,14 +143,26 @@ class _PageState extends State<_Page> {
                 const SizedBox(height: KSpace.m),
               ],
             ]),
-            section('Kain cards and photo-less items', [
+            section('Plain cards with author rings, photo-less items', [
               for (final (who, seed) in [('Amir Hakim', 'u-amir'), ('Nur Aisyah', 'u-aisyah'), ('Anonymous', '')]) ...[
                 KCard(
                   onTap: () {},
-                  edgeColor: seed.isEmpty
-                      ? theme.colorScheme.outlineVariant
-                      : KPalette.onTheme(KPalette.forKey(seed), theme.brightness),
-                  child: Text('$who: Ada sesiapa nak join study group Kalkulus malam ni? Bilik tutorial 3, Blok B.'),
+                  child: Row(children: [
+                    Container(
+                      padding: const EdgeInsets.all(1.5),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                            width: 1.5,
+                            color: seed.isEmpty
+                                ? theme.colorScheme.outlineVariant
+                                : KPalette.onTheme(KPalette.forKey(seed), theme.brightness)),
+                      ),
+                      child: const CircleAvatar(radius: 16),
+                    ),
+                    const SizedBox(width: KSpace.m),
+                    Expanded(child: Text('$who: Ada sesiapa nak join study group Kalkulus malam ni?')),
+                  ]),
                 ),
                 const SizedBox(height: KSpace.m),
               ],

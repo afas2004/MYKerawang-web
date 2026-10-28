@@ -16,6 +16,7 @@ import '../../widgets/error_state.dart';
 import '../../widgets/profile_avatar_action.dart';
 import '../../widgets/shell_actions.dart';
 import '../../widgets/tap_card.dart';
+import '../../widgets/universal_card.dart' show eventGlyphs;
 import 'announcements_repository.dart';
 import 'hub_strings.dart';
 
@@ -450,16 +451,15 @@ class _HeroSlide extends StatelessWidget {
   }
 }
 
-/// No cover photo: the category's colour with a generated pattern and the
-/// category's icon (no gradient placeholder).
+/// No cover photo: the category's colour and its icon (no pattern — the
+/// ground carries that — and no gradient placeholder).
 class _CategoryCover extends StatelessWidget {
   final AnnouncementCategory category;
   const _CategoryCover({required this.category});
 
   @override
   Widget build(BuildContext context) {
-    return BrandCover(
-      seed: 'announcement-${category.dbValue}',
+    return ColoredBox(
       color: categoryColor(category),
       child: Align(
         alignment: const Alignment(0.85, -0.6),
@@ -656,9 +656,11 @@ class _EventTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final start = parseLocal(event['start_datetime']);
     final image = event['image_url'] as String?;
+    final seed = '${event['id'] ?? event['title']}';
+    // No photo: the same calm tint cover as Home's event cards.
+    final tint = KTintCover(seed: seed, color: KPalette.forKey(seed), glyphs: eventGlyphs);
     return SizedBox(
       width: 220,
       child: KCard(
@@ -675,13 +677,9 @@ class _EventTile extends StatelessWidget {
                       imageUrl: image,
                       fit: BoxFit.cover,
                       memCacheWidth: 500,
-                      errorWidget: (_, __, ___) =>
-                          ColoredBox(color: scheme.surfaceContainerHighest),
+                      errorWidget: (_, __, ___) => tint,
                     )
-                  : ColoredBox(
-                      color: scheme.primaryContainer,
-                      child: Icon(AppIcons.events,
-                          color: scheme.onPrimaryContainer)),
+                  : tint,
             ),
             Padding(
               padding: const EdgeInsets.all(KSpace.m),
