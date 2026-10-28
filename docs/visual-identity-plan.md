@@ -337,7 +337,9 @@ No phase touches `supabase/`.
    or no display font (Jakarta only)?
 4. **Illustrations:** (a) commission or draw a small own set in the cut-work line
    style, (b) drop illustrations and use type-led empty states with the mark, or
-   (c) keep unDraw for now and do it later?
+   (c) keep unDraw for now and do it later? Open-licence sources, the hidden
+   pages that need art, and a page-by-page proposal are in
+   [illustration-sources.md](illustration-sources.md).
 5. **The logo redraw:** who makes the vector K? You or a designer from the
    original art, or should I trace a first version for you to approve? The current
    file is AI-generated raster, so check usage rights / originality before it
