@@ -554,14 +554,24 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: KRadius.card,
-            child: SizedBox(height: 88, child: BrandCover(seed: seed, color: ring)),
-          ),
-          const SizedBox(height: KSpace.l),
-          Row(
+          // Banner with the avatar sitting on its bottom edge and the name
+          // underneath, so the banner belongs to the person instead of
+          // floating above them.
+          Stack(
+            clipBehavior: Clip.none,
             children: [
-              Semantics(
+              ClipRRect(
+                borderRadius: KRadius.card,
+                child: SizedBox(
+                  height: 112,
+                  width: double.infinity,
+                  child: BrandCover(seed: seed, color: ring, hem: true),
+                ),
+              ),
+              Positioned(
+                left: KSpace.l,
+                bottom: -52,
+                child: Semantics(
                 button: avatarUrl != null,
                 label: name,
                 child: InkWell(
@@ -575,6 +585,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     padding: const EdgeInsets.all(3),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
+                      // A page-coloured collar so it sits cleanly on the banner.
+                      color: theme.scaffoldBackgroundColor,
                       border: Border.all(
                           width: 2.5,
                           color: theme.brightness == Brightness.dark
@@ -596,9 +608,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   ),
                 ),
               ),
-              const SizedBox(width: KSpace.l),
-              Expanded(
-                child: Column(
+              ),
+            ],
+          ),
+          const SizedBox(height: 60),
+          Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
@@ -639,9 +653,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     ),
                   ],
                 ),
-              ),
-            ],
-          ),
           if ((p['bio'] ?? '').toString().trim().isNotEmpty) ...[
             const SizedBox(height: KSpace.m),
             Text(p['bio'], style: theme.textTheme.bodyMedium),
