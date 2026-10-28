@@ -1,11 +1,15 @@
 -- Verification for 20261028120000_club_review_fixes.sql
 --
--- Run after the migration, either:
---   npx supabase db query --file supabase/checks/20261028_club_review.sql --db-url "<pooler uri>"
--- or paste into the dashboard SQL editor:
+-- Paste the whole file into the dashboard SQL editor (it accepts many statements):
 --   https://supabase.com/dashboard/project/zxjuqpqzyzmegdjttzyz/sql/new
 --
+-- Or run the statements one at a time on the CLI — `db query --file` only accepts
+-- a single statement:
+--   npx supabase db query --db-url "<pooler uri>" "select count(*) from ..."
+--
 -- Queries 1 and 3 must return **no rows**. Query 2 is informational.
+--
+-- Result on 2026-10-28, after applying the migration: 0, 0, 0.
 
 -- ---------------------------------------------------------------- 1. registry
 -- A rejected request must no longer hold its registry entry. Before the fix,

@@ -13,7 +13,7 @@ database.
 | Branch | `deepseek/clubs-admin` — clean, pushed |
 | Live | https://kerawang.my — build `202610282014`, version **1.9.2** (+27) |
 | Tests | **563** Flutter tests green; analyzer 16 info/warnings, **no errors** |
-| Migrations | two pending, both listed below: `20261026015100` (security review) and `20261028120000` (club review) |
+| Migrations | **all applied**, and the remote history table now matches. `db push` works through `db_push.ps1`; see the CLI notes below |
 | Supabase | project `zxjuqpqzyzmegdjttzyz` |
 
 ## Do this first: deploy
@@ -49,21 +49,16 @@ Four findings; three fixed here, one left to the owner.
 club's **public** roster without asking them — they only get a notification. Keep
 it (president-managed roster) or switch to an invitation the person accepts?
 
-Verify after `db push` (owner, SQL editor):
+Verified 2026-10-28 with
+[`supabase/checks/20261028_club_review.sql`](checks/20261028_club_review.sql):
 
-```sql
--- #1 nothing left stuck
-select r.code, r.name, c.handle from clubs c
-  join club_registry r on r.id = c.registry_id where c.status = 'rejected';
--- #2 clubs with more than 30 posts (were affected by the page bug)
-select club_id, count(*) from posts
-  where club_id is not null and not is_hidden group by club_id having count(*) > 30;
--- #4 club pins that were not set through the button
-select id, club_id, club_pinned_until, club_pinned_by from posts
- where club_pinned_until is not null
-   and (club_pinned_by is null
-        or club_pinned_until > now() + make_interval(days => (select pin_duration_days from moderation_settings where id)));
-```
+| Check | Result |
+|---|---|
+| Rejected clubs still holding a registry entry | **0** |
+| Clubs with more than 30 posts (the ones the page bug could bite) | **0** — nobody was affected yet |
+| Club pins not set through `club_pin_post` | **0** |
+| `trg_mod_guard_pin_columns` definition | `BEFORE INSERT OR UPDATE OF pinned_until, pinned_by, club_pinned_until, club_pinned_by` |
+| Reject path in the live function | releases the entry (`registry_id = case when p_approve …`) |
 
 ## What tonight's six commits do
 
@@ -104,8 +99,8 @@ https and Firebase sends HSTS (one year).
 | `20261026010100_form_after_checkin.sql` | `set_form_after_checkin(form, bool)` — the "ask the KI form after check-in" switch |
 | `20261026011100_checkin_does_not_join.sql` | A check-in no longer inserts into `event_participants` |
 | `20261026014100_storage_image_limits.sql` | `images` and `avatars` buckets: `allowed_mime_types` (jpeg/png/webp/gif) and a 5 MB `file_size_limit`. Applied 2026-10-25. |
-| `20261026015100_security_review_fixes.sql` | **NOT APPLIED YET.** Form text caps, hidden-event counts, exact signup domain, verification-domain trigger, execute grants, and the `images` bucket write policies. Apply before the club year — see `docs/security-review.md`. |
-| `20261028120000_club_review_fixes.sql` | **NOT APPLIED YET — owner runs `db push`.** Three club-review fixes: a **rejected** request releases its registry entry (`admin_decide_club_request` + one-time release of stuck rows), the **pin guard covers the club columns** (`club_pinned_until`/`club_pinned_by` were insertable straight from the client), and the roster notice credits **the president** rather than "officers". The app half of that review (club page pinned-post window, registry PIN lock, handle preview) is in 1.9.2. |
+| `20261026015100_security_review_fixes.sql` | Form text caps, hidden-event counts, exact signup domain, verification-domain trigger, execute grants, and the `images` bucket write policies. **Applied 2026-10-28.** Verified: an anonymous PNG upload to `images` now fails with `new row violates row-level security policy` (it returned 200 before). |
+| `20261028120000_club_review_fixes.sql` | The club-review fixes: a **rejected** request releases its registry entry, the **pin guard covers the club columns**, and the roster notice credits **the president**. **Applied 2026-10-28**, history recorded |
 
 Seeded data: `supabase/seed/2026-10-25_ki_test_event.sql` created **Malam Ujian
 KI** — the event to test the whole report loop on. Re-runnable.
@@ -245,10 +240,17 @@ node events/attendance_flow_test.mjs ../..  # 15
   `postgresql://postgres.zxjuqpqzyzmegdjttzyz:<password>@aws-1-ap-south-1.pooler.supabase.com:5432/postgres`
   `aws-1` is the right host — `aws-0` answers `tenant/user … not found`. The direct
   `db.<ref>.supabase.co` has no A record (IPv6 only).
-- **The history trap**: everything before `20261026015100` was pasted into the
-  dashboard, so `supabase_migrations.schema_migrations` may be empty and a plain
-  `db push` would replay ~51 files. `db_push.ps1 -Repair` records them as applied
-  first; the script always dry-runs and shows the plan before touching anything.
+- **The history trap — now resolved.** Everything before `20261025001100` had been
+  pushed, and the 16 migrations after it had not been recorded (they were pasted
+  into the dashboard). On 2026-10-28 those 16 were proved live object by object
+  ([`supabase/checks/20261028_history_preflight.sql`](checks/20261028_history_preflight.sql))
+  and then recorded with `migration repair --status applied`. The remote history
+  now matches the repo, so `db push` on a future migration applies **only** that
+  migration — no `-Repair` needed any more.
+- **`db query --file` runs one statement.** A file with several `select`s fails with
+  `cannot insert multiple commands into a prepared statement`. Run each query on
+  its own (`--db-url "<sql>"`), or paste the file into the dashboard, which is happy
+  with many.
 
 Two moderation assertions fail **without** the new migrations too ("two
 reports → one open case", "priority category hidden on first report") —
