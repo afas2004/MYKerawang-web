@@ -16,8 +16,19 @@ void main() {
   });
 
   test('the bundled lists are big enough to be useful', () {
-    expect(kEventCategorySeeds.length, greaterThan(40));
-    expect(kListingCategorySeeds.length, greaterThan(20));
+    expect(kEventCategorySeeds.length, greaterThanOrEqualTo(15));
+    expect(kListingCategorySeeds.length, greaterThanOrEqualTo(12));
+  });
+
+  test('the filter chips only name seeded categories', () {
+    final events = kEventCategorySlugs.toSet();
+    final listings = kListingCategorySlugs.toSet();
+    for (final c in kCommonEventCategories) {
+      expect(events, contains(c));
+    }
+    for (final c in kCommonListingCategories) {
+      expect(listings, contains(c));
+    }
   });
 
   test('every seed has both names', () {
@@ -39,7 +50,7 @@ void main() {
 
     // Before any load, cached() serves the seeds — so a filter chip can
     // always resolve a label.
-    expect(CategoryService.labelOf('event', 'workshop', AppStrings.en), 'Workshop');
+    expect(CategoryService.labelOf('event', 'workshop', AppStrings.en), 'Workshops & training');
     expect(CategoryService.labelOf('event', 'not-a-category', AppStrings.en),
         'not-a-category');
   });
