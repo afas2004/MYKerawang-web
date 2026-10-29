@@ -54,4 +54,22 @@ void main() {
     expect(CategoryService.labelOf('event', 'not-a-category', AppStrings.en),
         'not-a-category');
   });
+
+  test('a listing shows its category names, not slugs', () {
+    // Every category on the row, in its order, in the current language.
+    final row = {'categories': ['room', 'clothing'], 'category': 'room'};
+    expect(CategoryService.labelsFor('listing', row, AppStrings.en), 'Room & kitchen, Fashion');
+    expect(CategoryService.labelsFor('listing', row, AppStrings.ms), 'Bilik & dapur, Fesyen');
+
+    // Rows from before the array: the single old column.
+    expect(CategoryService.labelsFor('listing', {'categories': [], 'category': 'books'}, AppStrings.en),
+        'Books & stationery');
+
+    // No name for it: the slug, rather than nothing.
+    expect(CategoryService.labelsFor('listing', {'categories': ['made-up']}, AppStrings.en), 'made-up');
+
+    // Nothing at all: null, so the screen shows its own fallback.
+    expect(CategoryService.labelsFor('listing', {'categories': null, 'category': null}, AppStrings.en),
+        isNull);
+  });
 }

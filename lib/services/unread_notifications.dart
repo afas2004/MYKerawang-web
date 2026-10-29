@@ -20,8 +20,10 @@ class UnreadNotifications {
   String? _userId;
   Timer? _coalesce;
 
-  void start(String userId) {
-    if (_userId == userId && _channel != null) return;
+  /// [rejoin] replaces a live channel for the same user — after a token
+  /// refresh, when one joined on the old token may have failed.
+  void start(String userId, {bool rejoin = false}) {
+    if (!rejoin && _userId == userId && _channel != null) return;
     stop();
     _userId = userId;
     _channel = _supabase
@@ -37,7 +39,9 @@ class UnreadNotifications {
           ),
           callback: (_) => _scheduleRefresh(),
         )
-        .subscribe();
+        .subscribe((status, error) {
+          if (error != null) debugPrint('Unread channel $status: $error');
+        });
     refresh();
   }
 
