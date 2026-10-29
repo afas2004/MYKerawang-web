@@ -32,13 +32,13 @@ class UniversalCard extends StatelessWidget {
             : formatEventRange(start, parseLocal(data['end_datetime'])))
         : formatPrice(data['price']);
 
-    // No photo: a soft wash of the item's colour with one Fluent icon (never
-    // an empty grey box), and the date stub on events.
+    // No photo: a soft wash of the item's colour with one stitch drawing
+    // (never an empty grey box), and the date stub on events.
     final seed = '${data['id'] ?? title}';
     final generated = KTintCover(
       seed: seed,
       color: KPalette.forKey(seed),
-      icons: isEvent ? KTintCover.eventIcons : KTintCover.listingIcons,
+      motifs: isEvent ? KTintCover.eventMotifs : KTintCover.listingMotifs,
       child: isEvent && start != null
           ? Align(
               alignment: Alignment.bottomLeft,

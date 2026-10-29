@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import 'app_motif.dart';
 import 'brand_cover.dart' show stableHash;
 
 /// The app's one ground: "Corak kampus", small line drawings of Malay and
@@ -158,28 +159,29 @@ class _GroundPainter extends CustomPainter {
 }
 
 /// A cover for an item with no photo: a soft wash of its colour with one
-/// Fluent emoji (MIT, flat style) in the middle. Calm on purpose — the
-/// ground already carries the pattern, so covers don't add another.
+/// Malaysian stitch drawing (wau, nasi lemak, sape — the WP25 set) in that
+/// colour. Calm on purpose — the ground already carries the pattern, so
+/// covers don't add another.
 class KTintCover extends StatelessWidget {
   final String seed;
   final Color color;
 
-  /// Which icons this kind of item may get: file names in
-  /// `assets/illustrations/emoji/` (see [KTintCover.eventIcons]).
-  final List<String> icons;
+  /// Which drawings this kind of item may get (see [eventMotifs]).
+  final List<AppMotif> motifs;
 
-  static const eventIcons = ['calendar', 'party', 'kite', 'music', 'ball', 'sparkles'];
-  static const listingIcons = ['shopping_bags', 'books', 'open_book', 'backpack', 'cooked_rice', 'tea'];
+  static const eventMotifs = [AppMotif.wauBulan, AppMotif.wauKucing, AppMotif.wauJalaBudi, AppMotif.sape];
+  static const listingMotifs = [AppMotif.nasiLemak, AppMotif.sape, AppMotif.wauKucing];
 
   /// On top (a date stub, a price tag).
   final Widget? child;
 
-  const KTintCover({super.key, required this.seed, required this.color, this.icons = eventIcons, this.child});
+  const KTintCover({super.key, required this.seed, required this.color, this.motifs = eventMotifs, this.child});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
+    final ink = dark ? Color.lerp(color, Colors.white, 0.45)! : color;
     final wash = Color.alphaBlend(color.withValues(alpha: dark ? 0.32 : 0.14), theme.cardColor);
     return ColoredBox(
       color: wash,
@@ -188,13 +190,8 @@ class KTintCover extends StatelessWidget {
         children: [
           Center(
             child: LayoutBuilder(builder: (context, box) {
-              final size = (box.maxHeight.isFinite ? box.maxHeight * 0.42 : 36.0).clamp(18.0, 64.0).toDouble();
-              return SvgPicture.asset(
-                'assets/illustrations/emoji/${icons[stableHash(seed) % icons.length]}.svg',
-                width: size,
-                height: size,
-                excludeFromSemantics: true,
-              );
+              final size = (box.maxHeight.isFinite ? box.maxHeight * 0.7 : 56.0).clamp(24.0, 110.0).toDouble();
+              return MotifArt(motifs[stableHash(seed) % motifs.length], size: size, color: ink);
             }),
           ),
           if (child != null) child!,

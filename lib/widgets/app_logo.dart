@@ -16,12 +16,12 @@ class AppLogo extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(size * 0.26),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
       ),
       clipBehavior: Clip.antiAlias,
       child: Transform.scale(
-        // The artwork has generous margins; zoom so the K fills the tile.
-        scale: 1.75,
+        // The artwork's own white tile spans ~53 % of the crop; zoom past its
+        // soft edge so only the inside shows and our tile is the only tile.
+        scale: 1.95,
         child: Image.asset(
           'assets/logo_mark.jpg',
           fit: BoxFit.cover,

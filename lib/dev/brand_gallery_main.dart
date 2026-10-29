@@ -12,7 +12,7 @@ import '../language_cubit.dart';
 import '../screens/clubs/club_directory_screen.dart' show ClubCard;
 import '../screens/clubs/club_widgets.dart';
 import '../screens/events_screen.dart' show EventCard;
-import '../screens/marketplace_screen.dart' show MarketCard, PriceTag;
+import '../screens/marketplace_screen.dart' show MarketCard;
 import '../services/club_service.dart';
 import '../theme/app_themes.dart';
 import '../widgets/brand/brand.dart';
@@ -253,8 +253,6 @@ class _PageState extends State<_Page> {
                   MarketCard(item: {'title': 'Nasi lemak bungkus, sambal sotong pedas', 'price': p, 'image_url': ''}, onTap: () {}),
                 MarketCard(item: const {'title': 'Kalkulator saintifik', 'price': 45, 'status': 'sold', 'image_url': ''}, onTap: () {}),
               ], heightFor: (w) => MarketCard.heightFor(w, MediaQuery.textScalerOf(context))),
-              const SizedBox(height: KSpace.m),
-              const Wrap(spacing: KSpace.s, children: [PriceTag('RM 4.50'), PriceTag('RM 1,250.00'), PriceTag('RM 45', sold: true)]),
             ]),
             section('Buttons and motion', [
               Wrap(spacing: KSpace.s, runSpacing: KSpace.s, children: [

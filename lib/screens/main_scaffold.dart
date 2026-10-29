@@ -409,11 +409,11 @@ class _BarItem extends StatelessWidget {
                   height: 32,
                   child: OverflowBox(
                     alignment: Alignment.bottomCenter,
-                    maxHeight: _logoSize + 4,
-                    child: Container(
+                    maxHeight: _logoSize,
+                    // The logo tile itself, with only a soft shadow behind it.
+                    child: DecoratedBox(
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular((_logoSize + 4) * 0.28),
-                        color: scheme.surfaceContainerLowest,
+                        borderRadius: BorderRadius.circular(_logoSize * 0.26),
                         boxShadow: [
                           BoxShadow(
                             color: scheme.primary.withValues(alpha: 0.28),
@@ -422,7 +422,6 @@ class _BarItem extends StatelessWidget {
                           ),
                         ],
                       ),
-                      padding: const EdgeInsets.all(2),
                       child: const AppLogo(size: _logoSize),
                     ),
                   ),

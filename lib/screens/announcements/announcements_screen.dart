@@ -168,18 +168,17 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
         slivers: [
           if (!filtering && data.featured.isNotEmpty)
             SliverToBoxAdapter(child: _HeroCarousel(items: data.featured)),
-          if (channels.isNotEmpty)
-            SliverToBoxAdapter(
-              child: _ChannelRow(
-                channels: channels,
-                selected: _channel,
-                onSelect: (key) => setState(() => _channel = key),
-              ),
-            ),
           SliverToBoxAdapter(
-            child: _CategoryTabs(
-              selected: _category,
-              onSelect: (c) => setState(() => _category = c),
+            child: _FilterRow(
+              category: _category,
+              channels: channels,
+              channel: _channel,
+              onCategory: (c) => setState(() => _category = c),
+              onChannel: (key) => setState(() => _channel = key),
+              onAll: () => setState(() {
+                _category = null;
+                _channel = null;
+              }),
             ),
           ),
           if (showEvents)
@@ -498,63 +497,6 @@ class _Pill extends StatelessWidget {
 
 // ------------------------------------------------------------ channels
 
-class _ChannelRow extends StatelessWidget {
-  final List<AnnouncementChannel> channels;
-  final String? selected;
-  final ValueChanged<String?> onSelect;
-
-  const _ChannelRow({
-    required this.channels,
-    required this.selected,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final s = context.l10n;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SectionHeader(title: s.hub.channels),
-        SizedBox(
-          height: 48,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: KSpace.gutter),
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(right: KSpace.s),
-                child: ChoiceChip(
-                  label: Text(s.hub.allChannels),
-                  selected: selected == null,
-                  onSelected: (_) => onSelect(null),
-                ),
-              ),
-              for (final c in channels)
-                Padding(
-                  padding: const EdgeInsets.only(right: KSpace.s),
-                  child: ChoiceChip(
-                    avatar: _ChannelAvatar(channel: c, radius: 12),
-                    label: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Text(c.name),
-                      if (c.verified) ...[
-                        const SizedBox(width: 4),
-                        Icon(AppIcons.verified,
-                            size: 14, color: KTokens.of(context).accent),
-                      ],
-                    ]),
-                    selected: selected == c.key,
-                    onSelected: (on) => onSelect(on ? c.key : null),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _ChannelAvatar extends StatelessWidget {
   final AnnouncementChannel channel;
   final double radius;
@@ -577,21 +519,34 @@ class _ChannelAvatar extends StatelessWidget {
   }
 }
 
-// ------------------------------------------------------------ categories
+// --------------------------------------------------------------- filters
 
-class _CategoryTabs extends StatelessWidget {
-  final AnnouncementCategory? selected;
-  final ValueChanged<AnnouncementCategory?> onSelect;
+/// One row of filters: All, the categories, then the official channels
+/// (with their avatars) after a thin divider. All clears both; a category
+/// and a channel can be combined.
+class _FilterRow extends StatelessWidget {
+  final AnnouncementCategory? category;
+  final List<AnnouncementChannel> channels;
+  final String? channel;
+  final ValueChanged<AnnouncementCategory?> onCategory;
+  final ValueChanged<String?> onChannel;
+  final VoidCallback onAll;
 
-  const _CategoryTabs({required this.selected, required this.onSelect});
+  const _FilterRow({
+    required this.category,
+    required this.channels,
+    required this.channel,
+    required this.onCategory,
+    required this.onChannel,
+    required this.onAll,
+  });
 
   @override
   Widget build(BuildContext context) {
     final s = context.l10n;
-    final options = <(AnnouncementCategory?, String)>[
-      (null, s.hub.catAll),
-      for (final c in AnnouncementCategory.values) (c, categoryLabel(s, c)),
-    ];
+    final scheme = Theme.of(context).colorScheme;
+    Widget gap(Widget child) =>
+        Padding(padding: const EdgeInsets.only(right: KSpace.s), child: child);
     return Padding(
       padding: const EdgeInsets.only(top: KSpace.m),
       child: SizedBox(
@@ -600,16 +555,43 @@ class _CategoryTabs extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: KSpace.gutter),
           children: [
-            for (final (value, label) in options)
-              Padding(
-                padding: const EdgeInsets.only(right: KSpace.s),
-                child: ChoiceChip(
-                  label: Text(label),
-                  selected: selected == value,
-                  showCheckmark: false,
-                  onSelected: (_) => onSelect(value),
+            gap(ChoiceChip(
+              label: Text(s.hub.catAll),
+              selected: category == null && channel == null,
+              showCheckmark: false,
+              onSelected: (_) => onAll(),
+            )),
+            for (final c in AnnouncementCategory.values)
+              gap(ChoiceChip(
+                label: Text(categoryLabel(s, c)),
+                selected: category == c,
+                showCheckmark: false,
+                onSelected: (on) => onCategory(on ? c : null),
+              )),
+            if (channels.isNotEmpty)
+              Center(
+                child: Container(
+                  width: 1,
+                  height: 24,
+                  margin: const EdgeInsets.only(right: KSpace.s),
+                  color: scheme.outlineVariant,
                 ),
               ),
+            for (final c in channels)
+              gap(ChoiceChip(
+                avatar: _ChannelAvatar(channel: c, radius: 12),
+                label: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(c.name),
+                  if (c.verified) ...[
+                    const SizedBox(width: 4),
+                    Icon(AppIcons.verified,
+                        size: 14, color: KTokens.of(context).accent),
+                  ],
+                ]),
+                selected: channel == c.key,
+                showCheckmark: false,
+                onSelected: (on) => onChannel(on ? c.key : null),
+              )),
           ],
         ),
       ),

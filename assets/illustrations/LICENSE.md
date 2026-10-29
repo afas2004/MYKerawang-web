@@ -34,7 +34,5 @@ No attribution required; credited anyway in the app's licences page.
 | locked.svg | Locked |
 | woman_headscarf.svg | Woman with headscarf (default tone) |
 | graduation_cap.svg | Graduation cap |
-| calendar, party, kite, music, ball, sparkles .svg | Calendar, Party popper, Kite, Musical notes, Soccer ball, Sparkles (event covers) |
-| shopping_bags, books, open_book, backpack, cooked_rice, tea .svg | Shopping bags, Books, Open book, Backpack, Cooked rice, Hot beverage (listing covers) |
 
 The previous unDraw set was removed on 2026-10-29.

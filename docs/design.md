@@ -16,14 +16,14 @@ doesn't drift back to the generic default. Background and reasoning:
 2. **A framed screen, soft edges.** App bar (`KBand`): solid plum on every
    main tab with rounded lower corners, no strip, no pattern. Nav bar
    (`CompactNavBar`): white with rounded top corners and a soft shadow; Create
-   is the MYKerawang logo, big, rising above the bar; a rounded marigold
+   is the MYKerawang logo tile (no extra frame), big, rising above the bar; a rounded marigold
    mark sits above the active tab.
 3. **Plain figures.** Cards are plain surfaces with the hairline. The
    author's colour is a thin ring on the post avatar, not a card edge.
 4. **Special things keep one special shape** (table below).
 5. **No photo = a calm tint** (`KTintCover`): a soft wash of the item's
-   colour and one Fluent emoji (calendar, party, kite… for events; bags,
-   books, rice… for listings). Patterns are reserved for
+   colour and one Malaysian stitch drawing in that colour (wau, sape for
+   events; nasi lemak, sape, wau kucing for listings). Patterns are reserved for
    profile banners and club covers, which are those owners' identity.
 
 ## Personality
@@ -84,9 +84,9 @@ from the one ground.
 | Post | plain card; author's colour as a thin avatar ring (grey when anonymous) | `PostCard` |
 | Official / pinned | songket hem on top, marigold hairline, cut top-right corner | `OfficialFrame` (via `KCard(official:)`) |
 | Event date | ticket stub, plum, perforated edge | `DateBlock` |
-| Market price | marigold hanging tag | `PriceTag` |
+| Market price | plain bold text in the accent colour | `MarketCard` |
 | Announcement category | colour rail | `categoryColor` |
-| No photo (events, listings) | soft tint + one Fluent emoji; events add a date stub — never a grey box | `KTintCover` |
+| No photo (events, listings) | soft tint + one stitch drawing; events add a date stub — never a grey box | `KTintCover` |
 | No photo (clubs, profiles) | pattern cover with songket hem (their identity) | `ClubCover`, `BrandCover` |
 | No photo (announcement hero) | solid category colour + its icon | `_CategoryCover` |
 
