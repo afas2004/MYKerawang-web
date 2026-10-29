@@ -20,6 +20,7 @@ import 'screens/events/checkin_screens.dart';
 import 'screens/events/event_form_screen.dart';
 import 'screens/events/form_editor_screen.dart';
 import 'screens/events/form_responses_screen.dart';
+import 'screens/forms/form_gallery_screen.dart';
 import 'screens/forms/my_forms_screen.dart';
 import 'screens/guest_views.dart';
 import 'screens/events_screen.dart';
@@ -294,6 +295,13 @@ GoRouter buildRouter() {
         parentNavigatorKey: _rootKey,
         onExit: historyAwareExit,
         builder: (context, state) => const MyFormsScreen(),
+      ),
+      GoRoute(
+        // The template gallery: blank, import CSV, or a template.
+        path: '/forms/new',
+        parentNavigatorKey: _rootKey,
+        onExit: historyAwareExit,
+        builder: (context, state) => const FormGalleryScreen(),
       ),
       GoRoute(
         path: '/f/:id',

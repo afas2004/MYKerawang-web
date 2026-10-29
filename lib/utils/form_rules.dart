@@ -507,3 +507,110 @@ String? formErrorCode(Object error) {
   if (m == null) return null;
   return m.group(1) == 'FORM' ? m.group(2) : '${m.group(1)!.toLowerCase()}_${m.group(2)}';
 }
+
+// ----------------------------------------------------- CSV import (gallery)
+
+/// What "Import CSV" offers to download: one question per row, in the words a
+/// Google Forms user already knows.
+const String kSampleQuestionCsv = 'question,type,required,options\n'
+    'Full name,text,yes,\n'
+    'Matric number,matric,yes,\n'
+    'Which session?,choice,yes,Morning|Afternoon|Evening\n'
+    'What can you bring?,checkboxes,no,Food|Drinks|Decorations\n'
+    'Rate the last event,rating,no,1-5\n'
+    'Anything else?,paragraph,no,\n';
+
+/// Friendly type names (English, Malay, Google Forms) → field kinds.
+const Map<String, String> _csvTypes = {
+  '': 'short_text', 'text': 'short_text', 'short': 'short_text',
+  'short answer': 'short_text', 'jawapan pendek': 'short_text', 'teks': 'short_text',
+  'paragraph': 'long_text', 'long': 'long_text', 'long answer': 'long_text',
+  'perenggan': 'long_text', 'jawapan panjang': 'long_text',
+  'choice': 'single_choice', 'multiple choice': 'single_choice', 'radio': 'single_choice',
+  'dropdown': 'single_choice', 'pilihan': 'single_choice', 'aneka pilihan': 'single_choice',
+  'checkbox': 'multi_choice', 'checkboxes': 'multi_choice', 'multi': 'multi_choice',
+  'kotak semak': 'multi_choice',
+  'rating': 'rating', 'scale': 'rating', 'linear scale': 'rating', 'skala': 'rating',
+  'penilaian': 'rating',
+  'number': 'number', 'nombor': 'number',
+  'date': 'date', 'tarikh': 'date',
+  'email': 'email', 'e-mel': 'email', 'emel': 'email',
+  'phone': 'phone', 'telefon': 'phone',
+  'matric': 'student_id', 'matrik': 'student_id', 'student id': 'student_id',
+  'consent': 'consent', 'agree': 'consent', 'persetujuan': 'consent',
+  'heading': 'heading', 'section': 'heading', 'bahagian': 'heading', 'tajuk': 'heading',
+};
+
+const Set<String> _csvHeaders = {'question', 'soalan', 'kind', 'label'};
+
+/// Questions from a CSV file or a pasted list, for a new form.
+///
+/// Columns: `question, type, required, options`. Only the question is needed —
+/// a plain list, one question per line, becomes short-answer questions. Types
+/// take the friendly names in [_csvTypes] or the field kinds themselves;
+/// choices are `A|B|C` (or `A;B;C`), a rating scale is `1-5`. The editor's own
+/// format (kind first, see [parseFieldPaste]) is recognised and passed through.
+FieldPaste parseQuestionCsv(String text) {
+  final lines = text.split(RegExp(r'\r?\n')).map((l) => l.trim()).where((l) => l.isNotEmpty);
+  final first = lines.isEmpty ? null : _splitCells(lines.first);
+  final dataFirst = (first != null && _csvHeaders.contains(first.first.trim().toLowerCase()))
+      ? lines.skip(1).firstOrNull
+      : lines.firstOrNull;
+  if (dataFirst != null &&
+      kFormKinds.contains(_splitCells(dataFirst).first.trim().toLowerCase()) &&
+      _splitCells(dataFirst).length > 1) {
+    return parseFieldPaste(text);
+  }
+
+  final fields = <FormFieldSpec>[];
+  final problems = <FieldProblem>[];
+  final problemLines = <int>[];
+  var lineNo = 0;
+  for (final raw in text.split(RegExp(r'\r?\n'))) {
+    lineNo++;
+    final line = raw.trim();
+    if (line.isEmpty) continue;
+    final cells = _splitCells(line).map((c) => c.trim()).toList();
+    if (lineNo == 1 && _csvHeaders.contains(cells.first.toLowerCase())) continue;
+
+    final label = cells.first;
+    final typeCell = cells.length > 1 ? cells[1].toLowerCase() : '';
+    final kind = kFormKinds.contains(typeCell) ? typeCell : _csvTypes[typeCell];
+    if (kind == null) {
+      problems.add(FieldProblem(fields.length, 'unknown_kind'));
+      problemLines.add(lineNo);
+      continue;
+    }
+    final required = kind != 'heading' &&
+        cells.length > 2 &&
+        {'yes', 'y', 'true', '1', 'ya', 'wajib', 'required'}.contains(cells[2].toLowerCase());
+    final options = cells.length > 3 ? cells.sublist(3).join(',').trim() : '';
+
+    var choices = const <String>[];
+    var min = 1;
+    var max = 5;
+    if (kChoiceKinds.contains(kind) && options.isNotEmpty) {
+      choices = options.split(RegExp(r'[|;]')).map((c) => c.trim()).where((c) => c.isNotEmpty).toList();
+    }
+    if (kind == 'rating' && options.isNotEmpty) {
+      final m = RegExp(r'^(\d+)\s*-\s*(\d+)$').firstMatch(options);
+      if (m != null) {
+        min = int.parse(m.group(1)!);
+        max = int.parse(m.group(2)!);
+      }
+    }
+    fields.add(FormFieldSpec(
+      kind: kind,
+      label: label,
+      required: required,
+      choices: choices,
+      min: min,
+      max: max,
+    ));
+  }
+
+  final checked = checkFields(fields)
+      .where((p) => p.code != FormIssue.emptyForm || fields.isNotEmpty)
+      .toList();
+  return FieldPaste(fields, [...problems, ...checked], problemLines);
+}

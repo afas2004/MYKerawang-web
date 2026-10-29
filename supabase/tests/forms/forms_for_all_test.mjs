@@ -303,5 +303,51 @@ await q(`delete from clubs where id=$1`, [club]);
 ok((await q(`select count(*)::int n from event_forms where id=$1`, [fClub]))[0].n === 0,
   'deleting the club deletes its forms');
 
+// ---------------------------------------------------------- the template gallery (002100)
+const gallery = (await as(null, `select form_template_gallery() g`, [], 'anon'))[0].g;
+ok(gallery.length === 16, `the gallery lists 16 templates (got ${gallery.length})`);
+ok(new Set(gallery.map((t) => t.category)).size === 6, 'across the six categories');
+ok(gallery.every((t) => t.name_ms && t.description && t.description_ms && t.fields.length > 0),
+  'every template has a Malay name, descriptions and questions');
+const newOnes = gallery.filter((t) => t.slug !== 'ki');
+ok(newOnes.every((t) => t.fields.every((f) => f.label_ms)), 'every new question has a Malay label');
+ok(newOnes.every((t) => t.fields.every((f) => (f.choices == null) === (f.choices_ms == null)
+    && (f.choices == null || f.choices.length === f.choices_ms.length))),
+  'choices come in both languages, the same number of each');
+const badTpl = await q(`
+  select t.slug, f.label from form_template_fields f join form_templates t on t.id = f.template_id
+  where form_label_blocked(f.label) or form_label_blocked(f.label_ms)
+     or form_label_blocked(f.help) or form_label_blocked(f.help_ms)`);
+ok(badTpl.length === 0, `no template asks a blocked question (${JSON.stringify(badTpl)})`);
+let checkErr = null;
+try {
+  await q(`select form_check_field(f.kind, f.label, f.required, f.options, f.analysis, f.ki_code),
+                  form_check_field(f.kind, coalesce(f.label_ms, f.label), f.required,
+                                   coalesce(f.options_ms, f.options), f.analysis, f.ki_code)
+           from form_template_fields f`);
+} catch (e2) { checkErr = e2.message; }
+ok(checkErr === null, `every template question passes the field check in both languages (${checkErr})`);
+ok((await as(carol, `select count(*)::int n from form_templates_list()`))[0].n === 1,
+  'the event editor still offers only the KI survey');
+
+const dave = await user('dave');
+const fEn = (await as(dave, `select create_standalone_form(null, null, 'merch_order', 'en') f`))[0].f;
+const fMs = (await as(dave, `select create_standalone_form(null, null, 'merch_order', 'ms') f`))[0].f;
+const titleOf = async (id) => (await q(`select title from event_forms where id=$1`, [id]))[0].title;
+ok(await titleOf(fEn) === 'T-shirt & merch order', 'English title from the template');
+ok(await titleOf(fMs) === 'Tempahan baju & cenderamata', 'Malay title from the template');
+const msLabels = (await q(`select label, options from form_fields where form_id=$1 order by sort`, [fMs]));
+ok(msLabels.some((r) => r.label === 'Cara ambil' && r.options.choices[0] === 'Ambil di gerai kelab'),
+  'Malay questions and choices are copied');
+ok((await q(`select count(*)::int n from form_fields where form_id=$1`, [fEn]))[0].n === msLabels.length,
+  'both languages have the same questions');
+await as(dave, `select publish_form($1)`, [fMs]);
+ok((await q(`select status from event_forms where id=$1`, [fMs]))[0].status === 'open',
+  'a form made from a template publishes as it is');
+const blankMs = (await as(dave, `select create_standalone_form(null, null, null, 'ms') f`))[0].f;
+ok(await titleOf(blankMs) === 'Borang tanpa tajuk', 'a blank form is untitled in the right language');
+e = await err(dave, `select create_standalone_form(null, null, 'nope', 'en')`);
+ok(e?.includes('FORM:no_template'), 'an unknown template is refused');
+
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILED`);
 process.exit(failures === 0 ? 0 : 1);

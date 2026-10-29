@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../l10n/access_strings.dart';
 import '../../l10n/form_strings.dart';
 import '../../language_cubit.dart';
-import '../../services/club_service.dart';
 import '../../services/my_forms_service.dart';
 import '../../services/share_service.dart';
 import '../../theme/app_icons.dart';
@@ -15,7 +14,6 @@ import '../../utils/app_nav.dart';
 import '../../utils/feedback.dart';
 import '../../utils/form_rules.dart';
 import '../../utils/responsive.dart';
-import '../../utils/text_rules.dart';
 
 /// "My forms" (`/forms`): every standalone form the user made, and those of
 /// the clubs they are an officer of. New forms start here; each row opens the
@@ -30,7 +28,6 @@ class MyFormsScreen extends StatefulWidget {
 class _MyFormsScreenState extends State<MyFormsScreen> {
   List<MyForm>? _forms;
   Object? _error;
-  bool _busy = false;
 
   @override
   void initState() {
@@ -55,32 +52,11 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
   void _fail(Object e, VoidCallback retry) => showErrorWithRetry(context, e,
       onRetry: retry, message: context.l10nRead.formServerError(formErrorCode(e)));
 
+  /// New forms start in the template gallery, which opens the editor in its
+  /// place; coming back here reloads the list.
   Future<void> _create() async {
-    final s = context.l10nRead;
-    final options = await ClubService.postAsOptions(s.formsOwnerSelf)
-        .catchError((Object _) => [PostAsOption.self(s.formsOwnerSelf)]);
-    if (!mounted) return;
-    final req = await showDialog<_NewForm>(
-      context: context,
-      builder: (_) => _NewFormDialog(options: options),
-    );
-    if (req == null || !mounted) return;
-    setState(() => _busy = true);
-    try {
-      final id = await MyFormsService.instance.create(
-        title: req.title,
-        clubId: req.clubId,
-        templateSlug: req.useKi ? 'ki' : null,
-      );
-      if (!mounted) return;
-      setState(() => _busy = false);
-      await context.push('/f/$id/edit');
-      if (mounted) _load();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _busy = false);
-      _fail(e, _create);
-    }
+    await context.push('/forms/new');
+    if (mounted) _load();
   }
 
   Future<void> _copyLink(MyForm f) async {
@@ -153,7 +129,7 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
           Padding(
             padding: const EdgeInsets.only(right: KSpace.s),
             child: TextButton.icon(
-              onPressed: _busy ? null : _create,
+              onPressed: _create,
               icon: const Icon(AppIcons.create, size: 18),
               label: Text(s.formsNew),
             ),
@@ -174,7 +150,7 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
                       title: s.formsEmpty,
                       body: s.formsEmptySub,
                       action: FilledButton.icon(
-                        onPressed: _busy ? null : _create,
+                        onPressed: _create,
                         icon: const Icon(AppIcons.create, size: 18),
                         label: Text(s.formsNew),
                       ),
@@ -359,93 +335,6 @@ class _Message extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _NewForm {
-  final String title;
-  final String? clubId;
-  final bool useKi;
-  const _NewForm(this.title, this.clubId, this.useKi);
-}
-
-class _NewFormDialog extends StatefulWidget {
-  final List<PostAsOption> options;
-  const _NewFormDialog({required this.options});
-
-  @override
-  State<_NewFormDialog> createState() => _NewFormDialogState();
-}
-
-class _NewFormDialogState extends State<_NewFormDialog> {
-  final _title = TextEditingController();
-  String? _clubId;
-  bool _ki = false;
-
-  @override
-  void dispose() {
-    _title.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final s = context.l10n;
-    final clubs = [for (final o in widget.options) if (o.isClub) o];
-    return AlertDialog(
-      title: Text(s.formsNew),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              key: const ValueKey('new-form-title'),
-              controller: _title,
-              autofocus: true,
-              maxLength: kFormTitleMax,
-              decoration: InputDecoration(labelText: s.formsTitleLabel),
-            ),
-            if (clubs.isNotEmpty) ...[
-              const SizedBox(height: KSpace.s),
-              DropdownButtonFormField<String?>(
-                initialValue: _clubId,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  labelText: s.formsOwnerLabel,
-                  helperText: s.formsOwnerClubHelp,
-                  helperMaxLines: 3,
-                ),
-                items: [
-                  DropdownMenuItem(value: null, child: Text(s.formsOwnerSelf)),
-                  for (final c in clubs)
-                    DropdownMenuItem(
-                      value: c.clubId,
-                      child: Text(c.label, overflow: TextOverflow.ellipsis),
-                    ),
-                ],
-                onChanged: (v) => setState(() => _clubId = v),
-              ),
-            ],
-            const SizedBox(height: KSpace.s),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: _ki,
-              onChanged: (v) => setState(() => _ki = v),
-              title: Text(s.formsUseKi),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text(s.cancel)),
-        FilledButton(
-          onPressed: () =>
-              Navigator.pop(context, _NewForm(cleanLine(_title.text), _clubId, _ki)),
-          child: Text(s.formsCreate),
-        ),
-      ],
     );
   }
 }

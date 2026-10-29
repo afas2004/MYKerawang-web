@@ -49,7 +49,7 @@ Future<void> showCreateSheet(BuildContext context) async {
               onEvent: () => open(ctx, context.goCreateEvent),
               onSell: () => open(ctx, context.goCreateListing),
               onAnnouncement: () => open(ctx, () => context.push('/create/announcement')),
-              onForm: () => open(ctx, () => context.push('/forms')),
+              onForm: () => open(ctx, () => context.push('/forms/new')),
             ),
           ],
         ),

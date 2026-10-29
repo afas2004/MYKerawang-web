@@ -418,6 +418,74 @@ extension FormStrings on AppStrings {
       "Hantaran tanpa nama tidak boleh memaut borang — borang menunjukkan siapa pembuatnya.",
       "Anonymous posts can't link a form.");
 
+  // ---- template gallery (/forms/new) ----
+  String get gallerySearchHint => _t("Search templates", "Cari templat", "Search templates");
+  String get galleryClearSearch => _t("Clear search", "Kosongkan carian", "Clear search");
+  String get galleryStartTitle => _t("Start a new form", "Mula borang baharu", "Start a new form");
+  String get galleryTemplates => _t("Templates", "Templat", "Templates");
+  String get galleryCsv => _t("Import CSV", "Import CSV", "Import CSV");
+  String get galleryCsvSub => _t(
+      "Paste a question list or upload a .csv file.",
+      "Tampal senarai soalan atau muat naik fail .csv.",
+      "Paste a list or upload a .csv file.");
+  String galleryCategory(String? key) => switch (key) {
+        'events' => _t("Events & clubs", "Acara & kelab", "Events & clubs"),
+        'signups' => _t("Sign-ups", "Pendaftaran", "Sign-ups"),
+        'feedback' => _t("Feedback & polls", "Maklum balas & undian", "Feedback & polls"),
+        'orders' => _t("Orders", "Tempahan", "Orders"),
+        'campus' => _t("Campus life", "Kehidupan kampus", "Campus life"),
+        'academic' => _t("Study", "Akademik", "Study"),
+        _ => _t("All templates", "Semua templat", "All templates"),
+      };
+  String galleryNoMatch(String q) => _t(
+      "No templates match “$q”. Try another word, or start from a blank form.",
+      "Tiada templat sepadan dengan “$q”. Cuba perkataan lain, atau mula dengan borang kosong.",
+      "No templates match “$q”.");
+  String galleryQuestions(int n) =>
+      _t("$n ${n == 1 ? 'question' : 'questions'}", "$n soalan", "$n questions");
+  String get galleryUse => _t("Use this template", "Guna templat ini", "Use this template");
+  String get galleryRequired => _t("Required", "Wajib", "Required");
+  String get galleryLoadFailed =>
+      _t("Couldn't load the templates.", "Templat tidak dapat dimuatkan.", "Couldn't load the templates.");
+  String galleryKind(String kind) => switch (kind) {
+        'short_text' => _t("Short answer", "Jawapan pendek", "Short answer"),
+        'long_text' => _t("Paragraph", "Perenggan", "Paragraph"),
+        'single_choice' => _t("Multiple choice", "Aneka pilihan", "Multiple choice"),
+        'multi_choice' => _t("Checkboxes", "Kotak semak", "Checkboxes"),
+        'rating' => _t("Rating 1–5", "Penilaian 1–5", "Rating 1–5"),
+        'number' => _t("Number", "Nombor", "Number"),
+        'date' => _t("Date", "Tarikh", "Date"),
+        'email' => _t("Email", "E-mel", "Email"),
+        'phone' => _t("Phone", "Telefon", "Phone"),
+        'student_id' => _t("Matric number", "Nombor matrik", "Matric number"),
+        'consent' => _t("Agreement", "Persetujuan", "Agreement"),
+        _ => _t("Section", "Bahagian", "Section"),
+      };
+
+  // ---- CSV import ----
+  String get csvTitle => _t("Import questions", "Import soalan", "Import questions");
+  String get csvHelp => _t(
+      "One question per row: question, type, required, options. Types: text, paragraph, choice, "
+          "checkboxes, rating, date, email, phone, matric. Choices go A|B|C. A plain list works too.",
+      "Satu soalan setiap baris: soalan, jenis, wajib, pilihan. Jenis: text, paragraph, choice, "
+          "checkboxes, rating, date, email, phone, matric. Pilihan ditulis A|B|C. Senarai biasa juga boleh.",
+      "One question per row: question, type, required, options.");
+  String get csvHint => _t(
+      "question,type,required,options\nFull name,text,yes,\nWhich session?,choice,yes,Morning|Evening",
+      "soalan,jenis,wajib,pilihan\nNama penuh,text,ya,\nSesi mana?,choice,ya,Pagi|Petang",
+      "question,type,required,options");
+  String get csvChooseFile => _t("Choose .csv file", "Pilih fail .csv", "Choose .csv file");
+  String get csvSample => _t("Download sample", "Muat turun contoh", "Download sample");
+  String csvReady(int n) => _t(
+      "$n ${n == 1 ? 'question' : 'questions'} ready",
+      "$n soalan sedia",
+      "$n questions ready");
+  String csvProblems(String lines) => _t(
+      "Check line $lines: an unknown type, a missing question, or a choice with fewer than two options.",
+      "Semak baris $lines: jenis tidak dikenali, soalan kosong, atau pilihan kurang daripada dua.",
+      "Check line $lines.");
+  String get csvCreate => _t("Create form", "Cipta borang", "Create form");
+
   // ---- server refusals ----
   /// Wording for a `formErrorCode()`; null falls back to the generic message.
   String? formServerError(String? code) => switch (code) {

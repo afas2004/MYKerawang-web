@@ -8,6 +8,7 @@ import 'package:mykerawang/language_cubit.dart';
 import 'package:mykerawang/router.dart' show isGuestPath;
 import 'package:mykerawang/screens/events/event_form_screen.dart';
 import 'package:mykerawang/screens/events/form_editor_screen.dart';
+import 'package:mykerawang/screens/forms/form_gallery_screen.dart';
 import 'package:mykerawang/screens/forms/my_forms_screen.dart';
 import 'package:mykerawang/services/club_service.dart';
 import 'package:mykerawang/services/form_service.dart';
@@ -59,15 +60,19 @@ class FakeForms implements FormService {
 }
 
 class FakeMyForms implements MyFormsService {
-  FakeMyForms(this.forms);
+  FakeMyForms(this.forms, {this.templates = kGallery});
   List<MyForm> forms;
+  final List<GalleryTemplate> templates;
   final List<String> calls = [];
 
   @override
   Future<List<MyForm>> myForms() async => forms;
   @override
-  Future<String> create({String? title, String? clubId, String? templateSlug}) async {
-    calls.add('create:$title:$clubId:$templateSlug');
+  Future<List<GalleryTemplate>> gallery() async => templates;
+  @override
+  Future<String> create(
+      {String? title, String? clubId, String? templateSlug, String lang = 'en'}) async {
+    calls.add('create:$title:$clubId:$templateSlug:$lang');
     return 'new1';
   }
 
@@ -82,6 +87,52 @@ class FakeMyForms implements MyFormsService {
   @override
   Future<void> withdraw(String formId) async => calls.add('withdraw:$formId');
 }
+
+/// A small gallery: one template per category the tests look for.
+const kGallery = [
+  GalleryTemplate(
+    slug: 'event_registration',
+    name: 'Event registration',
+    nameMs: 'Pendaftaran acara',
+    description: 'Names, matric numbers and contacts of everyone joining.',
+    descriptionMs: 'Nama, nombor matrik dan nombor telefon semua peserta.',
+    category: 'events',
+    questions: [
+      TemplateQuestion(kind: 'short_text', label: 'Full name', labelMs: 'Nama penuh', required: true),
+      TemplateQuestion(kind: 'student_id', label: 'Matric number', labelMs: 'Nombor matrik'),
+      TemplateQuestion(
+          kind: 'single_choice',
+          label: 'Dietary needs',
+          labelMs: 'Keperluan pemakanan',
+          choices: ['None', 'Vegetarian'],
+          choicesMs: ['Tiada', 'Vegetarian']),
+    ],
+  ),
+  GalleryTemplate(
+    slug: 'merch_order',
+    name: 'T-shirt & merch order',
+    nameMs: 'Tempahan baju & cenderamata',
+    description: 'Sizes, quantities, collection and payment.',
+    descriptionMs: 'Saiz, kuantiti, cara ambil dan bayaran.',
+    category: 'orders',
+    questions: [
+      TemplateQuestion(kind: 'single_choice', label: 'Size', labelMs: 'Saiz', choices: ['S', 'M']),
+      TemplateQuestion(kind: 'number', label: 'Quantity', labelMs: 'Kuantiti'),
+    ],
+  ),
+  GalleryTemplate(
+    slug: 'event_feedback',
+    name: 'Event feedback',
+    nameMs: 'Maklum balas acara',
+    description: 'How did it go?',
+    descriptionMs: 'Bagaimana acara itu?',
+    category: 'feedback',
+    questions: [
+      TemplateQuestion(kind: 'rating', label: 'Overall', labelMs: 'Keseluruhan'),
+      TemplateQuestion(kind: 'long_text', label: 'Suggestions', labelMs: 'Cadangan'),
+    ],
+  ),
+];
 
 const _fields = [
   FormFieldSpec(id: 'q1', kind: 'short_text', label: 'What did you lose?', required: true),
@@ -243,7 +294,7 @@ void main() {
 
   testWidgets('its maker gets edit, not report', (tester) async {
     FormService.instance = FakeForms(FormView(doc: standalone(canEdit: true), canAnswer: true));
-    final router = await pump(tester, 375, const EventFormScreen(formId: 'f1'));
+    await pump(tester, 375, const EventFormScreen(formId: 'f1'));
     expect(find.byIcon(Icons.more_vert), findsNothing);
     await tester.tap(find.byTooltip('Edit form'));
     await tester.pumpAndSettle();
@@ -304,25 +355,12 @@ void main() {
     expect(find.text("You haven't made any forms yet."), findsOneWidget);
   });
 
-  testWidgets('New form creates a club form and opens its editor', (tester) async {
-    final fake = FakeMyForms(const []);
-    MyFormsService.instance = fake;
-    ClubService.debugPostAsOptions = () async => const [
-          PostAsOption.self('Just me'),
-          PostAsOption.club(clubId: 'c1', label: 'Robotics', handle: 'robotics'),
-        ];
-    final router = await pump(tester, 1280, const MyFormsScreen());
+  testWidgets('New form opens the template gallery', (tester) async {
+    MyFormsService.instance = FakeMyForms(const []);
+    await pump(tester, 1280, const MyFormsScreen());
     await tester.tap(find.text('New form').first);
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const ValueKey('new-form-title')), 'Robot sign-up');
-    await tester.tap(find.text('Just me'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Robotics').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Create'));
-    await tester.pumpAndSettle();
-    expect(fake.calls, ['create:Robot sign-up:c1:null']);
-    expect(find.text('route /f/new1/edit'), findsOneWidget);
+    expect(find.text('route /forms/new'), findsOneWidget);
   });
 
   testWidgets('delete asks first, then removes', (tester) async {
@@ -339,6 +377,176 @@ void main() {
     expect(fake.calls, ['delete:f1']);
     expect(find.text('Lost & found survey'), findsNothing);
   });
+
+  // ------------------------------------------------------------ the gallery
+  group('CSV import parsing', () {
+    test('the sample reads cleanly', () {
+      final p = parseQuestionCsv(kSampleQuestionCsv);
+      expect(p.ok, isTrue, reason: '${p.problems.map((e) => e.code)}');
+      expect(p.fields.map((f) => f.kind), [
+        'short_text', 'student_id', 'single_choice', 'multi_choice', 'rating', 'long_text',
+      ]);
+      expect(p.fields[2].choices, ['Morning', 'Afternoon', 'Evening']);
+      expect(p.fields[0].required, isTrue);
+    });
+
+    test('a plain list becomes short answers', () {
+      final p = parseQuestionCsv('Name\nRoom number\n\nFavourite food');
+      expect(p.ok, isTrue);
+      expect(p.fields.map((f) => f.label), ['Name', 'Room number', 'Favourite food']);
+      expect(p.fields.every((f) => f.kind == 'short_text'), isTrue);
+    });
+
+    test('Malay and Google Forms type names', () {
+      final p = parseQuestionCsv('soalan,jenis,wajib,pilihan\n'
+          'Nama,teks,ya,\nSesi,aneka pilihan,ya,Pagi;Petang\nNilai,linear scale,,1-10');
+      expect(p.ok, isTrue);
+      expect(p.fields.map((f) => f.kind), ['short_text', 'single_choice', 'rating']);
+      expect(p.fields[1].choices, ['Pagi', 'Petang']);
+      expect(p.fields[2].max, 10);
+    });
+
+    test('an unknown type names its line', () {
+      final p = parseQuestionCsv('question,type\nName,text\nColour,rainbow');
+      expect(p.ok, isFalse);
+      expect(p.problemLines, [3]);
+    });
+
+    test("the editor's own format still works", () {
+      final p = parseQuestionCsv('short_text,Nama penuh,yes\nrating,KI1,yes,1-5,ki_pre,1');
+      expect(p.ok, isTrue);
+      expect(p.fields[1].analysis, 'ki_pre');
+    });
+
+    test('search reaches both languages', () {
+      expect(kGallery[1].matches('baju'), isTrue);
+      expect(kGallery[1].matches('quantity'), isTrue);
+      expect(kGallery[1].matches('dietary'), isFalse);
+    });
+  });
+
+  for (final width in [375.0, 1280.0]) {
+    for (final dark in [false, true]) {
+      testWidgets('gallery at $width (${dark ? 'dark' : 'light'}) lays out', (tester) async {
+        MyFormsService.instance = FakeMyForms(const []);
+        ClubService.debugPostAsOptions = () async => const [PostAsOption.self('Just me')];
+        await pump(tester, width, const FormGalleryScreen(), dark: dark);
+
+        expect(find.byKey(const ValueKey('start-blank')), findsOneWidget);
+        expect(find.byKey(const ValueKey('start-csv')), findsOneWidget);
+        for (final t in kGallery) {
+          expect(find.byKey(ValueKey('tpl-${t.slug}')), findsOneWidget);
+        }
+        // Phones get a chip row, desktops a rail: both carry every category.
+        expect(find.byKey(const ValueKey('cat-orders')), findsOneWidget);
+        // Descriptions only where there is room for them.
+        expect(find.text('Sizes, quantities, collection and payment.'),
+            width >= 900 ? findsOneWidget : findsNothing);
+        // No owner picker without clubs.
+        expect(find.byKey(const ValueKey('gallery-owner')), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  testWidgets('search and categories narrow the grid', (tester) async {
+    MyFormsService.instance = FakeMyForms(const []);
+    ClubService.debugPostAsOptions = () async => const [];
+    await pump(tester, 375, const FormGalleryScreen());
+
+    await tester.enterText(find.byKey(const ValueKey('gallery-search')), 'merch');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('tpl-merch_order')), findsOneWidget);
+    expect(find.byKey(const ValueKey('tpl-event_registration')), findsNothing);
+
+    await tester.enterText(find.byKey(const ValueKey('gallery-search')), 'zzz');
+    await tester.pumpAndSettle();
+    expect(find.textContaining('No templates match'), findsOneWidget);
+    await tester.tap(find.text('Clear search').last);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('tpl-event_registration')), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const ValueKey('cat-feedback')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('cat-feedback')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('tpl-event_feedback')), findsOneWidget);
+    expect(find.byKey(const ValueKey('tpl-merch_order')), findsNothing);
+  });
+
+  for (final width in [375.0, 1280.0]) {
+    testWidgets('at $width a template previews, then makes a club form', (tester) async {
+      final fake = FakeMyForms(const []);
+      MyFormsService.instance = fake;
+      ClubService.debugPostAsOptions = () async => const [
+            PostAsOption.self('Just me'),
+            PostAsOption.club(clubId: 'c1', label: 'Robotics', handle: 'robotics'),
+          ];
+      await pump(tester, width, const FormGalleryScreen());
+
+      await tester.tap(find.byKey(const ValueKey('gallery-owner')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Robotics').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('tpl-event_registration')));
+      await tester.pumpAndSettle();
+      expect(find.text('Full name *'), findsOneWidget);
+      expect(find.textContaining('None · Vegetarian'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('use-template')));
+      await tester.pumpAndSettle();
+
+      expect(fake.calls, ['create:null:c1:event_registration:en']);
+      expect(find.text('route /f/new1/edit'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('blank form starts at once', (tester) async {
+    final fake = FakeMyForms(const []);
+    MyFormsService.instance = fake;
+    ClubService.debugPostAsOptions = () async => const [];
+    await pump(tester, 375, const FormGalleryScreen());
+    await tester.tap(find.byKey(const ValueKey('start-blank')));
+    await tester.pumpAndSettle();
+    expect(fake.calls, ['create:null:null:null:en']);
+    expect(find.text('route /f/new1/edit'), findsOneWidget);
+  });
+
+  for (final width in [375.0, 1280.0]) {
+    testWidgets('at $width a CSV import makes a form with its questions', (tester) async {
+      final mine = FakeMyForms(const []);
+      MyFormsService.instance = mine;
+      final forms = FakeForms(FormView(doc: standalone(status: 'draft', canEdit: true, fields: const [])));
+      FormService.instance = forms;
+      ClubService.debugPostAsOptions = () async => const [];
+      await pump(tester, width, const FormGalleryScreen());
+
+      await tester.tap(find.byKey(const ValueKey('start-csv')));
+      await tester.pumpAndSettle();
+      final create = find.byKey(const ValueKey('csv-create'));
+      expect(tester.widget<FilledButton>(create).onPressed, isNull, reason: 'nothing to import yet');
+
+      await tester.enterText(find.byKey(const ValueKey('csv-text')), 'Name,text,yes\nColour,rainbow');
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Check line 2'), findsOneWidget);
+      expect(tester.widget<FilledButton>(create).onPressed, isNull);
+
+      await tester.enterText(find.byKey(const ValueKey('csv-title')), 'Bake sale');
+      await tester.enterText(find.byKey(const ValueKey('csv-text')),
+          'question,type,required,options\nName,text,yes,\nCake,choice,yes,Chocolate|Pandan\nNotes,paragraph,,');
+      await tester.pumpAndSettle();
+      expect(find.text('3 questions ready'), findsOneWidget);
+      await tester.tap(create);
+      await tester.pumpAndSettle();
+
+      expect(mine.calls, ['create:Bake sale:null:null:en']);
+      expect(forms.saved.single.fields.map((f) => f.label), ['Name', 'Cake', 'Notes']);
+      expect(forms.saved.single.fields[1].choices, ['Chocolate', 'Pandan']);
+      expect(find.text('route /f/new1/edit'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   // ------------------------------------------------------------ linking
   testWidgets('the picker returns a form, closed and removed ones left out', (tester) async {
@@ -360,7 +568,7 @@ void main() {
 
   for (final dark in [false, true]) {
     testWidgets('a post shows its form button (${dark ? 'dark' : 'light'})', (tester) async {
-      final router = await pump(
+      await pump(
         tester,
         375,
         const Scaffold(
