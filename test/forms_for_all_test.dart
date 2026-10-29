@@ -15,6 +15,7 @@ import 'package:mykerawang/services/form_service.dart';
 import 'package:mykerawang/services/my_forms_service.dart';
 import 'package:mykerawang/utils/announcement_rules.dart';
 import 'package:mykerawang/utils/form_rules.dart';
+import 'package:mykerawang/widgets/form_link_card.dart';
 import 'package:mykerawang/widgets/form_picker.dart';
 import 'package:mykerawang/widgets/post_card.dart' show PostFormLinks;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -646,26 +647,76 @@ void main() {
     expect(picked?.path, '/f/f1');
   });
 
-  for (final dark in [false, true]) {
-    testWidgets('a post shows its form button (${dark ? 'dark' : 'light'})', (tester) async {
-      await pump(
-        tester,
-        375,
-        const Scaffold(
-          body: PostFormLinks(post: {
-            'id': 'p1',
-            'action_links': [
-              {'label': 'Fill in form', 'url': '/f/f1'},
-              {'label': 'Elsewhere', 'url': 'https://example.com'},
-            ],
-          }),
-        ),
-        dark: dark,
-      );
-      expect(find.text('Elsewhere'), findsNothing);
-      await tester.tap(find.text('Fill in form'));
+  // The card a post shows for a linked form.
+  const postWithForm = Scaffold(
+    body: PostFormLinks(post: {
+      'id': 'p1',
+      'action_links': [
+        {'label': 'Fill in form', 'url': '/f/f1'},
+        {'label': 'Elsewhere', 'url': 'https://example.com'},
+      ],
+    }),
+  );
+
+  for (final width in [375.0, 1280.0]) {
+    for (final dark in [false, true]) {
+      testWidgets('form card at $width (${dark ? 'dark' : 'light'}): open form', (tester) async {
+        FormLinkCard.clearCache();
+        FormService.instance = FakeForms(FormView(doc: standalone(), canAnswer: true));
+        await pump(tester, width, postWithForm, dark: dark);
+
+        expect(find.byKey(const ValueKey('form-link-card')), findsOneWidget);
+        expect(find.text('Elsewhere'), findsNothing, reason: 'only form links become cards');
+        expect(find.text('Lost & found survey'), findsOneWidget, reason: "the form's real title");
+        expect(find.textContaining('@alice · 2 questions'), findsOneWidget);
+        expect(find.textContaining('Open'), findsOneWidget);
+        // A real button where there is room, a chevron on a phone.
+        expect(find.byKey(const ValueKey('form-card-action')), width >= 420 ? findsOneWidget : findsNothing);
+
+        await tester.tap(find.byKey(const ValueKey('form-link-card')));
+        await tester.pumpAndSettle();
+        expect(find.text('route /f/f1'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  testWidgets('form card: answered says so and offers View', (tester) async {
+    FormLinkCard.clearCache();
+    FormService.instance = FakeForms(FormView(
+        doc: standalone(), canAnswer: true, mine: const {'answers': {'q1': 'x'}}));
+    await pump(tester, 1280, postWithForm);
+    expect(find.textContaining('You answered'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'View'), findsOneWidget);
+  });
+
+  testWidgets('form card: closed', (tester) async {
+    FormLinkCard.clearCache();
+    FormService.instance = FakeForms(FormView(doc: standalone(status: 'closed'), reason: 'closed'));
+    await pump(tester, 1280, postWithForm);
+    expect(find.textContaining('Closed'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'View'), findsOneWidget);
+  });
+
+  testWidgets('form card: a guest is invited to fill it in', (tester) async {
+    FormLinkCard.clearCache();
+    FormService.instance = FakeForms(FormView(doc: standalone(), reason: 'signed_out'));
+    await pump(tester, 1280, postWithForm);
+    expect(find.widgetWithText(FilledButton, 'Fill in'), findsOneWidget);
+  });
+
+  for (final reason in ['removed', 'deleted']) {
+    testWidgets('form card: a $reason form is a quiet dead end', (tester) async {
+      FormLinkCard.clearCache();
+      FormService.instance = reason == 'removed'
+          ? FakeForms(FormView(doc: standalone(hidden: true, fields: const []), reason: 'removed'))
+          : _MissingForms();
+      await pump(tester, 1280, postWithForm);
+      expect(find.text('This form is no longer available'), findsOneWidget);
+      expect(find.byKey(const ValueKey('form-card-action')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('form-link-card')));
       await tester.pumpAndSettle();
-      expect(find.text('route /f/f1'), findsOneWidget);
+      expect(find.text('route /f/f1'), findsNothing, reason: 'nowhere to go');
     });
   }
 
@@ -691,4 +742,11 @@ class _BrokenGallery extends FakeMyForms {
 
   @override
   Future<List<GalleryTemplate>> gallery() => Future.error(Exception('no function'));
+}
+
+class _MissingForms extends FakeForms {
+  _MissingForms() : super(FormView(doc: standalone()));
+
+  @override
+  Future<FormView> load(String formId) => Future.error(Exception('FORM:not_found'));
 }

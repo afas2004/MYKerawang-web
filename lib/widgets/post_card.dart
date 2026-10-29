@@ -4,7 +4,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../utils/announcement_rules.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:mykerawang/utils/app_nav.dart';
 import 'package:mykerawang/utils/report_helper.dart';
 import 'package:mykerawang/widgets/embed_card.dart';
@@ -26,6 +25,7 @@ import '../utils/formatters.dart';
 import '../utils/guest_access.dart';
 import '../utils/roles.dart';
 import '../utils/tags.dart';
+import 'form_link_card.dart';
 import 'mention_text.dart';
 import 'owner_menu.dart';
 import 'pin_controls.dart';
@@ -813,21 +813,22 @@ class PostFormLinks extends StatelessWidget {
     if (post['is_announcement'] == true) return const SizedBox.shrink();
     final links = [
       for (final l in ActionLink.listFrom(post['action_links']))
-        if (l.url.startsWith('/f/')) l,
+        if (FormLinkCard.idFrom(l.url) != null) l,
     ];
     if (links.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: KSpace.m),
-      child: Wrap(
-        spacing: KSpace.s,
-        runSpacing: KSpace.s,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (final l in links)
-            OutlinedButton.icon(
-              key: ValueKey('post-form-${l.url}'),
-              onPressed: () => context.push(l.url),
-              icon: const Icon(AppIcons.list, size: 18),
-              label: Text(l.label),
+            Padding(
+              padding: EdgeInsets.only(bottom: l == links.last ? 0 : KSpace.s),
+              child: FormLinkCard(
+                key: ValueKey('post-form-${l.url}'),
+                formId: FormLinkCard.idFrom(l.url)!,
+                label: l.label,
+              ),
             ),
         ],
       ),
