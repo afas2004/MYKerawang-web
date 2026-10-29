@@ -268,16 +268,32 @@ class ShellFrame extends StatelessWidget {
         children: [
           // Shared with pushed pages — see AppSidebar / DesktopChrome.
           AppSidebar(selectedIndex: currentIndex, onSelect: onSelect),
+          // Feed and rail are one centred block, so on a wide window the
+          // rail stays beside the feed instead of drifting to the far edge.
           Expanded(
             child: Center(
               child: ConstrainedBox(
-                constraints:
-                    const BoxConstraints(maxWidth: Responsive.feedMaxWidth),
-                child: child,
+                constraints: BoxConstraints(
+                  maxWidth: Responsive.feedMaxWidth +
+                      (showRail ? KSpace.xl + Responsive.rightRailWidth : 0),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: child),
+                    if (showRail) ...[
+                      const SizedBox(width: KSpace.xl),
+                      rightRail ??
+                          RightRail(
+                            showEvents: currentIndex != ShellBranch.events,
+                            showItems: currentIndex != ShellBranch.market,
+                          ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ),
-          if (showRail) rightRail ?? const RightRail(),
         ],
       ),
     );

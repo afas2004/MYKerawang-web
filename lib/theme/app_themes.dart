@@ -124,6 +124,22 @@ const Map<AppTheme, AppThemeSpec> kThemeSpecs = {
 @visibleForTesting
 bool debugUseSystemFonts = false;
 
+/// Requests the theme's web fonts and waits for them (at most [timeout])
+/// before the app's first frame; the HTML splash covers the wait.
+///
+/// Text laid out before a font arrives keeps the fallback font's size in
+/// places that measure once — chips lost the last letter of their label —
+/// and the page visibly swapped fonts a moment after it appeared.
+Future<void> preloadThemeFonts({Duration timeout = const Duration(seconds: 2)}) async {
+  if (debugUseSystemFonts) return;
+  buildAppTheme(AppTheme.values.first); // asks GoogleFonts for every style
+  try {
+    await GoogleFonts.pendingFonts().timeout(timeout);
+  } catch (_) {
+    // Slow or offline: start anyway; AfterFontsLoad re-measures chip rows.
+  }
+}
+
 /// Nudges [fg]'s lightness away from [bg] until the pair reaches [min]
 /// contrast (WCAG). Keeps hue, so brand colours stay recognisable.
 Color _ensureContrast(Color fg, Color bg, double min) {

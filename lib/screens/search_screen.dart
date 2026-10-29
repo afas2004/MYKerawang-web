@@ -12,6 +12,7 @@ import '../language_cubit.dart';
 import '../utils/app_nav.dart';
 import '../utils/formatters.dart';
 import '../utils/roles.dart';
+import '../widgets/after_fonts_load.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/status_badge.dart';
 
@@ -330,7 +331,10 @@ class _SearchScreenState extends State<SearchScreen> {
     // Search field lives in the app bar; filter chips sit right under it.
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 64,
+        // Desktop: the field sits in the page-header row, level with the
+        // other tabs' titles, on the page's own ground.
+        toolbarHeight: Responsive.isDesktop(context) ? KBand.desktopHeight : 64,
+        backgroundColor: Responsive.isDesktop(context) ? Colors.transparent : null,
         titleSpacing: KSpace.l,
         title: TextField(
           controller: _searchCtrl,
@@ -383,7 +387,9 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
-          child: SizedBox(
+          // Rebuilt once the web fonts load (labels otherwise keep the
+          // fallback width and lose their last letter).
+          child: AfterFontsLoad(child: SizedBox(
             height: 56,
             child: ListView(
               scrollDirection: Axis.horizontal,
@@ -401,7 +407,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
               ],
             ),
-          ),
+          )),
         ),
       ),
       body: Center(

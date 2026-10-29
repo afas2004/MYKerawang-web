@@ -69,6 +69,16 @@ The four main tabs' app bars are solid plum (deepened on dark themes) with
 softly rounded lower corners and a 20 px title. No songket strip on the bars. No pattern: the ground has
 the drawings. Other screens keep the plain app bar.
 
+**Desktop (≥ 900) has no band.** The sidebar frames the page: wordmark, then
+Create (the one primary action), the tabs and Clubs, then notifications,
+settings and admin; the profile (or Sign in) is pinned to its foot. Each tab
+opens with a quiet page header on the ground — the page name in the display
+face (`headlineMedium`, 88 px row), only page-specific actions beside it
+(`desktopActions`, e.g. New announcement); bell and avatar live in the
+sidebar. The feed and the right rail are one centred block, the rail's first
+card level with the content, and the rail leaves out the card for the tab
+it sits beside.
+
 ## Patterns — `KPattern`
 
 Star (bintang lapan), pucuk rebung, tabur; drawn in code, clipped to their box.

@@ -15,10 +15,10 @@ import 'shell_actions.dart';
 /// (detail/profile/settings) so the chrome never disappears mid-session
 /// — UI_UX_AUDIT H1.2.
 ///
-/// Top to bottom: wordmark, the tabs (Home, Announcements, Search, Market,
-/// Events), then for members notifications (unread badge), settings,
-/// admin (admins only), profile and Create; for guests Create (asks to log
-/// in) and Sign in / Join with student email.
+/// Top to bottom: wordmark, Create (guests are asked to log in), the tabs
+/// (Home, Announcements, Search, Market, Events) and Clubs, then for members
+/// notifications (unread badge), settings and admin (admins only). The foot
+/// holds the profile, or Sign in / Join with student email for guests.
 class AppSidebar extends StatelessWidget {
   static const double width = Responsive.sidebarWidth;
 
@@ -80,24 +80,37 @@ class AppSidebar extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // The page's head now that desktop has no top bar: the wordmark,
+            // then the one primary action.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(KSpace.m + 4, KSpace.xl, KSpace.m, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => context.go('/home'),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: KSpace.s, vertical: KSpace.xs),
+                    child: Wordmark(fontSize: 20),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.l, KSpace.m, KSpace.s),
+              child: FilledButton.icon(
+                onPressed: () => showCreateSheet(context),
+                icon: const Icon(AppIcons.create),
+                label: Text(s.shell.create),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                ),
+              ),
+            ),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.l, KSpace.m, KSpace.s),
+                padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.s, KSpace.m, KSpace.s),
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4, bottom: 16),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap: () => context.go('/home'),
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: KSpace.s, vertical: KSpace.xs),
-                          child: Wordmark(fontSize: 20),
-                        ),
-                      ),
-                    ),
-                  ),
                   for (int i = 0; i < items.length; i++)
                     SideNavTile(
                       icon: selectedIndex == i ? items[i].$2 : items[i].$1,
@@ -112,9 +125,8 @@ class AppSidebar extends StatelessWidget {
                       },
                     ),
                   const ClubsNavEntry(),
-                  const SizedBox(height: KSpace.s),
-                  Divider(height: 16, color: scheme.outlineVariant),
                   if (loggedIn) ...[
+                    Divider(height: 24, color: scheme.outlineVariant),
                     SideNavTile(
                       icon: onNotifications
                           ? AppIcons.notificationsActive
@@ -135,25 +147,16 @@ class AppSidebar extends StatelessWidget {
                       },
                     ),
                     const AdminNavEntry(),
-                    const ProfileAvatarAction(extended: true),
-                  ],
-                  const SizedBox(height: KSpace.l),
-                  FilledButton.icon(
-                    onPressed: () => showCreateSheet(context),
-                    icon: const Icon(AppIcons.create),
-                    label: Text(s.shell.create),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48),
-                    ),
-                  ),
-                  if (!loggedIn) ...[
-                    const SizedBox(height: KSpace.xl),
-                    const ProfileAvatarAction(extended: true),
                   ],
                 ],
               ),
             ),
-            const SizedBox(height: KSpace.l),
+            // Who you are (or Sign in), always at the foot.
+            Divider(height: 1, color: scheme.outlineVariant),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(KSpace.m, KSpace.m, KSpace.m, KSpace.l),
+              child: ProfileAvatarAction(extended: true),
+            ),
           ],
         ),
       ),

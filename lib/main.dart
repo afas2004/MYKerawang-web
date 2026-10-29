@@ -76,6 +76,10 @@ void main() async {
   // Credit the bundled illustrations on the licences page.
   registerArtCredits();
 
+  // The fonts first, behind the splash, so no text is measured with a
+  // stand-in font.
+  await preloadThemeFonts();
+
   runApp(const MyApp());
 }
 

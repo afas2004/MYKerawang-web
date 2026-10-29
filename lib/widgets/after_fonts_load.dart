@@ -7,7 +7,9 @@ bool _watching = false;
 
 /// Builds [child] again from new render objects once the web fonts arrive.
 ///
-/// The fonts load after the first frame. A chip measures its label once and
+/// main() waits for the fonts before the first frame (preloadThemeFonts),
+/// but gives up after a moment on a slow connection; then they load after
+/// the first frame. A chip measures its label once and
 /// keeps that size, so a chip row on screen from the start (the Market and
 /// Events filters) kept the narrower fallback-font width and the real font
 /// spilled past it: the last letter faded out. Rebuilding with a new key

@@ -313,7 +313,7 @@ class FeedView extends StatelessWidget {
     final size = Responsive.sizeFor(width);
     final railVisible = size.isLarge; // MainScaffold shows the rail here
     final items = buildFeedItems(posts, injectables, inject: !railVisible);
-    final topPadding = MediaQuery.paddingOf(context).top + kToolbarHeight;
+    final topPadding = MediaQuery.paddingOf(context).top + KBand.heightOf(context);
 
     return Scaffold(
       body: LinearRefresher(
@@ -328,7 +328,9 @@ class FeedView extends StatelessWidget {
               KBand.sliverAppBar(
                 context,
                 tone: KBand.home,
-                title: Text(
+                // Desktop: the sidebar carries the wordmark, so the page
+                // header just names the page.
+                title: size.isExpanded ? Text(s.navHome) : Text(
                   AppStrings.appName,
                   // 20 px so the wordmark fits beside four actions on a
                   // 360 px phone.

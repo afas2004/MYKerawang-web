@@ -121,6 +121,14 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
           const ProfileAvatarAction(),
           const SizedBox(width: KSpace.s),
         ],
+        desktopActions: [
+          if (_canPost)
+            FilledButton.tonalIcon(
+              onPressed: _newAnnouncement,
+              icon: const Icon(AppIcons.compose, size: 18),
+              label: Text(s.hub.newAnnouncement),
+            ),
+        ],
       ),
       body: _body(context),
     );
