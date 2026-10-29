@@ -18,6 +18,8 @@ import '../widgets/form_layout.dart';
 import '../widgets/media_picker_grid.dart';
 import '../widgets/restriction_gate.dart';
 import '../l10n/create_strings.dart';
+import '../l10n/form_strings.dart';
+import '../widgets/form_picker.dart';
 import '../services/club_service.dart';
 import '../services/moderation_service.dart';
 import '../utils/categories.dart';
@@ -533,13 +535,20 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   ),
                   for (var i = 0; i < _links.length; i++) _linkEditor(i),
                   if (_links.length < kActionLinksMax)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton.icon(
-                        onPressed: () => setState(() => _links.add(_LinkRow())),
-                        icon: const Icon(AppIcons.create, size: 18),
-                        label: Text(s.eventAddButton),
-                      ),
+                    Wrap(
+                      spacing: KSpace.s,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () => setState(() => _links.add(_LinkRow())),
+                          icon: const Icon(AppIcons.create, size: 18),
+                          label: Text(s.eventAddButton),
+                        ),
+                        // A form becomes an ordinary button: "Fill in form" → /f/:id.
+                        AttachFormButton(
+                          onPicked: (f) => setState(() =>
+                              _links.add(_LinkRow()..set(s.formLinkLabel, f.path))),
+                        ),
+                      ],
                     ),
                 ],
               ),

@@ -31,14 +31,21 @@ import '../../widgets/restriction_gate.dart';
 ///
 /// `save_event_form()` still writes the whole list at once, and the server
 /// still refuses the changes that would alter what a past answer meant.
+///
+/// A standalone form (`/f/:id/edit`, [eventId] null) uses the same editor
+/// without the event settings, plus a safety card: the no-personal-data note,
+/// and the questions the server would refuse or that ask for IC, bank or
+/// address details.
 class FormEditorScreen extends StatefulWidget {
-  final String eventId;
+  /// The event whose form this is; null for a standalone form.
+  final String? eventId;
 
   /// Open this form directly; null means "the event's newest form, or the
   /// start chooser if it has none".
   final String? formId;
 
-  const FormEditorScreen({super.key, required this.eventId, this.formId});
+  const FormEditorScreen({super.key, this.eventId, this.formId})
+      : assert(eventId != null || formId != null);
 
   @override
   State<FormEditorScreen> createState() => _FormEditorScreenState();
@@ -92,8 +99,8 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
     });
     try {
       String? id = widget.formId;
-      if (id == null) {
-        final summary = await FormService.instance.summary(widget.eventId);
+      if (id == null && widget.eventId != null) {
+        final summary = await FormService.instance.summary(widget.eventId!);
         id = summary?.id;
       }
       if (id == null) {
@@ -154,10 +161,10 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
   }
 
   Future<void> _startBlank() =>
-      _start(() => FormService.instance.createBlank(widget.eventId));
+      _start(() => FormService.instance.createBlank(widget.eventId!));
 
   Future<void> _startTemplate(String slug) =>
-      _start(() => FormService.instance.createFromTemplate(widget.eventId, slug));
+      _start(() => FormService.instance.createFromTemplate(widget.eventId!, slug));
 
   Future<void> _startPaste() async {
     final text = await showDialog<String>(
@@ -175,7 +182,7 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
     // A form row is created first: every later write targets a form id.
     setState(() => _saving = true);
     try {
-      final id = await FormService.instance.createBlank(widget.eventId);
+      final id = await FormService.instance.createBlank(widget.eventId!);
       final view = await FormService.instance.load(id);
       if (!mounted) return;
       _apply(view.doc);
@@ -208,6 +215,11 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
       if (!quiet) _toast(context.l10nRead.formIssueText(problems.first.code));
       return false;
     }
+    // The server refuses these on a standalone form; say so before the trip.
+    if (doc.standalone && blockedFieldIndexes(_specs).isNotEmpty) {
+      _toast(context.l10nRead.formBlockedLabel);
+      return false;
+    }
 
     setState(() => _saving = true);
     try {
@@ -233,7 +245,8 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
     } catch (e) {
       if (!mounted) return false;
       setState(() => _saving = false);
-      showErrorWithRetry(context, e, onRetry: _save);
+      showErrorWithRetry(context, e,
+          onRetry: _save, message: context.l10nRead.formServerError(formErrorCode(e)));
       return false;
     }
   }
@@ -260,7 +273,10 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
       notifyContentChanged();
       _toast(context.l10nRead.formPublished);
     } catch (e) {
-      if (mounted) showErrorWithRetry(context, e, onRetry: _publish);
+      if (mounted) {
+        showErrorWithRetry(context, e,
+            onRetry: _publish, message: context.l10nRead.formServerError(formErrorCode(e)));
+      }
     }
   }
 
@@ -429,7 +445,9 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
               // `from=edit` lets the responses page come back here instead of
               // pushing a second editor on top (that stack grew every round).
               onPressed: () => context.push(
-                '/event/${widget.eventId}/form/responses?f=${doc.id}&from=edit',
+                widget.eventId != null
+                    ? '/event/${widget.eventId}/form/responses?f=${doc.id}&from=edit'
+                    : '${doc.responsesPath}?from=edit',
               ),
             ),
           if (doc != null && !_readOnly)
@@ -620,6 +638,8 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
               ),
               const SizedBox(height: KSpace.m),
               _SummaryChips(specs: _specs),
+              // RSVP and check-in belong to an event; a standalone form has none.
+              if (!doc.standalone) ...[
               const SizedBox(height: KSpace.m),
               Divider(height: 1, color: scheme.outlineVariant),
               const SizedBox(height: KSpace.m),
@@ -639,9 +659,14 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
                   ),
                 ],
               ),
+              ],
             ],
           ),
         ),
+        if (doc.standalone) ...[
+          const SizedBox(height: KSpace.m),
+          _SafetyCard(specs: _specs),
+        ],
         if (!wide) ...[
           const SizedBox(height: KSpace.m),
           _CompactChecks(specs: _specs),
@@ -1990,6 +2015,72 @@ class _RailCard extends StatelessWidget {
           ],
           const SizedBox(height: KSpace.m),
           child,
+        ],
+      ),
+    );
+  }
+}
+
+/// A standalone form's safety card: the no-personal-data note, then every
+/// question the server will refuse (password, OTP, PIN, card) and every one
+/// asking for IC, bank or address details.
+class _SafetyCard extends StatelessWidget {
+  final List<FormFieldSpec> specs;
+  const _SafetyCard({required this.specs});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final blocked = blockedFieldIndexes(specs);
+    final sensitive = [
+      for (final i in sensitiveFieldIndexes(specs))
+        if (!blocked.contains(i)) i,
+    ];
+
+    Widget line(IconData icon, Color color, String text, {Key? key}) => Padding(
+          key: key,
+          padding: const EdgeInsets.only(top: KSpace.s),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 18, color: color),
+              const SizedBox(width: KSpace.s),
+              Expanded(child: Text(text, style: Theme.of(context).textTheme.bodySmall)),
+            ],
+          ),
+        );
+
+    String label(int i) {
+      final l = specs[i].label.trim();
+      return '${i + 1}. ${l.isEmpty ? '…' : l}';
+    }
+
+    return Container(
+      key: const ValueKey('form-safety'),
+      padding: const EdgeInsets.all(KSpace.m),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        borderRadius: KRadius.card,
+        border: Border.all(color: blocked.isEmpty ? scheme.outlineVariant : scheme.error),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(AppIcons.lock, size: 18, color: scheme.onSurfaceVariant),
+              const SizedBox(width: KSpace.s),
+              Expanded(child: Text(s.formPrivacyNote, style: Theme.of(context).textTheme.bodySmall)),
+            ],
+          ),
+          for (final i in blocked)
+            line(AppIcons.error, scheme.error, '${label(i)} — ${s.formBlockedLabel}',
+                key: ValueKey('blocked-$i')),
+          for (final i in sensitive)
+            line(AppIcons.warning, scheme.tertiary, '${label(i)} — ${s.formSensitiveLabel}',
+                key: ValueKey('sensitive-$i')),
         ],
       ),
     );

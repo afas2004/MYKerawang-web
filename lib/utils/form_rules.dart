@@ -460,3 +460,50 @@ List<String> _splitCells(String line) {
   cells.add(buf.toString());
   return cells;
 }
+
+// ----------------------------------------------------- standalone form safety
+
+/// Questions a student-made form may not ask: the server refuses them
+/// (`form_label_blocked()` in 20261029001100_forms_for_all.sql — same list).
+final RegExp _blockedLabel = RegExp(
+  r'\b(password|passwd|passcode|kata\s*laluan|otp|tac|pin|cvv|cvc)\b'
+  r'|card\s*number|credit\s*card|debit\s*card'
+  r'|nombor\s*kad\s*(kredit|debit)|no\.?\s*kad\s*(kredit|debit)',
+  caseSensitive: false,
+);
+
+/// Questions with real uses (trip insurance, refunds, delivery) that still
+/// deserve a second thought: the editor warns, the server allows.
+final RegExp _sensitiveLabel = RegExp(
+  r'\b(ic|mykad|nric)\b|kad\s*pengenalan|no\.?\s*k/?p\b'
+  r'|\bbank\b|akaun\s*bank|account\s*number|nombor\s*akaun'
+  r'|\baddress\b|\balamat\b',
+  caseSensitive: false,
+);
+
+/// True when [text] asks for a password, OTP, PIN or card details.
+bool formLabelBlocked(String? text) => _blockedLabel.hasMatch(text ?? '');
+
+/// True when [text] asks for an IC number, bank details or an address.
+bool formLabelSensitive(String? text) => _sensitiveLabel.hasMatch(text ?? '');
+
+/// Labels (or help text) of [fields] the server would refuse on a standalone
+/// form, as field indexes.
+List<int> blockedFieldIndexes(List<FormFieldSpec> fields) => [
+      for (var i = 0; i < fields.length; i++)
+        if (formLabelBlocked(fields[i].label) || formLabelBlocked(fields[i].help)) i,
+    ];
+
+/// Indexes of [fields] asking for sensitive personal data.
+List<int> sensitiveFieldIndexes(List<FormFieldSpec> fields) => [
+      for (var i = 0; i < fields.length; i++)
+        if (formLabelSensitive(fields[i].label) || formLabelSensitive(fields[i].help)) i,
+    ];
+
+/// The `FORM:<code>` (or `MOD:rate_limited:form`) a server error carries, or
+/// null when it carries none. `FORM:required:<id>` reads as `required`.
+String? formErrorCode(Object error) {
+  final m = RegExp(r'(FORM|MOD|VERIFY):([a-z_]+)').firstMatch('$error');
+  if (m == null) return null;
+  return m.group(1) == 'FORM' ? m.group(2) : '${m.group(1)!.toLowerCase()}_${m.group(2)}';
+}

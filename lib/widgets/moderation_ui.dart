@@ -21,6 +21,7 @@ abstract final class ModIcons {
   static const IconData comment = AppIcons.comment;
   static const IconData event = AppIcons.events;
   static const IconData listing = AppIcons.market;
+  static const IconData form = AppIcons.list;
   static const IconData person = AppIcons.person;
   static const IconData hidden = AppIcons.anonymous;
   static const IconData visible = AppIcons.visible;

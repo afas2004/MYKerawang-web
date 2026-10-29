@@ -4,6 +4,8 @@ import 'package:image_picker/image_picker.dart';
 
 import '../l10n/announce_strings.dart';
 import '../l10n/app_strings.dart';
+import '../l10n/form_strings.dart';
+import '../widgets/form_picker.dart';
 import '../language_cubit.dart';
 import '../services/announcement_service.dart';
 import '../utils/announcement_rules.dart';
@@ -524,13 +526,20 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
         label(a.actions),
         for (var i = 0; i < _actions.length; i++) _actionEditor(i, a),
         if (_actions.length < kActionLinksMax)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => _set(() => _actions.add(_ActionRow())),
-              icon: const Icon(AppIcons.create, size: 18),
-              label: Text(a.addAction),
-            ),
+          Wrap(
+            spacing: KSpace.s,
+            children: [
+              TextButton.icon(
+                onPressed: () => _set(() => _actions.add(_ActionRow())),
+                icon: const Icon(AppIcons.create, size: 18),
+                label: Text(a.addAction),
+              ),
+              AttachFormButton(
+                onPicked: (f) => _set(() => _actions.add(_ActionRow()
+                  ..label.text = context.l10nRead.formLinkLabel
+                  ..url.text = f.path)),
+              ),
+            ],
           ),
 
         // Linked event

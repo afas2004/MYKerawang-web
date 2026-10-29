@@ -42,7 +42,7 @@ const kReportCategories = [
 const kDefaultPriorityCategories = ['harassment', 'inappropriate'];
 
 /// Reportable target types (`reports.target_type`).
-const kTargetTypes = ['post', 'comment', 'event', 'listing', 'user'];
+const kTargetTypes = ['post', 'comment', 'event', 'listing', 'user', 'form'];
 
 /// Types that can be hidden / removed (a profile can only be warned or
 /// restricted).

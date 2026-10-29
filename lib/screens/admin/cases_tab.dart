@@ -198,6 +198,8 @@ class _CasesTabState extends State<CasesTab> with AutomaticKeepAliveClientMixin 
         context.push('/event/$id');
       case 'listing':
         context.push('/item/$id');
+      case 'form':
+        context.push('/f/$id');
       case 'comment':
         final post = preview?['post_id'];
         final event = preview?['event_id'];

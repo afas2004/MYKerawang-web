@@ -48,6 +48,23 @@ class FormDoc {
   final bool canEdit;
   final List<FormFieldSpec> fields;
 
+  /// Not tied to an event: made by a student or a club (`/f/:id`).
+  final bool standalone;
+
+  /// Taken down by moderation: no answers, and its answers cannot be read.
+  final bool isHidden;
+
+  /// Who made a standalone form, shown on its answer page.
+  final String? ownerUsername;
+  final String? ownerName;
+
+  /// The club a standalone form belongs to, if any.
+  final String? clubName;
+  final String? clubHandle;
+
+  /// The event an event form belongs to.
+  final String? eventId;
+
   const FormDoc({
     required this.id,
     required this.title,
@@ -57,7 +74,23 @@ class FormDoc {
     this.afterCheckin = false,
     this.canEdit = true,
     this.fields = const [],
+    this.standalone = false,
+    this.isHidden = false,
+    this.ownerUsername,
+    this.ownerName,
+    this.clubName,
+    this.clubHandle,
+    this.eventId,
   });
+
+  /// Where the editor, the answer page and the responses page live.
+  String get answerPath =>
+      standalone || eventId == null ? '/f/$id' : '/event/$eventId/form?f=$id';
+  String get editPath =>
+      standalone || eventId == null ? '/f/$id/edit' : '/event/$eventId/form/edit?f=$id';
+  String get responsesPath => standalone || eventId == null
+      ? '/f/$id/responses'
+      : '/event/$eventId/form/responses?f=$id';
 
   bool get isDraft => status == 'draft';
 
@@ -89,6 +122,13 @@ class FormDoc {
         afterCheckin: afterCheckin ?? this.afterCheckin,
         canEdit: canEdit,
         fields: fields ?? this.fields,
+        standalone: standalone,
+        isHidden: isHidden,
+        ownerUsername: ownerUsername,
+        ownerName: ownerName,
+        clubName: clubName,
+        clubHandle: clubHandle,
+        eventId: eventId,
       );
 }
 
@@ -100,8 +140,11 @@ class FormView {
   /// False with a [reason] when the caller cannot answer.
   final bool canAnswer;
 
-  /// `signed_out` · `closed` · `not_joined` · `full`.
+  /// `signed_out` · `closed` · `not_joined` · `full` · `removed`.
   final String? reason;
+
+  /// The caller may read the answers (owner, club officers; organisers).
+  final bool canRead;
 
   /// The caller's own answers, keyed by field id, and the role they picked.
   final Map<String, dynamic>? mine;
@@ -111,6 +154,7 @@ class FormView {
     required this.doc,
     this.canAnswer = false,
     this.reason,
+    this.canRead = false,
     this.mine,
     this.myRole,
   });
@@ -305,6 +349,9 @@ class SupabaseFormService implements FormService {
         .map((e) => FormFieldSpec.fromRpc(Map<String, dynamic>.from(e as Map)))
         .toList();
     final mine = all['mine'];
+    final owner = form['owner'] is Map ? form['owner'] as Map : const {};
+    final club = form['club'] is Map ? form['club'] as Map : const {};
+    final event = form['event'] is Map ? form['event'] as Map : const {};
     return FormView(
       doc: FormDoc(
         id: '${form['id']}',
@@ -315,9 +362,17 @@ class SupabaseFormService implements FormService {
         afterCheckin: form['after_checkin'] == true,
         canEdit: all['can_edit'] == true,
         fields: fields,
+        standalone: form['standalone'] == true,
+        isHidden: form['is_hidden'] == true,
+        ownerUsername: owner['username'] as String?,
+        ownerName: owner['display_name'] as String?,
+        clubName: club['name'] as String?,
+        clubHandle: club['handle'] as String?,
+        eventId: event['id'] as String?,
       ),
       canAnswer: all['can_answer'] == true,
       reason: all['reason'] as String?,
+      canRead: all['can_read'] == true,
       mine: mine is Map ? Map<String, dynamic>.from(mine) : null,
       myRole: mine is Map ? mine['role'] as String? : null,
     );

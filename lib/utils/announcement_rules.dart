@@ -45,6 +45,8 @@ final List<RegExp> kInternalRoutePatterns = [
     r'/create/post',
     r'/create/event',
     r'/create/listing',
+    r'/forms',
+    r'/f/[^/]+',
   ])
     RegExp('^$p/?\$'),
 ];
