@@ -418,6 +418,15 @@ extension FormStrings on AppStrings {
       "Hantaran tanpa nama tidak boleh memaut borang — borang menunjukkan siapa pembuatnya.",
       "Anonymous posts can't link a form.");
 
+  // ---- a form linked from a post ----
+  String get formCardKind => _t("Form", "Borang", "Form");
+  String get formCardOpen => _t("Open", "Dibuka", "Open");
+  String get formCardAnswered => _t("You answered", "Anda sudah menjawab", "You answered");
+  String get formCardFill => _t("Fill in", "Isi", "Fill in");
+  String get formCardView => _t("View", "Lihat", "View");
+  String get formCardGone =>
+      _t("This form is no longer available", "Borang ini tiada lagi", "This form is no longer available");
+
   // ---- template gallery (/forms/new) ----
   String get gallerySearchHint => _t("Search templates", "Cari templat", "Search templates");
   String get galleryClearSearch => _t("Clear search", "Kosongkan carian", "Clear search");
