@@ -1034,7 +1034,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     }
     final cap = e['capacity'];
     if (cap is num) {
-      rows.add((AppIcons.people, s.evCapacity, '$_participantCount / ${cap.toInt()}'));
+      rows.add((AppIcons.people, s.evCapacityShort, '$_participantCount / ${cap.toInt()}'));
     }
     if (e['merit_offered'] == true) {
       final note = '${e['merit_note'] ?? ''}'.trim();
