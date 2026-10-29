@@ -90,8 +90,8 @@ class CategoryService {
         .from('content_categories')
         .select()
         .eq('kind', kind)
-        .order('sort')
-        .order('name_en');
+        .order('sort', ascending: true)
+        .order('name_en', ascending: true);
     return [
       for (final r in rows as List)
         ContentCategory.fromRow((r as Map).cast<String, dynamic>())
@@ -105,8 +105,8 @@ class CategoryService {
           .select()
           .eq('kind', kind)
           .eq('active', true)
-          .order('sort')
-          .order('name_en');
+          .order('sort', ascending: true)
+          .order('name_en', ascending: true);
       final list = [
         for (final r in rows as List)
           ContentCategory.fromRow((r as Map).cast<String, dynamic>())
