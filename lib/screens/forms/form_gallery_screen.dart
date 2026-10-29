@@ -59,6 +59,7 @@ class _FormGalleryScreenState extends State<FormGalleryScreen> {
   List<PostAsOption> _owners = const [];
   PostAsOption? _owner;
   bool _busy = false;
+  bool _loadFailed = false;
 
   @override
   void initState() {
@@ -172,18 +173,10 @@ class _FormGalleryScreenState extends State<FormGalleryScreen> {
             child: FutureBuilder<List<GalleryTemplate>>(
               future: _templates,
               builder: (context, snap) {
-                if (snap.hasError) {
-                  return _Center(
-                    icon: AppIcons.error,
-                    text: s.galleryLoadFailed,
-                    action: TextButton(
-                      onPressed: () =>
-                          setState(() => _templates = MyFormsService.instance.gallery()),
-                      child: Text(s.retry),
-                    ),
-                  );
-                }
-                final all = snap.data;
+                // A failed catalogue still leaves Blank and Import CSV usable;
+                // the error sits where the grid would be.
+                _loadFailed = snap.hasError;
+                final all = snap.hasError ? const <GalleryTemplate>[] : snap.data;
                 if (all == null) {
                   return const Center(child: CircularProgressIndicator());
                 }
@@ -390,6 +383,20 @@ class _FormGalleryScreenState extends State<FormGalleryScreen> {
     required bool describe,
   }) {
     final s = context.l10n;
+    if (_loadFailed) {
+      return [
+        SliverToBoxAdapter(
+          child: _Center(
+            icon: AppIcons.error,
+            text: s.galleryLoadFailed,
+            action: TextButton(
+              onPressed: () => setState(() => _templates = MyFormsService.instance.gallery()),
+              child: Text(s.retry),
+            ),
+          ),
+        ),
+      ];
+    }
     if (shown.isEmpty) {
       return [
         SliverToBoxAdapter(

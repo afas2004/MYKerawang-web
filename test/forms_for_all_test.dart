@@ -449,6 +449,15 @@ void main() {
     }
   }
 
+  testWidgets('without the catalogue, blank and CSV still work', (tester) async {
+    MyFormsService.instance = _BrokenGallery();
+    ClubService.debugPostAsOptions = () async => const [];
+    await pump(tester, 375, const FormGalleryScreen());
+    expect(find.text("Couldn't load the templates."), findsOneWidget);
+    expect(find.byKey(const ValueKey('start-blank')), findsOneWidget);
+    expect(find.byKey(const ValueKey('start-csv')), findsOneWidget);
+  });
+
   testWidgets('search and categories narrow the grid', (tester) async {
     MyFormsService.instance = FakeMyForms(const []);
     ClubService.debugPostAsOptions = () async => const [];
@@ -604,4 +613,11 @@ void main() {
     );
     expect(find.text('Fill in form'), findsNothing);
   });
+}
+
+class _BrokenGallery extends FakeMyForms {
+  _BrokenGallery() : super(const []);
+
+  @override
+  Future<List<GalleryTemplate>> gallery() => Future.error(Exception('no function'));
 }
