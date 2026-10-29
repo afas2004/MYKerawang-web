@@ -234,7 +234,7 @@ class _EventsViewState extends State<EventsView>
               ? SliverList.separated(
                   itemCount: events.length,
                   separatorBuilder: (_, __) => const SizedBox(height: KSpace.m),
-                  itemBuilder: (_, i) => i < 6 ? KEntrance(index: i, child: card(events[i])) : card(events[i]),
+                  itemBuilder: (_, i) => i < 3 ? KEntrance(index: i, child: card(events[i])) : card(events[i]),
                 )
               : SliverGrid.builder(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(

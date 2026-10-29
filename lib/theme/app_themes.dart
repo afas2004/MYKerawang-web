@@ -305,12 +305,12 @@ ThemeData buildAppTheme(AppTheme theme) {
     splashColor: pressed,
     materialTapTargetSize: MaterialTapTargetSize.padded,
     pageTransitionsTheme: const PageTransitionsTheme(builders: {
-      TargetPlatform.android: FadeThroughPageTransitionsBuilder(),
-      TargetPlatform.iOS: FadeThroughPageTransitionsBuilder(),
-      TargetPlatform.macOS: FadeThroughPageTransitionsBuilder(),
-      TargetPlatform.windows: FadeThroughPageTransitionsBuilder(),
-      TargetPlatform.linux: FadeThroughPageTransitionsBuilder(),
-      TargetPlatform.fuchsia: FadeThroughPageTransitionsBuilder(),
+      TargetPlatform.android: AppPageTransitionsBuilder(),
+      TargetPlatform.iOS: AppPageTransitionsBuilder(),
+      TargetPlatform.macOS: AppPageTransitionsBuilder(),
+      TargetPlatform.windows: AppPageTransitionsBuilder(),
+      TargetPlatform.linux: AppPageTransitionsBuilder(),
+      TargetPlatform.fuchsia: AppPageTransitionsBuilder(),
     }),
     iconTheme: IconThemeData(color: spec.text, size: 22),
     appBarTheme: AppBarTheme(

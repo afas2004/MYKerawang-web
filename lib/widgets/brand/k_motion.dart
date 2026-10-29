@@ -30,7 +30,7 @@ class KEntrance extends StatefulWidget {
   final int index;
   final int maxStaggered;
 
-  const KEntrance({super.key, required this.child, this.index = 0, this.maxStaggered = 6});
+  const KEntrance({super.key, required this.child, this.index = 0, this.maxStaggered = 3});
 
   @override
   State<KEntrance> createState() => _KEntranceState();

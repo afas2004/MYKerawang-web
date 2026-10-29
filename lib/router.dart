@@ -36,6 +36,7 @@ import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
 import 'utils/app_nav.dart';
 import 'utils/guest_access.dart';
+import 'theme/transitions.dart';
 import 'utils/responsive.dart';
 import 'widgets/app_sidebar.dart';
 import 'widgets/brand/brand.dart' show AppIllo, BrandEmptyState, KRadius;
@@ -151,15 +152,18 @@ GoRouter buildRouter() {
       GoRoute(path: '/', redirect: (_, __) => '/home'),
       GoRoute(
         path: '/login',
-        builder: (context, state) =>
-            LoginScreen(
-              from: state.uri.queryParameters['from'],
-              oauthError: state.uri.queryParameters['error_description'],
-            ),
+        // No sidebar here, so the whole page takes the desktop fade.
+        builder: (context, state) => RouteContentFade(
+          child: LoginScreen(
+            from: state.uri.queryParameters['from'],
+            oauthError: state.uri.queryParameters['error_description'],
+          ),
+        ),
       ),
       GoRoute(
         path: '/onboarding',
-        builder: (context, state) => const OnboardingScreen(),
+        builder: (context, state) =>
+            const RouteContentFade(child: OnboardingScreen()),
       ),
 
       // --- MAIN TABS (state preserved per branch, like IndexedStack) ---
@@ -255,9 +259,11 @@ GoRouter buildRouter() {
         path: '/event/:id/checkin',
         // The phone-camera fallback: the attendance QR opens this URL.
         // Members only — authRedirect sends guests to login and back.
-        builder: (context, state) => CheckinPage(
-          eventId: state.pathParameters['id']!,
-          token: state.uri.queryParameters['t'],
+        builder: (context, state) => DesktopChrome(
+          child: CheckinPage(
+            eventId: state.pathParameters['id']!,
+            token: state.uri.queryParameters['t'],
+          ),
         ),
       ),
       GoRoute(
@@ -270,9 +276,14 @@ GoRouter buildRouter() {
         // which is how the form "came back by itself".
         parentNavigatorKey: _rootKey,
         onExit: historyAwareExit,
-        builder: (context, state) => EventFormScreen(
-          eventId: state.pathParameters['id']!,
-          formId: state.uri.queryParameters['f'],
+        // The screen sets its own reading width; the chrome only adds the
+        // sidebar.
+        builder: (context, state) => DesktopChrome(
+          maxWidth: Responsive.detailMaxWidth,
+          child: EventFormScreen(
+            eventId: state.pathParameters['id']!,
+            formId: state.uri.queryParameters['f'],
+          ),
         ),
       ),
       GoRoute(
@@ -280,9 +291,12 @@ GoRouter buildRouter() {
         // The organiser's report page: S1/S2/S3 and the CSV.
         parentNavigatorKey: _rootKey,
         onExit: historyAwareExit,
-        builder: (context, state) => FormResponsesScreen(
-          eventId: state.pathParameters['id']!,
-          formId: state.uri.queryParameters['f'],
+        builder: (context, state) => DesktopChrome(
+          maxWidth: Responsive.detailMaxWidth,
+          child: FormResponsesScreen(
+            eventId: state.pathParameters['id']!,
+            formId: state.uri.queryParameters['f'],
+          ),
         ),
       ),
       GoRoute(
@@ -291,9 +305,13 @@ GoRouter buildRouter() {
         // first (leaveFormRoute → FormGuard).
         parentNavigatorKey: _rootKey,
         onExit: leaveFormRoute,
-        builder: (context, state) => FormEditorScreen(
-          eventId: state.pathParameters['id']!,
-          formId: state.uri.queryParameters['f'],
+        // Full window on purpose: the editor sizes its coverage rail from
+        // the window width, and a sidebar would squeeze it.
+        builder: (context, state) => RouteContentFade(
+          child: FormEditorScreen(
+            eventId: state.pathParameters['id']!,
+            formId: state.uri.queryParameters['f'],
+          ),
         ),
       ),
       GoRoute(
