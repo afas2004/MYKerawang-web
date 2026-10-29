@@ -7,6 +7,7 @@ import '../l10n/access_strings.dart';
 import '../utils/app_nav.dart';
 import '../utils/guest_access.dart';
 import '../services/unread_notifications.dart';
+import '../widgets/after_fonts_load.dart';
 import '../widgets/profile_avatar_action.dart';
 import '../widgets/shell_actions.dart';
 import '../services/category_service.dart';
@@ -405,7 +406,9 @@ class _CategoryChipRow extends StatelessWidget {
       for (final slug in kCommonListingCategories) ...all.where((c) => c.slug == slug),
       ...all.where((c) => c.slug == selected && !kCommonListingCategories.contains(c.slug)),
     ];
-    return SizedBox(
+    // Rebuilt once the web fonts load, or the labels keep their fallback
+    // width and the last letter fades out.
+    return AfterFontsLoad(child: SizedBox(
       height: 52,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
@@ -432,7 +435,7 @@ class _CategoryChipRow extends StatelessWidget {
           );
         },
       ),
-    );
+    ));
   }
 }
 

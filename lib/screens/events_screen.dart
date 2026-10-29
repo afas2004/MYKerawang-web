@@ -10,6 +10,7 @@ import '../language_cubit.dart';
 import '../utils/app_nav.dart';
 import '../utils/guest_access.dart';
 import '../services/unread_notifications.dart';
+import '../widgets/after_fonts_load.dart';
 import '../widgets/profile_avatar_action.dart';
 import '../widgets/shell_actions.dart';
 import '../services/category_service.dart';
@@ -582,7 +583,9 @@ class _TagChipRow extends StatelessWidget {
   Widget build(BuildContext context) {
     // A selected category outside the common set keeps its chip.
     final shown = tags.contains(selected) ? tags : [...tags, selected];
-    return SizedBox(
+    // Rebuilt once the web fonts load, or the labels keep their fallback
+    // width and the last letter fades out.
+    return AfterFontsLoad(child: SizedBox(
       height: 48,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
@@ -591,7 +594,7 @@ class _TagChipRow extends StatelessWidget {
         separatorBuilder: (_, __) => const SizedBox(width: KSpace.s),
         itemBuilder: (context, i) => _tagChip(context, shown[i], selected),
       ),
-    );
+    ));
   }
 }
 
