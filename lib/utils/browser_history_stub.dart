@@ -7,3 +7,6 @@ bool browserHistoryForward() => false;
 /// Non-web: there is no history to keep tidy, so the caller launches the
 /// OAuth page itself (this returns false = "not handled").
 bool replaceLocationForOAuth(String url) => false;
+
+/// Non-web: no page to reload; the caller navigates in-app instead.
+bool reloadAt(String path) => false;

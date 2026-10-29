@@ -9,9 +9,11 @@ import '../../l10n/app_strings.dart';
 import '../../theme/app_themes.dart' show kOnPhoto, photoScrim;
 import '../../language_cubit.dart';
 import '../../utils/app_nav.dart';
+import '../../utils/club_mentions.dart';
 import '../../utils/formatters.dart';
 import '../../utils/url_rules.dart';
 import '../../widgets/brand/brand.dart';
+import '../../widgets/club_mention_chip.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/linear_refresher.dart';
 import '../../widgets/profile_avatar_action.dart';
@@ -370,7 +372,7 @@ class _HeroSlide extends StatelessWidget {
     final theme = Theme.of(context);
     final s = context.l10n;
     final cover = item.coverUrl;
-    final title = item.title.isNotEmpty ? item.title : item.body;
+    final title = item.title.isNotEmpty ? item.title : _excerpt(item.body);
     final badge = item.featured
         ? (s.hub.featured, AppIcons.sparkle)
         : item.pinned
@@ -767,7 +769,7 @@ class AnnouncementCard extends StatelessWidget {
                           style: theme.textTheme.titleMedium),
                     if (a.body.isNotEmpty) ...[
                       const SizedBox(height: KSpace.xs),
-                      Text(a.body,
+                      Text(_excerpt(a.body),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodyMedium
@@ -874,4 +876,10 @@ class _HubSkeleton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A body shown as plain text: club mentions read as the club's name.
+String _excerpt(String body) {
+  ClubMentionDirectory.ensureLoaded();
+  return plainClubMentions(body, ClubMentionDirectory.names);
 }

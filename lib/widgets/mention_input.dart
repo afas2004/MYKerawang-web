@@ -2,7 +2,52 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 
+import '../utils/club_mentions.dart';
 import '../utils/filter_rules.dart';
+import 'mention_text.dart';
+
+/// A text controller that marks mentions as you type: `@people` in bold
+/// primary, club mentions (`@[handle]`) as a tinted highlight, so it is
+/// clear the composer understood them. Only styling — the text is the
+/// same characters the reader's page turns into links and chips.
+class MentionEditingController extends TextEditingController {
+  MentionEditingController({super.text});
+
+  static final _any =
+      RegExp('${clubMentionPattern.pattern}|${MentionText.mentionPattern.pattern}');
+
+  @override
+  TextSpan buildTextSpan({
+    required BuildContext context,
+    TextStyle? style,
+    required bool withComposing,
+  }) {
+    // Leave IME composition (CJK input) to the default rendering.
+    if (withComposing && value.isComposingRangeValid) {
+      return super.buildTextSpan(context: context, style: style, withComposing: withComposing);
+    }
+    final scheme = Theme.of(context).colorScheme;
+    final children = <TextSpan>[];
+    var i = 0;
+    for (final m in _any.allMatches(text)) {
+      if (m.start > i) children.add(TextSpan(text: text.substring(i, m.start)));
+      final club = m.group(1) != null;
+      children.add(TextSpan(
+        text: m.group(0),
+        style: club
+            ? TextStyle(
+                color: scheme.onSecondaryContainer,
+                backgroundColor: scheme.secondaryContainer,
+                fontWeight: FontWeight.w600,
+              )
+            : TextStyle(color: scheme.primary, fontWeight: FontWeight.w700),
+      ));
+      i = m.end;
+    }
+    if (i < text.length) children.add(TextSpan(text: text.substring(i)));
+    return TextSpan(style: style, children: children);
+  }
+}
 
 class MentionInput extends StatelessWidget {
   final TextEditingController controller;
@@ -12,10 +57,19 @@ class MentionInput extends StatelessWidget {
 
   /// Also suggest **clubs** while typing, not just `@people`.
   ///
-  /// A club has a handle but no profile, so `@kerawang` would mention nobody.
-  /// Where a field is meant to name a club (the event's co-organiser), the
-  /// suggestion inserts the club's name as text instead of a mention.
+  /// A club has a handle but no profile, so `@kerawang` would mention nobody
+  /// (or the wrong person). A picked club inserts a club mention,
+  /// `@[handle]`, which the page shows as a chip (see club_mentions.dart).
   final bool suggestClubs;
+
+  /// Suggest `@people`. Off where a mention would notify nobody and only
+  /// clubs make sense (the announcement body).
+  final bool suggestPeople;
+
+  /// Replaces the bare, borderless look (for a field with its own frame,
+  /// helper text and counter).
+  final InputDecoration? decoration;
+  final int? maxLength;
 
   const MentionInput({
     super.key,
@@ -29,6 +83,9 @@ class MentionInput extends StatelessWidget {
     this.autofocus = false,
     this.focusNode,
     this.suggestClubs = false,
+    this.suggestPeople = true,
+    this.decoration,
+    this.maxLength,
   });
 
   /// Lets callers focus the field (e.g. "Comment" on a post).
@@ -61,7 +118,9 @@ class MentionInput extends StatelessWidget {
           style: style,
           minLines: minLines ?? 1,
           maxLines: maxLines ?? (isMultiLine ? 8 : 1),
-          decoration: InputDecoration(
+          maxLength: maxLength,
+          keyboardType: isMultiLine ? TextInputType.multiline : null,
+          decoration: decoration ?? InputDecoration(
             hintText: hintText,
             hintStyle: style?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant),
@@ -95,7 +154,10 @@ class MentionInput extends StatelessWidget {
 
         // A bare "@" is too broad to search on.
         if (isMention && currentWord.length < 2) return null;
-        if (!isMention && !suggestClubs) return null;
+        // Bare words find clubs only in a one-line field (the co-organiser,
+        // where the whole entry is a name); in a body that would pop up on
+        // every word, so there it takes an "@".
+        if (!isMention && (!suggestClubs || isMultiLine)) return null;
         if (!isMention && currentWord.length < 2) return null;
 
         final query = isMention ? currentWord.substring(1) : currentWord;
@@ -106,7 +168,7 @@ class MentionInput extends StatelessWidget {
         final out = <Map<String, dynamic>>[];
 
         // 4a. People, for an @mention.
-        if (isMention) {
+        if (isMention && suggestPeople) {
           try {
             final res = await Supabase.instance.client
                 .from('profiles')
@@ -119,7 +181,8 @@ class MentionInput extends StatelessWidget {
           }
         }
 
-        // 4b. Clubs, by name or handle. These insert as a name, not a mention:
+        // 4b. Clubs, by name or handle, typed bare or after "@". These
+        //      insert as a club mention, `@[handle]`, never `@handle`:
         //      a club has no profile to notify.
         if (suggestClubs) {
           try {
@@ -170,9 +233,10 @@ class MentionInput extends StatelessWidget {
         }
         start++; 
 
-        // A club becomes its name; a person becomes "@username ".
+        // A club becomes "@[handle] " (a chip on the page); a person
+        // becomes "@username ".
         final insert = user['kind'] == 'club'
-            ? '${user['name']} '
+            ? '${clubMentionToken('${user['handle']}')} '
             : "@${user['username']} ";
         final newText = text.replaceRange(start, selection.baseOffset, insert);
         

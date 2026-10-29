@@ -1067,9 +1067,11 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                             ?.copyWith(color: scheme.onSurfaceVariant)),
                   ),
                   Expanded(
-                    child: Text(value,
+                    // FormattedBody so a club mention (the co-organiser,
+                    // usually) shows as its chip.
+                    child: FormattedBody(value,
                         style: theme.textTheme.bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.w500)),
+                            ?.copyWith(fontWeight: FontWeight.w500, color: scheme.onSurface)),
                   ),
                 ],
               ),

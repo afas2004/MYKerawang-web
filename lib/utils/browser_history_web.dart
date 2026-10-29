@@ -29,3 +29,11 @@ bool replaceLocationForOAuth(String url) {
   web.window.location.replace(url);
   return true;
 }
+
+/// Loads [path] as a fresh page in place of the current entry: every cubit,
+/// cache and pushed page starts over. Used after signing out, so nothing of
+/// the old account stays on screen.
+bool reloadAt(String path) {
+  web.window.location.replace(path);
+  return true;
+}

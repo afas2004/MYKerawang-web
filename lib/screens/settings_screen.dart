@@ -21,6 +21,8 @@ import '../services/account_data.dart';
 import '../services/moderation_service.dart';
 import '../services/student_verification.dart';
 import '../utils/app_nav.dart';
+import '../utils/browser_history_stub.dart'
+    if (dart.library.js_interop) '../utils/browser_history_web.dart';
 import 'profile_cubit.dart';
 import 'login_cubit.dart';
 import 'verification/verify_sheet.dart';
@@ -252,9 +254,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     try {
       await _supabase.auth.signOut();
-      // The router's auth redirect also catches this; go explicitly so the
-      // whole stack (including pushed routes) is replaced.
-      if (mounted) context.go('/login');
+      // Straight to Home as a guest. On the web that is a fresh page load:
+      // a `go` from here would be turned into a browser back by this page's
+      // onExit (landing on the profile, still showing the old account), and
+      // the tabs' cubits would keep the old account's data anyway.
+      if (reloadAt('/home')) return;
+      if (mounted) context.go('/home');
     } catch (e) {
       if (mounted) {
         final scheme = Theme.of(context).colorScheme;
