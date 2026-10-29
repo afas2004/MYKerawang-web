@@ -1,96 +1,96 @@
 # MYKerawang
 
-A student community platform for Kolej Kerawang, UiTM Terengganu Cendering, built with Flutter and Supabase. It combines a confession/announcement social feed, a campus marketplace, and an events calendar in one app, with first-class support for both mobile and web.
+A community app for the students, clubs and staff of Kolej Kerawang, a UiTM residential college. One place for the college feed, official announcements, clubs, events and a student marketplace, in English and Malay.
 
-## Screenshots
+**Live: [kerawang.my](https://kerawang.my)** · version 1.10.2
 
-| Home Feed | Marketplace | Events |
+| Home feed | Announcements | Events |
 | :---: | :---: | :---: |
-| <img width="300" alt="image" src="https://github.com/user-attachments/assets/849677ad-6f74-4ba1-acd5-1ac143ee8455" /> | <img width="300" alt="image" src="https://github.com/user-attachments/assets/aa24445c-2ac8-41f4-9c7c-497e8b13c6d0" /> | <img width="300" alt="image" src="https://github.com/user-attachments/assets/0bc3abd9-e753-4bf2-bfd7-86ecf33b268d" /> |
-
-
-## Web app
-
-[**Access the website here**](https://mykerawang-app.web.app/)
-
-*Sign up using email or Google account*
+| <img src="docs/screenshots/home.png" width="250" alt="Home feed: upcoming events, marketplace finds and posts" /> | <img src="docs/screenshots/announcements.png" width="250" alt="Announcements hub with Kolej, JPK, Clubs and Events channels" /> | <img src="docs/screenshots/events.png" width="250" alt="Events list with dates, times, venues and organising club" /> |
 
 ## Features
 
-**Social feed**
-- Post announcements, questions, confessions, lost & found notices, rants, or academic queries — anonymously if you'd rather
-- Tag posts and `@mention` other students inline
-- Share a marketplace listing or event straight into the feed as a card
+- **Home feed**: posts, questions, confessions and lost & found, optionally anonymous, with tags, `@mentions`, and events or listings shared as cards.
+- **Announcements hub**: official news in Kolej, JPK and Clubs channels, with a featured carousel and upcoming official events.
+- **Clubs**: a directory, club pages with posts and a public roster, club registration against a registry, join requests, and posting as a club.
+- **Events**: event pages with a registration link, QR check-in with a rotating code and a live attendance count, add-to-calendar, and attendance CSV export.
+- **KI forms**: per-event survey builder for the HEP report (KI1–KI7 before/after, S1/S2/S3 analysis, copyable tables and CSV).
+- **Marketplace**: list items for sale and contact the seller on WhatsApp.
+- **Guest mode**: shared links to posts, profiles, events and listings open read-only without an account; any action leads to sign-in and back.
+- **English and Malay**, switchable in Settings.
+- **Student verification**: students submit a UiTM email and an admin checks it.
+- **Moderation console** (`/admin`, PIN-locked): reports and cases, club approvals, join requests, appeals, restrictions, an action log, categories and verifications.
 
-**Marketplace**
-- Browse and list items for sale
-- Contact a seller directly via WhatsApp
-
-**Events**
-- Browse upcoming and past campus events
-- Open a full detail page for each one
-
-**Trust & safety**
-- Report a post, listing, or user for spam, hate speech, inappropriate content, misinformation, or other reasons
-- Reports go straight to Supabase for review
-
-**Profiles & notifications**
-- Follow other students and see follower/following lists
-- Get realtime updates pushed to your device as local notifications (mobile)
-
-**Built for mobile and web, from one codebase**
-- Bottom-nav layout on mobile, sidebar + discovery rail on web
-- Clean, shareable URLs on web (`/market`, `/event/:id`, `/post/:id`, and so on)
-- QR generation and in-app scanning for quick actions
-- Listings and events cache locally on mobile, so the feed still loads something offline
+Sign in with email or Google.
 
 ## Tech stack
 
-- **Framework:** Flutter (Dart SDK `^3.8.1`), targeting Android, iOS, and Web from one codebase
-- **Backend:** [Supabase](https://supabase.com) (Postgres + Auth + Realtime + Storage)
-- **State management:** `flutter_bloc` (Cubits per feature: events, marketplace, profile, theme, language, login)
-- **Routing:** `go_router`, with clean web URLs via `flutter_web_plugins`' path URL strategy
-- **Local storage:** `sqflite` (mobile-only offline cache), `shared_preferences` (theme/language persistence)
-- **Media:** `image_picker`, `flutter_image_compress`, `cached_network_image`, `photo_view`, `gal`
-- **Other integrations:** `flutter_local_notifications` + `permission_handler` (push notifications), `url_launcher` (WhatsApp hand-off), `share_plus`, `qr_flutter` / `mobile_scanner`, `timeago`, `flutter_typeahead`, `flutter_parsed_text`
+- **Flutter** (Dart `^3.8.1`), shipped as a web app (wasm build). State with `flutter_bloc`, routing with `go_router` and clean URLs.
+- **Supabase**: Postgres with row-level security, server-side RPCs for anything privileged (club decisions, form submission, check-in), Auth, Storage and Realtime.
+- **Firebase Hosting** serves the built site.
+
+## For developers
+
+### Run locally
+
+```bash
+flutter pub get
+flutter run -d chrome
+```
+
+The app connects to the Supabase project configured in `lib/main.dart` (the public URL and publishable key), so a local run reads and writes real data.
+
+### Tests
+
+```bash
+flutter test
+```
+
+The database migrations have their own suites under `supabase/tests/`. They apply every migration to an in-memory Postgres ([PGlite](https://pglite.dev)) and check RLS and the RPCs. Install PGlite once, then run a suite:
+
+```bash
+cd supabase/tests/moderation
+npm i --no-save @electric-sql/pglite@0.2.17
+node moderation_test.mjs ../../../
+node ../clubs/clubs_test.mjs ../../..
+```
+
+The header comment of each `*_test.mjs` file shows how to run it.
+
+### Database
+
+Migrations live in `supabase/migrations/`, one timestamped SQL file per change. `supabase/checks/` holds read-only verification queries and `supabase/seed/` holds beta seed data.
+
+### Deploy
+
+Always deploy with `deploy_web.bat`. Never deploy a plain `flutter build web`. The script stamps a build id, turns off the PWA service worker, swaps in a self-removing worker for old caches, and then runs `firebase deploy --only hosting`.
 
 ## Project structure
 
 ```
 lib/
-├── screens/          # Feature screens: home, search, marketplace, events, profile,
-│                      # post/item/event detail, create post/listing/event, settings, login
-├── widgets/           # Shared UI: post card, feed composer, embed card, mention input,
-│                       # hover carousel, right rail, sidebar, kerawang motif, universal card
-├── services/          # notification_service, share_service
-├── utils/             # Responsive/adaptive layout helpers, image compression, file saving
-│                       # (web vs. native), report_helper, feed seeder
-├── theme/             # Named app themes (Kampus Bold / Istana Modern / Songket Noir)
-├── l10n/              # Lightweight localisation (English / Bahasa Melayu / Japanese)
-├── database_helper.dart  # sqflite offline cache (mobile only; skipped on web)
-├── router.dart         # go_router route table
-└── main.dart           # App entry point, Supabase init, global Cubit providers
+├── main.dart            entry point, Supabase init, app-wide cubits
+├── router.dart          route table (go_router)
+├── screens/             feed, market, events, profile, create/edit, settings
+│   ├── announcements/   announcements hub
+│   ├── clubs/           directory, club page, register, manage
+│   ├── events/          check-in, attendance, KI form editor/answers/analysis
+│   ├── admin/           moderation console
+│   └── verification/    student verification sheet
+├── services/            Supabase-facing services (posts, clubs, forms, moderation…)
+├── widgets/             shared UI (post card, composer, sidebar, brand…)
+├── utils/               rules and helpers (validation, CSV, links, layout)
+├── l10n/                English and Malay strings
+└── theme/               themes, tokens, icons
+supabase/
+├── migrations/          schema, RLS and RPCs
+├── tests/               PGlite migration suites
+├── checks/  seed/
+test/                    Flutter widget and unit tests
+docs/                    design notes, handover, security review, screenshots
+deploy_web.bat           build + deploy to Firebase Hosting
 ```
-
-## Getting started
-
-**Prerequisites:** a Flutter SDK compatible with Dart `^3.8.1`, plus the Android Studio/Xcode toolchain for whichever platform you're targeting, and a Supabase project.
-
-```bash
-git clone https://github.com/afas2004/MYKerawang-web.git
-cd MYKerawang-web
-flutter pub get
-flutter run
-```
-
-To run the web build specifically:
-
-```bash
-flutter run -d chrome
-```
-
-
 
 ## Author
 
-Built by Afas as a student project for Kolej Kerawang, UiTM Terengganu Cendering.
+Built by Afas for Kolej Kerawang, UiTM.
