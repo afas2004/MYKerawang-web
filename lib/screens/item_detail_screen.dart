@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
+import '../services/category_service.dart';
 import '../theme/app_themes.dart';
 import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
@@ -52,6 +53,11 @@ int _currentImageIndex = 0;
     super.initState();
     _itemData = widget.item;
     _refreshData();
+    // Labels resolve from the cache (or the bundled seeds); repaint once
+    // the live names arrive, for a category added since the seeds.
+    CategoryService.forKind('listing').then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -678,7 +684,8 @@ int _currentImageIndex = 0;
           padding: const EdgeInsets.symmetric(horizontal: KSpace.l, vertical: KSpace.xs),
           child: Column(
             children: [
-              infoRow(AppIcons.price, s.category, _itemData['category'] ?? s.categoryGeneral),
+              infoRow(AppIcons.price, s.category,
+                  CategoryService.labelsFor('listing', _itemData, s) ?? s.categoryGeneral),
               const Divider(height: 1),
               infoRow(
                 switch (status) {
