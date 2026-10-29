@@ -16,7 +16,6 @@ import '../../widgets/error_state.dart';
 import '../../widgets/profile_avatar_action.dart';
 import '../../widgets/shell_actions.dart';
 import '../../widgets/tap_card.dart';
-import '../../widgets/universal_card.dart' show eventGlyphs;
 import 'announcements_repository.dart';
 import 'hub_strings.dart';
 
@@ -660,7 +659,7 @@ class _EventTile extends StatelessWidget {
     final image = event['image_url'] as String?;
     final seed = '${event['id'] ?? event['title']}';
     // No photo: the same calm tint cover as Home's event cards.
-    final tint = KTintCover(seed: seed, color: KPalette.forKey(seed), glyphs: eventGlyphs);
+    final tint = KTintCover(seed: seed, color: KPalette.forKey(seed));
     return SizedBox(
       width: 220,
       child: KCard(

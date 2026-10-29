@@ -24,8 +24,7 @@ class KGround extends StatefulWidget {
 
   const KGround({super.key, required this.child, this.strength = 0.06});
 
-  /// The drawings, 24 × 24, single stroke (also used one at a time by
-  /// [KGlyph] on covers without a photo).
+  /// The drawings, 24 × 24, single stroke.
   static const glyphs = <String, String>{
     'wau': '<path d="M12 2C9 5 5 6.5 2 7.5c3.5 2 7 3 10 3.5 3-.5 6.5-1.5 10-3.5C19 6.5 15 5 12 2Z"/><path d="M12 11v6"/><path d="M8.5 17.5c1.5 1.8 5.5 1.8 7 0-1.5-1.2-5.5-1.2-7 0Z"/><path d="M12 19.5v3"/>',
     'ketupat': '<path d="M12 3l8 8-8 8-8-8z"/><path d="M8 7l8 8M16 7l-8 8"/><path d="M12 19v3"/>',
@@ -158,57 +157,29 @@ class _GroundPainter extends CustomPainter {
       old.background != background || old.tile != tile || old.dpr != dpr;
 }
 
-/// One drawing from the ground's set, for covers without a photo.
-///
-///   KGlyph.forSeed('event-42', color: c, size: 32)
-class KGlyph extends StatelessWidget {
-  final String name;
-  final Color color;
-  final double size;
-
-  const KGlyph(this.name, {super.key, required this.color, this.size = 32});
-
-  /// A stable drawing for [seed], from [names] (all of them by default).
-  factory KGlyph.forSeed(String seed,
-      {Key? key, required Color color, double size = 32, List<String>? names}) {
-    final pool = names ?? KGround.glyphs.keys.toList();
-    return KGlyph(pool[stableHash(seed) % pool.length], key: key, color: color, size: size);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final hex = '#${(color.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
-    return SvgPicture.string(
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" '
-      'stroke="$hex" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
-      '${KGround.glyphs[name]}</svg>',
-      width: size,
-      height: size,
-      excludeFromSemantics: true,
-    );
-  }
-}
-
 /// A cover for an item with no photo: a soft wash of its colour with one
-/// drawing in the middle. Calm on purpose — the ground already carries the
-/// pattern, so covers don't add another.
+/// Fluent emoji (MIT, flat style) in the middle. Calm on purpose — the
+/// ground already carries the pattern, so covers don't add another.
 class KTintCover extends StatelessWidget {
   final String seed;
   final Color color;
 
-  /// Which drawings this kind of item may get.
-  final List<String>? glyphs;
+  /// Which icons this kind of item may get: file names in
+  /// `assets/illustrations/emoji/` (see [KTintCover.eventIcons]).
+  final List<String> icons;
+
+  static const eventIcons = ['calendar', 'party', 'kite', 'music', 'ball', 'sparkles'];
+  static const listingIcons = ['shopping_bags', 'books', 'open_book', 'backpack', 'cooked_rice', 'tea'];
 
   /// On top (a date stub, a price tag).
   final Widget? child;
 
-  const KTintCover({super.key, required this.seed, required this.color, this.glyphs, this.child});
+  const KTintCover({super.key, required this.seed, required this.color, this.icons = eventIcons, this.child});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
-    final ink = dark ? Color.lerp(color, Colors.white, 0.45)! : color;
     final wash = Color.alphaBlend(color.withValues(alpha: dark ? 0.32 : 0.14), theme.cardColor);
     return ColoredBox(
       color: wash,
@@ -216,12 +187,15 @@ class KTintCover extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           Center(
-            child: LayoutBuilder(
-              builder: (context, box) => KGlyph.forSeed(seed,
-                  color: ink,
-                  names: glyphs,
-                  size: (box.maxHeight.isFinite ? box.maxHeight * 0.36 : 32.0).clamp(18.0, 56.0).toDouble()),
-            ),
+            child: LayoutBuilder(builder: (context, box) {
+              final size = (box.maxHeight.isFinite ? box.maxHeight * 0.42 : 36.0).clamp(18.0, 64.0).toDouble();
+              return SvgPicture.asset(
+                'assets/illustrations/emoji/${icons[stableHash(seed) % icons.length]}.svg',
+                width: size,
+                height: size,
+                excludeFromSemantics: true,
+              );
+            }),
           ),
           if (child != null) child!,
         ],

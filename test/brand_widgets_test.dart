@@ -186,7 +186,7 @@ void main() {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
       await tester.pump();
       expect(tester.takeException(), isNull);
-      expect(find.byType(KGlyph), findsNWidgets(3));
+      expect(find.byType(KTintCover), findsNWidgets(3));
     });
   }
 

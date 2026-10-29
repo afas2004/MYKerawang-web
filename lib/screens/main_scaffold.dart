@@ -284,11 +284,11 @@ class ShellFrame extends StatelessWidget {
   }
 }
 
-/// Phone bottom bar, the "kaki kain" (foot of the kain) to the app bar's
-/// head: a songket hem along its top edge, then Home, Announcements, Create,
-/// Market, Events. The active tab is plum with a small marigold diamond
-/// above it; Create is a plum diamond in the middle slot (it opens the
-/// create sheet; guests are asked to log in first). Search has no slot; it's in the tab app bars. Profile is
+/// Phone bottom bar, the foot to the app bar's head: a white bar with softly
+/// rounded top corners. Home, Announcements, Create, Market, Events. The
+/// active tab is plum with a small rounded marigold mark above it; Create is
+/// the MYKerawang logo, big and rising above the bar in the middle slot (it
+/// opens the create sheet; guests are asked to log in first). Search has no slot; it's in the tab app bars. Profile is
 /// reached from [ProfileAvatarAction] in the app bars.
 class CompactNavBar extends StatelessWidget {
   final int currentIndex;
@@ -320,21 +320,16 @@ class CompactNavBar extends StatelessWidget {
       label: s.shell.mainNavigation,
       child: Material(
         color: scheme.surfaceContainerLowest,
+        elevation: 6,
+        shadowColor: scheme.primary.withValues(alpha: 0.25),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
         child: SafeArea(
           top: false,
           child: SizedBox(
             height: height,
-            child: Stack(
-              children: [
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  top: 0,
-                  child: SongketHem(height: 7, color: scheme.primary.withValues(alpha: 0.55)),
-                ),
-                Positioned.fill(
-                  top: 7,
-                  child: Row(
+            child: Row(
               children: [
                 tab(ShellBranch.home),
                 tab(ShellBranch.announcements),
@@ -351,9 +346,6 @@ class CompactNavBar extends StatelessWidget {
                 tab(ShellBranch.market),
                 tab(ShellBranch.events),
               ],
-                  ),
-                ),
-              ],
             ),
           ),
         ),
@@ -361,6 +353,8 @@ class CompactNavBar extends StatelessWidget {
     );
   }
 }
+
+const double _logoSize = 52;
 
 class _BarItem extends StatelessWidget {
   final IconData icon;
@@ -407,26 +401,29 @@ class _BarItem extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (accent)
-                // Create: a plum diamond, in the same 32 px slot as the tab
-                // icons so every label shares one baseline.
+                // Create: the MYKerawang logo, big, rising above the bar. It
+                // keeps the 32 px slot of the tab icons so every label shares
+                // one baseline; the extra height paints upward.
                 SizedBox(
                   width: 64,
                   height: 32,
-                  child: Center(
-                    child: Transform.rotate(
-                  angle: 0.785398,
-                  child: Container(
-                    width: 30,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: scheme.primary,
-                      borderRadius: const BorderRadius.all(Radius.circular(9)),
-                    ),
-                    child: Transform.rotate(
-                      angle: -0.785398,
-                      child: Icon(icon, color: fg, size: 20),
-                    ),
-                  ),
+                  child: OverflowBox(
+                    alignment: Alignment.bottomCenter,
+                    maxHeight: _logoSize + 4,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular((_logoSize + 4) * 0.28),
+                        color: scheme.surfaceContainerLowest,
+                        boxShadow: [
+                          BoxShadow(
+                            color: scheme.primary.withValues(alpha: 0.28),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(2),
+                      child: const AppLogo(size: _logoSize),
                     ),
                   ),
                 )
@@ -439,16 +436,20 @@ class _BarItem extends StatelessWidget {
                     clipBehavior: Clip.none,
                     children: [
                       Icon(selected ? selectedIcon : icon, color: fg, size: 22),
-                      // The active tab's marigold diamond.
+                      // The active tab's soft marigold mark.
                       Positioned(
-                        top: -4,
+                        top: -5,
                         child: AnimatedScale(
                           scale: selected ? 1 : 0,
                           duration: motion.medium,
                           curve: KMotion.curve,
-                          child: Transform.rotate(
-                            angle: 0.785398,
-                            child: Container(width: 6, height: 6, color: KTokens.of(context).accent),
+                          child: Container(
+                            width: 14,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: KTokens.of(context).accent,
+                              borderRadius: KRadius.pill,
+                            ),
                           ),
                         ),
                       ),

@@ -13,15 +13,17 @@ doesn't drift back to the generic default. Background and reasoning:
    in the theme primary, like Telegram/WhatsApp chat wallpapers. The theme's
    scaffold background is transparent so it shows everywhere; opaque
    page-coloured fills use `colorScheme.surface`.
-2. **A framed screen.** App bar = kepala kain (`KBand`: solid plum on every
-   main tab, songket hem below, no pattern). Nav bar = kaki kain
-   (`CompactNavBar`: songket hem on top, plum diamond Create, marigold
-   diamond above the active tab).
+2. **A framed screen, soft edges.** App bar (`KBand`): solid plum on every
+   main tab with rounded lower corners, no strip, no pattern. Nav bar
+   (`CompactNavBar`): white with rounded top corners and a soft shadow; Create
+   is the MYKerawang logo, big, rising above the bar; a rounded marigold
+   mark sits above the active tab.
 3. **Plain figures.** Cards are plain surfaces with the hairline. The
    author's colour is a thin ring on the post avatar, not a card edge.
 4. **Special things keep one special shape** (table below).
 5. **No photo = a calm tint** (`KTintCover`): a soft wash of the item's
-   colour and one drawing from the ground's set. Patterns are reserved for
+   colour and one Fluent emoji (calendar, party, kite… for events; bags,
+   books, rice… for listings). Patterns are reserved for
    profile banners and club covers, which are those owners' identity.
 
 ## Personality
@@ -64,8 +66,8 @@ scene's top. Never across the middle of content, never as a texture.
 
 ## Header band (kepala kain) — `KBand`
 
-The four main tabs' app bars are solid plum (deepened on dark themes) with a
-songket hem on the lower edge and a 20 px title. No pattern: the ground has
+The four main tabs' app bars are solid plum (deepened on dark themes) with
+softly rounded lower corners and a 20 px title. No songket strip on the bars. No pattern: the ground has
 the drawings. Other screens keep the plain app bar.
 
 ## Patterns — `KPattern`
@@ -84,7 +86,7 @@ from the one ground.
 | Event date | ticket stub, plum, perforated edge | `DateBlock` |
 | Market price | marigold hanging tag | `PriceTag` |
 | Announcement category | colour rail | `categoryColor` |
-| No photo (events, listings) | soft tint + one drawing; events add a date stub — never a grey box | `KTintCover` |
+| No photo (events, listings) | soft tint + one Fluent emoji; events add a date stub — never a grey box | `KTintCover` |
 | No photo (clubs, profiles) | pattern cover with songket hem (their identity) | `ClubCover`, `BrandCover` |
 | No photo (announcement hero) | solid category colour + its icon | `_CategoryCover` |
 

@@ -134,7 +134,7 @@ class _PageState extends State<_Page> {
             section('Header bands (kepala kain)', [
               for (final (name, tone) in [('Home', KBand.home), ('News', KBand.news), ('Market', KBand.market), ('Events', KBand.events)]) ...[
                 SizedBox(
-                  height: kToolbarHeight + KBand.hemHeight,
+                  height: kToolbarHeight + KBand.footRadius,
                   child: KBand.appBar(context, tone: tone, title: Text(name), actions: [
                     IconButton(onPressed: () {}, icon: const Icon(AppIcons.search)),
                     IconButton(onPressed: () {}, icon: const Icon(AppIcons.notifications)),

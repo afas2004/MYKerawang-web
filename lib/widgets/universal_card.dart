@@ -32,13 +32,13 @@ class UniversalCard extends StatelessWidget {
             : formatEventRange(start, parseLocal(data['end_datetime'])))
         : formatPrice(data['price']);
 
-    // No photo: a soft wash of the item's colour with one drawing from the
-    // ground's set (never an empty grey box), and the date stub on events.
+    // No photo: a soft wash of the item's colour with one Fluent icon (never
+    // an empty grey box), and the date stub on events.
     final seed = '${data['id'] ?? title}';
     final generated = KTintCover(
       seed: seed,
       color: KPalette.forKey(seed),
-      glyphs: isEvent ? eventGlyphs : listingGlyphs,
+      icons: isEvent ? KTintCover.eventIcons : KTintCover.listingIcons,
       child: isEvent && start != null
           ? Align(
               alignment: Alignment.bottomLeft,
@@ -110,10 +110,6 @@ class UniversalCard extends StatelessWidget {
     );
   }
 }
-
-/// Drawings that suit an event / a listing cover.
-const eventGlyphs = ['wau', 'note', 'ball', 'cap', 'star', 'bungaraya'];
-const listingGlyphs = ['book', 'tea', 'pencil', 'bike', 'songket', 'ketupat'];
 
 /// Month over day, white on plum, for an event cover with no photo.
 class _MiniStub extends StatelessWidget {

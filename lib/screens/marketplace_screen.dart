@@ -14,7 +14,6 @@ import '../utils/formatters.dart';
 import '../utils/listing_status.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/brand/brand.dart';
-import '../widgets/universal_card.dart' show listingGlyphs;
 import 'marketplace_cubit.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
@@ -344,12 +343,12 @@ class MarketCard extends StatelessWidget {
                   color: isSold ? scheme.outline : null,
                   colorBlendMode: isSold ? BlendMode.saturation : null,
                   placeholder: (_, __) => ColoredBox(color: scheme.surfaceContainerHighest),
-                  // No photo (or a broken one): a soft wash with one drawing,
+                  // No photo (or a broken one): a soft wash with one icon,
                   // never an empty grey box.
                   errorWidget: (_, __, ___) => KTintCover(
                     seed: '${item['id'] ?? title}',
                     color: KPalette.forKey('${item['id'] ?? title}'),
-                    glyphs: listingGlyphs,
+                    icons: KTintCover.listingIcons,
                   ),
                 ),
                 if (badge != null)
