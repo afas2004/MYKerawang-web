@@ -12,6 +12,7 @@ IconData caseTypeIcon(String? t) => switch (t) {
       'comment' => ModIcons.comment,
       'event' => ModIcons.event,
       'listing' => ModIcons.listing,
+      'form' => ModIcons.form,
       _ => ModIcons.person,
     };
 

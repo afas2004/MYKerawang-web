@@ -319,4 +319,251 @@ extension FormStrings on AppStrings {
         'unknown_kind' => _t("Unknown answer type.", "Jenis jawapan tidak dikenali.", "Unknown answer type."),
         _ => _t("Something is not right with that question.", "Ada yang tidak kena dengan soalan itu.", "Something is not right."),
       };
+
+  // ---- forms for everyone (/forms, /f/:id) ----
+  String get formsMine => _t("My forms", "Borang saya", "My forms");
+  String get formsCreateSub => _t(
+      "A sign-up sheet, survey or order form to link from a post.",
+      "Senarai nama, tinjauan atau borang tempahan untuk dipaut dari hantaran.",
+      "A sign-up sheet, survey or order form to link from a post.");
+  String get formsNew => _t("New form", "Borang baharu", "New form");
+  String get formsEmpty =>
+      _t("You haven't made any forms yet.", "Anda belum membuat sebarang borang.", "No forms yet.");
+  String get formsEmptySub => _t(
+      "Make a sign-up sheet, a survey or an order form, then link it from a post, event or announcement.",
+      "Buat senarai nama, tinjauan atau borang tempahan, kemudian pautkan dari hantaran, acara atau pengumuman.",
+      "Make a form, then link it from a post.");
+  String get formsTitleLabel => _t("Form title", "Tajuk borang", "Form title");
+  String get formsOwnerLabel => _t("Owner", "Pemilik", "Owner");
+  String get formsOwnerSelf => _t("Just me", "Saya sendiri", "Just me");
+  String get formsOwnerClubHelp => _t(
+      "A club form can be edited, and its answers read, by the club's officers.",
+      "Borang kelab boleh disunting, dan jawapannya dibaca, oleh AJK kelab.",
+      "Club officers can edit a club form and read its answers.");
+  String get formsUseKi =>
+      _t("Start from the KI template", "Mula dengan templat KI", "Start from the KI template");
+  String get formsCreate => _t("Create", "Cipta", "Create");
+  String formsResponses(int n) =>
+      _t("$n ${n == 1 ? 'response' : 'responses'}", "$n jawapan", "$n responses");
+  String get formsRemoved =>
+      _t("Removed by moderators", "Dibuang oleh moderator", "Removed by moderators");
+  String get formsCopyLink => _t("Copy link", "Salin pautan", "Copy link");
+  String get formsLinkCopied => _t("Link copied", "Pautan disalin", "Link copied");
+  String get formsClose => _t("Close form", "Tutup borang", "Close form");
+  String get formsCloseTitle => _t("Close this form?", "Tutup borang ini?", "Close this form?");
+  String get formsCloseBody => _t(
+      "It stops taking answers. You can still read and export the answers you have.",
+      "Borang tidak lagi menerima jawapan. Anda masih boleh membaca dan mengeksport jawapan yang ada.",
+      "It stops taking answers.");
+  String get formsDelete => _t("Delete form", "Padam borang", "Delete form");
+  String get formsDeleteTitle => _t("Delete this form?", "Padam borang ini?", "Delete this form?");
+  String formsDeleteBody(int n) => _t(
+      "Its questions and all $n answers are deleted for good. Links to it stop working.",
+      "Soalan dan kesemua $n jawapannya dipadam terus. Pautan kepadanya tidak akan berfungsi lagi.",
+      "Its questions and all $n answers are deleted for good.");
+  String get formsDeleted => _t("Form deleted", "Borang dipadam", "Form deleted");
+
+  // ---- who made it (answer page) ----
+  String formMadeBy(String who) => _t(
+      "Made by $who — not an official college form.",
+      "Dibuat oleh $who — bukan borang rasmi kolej.",
+      "Made by $who — not an official college form.");
+  String get formNeverPassword => _t(
+      "Never enter a password, OTP or bank PIN in a form. Report forms that ask for one.",
+      "Jangan sesekali masukkan kata laluan, OTP atau PIN bank dalam borang. Laporkan borang yang memintanya.",
+      "Never enter a password, OTP or PIN in a form.");
+  String get formAnswerRemoved => _t(
+      "This form was removed by the moderators.",
+      "Borang ini telah dibuang oleh moderator.",
+      "This form was removed by the moderators.");
+  String get formWithdraw => _t("Withdraw my answer", "Tarik balik jawapan saya", "Withdraw my answer");
+  String get formWithdrawTitle =>
+      _t("Withdraw your answer?", "Tarik balik jawapan anda?", "Withdraw your answer?");
+  String get formWithdrawBody => _t(
+      "Your answer is deleted from this form. You can answer again while it is open.",
+      "Jawapan anda dipadam daripada borang ini. Anda boleh menjawab semula selagi borang dibuka.",
+      "Your answer is deleted from this form.");
+  String get formWithdrawn => _t("Answer withdrawn", "Jawapan ditarik balik", "Answer withdrawn");
+
+  // ---- editor safety ----
+  String get formPrivacyNote => _t(
+      "Only ask what you need. People trust you with their answers — say why you need personal details, and delete the form when you're done.",
+      "Tanya apa yang perlu sahaja. Penjawab mempercayakan jawapan mereka kepada anda — nyatakan sebab anda perlukan butiran peribadi, dan padam borang apabila selesai.",
+      "Only ask what you need.");
+  String get formBlockedLabel => _t(
+      "Forms can't ask for passwords, OTPs, PINs or card numbers.",
+      "Borang tidak boleh meminta kata laluan, OTP, PIN atau nombor kad.",
+      "Forms can't ask for passwords, OTPs, PINs or card numbers.");
+  String get formSensitiveLabel => _t(
+      "This asks for personal data (IC, bank account, address). Keep it only if you need it, and say why in the description.",
+      "Soalan ini meminta data peribadi (IC, akaun bank, alamat). Simpan hanya jika perlu, dan nyatakan sebabnya dalam penerangan.",
+      "This asks for personal data. Keep it only if you need it.");
+
+  // ---- linking a form from a composer ----
+  String get formAttach => _t("Attach a form", "Lampirkan borang", "Attach a form");
+  String get formAttachTitle => _t("Choose a form", "Pilih borang", "Choose a form");
+  String get formAttachEmpty => _t(
+      "No forms yet. Make one first, then attach it here.",
+      "Belum ada borang. Buat satu dahulu, kemudian lampirkan di sini.",
+      "No forms yet.");
+  String get formAttachManage => _t("Open My forms", "Buka Borang saya", "Open My forms");
+  String get formLinkLabel => _t("Fill in form", "Isi borang", "Fill in form");
+  String get formAttachDraft => _t(
+      "Draft — publish it before people can answer.",
+      "Draf — terbitkan sebelum orang boleh menjawab.",
+      "Draft — publish it first.");
+  String get formAttachRemove => _t("Remove form", "Buang borang", "Remove form");
+  String get formAttachAnon => _t(
+      "Anonymous posts can't link a form — a form shows who made it.",
+      "Hantaran tanpa nama tidak boleh memaut borang — borang menunjukkan siapa pembuatnya.",
+      "Anonymous posts can't link a form.");
+
+  // ---- template gallery (/forms/new) ----
+  String get gallerySearchHint => _t("Search templates", "Cari templat", "Search templates");
+  String get galleryClearSearch => _t("Clear search", "Kosongkan carian", "Clear search");
+  String get galleryStartTitle => _t("Start a new form", "Mula borang baharu", "Start a new form");
+  String get galleryTemplates => _t("Templates", "Templat", "Templates");
+  String get galleryCsv => _t("Import CSV", "Import CSV", "Import CSV");
+  String get galleryCsvSub => _t(
+      "Paste a question list or upload a .csv file.",
+      "Tampal senarai soalan atau muat naik fail .csv.",
+      "Paste a list or upload a .csv file.");
+  String galleryCategory(String? key) => switch (key) {
+        'events' => _t("Events & clubs", "Acara & kelab", "Events & clubs"),
+        'signups' => _t("Sign-ups", "Pendaftaran", "Sign-ups"),
+        'feedback' => _t("Feedback & polls", "Maklum balas & undian", "Feedback & polls"),
+        'orders' => _t("Orders", "Tempahan", "Orders"),
+        'campus' => _t("Campus life", "Kehidupan kampus", "Campus life"),
+        'academic' => _t("Study", "Akademik", "Study"),
+        _ => _t("All templates", "Semua templat", "All templates"),
+      };
+  String galleryNoMatch(String q) => _t(
+      "No templates match “$q”. Try another word, or start from a blank form.",
+      "Tiada templat sepadan dengan “$q”. Cuba perkataan lain, atau mula dengan borang kosong.",
+      "No templates match “$q”.");
+  String galleryQuestions(int n) =>
+      _t("$n ${n == 1 ? 'question' : 'questions'}", "$n soalan", "$n questions");
+  String get galleryUse => _t("Use this template", "Guna templat ini", "Use this template");
+  String get galleryRequired => _t("Required", "Wajib", "Required");
+  String get galleryLoadFailed =>
+      _t("Couldn't load the templates.", "Templat tidak dapat dimuatkan.", "Couldn't load the templates.");
+  String galleryKind(String kind) => switch (kind) {
+        'short_text' => _t("Short answer", "Jawapan pendek", "Short answer"),
+        'long_text' => _t("Paragraph", "Perenggan", "Paragraph"),
+        'single_choice' => _t("Multiple choice", "Aneka pilihan", "Multiple choice"),
+        'multi_choice' => _t("Checkboxes", "Kotak semak", "Checkboxes"),
+        'rating' => _t("Rating 1–5", "Penilaian 1–5", "Rating 1–5"),
+        'number' => _t("Number", "Nombor", "Number"),
+        'date' => _t("Date", "Tarikh", "Date"),
+        'email' => _t("Email", "E-mel", "Email"),
+        'phone' => _t("Phone", "Telefon", "Phone"),
+        'student_id' => _t("Matric number", "Nombor matrik", "Matric number"),
+        'consent' => _t("Agreement", "Persetujuan", "Agreement"),
+        _ => _t("Section", "Bahagian", "Section"),
+      };
+
+  // ---- editor side panel (general forms) ----
+  String get panelShare => _t("Share", "Kongsi", "Share");
+  String get panelShareSub => _t(
+      "Anyone with the link sees the questions; signed-in students can answer.",
+      "Sesiapa yang ada pautan boleh melihat soalan; pelajar yang log masuk boleh menjawab.",
+      "Anyone with the link sees the questions.");
+  String get panelShareDraft => _t(
+      "Publish the form to start taking answers.",
+      "Terbitkan borang untuk mula menerima jawapan.",
+      "Publish the form to start taking answers.");
+  String get panelOpen => _t("Open form", "Buka borang", "Open form");
+  String get panelSettings => _t("Settings", "Tetapan", "Settings");
+  String get panelSettingsSub =>
+      _t("Saved with the form.", "Disimpan bersama borang.", "Saved with the form.");
+  String get panelSettingsAndShare =>
+      _t("Settings & sharing", "Tetapan & perkongsian", "Settings & sharing");
+  String get panelClosesAt =>
+      _t("Stop taking answers on", "Berhenti menerima jawapan pada", "Stop taking answers on");
+  String get panelNoEnd => _t("No end date", "Tiada tarikh akhir", "No end date");
+  String get panelPickDate => _t("Choose date", "Pilih tarikh", "Choose date");
+  String get panelClear => _t("Clear", "Kosongkan", "Clear");
+  String get panelLimit => _t("Response limit", "Had jawapan", "Response limit");
+  String get panelLimitHint => _t("No limit", "Tiada had", "No limit");
+  String get panelCloseNow =>
+      _t("Stop taking answers now", "Berhenti menerima jawapan sekarang", "Stop taking answers now");
+  String get panelOverview => _t("Question types", "Jenis soalan", "Question types");
+  String get checkChoicesOk => _t(
+      "Every choice question has at least two options",
+      "Setiap soalan pilihan ada sekurang-kurangnya dua pilihan",
+      "Every choice question has two options");
+  String checkChoicesFail(int n) => _t(
+      "$n choice ${n == 1 ? 'question needs' : 'questions need'} more options",
+      "$n soalan pilihan memerlukan lebih banyak pilihan",
+      "$n choice questions need more options");
+  String get checkBlockedOk => _t(
+      "No password, OTP or card questions",
+      "Tiada soalan kata laluan, OTP atau kad",
+      "No password, OTP or card questions");
+  String checkBlockedFail(int n) => _t(
+      "$n ${n == 1 ? 'question asks' : 'questions ask'} for a password or card details — remove ${n == 1 ? 'it' : 'them'}",
+      "$n soalan meminta kata laluan atau butiran kad — buang soalan itu",
+      "$n questions ask for a password or card details");
+  String get checkPersonalOk => _t(
+      "No IC, bank or address questions",
+      "Tiada soalan IC, bank atau alamat",
+      "No IC, bank or address questions");
+  String checkPersonalWarn(int n) => _t(
+      "$n ${n == 1 ? 'question asks' : 'questions ask'} for personal data — say why in the introduction",
+      "$n soalan meminta data peribadi — nyatakan sebabnya dalam pengenalan",
+      "$n questions ask for personal data");
+
+  // ---- CSV import ----
+  String get csvTitle => _t("Import questions", "Import soalan", "Import questions");
+  String get csvHelp => _t(
+      "One question per row: question, type, required, options. Types: text, paragraph, choice, "
+          "checkboxes, rating, date, email, phone, matric. Choices go A|B|C. A plain list works too.",
+      "Satu soalan setiap baris: soalan, jenis, wajib, pilihan. Jenis: text, paragraph, choice, "
+          "checkboxes, rating, date, email, phone, matric. Pilihan ditulis A|B|C. Senarai biasa juga boleh.",
+      "One question per row: question, type, required, options.");
+  String get csvHint => _t(
+      "question,type,required,options\nFull name,text,yes,\nWhich session?,choice,yes,Morning|Evening",
+      "soalan,jenis,wajib,pilihan\nNama penuh,text,ya,\nSesi mana?,choice,ya,Pagi|Petang",
+      "question,type,required,options");
+  String get csvChooseFile => _t("Choose .csv file", "Pilih fail .csv", "Choose .csv file");
+  String get csvSample => _t("Download sample", "Muat turun contoh", "Download sample");
+  String csvReady(int n) => _t(
+      "$n ${n == 1 ? 'question' : 'questions'} ready",
+      "$n soalan sedia",
+      "$n questions ready");
+  String csvProblems(String lines) => _t(
+      "Check line $lines: an unknown type, a missing question, or a choice with fewer than two options.",
+      "Semak baris $lines: jenis tidak dikenali, soalan kosong, atau pilihan kurang daripada dua.",
+      "Check line $lines.");
+  String get csvCreate => _t("Create form", "Cipta borang", "Create form");
+
+  // ---- server refusals ----
+  /// Wording for a `formErrorCode()`; null falls back to the generic message.
+  String? formServerError(String? code) => switch (code) {
+        'blocked_label' => formBlockedLabel,
+        'too_many' => _t(
+            "You have 10 open or draft forms. Close or delete one first.",
+            "Anda ada 10 borang dibuka atau draf. Tutup atau padam satu dahulu.",
+            "You have 10 open or draft forms."),
+        'mod_rate_limited' => _t(
+            "New accounts can make only a few forms an hour. Try again later.",
+            "Akaun baharu hanya boleh membuat beberapa borang sejam. Cuba lagi nanti.",
+            "Try again later."),
+        'rate_limited' => _t(
+            "You've answered a lot of forms this hour. Try again later.",
+            "Anda telah menjawab banyak borang dalam sejam ini. Cuba lagi nanti.",
+            "Try again later."),
+        'removed' => formAnswerRemoved,
+        'full' => formAnswerFull,
+        'closed' => formAnswerClosed,
+        'mod_restricted' => _t(
+            "Your account can't do this right now.",
+            "Akaun anda tidak boleh berbuat demikian sekarang.",
+            "Your account can't do this right now."),
+        'verify_required' => _t(
+            "Verify your student status to do this.",
+            "Sahkan status pelajar anda untuk berbuat demikian.",
+            "Verify your student status to do this."),
+        _ => null,
+      };
 }

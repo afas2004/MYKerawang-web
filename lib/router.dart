@@ -20,6 +20,8 @@ import 'screens/events/checkin_screens.dart';
 import 'screens/events/event_form_screen.dart';
 import 'screens/events/form_editor_screen.dart';
 import 'screens/events/form_responses_screen.dart';
+import 'screens/forms/form_gallery_screen.dart';
+import 'screens/forms/my_forms_screen.dart';
 import 'screens/guest_views.dart';
 import 'screens/events_screen.dart';
 import 'screens/home_screen.dart';
@@ -84,6 +86,8 @@ final List<RegExp> _guestPaths = [
   RegExp(r'^/(home|announcements|market|events|search)/?$'),
   RegExp(r'^/(event|item|post|u)/[^/]+/?$'),
   RegExp(r'^/tag/[^/]+/?$'),
+  // A shared form shows who made it and a sign-in bar; answering needs an account.
+  RegExp(r'^/f/[^/]+/?$'),
   RegExp(r'^/settings/privacy/?$'),
 ];
 
@@ -298,6 +302,39 @@ GoRouter buildRouter() {
             formId: state.uri.queryParameters['f'],
           ),
         ),
+      ),
+      // Standalone forms (anyone's): answer, edit, responses, and the list.
+      GoRoute(
+        path: '/forms',
+        parentNavigatorKey: _rootKey,
+        onExit: historyAwareExit,
+        builder: (context, state) => const MyFormsScreen(),
+      ),
+      GoRoute(
+        // The template gallery: blank, import CSV, or a template.
+        path: '/forms/new',
+        parentNavigatorKey: _rootKey,
+        onExit: historyAwareExit,
+        builder: (context, state) => const FormGalleryScreen(),
+      ),
+      GoRoute(
+        path: '/f/:id',
+        parentNavigatorKey: _rootKey,
+        onExit: historyAwareExit,
+        builder: (context, state) => EventFormScreen(formId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/f/:id/responses',
+        parentNavigatorKey: _rootKey,
+        onExit: historyAwareExit,
+        builder: (context, state) =>
+            FormResponsesScreen(formId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/f/:id/edit',
+        parentNavigatorKey: _rootKey,
+        onExit: leaveFormRoute,
+        builder: (context, state) => FormEditorScreen(formId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/event/:id/form/edit',
