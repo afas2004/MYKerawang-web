@@ -18,7 +18,7 @@ class UpdateService {
   static final instance = UpdateService._();
 
   /// Keep in sync with the `version:` name in pubspec.yaml.
-  static const appVersion = '1.10.6';
+  static const appVersion = '1.10.7';
   static const buildId = String.fromEnvironment('BUILD_ID', defaultValue: 'dev');
 
   /// Only release web builds made by the deploy script can be checked.
