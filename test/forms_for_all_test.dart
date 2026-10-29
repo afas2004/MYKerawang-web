@@ -328,6 +328,77 @@ void main() {
     });
   }
 
+  // ------------------------------------------------------------ editor side panel
+  const generalFields = [
+    FormFieldSpec(id: 'a', kind: 'short_text', label: 'Name', required: true),
+    FormFieldSpec(id: 'b', kind: 'rating', label: 'Easy to use?'),
+    FormFieldSpec(id: 'c', kind: 'rating', label: 'Would recommend?'),
+  ];
+
+  for (final width in [375.0, 1280.0]) {
+    for (final dark in [false, true]) {
+      testWidgets('general form at $width (${dark ? 'dark' : 'light'}) gets the general panel',
+          (tester) async {
+        FormService.instance = FakeForms(FormView(
+            doc: standalone(status: 'open', canEdit: true, fields: generalFields)));
+        await pump(tester, width, const FormEditorScreen(formId: 'f1'), dark: dark);
+
+        // No KI anywhere: no counting tags, no coverage table.
+        expect(find.text(AppStrings.en.formTagNone), findsNothing);
+        expect(find.text('KI1'), findsNothing);
+        expect(find.textContaining(AppStrings.en.formCountedBeforeShort), findsNothing);
+        expect(find.text('Edit form'), findsOneWidget);
+
+        if (width >= 1000) {
+          expect(find.byKey(const ValueKey('panel-share')), findsOneWidget);
+          expect(find.byKey(const ValueKey('panel-settings')), findsOneWidget);
+          expect(find.byKey(const ValueKey('panel-overview')), findsOneWidget);
+          expect(find.textContaining('kerawang.my/f/f1'), findsOneWidget);
+        } else {
+          // Folded on a phone, open on request.
+          expect(find.byKey(const ValueKey('panel-settings')), findsNothing);
+          await tester.tap(find.text(AppStrings.en.panelSettingsAndShare));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('panel-settings')), findsOneWidget);
+        }
+        expect(find.byKey(const ValueKey('close-now')), findsOneWidget, reason: 'the form is open');
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  testWidgets('a response limit and a closing date are saved with the form', (tester) async {
+    final fake = FakeForms(
+        FormView(doc: standalone(status: 'draft', canEdit: true, fields: generalFields)));
+    FormService.instance = fake;
+    await pump(tester, 1280, const FormEditorScreen(formId: 'f1'));
+
+    await tester.enterText(find.byKey(const ValueKey('response-limit')), '50');
+    await tester.tap(find.byKey(const ValueKey('closes-at')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Save'));
+    await tester.pumpAndSettle();
+
+    final saved = fake.saved.single;
+    expect(saved.maxResponses, 50);
+    expect(saved.closesAt, isNotNull);
+    expect(saved.header['max_responses'], '50');
+    expect(saved.header['closes_at'], isNotEmpty);
+  });
+
+  testWidgets('a form from the KI template keeps the KI tools', (tester) async {
+    FormService.instance = FakeForms(FormView(
+      doc: standalone(status: 'draft', canEdit: true, fields: const [
+        FormFieldSpec(id: 'k', kind: 'rating', label: 'KI1 Komunikasi', analysis: 'ki_pre', kiCode: 1),
+      ]),
+    ));
+    await pump(tester, 1280, const FormEditorScreen(formId: 'f1'));
+    expect(find.text('KI1'), findsWidgets);
+    expect(find.byKey(const ValueKey('panel-share')), findsNothing);
+  });
+
   // ------------------------------------------------------------ my forms
   const rows = [
     MyForm(id: 'f1', title: 'Lost & found survey', status: 'open', responses: 3),

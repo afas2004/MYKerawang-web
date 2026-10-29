@@ -65,6 +65,12 @@ class FormDoc {
   /// The event an event form belongs to.
   final String? eventId;
 
+  /// Answers stop after this moment (null: until it is closed by hand).
+  final DateTime? closesAt;
+
+  /// Answers stop after this many people (null: no limit).
+  final int? maxResponses;
+
   const FormDoc({
     required this.id,
     required this.title,
@@ -81,6 +87,8 @@ class FormDoc {
     this.clubName,
     this.clubHandle,
     this.eventId,
+    this.closesAt,
+    this.maxResponses,
   });
 
   /// Where the editor, the answer page and the responses page live.
@@ -103,6 +111,9 @@ class FormDoc {
         'intro': intro,
         'require_rsvp': requireRsvp,
         'after_checkin': afterCheckin,
+        // Always sent: an empty value is how a cleared setting is saved.
+        'closes_at': closesAt?.toUtc().toIso8601String() ?? '',
+        'max_responses': maxResponses?.toString() ?? '',
       };
 
   FormDoc copyWith({
@@ -112,6 +123,8 @@ class FormDoc {
     bool? requireRsvp,
     bool? afterCheckin,
     List<FormFieldSpec>? fields,
+    DateTime? Function()? closesAt,
+    int? Function()? maxResponses,
   }) =>
       FormDoc(
         id: id,
@@ -129,6 +142,8 @@ class FormDoc {
         clubName: clubName,
         clubHandle: clubHandle,
         eventId: eventId,
+        closesAt: closesAt == null ? this.closesAt : closesAt(),
+        maxResponses: maxResponses == null ? this.maxResponses : maxResponses(),
       );
 }
 
@@ -369,6 +384,8 @@ class SupabaseFormService implements FormService {
         clubName: club['name'] as String?,
         clubHandle: club['handle'] as String?,
         eventId: event['id'] as String?,
+        closesAt: DateTime.tryParse('${form['closes_at'] ?? ''}')?.toLocal(),
+        maxResponses: (form['max_responses'] as num?)?.toInt(),
       ),
       canAnswer: all['can_answer'] == true,
       reason: all['reason'] as String?,

@@ -462,6 +462,57 @@ extension FormStrings on AppStrings {
         _ => _t("Section", "Bahagian", "Section"),
       };
 
+  // ---- editor side panel (general forms) ----
+  String get panelShare => _t("Share", "Kongsi", "Share");
+  String get panelShareSub => _t(
+      "Anyone with the link sees the questions; signed-in students can answer.",
+      "Sesiapa yang ada pautan boleh melihat soalan; pelajar yang log masuk boleh menjawab.",
+      "Anyone with the link sees the questions.");
+  String get panelShareDraft => _t(
+      "Publish the form to start taking answers.",
+      "Terbitkan borang untuk mula menerima jawapan.",
+      "Publish the form to start taking answers.");
+  String get panelOpen => _t("Open form", "Buka borang", "Open form");
+  String get panelSettings => _t("Settings", "Tetapan", "Settings");
+  String get panelSettingsSub =>
+      _t("Saved with the form.", "Disimpan bersama borang.", "Saved with the form.");
+  String get panelSettingsAndShare =>
+      _t("Settings & sharing", "Tetapan & perkongsian", "Settings & sharing");
+  String get panelClosesAt =>
+      _t("Stop taking answers on", "Berhenti menerima jawapan pada", "Stop taking answers on");
+  String get panelNoEnd => _t("No end date", "Tiada tarikh akhir", "No end date");
+  String get panelPickDate => _t("Choose date", "Pilih tarikh", "Choose date");
+  String get panelClear => _t("Clear", "Kosongkan", "Clear");
+  String get panelLimit => _t("Response limit", "Had jawapan", "Response limit");
+  String get panelLimitHint => _t("No limit", "Tiada had", "No limit");
+  String get panelCloseNow =>
+      _t("Stop taking answers now", "Berhenti menerima jawapan sekarang", "Stop taking answers now");
+  String get panelOverview => _t("Question types", "Jenis soalan", "Question types");
+  String get checkChoicesOk => _t(
+      "Every choice question has at least two options",
+      "Setiap soalan pilihan ada sekurang-kurangnya dua pilihan",
+      "Every choice question has two options");
+  String checkChoicesFail(int n) => _t(
+      "$n choice ${n == 1 ? 'question needs' : 'questions need'} more options",
+      "$n soalan pilihan memerlukan lebih banyak pilihan",
+      "$n choice questions need more options");
+  String get checkBlockedOk => _t(
+      "No password, OTP or card questions",
+      "Tiada soalan kata laluan, OTP atau kad",
+      "No password, OTP or card questions");
+  String checkBlockedFail(int n) => _t(
+      "$n ${n == 1 ? 'question asks' : 'questions ask'} for a password or card details — remove ${n == 1 ? 'it' : 'them'}",
+      "$n soalan meminta kata laluan atau butiran kad — buang soalan itu",
+      "$n questions ask for a password or card details");
+  String get checkPersonalOk => _t(
+      "No IC, bank or address questions",
+      "Tiada soalan IC, bank atau alamat",
+      "No IC, bank or address questions");
+  String checkPersonalWarn(int n) => _t(
+      "$n ${n == 1 ? 'question asks' : 'questions ask'} for personal data — say why in the introduction",
+      "$n soalan meminta data peribadi — nyatakan sebabnya dalam pengenalan",
+      "$n questions ask for personal data");
+
   // ---- CSV import ----
   String get csvTitle => _t("Import questions", "Import soalan", "Import questions");
   String get csvHelp => _t(
