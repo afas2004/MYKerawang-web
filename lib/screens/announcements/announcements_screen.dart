@@ -13,6 +13,7 @@ import '../../utils/formatters.dart';
 import '../../utils/url_rules.dart';
 import '../../widgets/brand/brand.dart';
 import '../../widgets/error_state.dart';
+import '../../widgets/linear_refresher.dart';
 import '../../widgets/profile_avatar_action.dart';
 import '../../widgets/shell_actions.dart';
 import '../../widgets/tap_card.dart';
@@ -114,11 +115,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
               icon: const Icon(AppIcons.compose),
               onPressed: _newAnnouncement,
             ),
-          IconButton(
-            tooltip: s.refresh,
-            icon: const Icon(AppIcons.refresh),
-            onPressed: _load,
-          ),
+          // No refresh button: pull down to refresh, like every other tab.
           const ProfileAvatarAction(),
           const SizedBox(width: KSpace.s),
         ],
@@ -134,7 +131,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
 
     final data = _data ?? AnnouncementsData.empty;
     if (data.items.isEmpty && data.upcomingEvents.isEmpty) {
-      return RefreshIndicator(
+      return LinearRefresher(
         onRefresh: _load,
         child: LayoutBuilder(
           builder: (context, c) => SingleChildScrollView(
@@ -161,7 +158,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
         _channel == null &&
         (_category == null || _category == AnnouncementCategory.event);
 
-    return RefreshIndicator(
+    return LinearRefresher(
       onRefresh: _load,
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
