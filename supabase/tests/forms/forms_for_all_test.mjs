@@ -311,6 +311,9 @@ ok(gallery.every((t) => t.name_ms && t.description && t.description_ms && t.fiel
   'every template has a Malay name, descriptions and questions');
 const newOnes = gallery.filter((t) => t.slug !== 'ki');
 ok(newOnes.every((t) => t.fields.every((f) => f.label_ms)), 'every new question has a Malay label');
+ok(!JSON.stringify(gallery).includes('�'), 'no template text carries a broken character');
+ok(gallery.find((t) => t.slug === 'lost_found').fields[0].label === 'I have…',
+  'the ellipsis survives the seed');
 ok(newOnes.every((t) => t.fields.every((f) => (f.choices == null) === (f.choices_ms == null)
     && (f.choices == null || f.choices.length === f.choices_ms.length))),
   'choices come in both languages, the same number of each');

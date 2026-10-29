@@ -82,7 +82,7 @@ values
   ('lost_found', 'Lost & found report', 'Laporan barang hilang & dijumpai', null, null,
    'Report something lost or found on campus.', 'Laporkan barang yang hilang atau dijumpai di kampus.', 'campus', 'official', 10),
   ('facility_report', 'Facility problem report', 'Laporan kerosakan kemudahan', null, null,
-   'Broken lights, leaks, Wi-Fi — where and how urgent.', 'Lampu rosak, paip bocor, Wi-Fi — di mana dan tahap kecemasan.', 'campus', 'official', 20)
+   'Broken lights, leaks, Wi-Fi â€” where and how urgent.', 'Lampu rosak, paip bocor, Wi-Fi â€” di mana dan tahap kecemasan.', 'campus', 'official', 20)
 on conflict (slug) do update set
   name = excluded.name, name_ms = excluded.name_ms,
   intro = excluded.intro, intro_ms = excluded.intro_ms,
@@ -168,8 +168,8 @@ from (values
   ('food_preorder', 'multi_choice', 'What would you like?', 'Apa yang anda mahu?', null, null, true, '{"choices": ["Item 1", "Item 2", "Item 3"]}'::jsonb, '{"choices": ["Item 1", "Item 2", "Item 3"]}'::jsonb, 40),
   ('food_preorder', 'number', 'Quantity', 'Kuantiti', null, null, true, null, null, 50),
   ('food_preorder', 'date', 'Delivery date', 'Tarikh penghantaran', null, null, true, null, null, 60),
-  ('food_preorder', 'long_text', 'Notes (spicy, no onion…)', 'Nota (pedas, tanpa bawang…)', null, null, false, null, null, 70),
-  ('lost_found', 'single_choice', 'I have…', 'Saya telah…', null, null, true, '{"choices": ["Lost something", "Found something"]}'::jsonb, '{"choices": ["Kehilangan barang", "Menjumpai barang"]}'::jsonb, 10),
+  ('food_preorder', 'long_text', 'Notes (spicy, no onionâ€¦)', 'Nota (pedas, tanpa bawangâ€¦)', null, null, false, null, null, 70),
+  ('lost_found', 'single_choice', 'I haveâ€¦', 'Saya telahâ€¦', null, null, true, '{"choices": ["Lost something", "Found something"]}'::jsonb, '{"choices": ["Kehilangan barang", "Menjumpai barang"]}'::jsonb, 10),
   ('lost_found', 'short_text', 'What is it?', 'Apa barangnya?', null, null, true, null, null, 20),
   ('lost_found', 'short_text', 'Where?', 'Di mana?', null, null, true, null, null, 30),
   ('lost_found', 'date', 'When?', 'Bila?', null, null, false, null, null, 40),

@@ -194,10 +194,26 @@ class _FormGalleryScreenState extends State<FormGalleryScreen> {
     );
   }
 
-  List<GalleryTemplate> _visible(List<GalleryTemplate> all) => [
-    for (final t in all)
-      if ((_category == null || t.category == _category) && t.matches(_search.text)) t,
-  ];
+  /// The cards to show: filtered, then grouped in the categories' order so
+  /// "All templates" reads as sections rather than a shuffle (the server's
+  /// order is kept within a category).
+  List<GalleryTemplate> _visible(List<GalleryTemplate> all) {
+    final shown = [
+      for (final t in all)
+        if ((_category == null || t.category == _category) && t.matches(_search.text)) t,
+    ];
+    int rank(GalleryTemplate t) {
+      final i = _categories.indexOf(t.category);
+      return i < 0 ? _categories.length : i;
+    }
+
+    final order = {for (var i = 0; i < shown.length; i++) shown[i]: i};
+    shown.sort((a, b) {
+      final c = rank(a).compareTo(rank(b));
+      return c != 0 ? c : order[a]!.compareTo(order[b]!);
+    });
+    return shown;
+  }
 
   Widget _narrow(BuildContext context, List<GalleryTemplate> all) {
     final s = context.l10n;
