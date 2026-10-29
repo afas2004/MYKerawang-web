@@ -50,8 +50,10 @@ class ClubMentionChip extends StatelessWidget {
       builder: (context, clubs, _) {
         final club = clubs[handle.toLowerCase()];
         final tint = club == null ? scheme.primary : clubColor(club);
+        // Club colours are deep; on a dark ground they need more light.
+        final dark = Theme.of(context).brightness == Brightness.dark;
         final text = (style ?? DefaultTextStyle.of(context).style).copyWith(
-          color: Color.lerp(tint, scheme.onSurface, 0.25),
+          color: Color.lerp(tint, scheme.onSurface, dark ? 0.7 : 0.25),
           fontWeight: FontWeight.w600,
           height: 1.2,
         );
@@ -61,8 +63,9 @@ class ClubMentionChip extends StatelessWidget {
           label: club?.name ?? '@$handle',
           excludeSemantics: true,
           child: Material(
-            color: tint.withValues(alpha: 0.12),
-            shape: StadiumBorder(side: BorderSide(color: tint.withValues(alpha: 0.35))),
+            color: tint.withValues(alpha: dark ? 0.3 : 0.12),
+            shape: StadiumBorder(
+                side: BorderSide(color: tint.withValues(alpha: dark ? 0.8 : 0.35))),
             child: InkWell(
               customBorder: const StadiumBorder(),
               onTap: () => context.push('/c/$handle'),
