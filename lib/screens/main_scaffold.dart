@@ -354,7 +354,7 @@ class CompactNavBar extends StatelessWidget {
   }
 }
 
-const double _logoSize = 52;
+const double _logoSize = 44;
 
 class _BarItem extends StatelessWidget {
   final IconData icon;
@@ -409,6 +409,10 @@ class _BarItem extends StatelessWidget {
                   height: 32,
                   child: OverflowBox(
                     alignment: Alignment.bottomCenter,
+                    // Loose and square: the slot is 64 wide, the logo isn't.
+                    minWidth: _logoSize,
+                    maxWidth: _logoSize,
+                    minHeight: _logoSize,
                     maxHeight: _logoSize,
                     // The logo tile itself, with only a soft shadow behind it.
                     child: DecoratedBox(

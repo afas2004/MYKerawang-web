@@ -565,7 +565,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 child: SizedBox(
                   height: 112,
                   width: double.infinity,
-                  child: BrandCover(seed: seed, color: ring, hem: true),
+                  child: BrandCover(seed: seed, color: ring),
                 ),
               ),
               Positioned(

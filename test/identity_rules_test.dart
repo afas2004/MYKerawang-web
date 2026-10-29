@@ -52,10 +52,8 @@ void main() {
     }
   });
 
-  test('songket is drawn only through SongketHem', () {
-    expect(
-      offenders(RegExp(r'songket_perseri\.svg'), {'lib/widgets/brand/songket_hem.dart'}),
-      isEmpty,
-    );
+  test('no songket pattern strips (removed by design, 2026-10-29)', () {
+    expect(offenders(RegExp(r'songket_perseri|SongketHem'), {}), isEmpty);
+    expect(File('web/index.html').readAsStringSync(), isNot(contains('songket')));
   });
 }

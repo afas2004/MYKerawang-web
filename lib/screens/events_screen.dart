@@ -75,7 +75,7 @@ class EventsView extends StatefulWidget {
 class _EventsViewState extends State<EventsView>
     with RefreshOnContentChange {
   final TextEditingController _searchCtrl = TextEditingController();
-  final List<String> _tags = ['All', ...kEventCategorySlugs];
+  final List<String> _tags = ['All', ...kCommonEventCategories];
 
   /// Past (ended / cancelled) events start collapsed at the bottom.
   bool _showPast = false;
@@ -580,14 +580,16 @@ class _TagChipRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A selected category outside the common set keeps its chip.
+    final shown = tags.contains(selected) ? tags : [...tags, selected];
     return SizedBox(
       height: 48,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: KSpace.l, vertical: KSpace.xs),
-        itemCount: tags.length,
+        itemCount: shown.length,
         separatorBuilder: (_, __) => const SizedBox(width: KSpace.s),
-        itemBuilder: (context, i) => _tagChip(context, tags[i], selected),
+        itemBuilder: (context, i) => _tagChip(context, shown[i], selected),
       ),
     );
   }

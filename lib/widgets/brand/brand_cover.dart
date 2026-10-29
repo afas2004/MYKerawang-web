@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../../theme/tokens.dart';
 import 'app_motif.dart';
 import 'k_pattern.dart';
-import 'songket_hem.dart';
 
 /// The six colours a club (and later a profile) can wear. All are dark
 /// enough for white text and marks on top (≥ 4.5:1), in every theme.
@@ -38,11 +37,10 @@ int stableHash(String s) {
   return h;
 }
 
-/// A cover for anything without a photo (clubs, announcements, profile
-/// banners): a solid colour with a faint pattern generated from [seed] —
-/// motif, scale and angle all follow from the seed, so no two clubs share
-/// one but each always looks the same — plus an optional stitch [motif]
-/// and a songket [hem] on the bottom edge.
+/// A cover for clubs and profile banners without a photo: a solid colour
+/// with a faint pattern generated from [seed] — motif, scale and angle all
+/// follow from the seed, so no two clubs share one but each always looks the
+/// same — plus an optional stitch [motif].
 ///
 ///   BrandCover(seed: club.handle, color: clubColor(club), motif: AppMotif.sape)
 ///
@@ -55,9 +53,6 @@ class BrandCover extends StatelessWidget {
   final Color? color;
   final AppMotif? motif;
 
-  /// Songket hem along the bottom edge.
-  final bool hem;
-
   /// Optional content on top (e.g. a category icon).
   final Widget? child;
 
@@ -66,7 +61,6 @@ class BrandCover extends StatelessWidget {
     required this.seed,
     this.color,
     this.motif,
-    this.hem = false,
     this.child,
   });
 
@@ -82,8 +76,7 @@ class BrandCover extends StatelessWidget {
         child: LayoutBuilder(builder: (context, box) {
           final w = box.maxWidth.isFinite ? box.maxWidth : 320.0;
           final ht = box.maxHeight.isFinite ? box.maxHeight : 160.0;
-          final hemH = hem ? math.min(10.0, ht * 0.08) : 0.0;
-          final motifSize = math.min((ht - hemH) * 0.82, w * 0.42);
+          final motifSize = math.min(ht * 0.82, w * 0.42);
           return Stack(
             fit: StackFit.expand,
             children: [
@@ -97,20 +90,12 @@ class BrandCover extends StatelessWidget {
               if (motif != null && motifSize >= 24)
                 Positioned(
                   right: math.min(KSpace.l, w * 0.05),
-                  top: (ht - hemH - motifSize) / 2,
+                  top: (ht - motifSize) / 2,
                   width: motifSize,
                   height: motifSize,
                   child: MotifArt(motif!, size: motifSize, color: mark),
                 ),
               if (child != null) child!,
-              if (hem)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: SongketHem(
-                      height: hemH, color: Colors.white.withValues(alpha: 0.8)),
-                ),
             ],
           );
         }),

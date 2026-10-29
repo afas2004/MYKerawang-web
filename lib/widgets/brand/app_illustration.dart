@@ -4,7 +4,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../theme/tokens.dart';
 import 'app_motif.dart';
-import 'songket_hem.dart';
 
 /// The app's spot illustrations: Open Peeps students (CC0) in a hand line,
 /// with Malaysian stitch motifs (WP25, CC BY 4.0) and a few Fluent emoji
@@ -22,7 +21,7 @@ enum AppIllo {
   /// 404: the kite's string snapped ("Wau terputus tali").
   notFound,
 
-  /// Something failed to load: a songket hem with one loose thread.
+  /// Something failed to load: one loose thread.
   error,
 
   /// Guests reaching a signed-in feature: a student peeking in.
@@ -157,8 +156,7 @@ final Map<AppIllo, List<_Layer>> _scenes = {
     const _Person('peep-standing-12', left: 40, height: 172, aspect: 710 / 255),
   ],
   AppIllo.error: [
-    const _Hem(left: 0, top: 0, width: 150, height: 8),
-    const _Line([Offset(148, 6), Offset(160, 34), Offset(142, 62), Offset(156, 92), Offset(146, 118)]),
+    const _Line([Offset(150, 8), Offset(176, 22), Offset(150, 44), Offset(172, 70), Offset(148, 96), Offset(160, 118)]),
     const _Person('peep-standing-22', left: 40, height: 168, aspect: 691 / 321),
   ],
   AppIllo.guestGate: [
@@ -304,23 +302,6 @@ class _LinePainter extends CustomPainter {
   @override
   bool shouldRepaint(_LinePainter old) =>
       old.color != color || old.points != points || old.dashed != dashed;
-}
-
-class _Hem extends _Layer {
-  final double left, top, width, height;
-  const _Hem({required this.left, required this.top, required this.width, required this.height});
-
-  @override
-  String get asset => SongketHem.asset;
-
-  @override
-  Widget build(BuildContext context) => Positioned(
-        left: left,
-        top: top,
-        width: width,
-        height: height,
-        child: SongketHem(height: height),
-      );
 }
 
 /// A plain surface card (the locked page in the guest scene).

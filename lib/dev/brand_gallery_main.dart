@@ -308,8 +308,6 @@ class _PageState extends State<_Page> {
                 ],
               ),
               const SizedBox(height: KSpace.m),
-              const SongketHem(height: 10),
-              const SizedBox(height: KSpace.m),
               SizedBox(height: 160, child: KPattern(kind: KPatternKind.star8, color: theme.colorScheme.primary.withValues(alpha: 0.14))),
               const SizedBox(height: KSpace.xxl * 2),
             ]),

@@ -4,11 +4,6 @@ Downloaded 2026-10-28 from Wikimedia Commons. Slimmed for bundling (styles,
 ids and metadata removed, path numbers rounded to one decimal); drawn in a
 single colour at runtime.
 
-## songket_perseri.svg — CC0 1.0
-
-"Malay songket pattern - Perseri.svg" by EmpAhmadK,
-https://commons.wikimedia.org/wiki/File:Malay_songket_pattern_-_Perseri.svg
-
 ## motifs/ — CC BY 4.0, attribution required
 
 Illustrations by **Geleparaplu for Wikimedia Malaysia** (Wikipedia 25,

@@ -4,13 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../../theme/app_icons.dart';
 import '../../theme/tokens.dart';
-import 'songket_hem.dart';
 
 /// Marks official / pinned / verified content — the one place the kerawang
-/// shape lives in the UI: a songket hem along the top edge, an accent
-/// hairline, and the top-right corner cut off (the "kerawang cut"). With a
-/// [label] (or [semanticLabel]) an accent label row sits under the hem —
-/// e.g. "📌 Pinned", "✓ Official club".
+/// shape lives in the UI: an accent hairline and the top-right corner cut
+/// off (the "kerawang cut"). With a [label] (or [semanticLabel]) an accent
+/// label row sits at the top — e.g. "📌 Pinned", "✓ Official club".
 ///
 /// The accent is the app's one special colour; use this only for content
 /// that is genuinely official or pinned.
@@ -74,7 +72,6 @@ class OfficialFrame extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            SongketHem(height: 7, color: k.accent),
             if (text != null)
               Container(
                 color: k.accent.withValues(alpha: 0.10),

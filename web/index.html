@@ -58,8 +58,8 @@
   <!-- Splash: shown while the engine + app download (several seconds on
        mobile data), removed on Flutter's first frame. Background follows the
        saved theme (same values as lib/theme/app_themes.dart) so there's no
-       flash when Flutter paints: plain background, the K tile, and a songket
-       hem that weaves across while loading (static under reduced motion). -->
+       flash when Flutter paints: plain background, the K tile, and a soft
+       rounded bar that fills while loading (static under reduced motion). -->
   <style>
     :root { --bg: #F6F5F8; --primary: #5E1A4F; --track: rgba(94,26,79,.14); }
     html[data-theme="istana"] { --bg: #F7F3EE; --primary: #55163F; --track: rgba(85,22,63,.14); }
@@ -72,10 +72,8 @@
     }
     #splash img { width: 88px; height: 88px; border-radius: 22px; background: #fff;
       box-shadow: 0 1px 0 var(--track); animation: settle .5s cubic-bezier(.2,.8,.2,1) both; }
-    #splash .hem { width: 132px; height: 10px; background: var(--track); position: relative; overflow: hidden;
-      -webkit-mask: url("assets/assets/brand/songket_perseri.svg") left center / auto 100% repeat-x;
-      mask: url("assets/assets/brand/songket_perseri.svg") left center / auto 100% repeat-x; }
-    #splash .hem::after { content: ""; position: absolute; inset: 0; background: var(--primary);
+    #splash .hem { width: 96px; height: 6px; border-radius: 999px; background: var(--track); position: relative; overflow: hidden; }
+    #splash .hem::after { content: ""; position: absolute; inset: 0; border-radius: 999px; background: var(--primary);
       transform-origin: left; animation: weave 1.4s cubic-bezier(.6,0,.2,1) infinite; }
     @keyframes settle { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
     @keyframes weave { 0% { transform: scaleX(0); } 60%, 100% { transform: scaleX(1); } }

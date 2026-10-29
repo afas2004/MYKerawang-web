@@ -57,12 +57,11 @@ From the logo. Plum is the brand, marigold the one accent.
 - No tracked-out capitals for decoration; month abbreviations on date stubs
   are the only uppercase labels.
 
-## Songket — the edge rule
+## No pattern strips
 
-`SongketHem` only, and only on **edges**: top/bottom of the login ground, the
-bottom of a generated cover, the top of an official card, under the error
-scene's top. Never across the middle of content, never as a texture.
-(`identity_rules_test.dart` keeps the asset behind `SongketHem`.)
+The songket strip (`SongketHem`) was removed everywhere on 2026-10-29: bars,
+login, official cards, covers, splash. Edges are soft and plain; the
+culture lives in the ground's drawings and the stitch motifs.
 
 ## Header band (kepala kain) — `KBand`
 
@@ -82,12 +81,12 @@ from the one ground.
 |---|---|---|
 | Normal card | 1 px hairline, 16 px corners | `KCard` |
 | Post | plain card; author's colour as a thin avatar ring (grey when anonymous) | `PostCard` |
-| Official / pinned | songket hem on top, marigold hairline, cut top-right corner | `OfficialFrame` (via `KCard(official:)`) |
+| Official / pinned | marigold hairline, cut top-right corner, label row | `OfficialFrame` (via `KCard(official:)`) |
 | Event date | ticket stub, plum, perforated edge | `DateBlock` |
 | Market price | plain bold text in the accent colour | `MarketCard` |
 | Announcement category | colour rail | `categoryColor` |
 | No photo (events, listings) | soft tint + one stitch drawing; events add a date stub — never a grey box | `KTintCover` |
-| No photo (clubs, profiles) | pattern cover with songket hem (their identity) | `ClubCover`, `BrandCover` |
+| No photo (clubs, profiles) | pattern cover (their identity) | `ClubCover`, `BrandCover` |
 | No photo (announcement hero) | solid category colour + its icon | `_CategoryCover` |
 
 ## Illustration — `AppIllustration`
@@ -106,7 +105,7 @@ so nothing clips. **No illustrations on moderation or admin pages**
 - `KLikeBurst`: save pops and bursts six marigold diamonds
 - `KStampSwitcher`: Join/Follow ⇄ Joined/Following lands like a stamp
 - `LinearRefresher`: a wau comes down on its string and flies while loading
-- splash (`web/index.html`): the K tile settles, a songket hem weaves
+- splash (`web/index.html`): the K tile settles, a rounded bar fills
 
 ## Credits
 

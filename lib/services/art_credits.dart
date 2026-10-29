@@ -12,8 +12,6 @@ Wau Bulan, Wau Kucing, Wau Jala Budi, Nasi Lemak and Sape illustrations by Gelep
 Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0), https://creativecommons.org/licenses/by/4.0/
 
 Changes: recoloured, metadata removed, coordinates rounded.''');
-    yield const LicenseEntryWithLineBreaks(['Songket pattern'], '''
-"Malay songket pattern - Perseri" by EmpAhmadK, Wikimedia Commons. CC0 1.0 (public domain).''');
     yield const LicenseEntryWithLineBreaks(['Open Peeps, Open Doodles'], '''
 Illustrations by Pablo Stanley, openpeeps.com and opendoodles.com. CC0 1.0 (public domain).''');
     yield const LicenseEntryWithLineBreaks(['Fluent Emoji'], '''

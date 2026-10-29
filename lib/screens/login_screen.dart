@@ -145,8 +145,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ],
               );
             }
-            return _LoginGround(
-              child: SafeArea(
+            return SafeArea(
               child: Center(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
@@ -162,7 +161,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-              ),
               ),
             );
           }),
@@ -364,8 +362,7 @@ class _BrandPanel extends StatelessWidget {
     final scheme = theme.colorScheme;
     return ColoredBox(
       color: scheme.primaryContainer,
-      child: _LoginGround(
-        child: Center(
+      child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(KSpace.xxl + KSpace.l),
           child: ConstrainedBox(
@@ -391,27 +388,7 @@ class _BrandPanel extends StatelessWidget {
             ),
           ),
         ),
-        ),
       ),
-    );
-  }
-}
-
-/// The login frame: a songket hem along the top and bottom edges, like the
-/// head and foot of a kain. The drawings behind come from the app's one
-/// ground (KGround); the hems sit on the edges, so neither covers content.
-class _LoginGround extends StatelessWidget {
-  final Widget child;
-  const _LoginGround({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned.fill(child: child),
-        const Positioned(left: 0, right: 0, top: 0, child: SongketHem(height: 10)),
-        const Positioned(left: 0, right: 0, bottom: 0, child: SongketHem(height: 10)),
-      ],
     );
   }
 }

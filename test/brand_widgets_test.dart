@@ -81,11 +81,10 @@ void main() {
             ),
             // Patterns, hems and covers fill whatever box they get: very
             // short, very wide, and with a motif that must stay inside.
-            const SongketHem(height: 8),
             const SizedBox(height: 60, child: KPattern(kind: KPatternKind.star8, color: Colors.black12)),
             const SizedBox(height: 24, child: KPattern(kind: KPatternKind.pucuk, color: Colors.black12, angle: 45)),
-            const SizedBox(height: 140, child: BrandCover(seed: 'kebudayaan', motif: AppMotif.wauBulan, hem: true)),
-            const SizedBox(height: 40, child: BrandCover(seed: 'robotik', motif: AppMotif.sape, hem: true)),
+            const SizedBox(height: 140, child: BrandCover(seed: 'kebudayaan', motif: AppMotif.wauBulan)),
+            const SizedBox(height: 40, child: BrandCover(seed: 'robotik', motif: AppMotif.sape)),
             for (final i in AppIllo.values) AppIllustration(i, size: 160),
             SizedBox(
               height: 240,
@@ -208,7 +207,7 @@ void main() {
     // Path data must keep numbers apart: "0.30.5" (two numbers merged by a
     // careless minifier) silently breaks the whole drawing on web.
     final merged = RegExp(r'\d\.\d+\.\d');
-    for (final a in {...assets, for (final m in AppMotif.values) m.asset, SongketHem.asset}) {
+    for (final a in {...assets, for (final m in AppMotif.values) m.asset}) {
       expect(merged.hasMatch(File(a).readAsStringSync()), isFalse, reason: a);
     }
   });

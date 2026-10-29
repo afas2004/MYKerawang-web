@@ -31,7 +31,7 @@ AppMotif? clubMotif(Club club) => switch (club.category) {
     };
 
 /// A club's cover: its photo, or a cover generated from its handle in the
-/// club colour, with the category motif and a songket hem.
+/// club colour, with the category motif.
 class ClubCover extends StatelessWidget {
   final Club club;
   const ClubCover({super.key, required this.club});
@@ -42,7 +42,6 @@ class ClubCover extends StatelessWidget {
       seed: club.handle,
       color: clubColor(club),
       motif: clubMotif(club),
-      hem: true,
     );
     final url = club.coverUrl;
     if (url == null || url.isEmpty) return generated;
