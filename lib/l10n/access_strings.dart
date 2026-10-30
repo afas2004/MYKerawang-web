@@ -401,6 +401,22 @@ extension AccessStrings on AppStrings {
   String get listingNowSold => _t("This item has just been sold.",
       "Barang ini baru sahaja terjual.", "この商品は売り切れになりました。");
 
+  // ---- pin bar ----
+  String get pinClose => _t("Close pin", "Tutup pin", "ピンを閉じる");
+  String get pinOpenPost => _t("Opens the post", "Buka hantaran", "投稿を開く");
+  String get pinChoiceTitle => _t("Pin this post", "Pin hantaran ini", "この投稿をピン留め");
+  String get pinNormal => _t("Normal pin", "Pin biasa", "通常のピン");
+  String get pinNormalHint => _t("Ends by itself. Readers can close it.",
+      "Tamat sendiri. Pembaca boleh tutup.", "自動で終了します。読者は閉じられます。");
+  String get pinMandatory => _t("Mandatory pin", "Pin wajib", "必須のピン");
+  String get pinMandatoryHint => _t("Stays until an admin unpins it. Readers can't close it.",
+      "Kekal sampai admin nyahpin. Pembaca tak boleh tutup.",
+      "管理者が外すまで残ります。読者は閉じられません。");
+  String get pinMakeMandatory => _t("Make mandatory", "Jadikan wajib", "必須にする");
+  String get pinMakeNormal => _t("Make normal", "Jadikan biasa", "通常に戻す");
+  String get pinMandatoryDone => _t("Pinned until you unpin it",
+      "Dipin sampai anda nyahpin", "外すまでピン留めしました");
+
   // ---- listing status ----
   String get statusAvailable => _t("Available", "Ada", "販売中");
   String get statusReserved => _t("Reserved", "Ditempah", "取引中");

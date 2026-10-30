@@ -107,6 +107,8 @@ abstract final class KBand {
     List<Widget>? desktopActions,
     bool floating = true,
     bool snap = true,
+    bool pinned = false,
+    bool rounded = true,
   }) {
     if (Responsive.isDesktop(context)) {
       return SliverAppBar(
@@ -124,6 +126,7 @@ abstract final class KBand {
     return SliverAppBar(
       floating: floating,
       snap: snap,
+      pinned: pinned,
       title: title,
       actions: actions,
       centerTitle: false,
@@ -132,7 +135,7 @@ abstract final class KBand {
       iconTheme: const IconThemeData(color: onBand),
       actionsIconTheme: const IconThemeData(color: onBand),
       titleTextStyle: _title(context),
-      shape: _shape,
+      shape: rounded ? _shape : null,
     );
   }
 }

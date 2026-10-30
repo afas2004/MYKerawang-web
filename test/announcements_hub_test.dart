@@ -98,7 +98,7 @@ void main() {
       expect(Announcement.fromRow(row()).coverUrl, isNull);
     });
 
-    test('hero: featured, else pinned, else newest three', () {
+    test('hero: featured, else newest three; pins take no slot', () {
       List<String> hero(List<Map<String, dynamic>> rows) => AnnouncementsData(
             items: AnnouncementsData.sorted(
                 [for (final r in rows) Announcement.fromRow(r, now: _now)]),
@@ -112,7 +112,6 @@ void main() {
             row(id: 'c', featureUntil: _now.add(const Duration(hours: 1))),
           ]),
           ['c']);
-      expect(hero([row(id: 'a'), row(id: 'b', pinned: true)]), ['b']);
       expect(
           hero([
             for (var i = 0; i < 5; i++)

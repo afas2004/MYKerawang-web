@@ -3,7 +3,10 @@ import 'package:mykerawang/utils/app_nav.dart';
 import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/mention_service.dart';
+import '../l10n/moderation_strings.dart';
+import '../services/club_service.dart';
 import '../services/comment_pins.dart';
+import '../widgets/pin_controls.dart';
 import '../services/moderation_service.dart';
 import '../services/announcement_service.dart';
 import '../services/post_service.dart';
@@ -128,6 +131,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   /// The viewer wrote this post (anonymous ones included).
   bool _mine = false;
 
+  /// Null for the post's author, who needs no role check.
+  String? _role;
+
   /// The event an announcement links to (linked_event_id).
   Map<String, dynamic>? _linkedEvent;
 
@@ -167,10 +173,26 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     final mine = await PostService.isMine(_postData);
     if (mounted && mine != _mine) setState(() => _mine = mine);
     final role = mine ? null : await ModerationService.myRole();
-    final can = mine || role == 'admin' || role == 'owner';
+    final clubId = _postData['club_id'] as String?;
+    final officer = !mine &&
+        clubId != null &&
+        canManageClub(await ClubService.myRole(clubId));
+    final can = mine || officer || role == 'admin' || role == 'owner';
+    if (mounted && role != _role) setState(() => _role = role);
     if (mounted && can != _canPinComments) {
       setState(() => _canPinComments = can);
     }
+  }
+
+  Future<void> _toggleAnnouncementPin() async {
+    void apply(bool v) {
+      if (mounted) setState(() => _postData = {..._postData, 'is_pinned': v});
+    }
+
+    final pinned = _postData['is_pinned'] == true;
+    final now = await PinActions.toggle(context, _postData,
+        pinned: pinned, onChanged: apply);
+    if (now != pinned) apply(now);
   }
 
   Future<void> _togglePin(Map<String, dynamic> c) async {
@@ -510,6 +532,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   mine: _mine,
                   onEdit: () => openPostEditor(context, _postData),
                   onDelete: _deleteAnnouncement,
+                  onTogglePin: PinActions.canPin(_postData, _role)
+                      ? _toggleAnnouncementPin
+                      : null,
                 )
               : PostCard(
                   post: _postData,
@@ -825,6 +850,9 @@ class AnnouncementDetailHead extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
+  /// Admins only.
+  final VoidCallback? onTogglePin;
+
   const AnnouncementDetailHead({
     super.key,
     required this.post,
@@ -832,6 +860,7 @@ class AnnouncementDetailHead extends StatelessWidget {
     required this.mine,
     required this.onEdit,
     required this.onDelete,
+    this.onTogglePin,
   });
 
   @override
@@ -861,6 +890,12 @@ class AnnouncementDetailHead extends StatelessWidget {
                 ),
               ),
               const Spacer(),
+              if (onTogglePin != null)
+                TextButton.icon(
+                  onPressed: onTogglePin,
+                  icon: const Icon(AppIcons.pin, size: 18),
+                  label: Text(post['is_pinned'] == true ? s.mod.unpin : s.mod.pin),
+                ),
               if (mine) ...[
                 TextButton.icon(
                   onPressed: onEdit,

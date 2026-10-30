@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../services/comment_pins.dart';
 import '../services/form_service.dart';
+import '../services/club_service.dart';
 import '../services/moderation_service.dart';
 import 'package:mykerawang/services/share_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -89,6 +90,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     _commentsStream = _fetchCommentsStream();
     _fetchEventDetails();
     _loadOpenForm();
+    _checkClubOfficer();
     _loadContacts();
   }
 
@@ -353,6 +355,18 @@ class _EventDetailScreenState extends State<EventDetailScreen>
   }
 
   bool get _isCancelled => _event['cancelled_at'] != null;
+
+  /// May pin comments on the club's event (the RPC re-checks).
+  bool _clubOfficer = false;
+
+  Future<void> _checkClubOfficer() async {
+    final clubId = _event['club_id'] as String?;
+    if (clubId == null) return;
+    final officer = canManageClub(await ClubService.myRole(clubId));
+    if (mounted && officer != _clubOfficer) {
+      setState(() => _clubOfficer = officer);
+    }
+  }
 
   /// Soft cancel: the event stays visible, marked cancelled, and a
   /// database trigger notifies everyone who joined.
@@ -1693,6 +1707,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
               future: ModerationService.myRole(),
               builder: (context, role) {
                 final canPin = _isOwner ||
+                    _clubOfficer ||
                     role.data == 'admin' ||
                     role.data == 'owner';
                 return Column(

@@ -133,8 +133,13 @@ class ModerationService {
   }
 
   // ------------------------------------------------------------- pins
-  static Future<Map<String, dynamic>> pin(String postId, {bool replace = false}) async {
-    final r = await _db.rpc('pin_post', params: {'p_post_id': postId, 'p_replace': replace});
+  static Future<Map<String, dynamic>> pin(String postId,
+      {bool replace = false, bool mandatory = false}) async {
+    final r = await _db.rpc('pin_post', params: {
+      'p_post_id': postId,
+      'p_replace': replace,
+      'p_mandatory': mandatory,
+    });
     return Map<String, dynamic>.from(r as Map);
   }
 
