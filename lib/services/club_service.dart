@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/event_live.dart';
 
 import '../utils/filter_rules.dart';
 
@@ -495,7 +496,8 @@ class ClubService {
           .select()
           .eq('club_id', clubId)
           .order('start_datetime', ascending: false)
-          .limit(50));
+          .limit(50))
+        ..sort(compareForBrowse);
 
   static Future<List<Map<String, dynamic>>> listings(String clubId) async =>
       List<Map<String, dynamic>>.from(await _db

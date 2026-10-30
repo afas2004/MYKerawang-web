@@ -7,6 +7,9 @@
 /// makes the code short-lived; this only decides whether the UI offers it.
 library;
 
+import '../l10n/access_strings.dart';
+import '../l10n/app_strings.dart';
+
 /// The check-in window: 15 minutes before the start until the end.
 const Duration kCheckinOpensBefore = Duration(minutes: 15);
 
@@ -24,6 +27,41 @@ bool checkinOpen(Map<String, dynamic> event, {DateTime? now}) {
 
   final at = now ?? DateTime.now();
   return at.isAfter(start.subtract(kCheckinOpensBefore)) && at.isBefore(end);
+}
+
+/// Has this event finished? Ended events stay visible (greyed out) —
+/// history is content (DESIGN_SPEC §6).
+bool isEventEnded(Map<String, dynamic> event) {
+  final raw = event['end_datetime'] ?? event['start_datetime'];
+  final end = DateTime.tryParse(raw ?? '');
+  if (end == null) return false;
+  return end.toUtc().isBefore(DateTime.now().toUtc());
+}
+
+/// Cancelled by the organiser (events.cancelled_at, see
+/// 20261019002200_event_soft_cancel.sql).
+bool isEventCancelled(Map<String, dynamic> event) => event['cancelled_at'] != null;
+
+/// Ended or cancelled: either way it's history, greyed and sorted last.
+bool isEventClosed(Map<String, dynamic> event) =>
+    isEventEnded(event) || isEventCancelled(event);
+
+/// Badge text for a closed event; none while it is still on. Cancelled wins
+/// over ended: a cancelled event whose date has passed never happened.
+String? eventBadge(Map<String, dynamic> event, AppStrings s) {
+  if (isEventCancelled(event)) return s.cancelled;
+  return isEventEnded(event) ? s.ended : null;
+}
+
+/// Browse order: upcoming (soonest first), then ended or cancelled (most
+/// recent first).
+int compareForBrowse(Map<String, dynamic> a, Map<String, dynamic> b) {
+  DateTime start(Map<String, dynamic> e) =>
+      DateTime.tryParse(e['start_datetime'] ?? '') ?? DateTime(1970);
+  final aClosed = isEventClosed(a);
+  final bClosed = isEventClosed(b);
+  if (aClosed != bClosed) return aClosed ? 1 : -1;
+  return aClosed ? start(b).compareTo(start(a)) : start(a).compareTo(start(b));
 }
 
 /// True when [event] is happening right now (start <= now < end). Used for the

@@ -10,6 +10,7 @@ import '../l10n/social_strings.dart';
 import '../services/unread_notifications.dart';
 import '../utils/app_nav.dart';
 import '../utils/guest_access.dart';
+import '../utils/listing_status.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/embed_card.dart';
 import '../widgets/error_state.dart';
@@ -120,12 +121,14 @@ class _HomeScreenState extends State<HomeScreen>
       final results = await Future.wait<List<Map<String, dynamic>>>([
         _supabase.from('events')
             .select()
+            .eq('is_hidden', false)
+            .isFilter('cancelled_at', null)
             .gt('end_datetime', now)
             .order('start_datetime', ascending: true)
             .limit(20),
         _supabase.from('listings')
             .select()
-            .eq('is_sold', false)
+            .or(kAvailableListingsFilter)
             .order('created_at', ascending: false)
             .limit(20),
         _postsPage(0),

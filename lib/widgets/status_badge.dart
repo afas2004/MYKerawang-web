@@ -1,5 +1,34 @@
 import 'package:flutter/material.dart';
+import '../l10n/access_strings.dart';
+import '../l10n/app_strings.dart';
 import '../theme/app_themes.dart';
+import '../utils/event_live.dart';
+import '../utils/listing_status.dart';
+
+/// Badge text for an event or listing row; null while it is live.
+String? statusLabelFor(Map<String, dynamic> data, AppStrings s,
+        {required bool isEvent}) =>
+    isEvent ? eventBadge(data, s) : ListingStatus.of(data).badge(s);
+
+/// [statusLabelFor], plus "Check-in open" while an event's door is open: what
+/// the feed's cards show on their photo.
+String? cardLabelFor(Map<String, dynamic> data, AppStrings s,
+        {required bool isEvent}) =>
+    statusLabelFor(data, s, isEvent: isEvent) ??
+    (isEvent && checkinOpen(data) ? s.evCheckinOpen : null);
+
+/// [photo] with [label] in its top corner; [photo] itself when there is no
+/// label. The parent must give the photo a fixed size.
+Widget photoWithStatus(Widget photo, String? label) => label == null
+    ? photo
+    : Stack(
+        fit: StackFit.expand,
+        children: [
+          photo,
+          Positioned(
+              top: KSpace.s, left: KSpace.s, child: StatusBadge(label)),
+        ],
+      );
 
 /// "Ended" / "Sold" / "Reserved" / "Cancelled" marker laid over a photo:
 /// a dark pill, so it reads on any image. [StatusBadge.stamp] is the

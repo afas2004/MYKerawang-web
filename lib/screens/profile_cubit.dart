@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/event_live.dart';
 
 // 1. The State
 class ProfileState {
@@ -107,7 +108,7 @@ class ProfileCubit extends Cubit<ProfileState> {
           isLoading: false, // Done!
           profile: profileData,
           listings: listingsData,
-          events: eventsData,
+          events: eventsData..sort(compareForBrowse),
         ));
       } catch (e) {
         emit(state.copyWith(isLoading: false, errorMessage: e.toString()));

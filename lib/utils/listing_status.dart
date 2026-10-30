@@ -1,6 +1,12 @@
 import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 
+/// PostgREST filter for listings still for sale. `is_sold` alone lets
+/// reserved items through; rows with no `status` predate the migration, so
+/// they fall back to it (same rule as [ListingStatus.of]).
+const kAvailableListingsFilter =
+    'status.eq.available,and(status.is.null,is_sold.eq.false)';
+
 /// `listings.status` (see 20261019002500_listing_status.sql).
 enum ListingStatus {
   available,

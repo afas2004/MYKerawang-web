@@ -1,8 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../language_cubit.dart';
+import '../utils/event_live.dart';
 import '../utils/formatters.dart';
 import 'brand/brand.dart';
+import 'status_badge.dart';
 
 /// An event or listing inside the feed, styled like the market / event
 /// cards: 16:10 photo, title, then the price or the date · place line.
@@ -43,6 +45,7 @@ class EmbedCard extends StatelessWidget {
     final imageUrl = data['image_url'] as String?;
     final meta = _meta();
     final kindIcon = isEvent ? AppIcons.events : AppIcons.market;
+    final badge = cardLabelFor(data, context.l10n, isEvent: isEvent);
 
     final metaStyle = isEvent
         ? theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)
@@ -100,6 +103,13 @@ class EmbedCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleSmall
                             ?.copyWith(fontWeight: FontWeight.w600)),
+                    if (badge != null)
+                      Text(badge,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                              color: isEvent && checkinOpen(data)
+                                  ? scheme.primary
+                                  : scheme.error,
+                              fontWeight: FontWeight.w600)),
                     if (metaRow != null) ...[
                       const SizedBox(height: 2),
                       metaRow,
@@ -124,7 +134,9 @@ class EmbedCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            AspectRatio(aspectRatio: 16 / 10, child: photo(1000)),
+            AspectRatio(
+                aspectRatio: 16 / 10,
+                child: photoWithStatus(photo(1000), badge)),
             Padding(
               padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, KSpace.l),
               child: Column(
@@ -197,16 +209,18 @@ class SharedItemHero extends StatelessWidget {
         children: [
           AspectRatio(
             aspectRatio: 16 / 9,
-            child: (imageUrl != null && imageUrl.isNotEmpty)
-                ? CachedNetworkImage(
-                    imageUrl: imageUrl,
-                    fit: BoxFit.cover,
-                    memCacheWidth: 1000,
-                    placeholder: (_, __) =>
-                        ColoredBox(color: scheme.surfaceContainerHighest),
-                    errorWidget: (_, __, ___) => _Placeholder(icon: icon),
-                  )
-                : _Placeholder(icon: icon),
+            child: photoWithStatus(
+                (imageUrl != null && imageUrl.isNotEmpty)
+                    ? CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        fit: BoxFit.cover,
+                        memCacheWidth: 1000,
+                        placeholder: (_, __) =>
+                            ColoredBox(color: scheme.surfaceContainerHighest),
+                        errorWidget: (_, __, ___) => _Placeholder(icon: icon),
+                      )
+                    : _Placeholder(icon: icon),
+                cardLabelFor(data, s, isEvent: isEvent)),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, KSpace.l),

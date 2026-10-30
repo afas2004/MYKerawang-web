@@ -10,6 +10,7 @@ import '../l10n/app_strings.dart';
 import '../l10n/shell_strings.dart';
 import '../language_cubit.dart';
 import '../utils/app_nav.dart';
+import '../utils/event_live.dart';
 import '../utils/formatters.dart';
 import '../utils/roles.dart';
 import '../widgets/after_fonts_load.dart';
@@ -96,12 +97,6 @@ class _SearchScreenState extends State<SearchScreen> {
   static String _filterSafe(String raw) =>
       filterSafe(raw).replaceFirst(RegExp(r'^@+'), '');
 
-  bool _hasEnded(Map<String, dynamic> event) {
-    final end = parseLocal(event['end_datetime']) ??
-        parseLocal(event['start_datetime']);
-    return end != null && end.isBefore(DateTime.now());
-  }
-
   /// "#futsal" → "futsal"; null when the query isn't a hashtag.
   static String? hashtagOf(String query) {
     final q = query.trim();
@@ -171,17 +166,14 @@ class _SearchScreenState extends State<SearchScreen> {
 
       // 2. Search EVENTS
       if (_activeFilter == 'All' || _activeFilter == 'Events' || _activeFilter == 'Posts') {
-        // Ended events stay findable (shown greyed with the Ended badge);
-        // upcoming ones sort first, then most recently ended.
+        // Ended and cancelled events stay findable (greyed, with a badge);
+        // upcoming ones sort first.
         final events = await _supabase.from('events')
-            .select('id, title, start_datetime, end_datetime, image_url')
+            .select('id, title, start_datetime, end_datetime, image_url, cancelled_at')
             .ilike('title', q)
             .order('start_datetime', ascending: false)
             .limit(limitPerCategory);
-        final upcoming = events.where((e) => !_hasEnded(e)).toList().reversed;
-        final ended = events.where(_hasEnded);
-
-        for (var e in [...upcoming, ...ended]) {
+        for (var e in events..sort(compareForBrowse)) {
           if (_activeFilter != 'Posts') tempResults.add({...e, 'type': 'event'});
           foundEventIds.add(e['id']); 
         }
@@ -190,7 +182,7 @@ class _SearchScreenState extends State<SearchScreen> {
       // 3. Search MARKETPLACE
       if (_activeFilter == 'All' || _activeFilter == 'Market' || _activeFilter == 'Posts') {
         final items = await _supabase.from('listings')
-            .select('id, title, price, image_url, is_sold')
+            .select('id, title, price, image_url, is_sold, status')
             .ilike('title', q)
             .eq('is_sold', false)
             .limit(limitPerCategory);
@@ -609,7 +601,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
     final title = item['title'] ?? s.untitled;
     final image = item['image_url'];
-    final ended = isEvent && _hasEnded(item);
+    final closed = isEvent && isEventClosed(item);
+    final status =
+        isPost ? null : statusLabelFor(item, s, isEvent: isEvent);
     
     String subtitle;
     String badgeLabel;
@@ -674,8 +668,8 @@ class _SearchScreenState extends State<SearchScreen> {
                         color: scheme.surfaceContainerHighest,
                         child: Icon(placeholderIcon, color: scheme.onSurfaceVariant),
                       ),
-                if (ended)
-                  Center(child: StatusBadge(s.ended)),
+                if (status != null)
+                  Center(child: StatusBadge(status)),
                   ],
                 ),
               ),
@@ -715,7 +709,7 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
       ),
     );
-    return _greyIfEnded(card, ended);
+    return _greyIfEnded(card, closed);
   }
 
   /// Past events stay tappable but read as inactive.
