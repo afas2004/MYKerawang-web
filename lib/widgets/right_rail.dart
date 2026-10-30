@@ -8,6 +8,7 @@ import '../language_cubit.dart';
 import '../theme/app_themes.dart';
 import '../utils/app_nav.dart';
 import '../utils/formatters.dart';
+import '../utils/listing_status.dart';
 import 'brand/brand.dart';
 
 /// What the rail shows: upcoming (or, failing that, recent) events and
@@ -58,13 +59,15 @@ class _RightRailState extends State<RightRail> {
       supabase
           .from('events')
           .select()
+          .eq('is_hidden', false)
+          .isFilter('cancelled_at', null)
           .gt('end_datetime', now)
           .order('start_datetime', ascending: true)
           .limit(3),
       supabase
           .from('listings')
           .select()
-          .eq('is_sold', false)
+          .or(kAvailableListingsFilter)
           .order('created_at', ascending: false)
           .limit(4),
     ]);
@@ -75,6 +78,8 @@ class _RightRailState extends State<RightRail> {
       events = await supabase
           .from('events')
           .select()
+          .eq('is_hidden', false)
+          .isFilter('cancelled_at', null)
           .order('start_datetime', ascending: false)
           .limit(3);
       past = events.isNotEmpty;
@@ -126,7 +131,8 @@ class _RightRailState extends State<RightRail> {
                           ? const _RailEmpty()
                           : Column(
                               children: [
-                                for (final e in data.events) _EventRow(e),
+                                for (final e in data.events)
+                                  _EventRow(e, past: data.pastEvents),
                               ],
                             ),
                 ),
@@ -192,7 +198,10 @@ class _RailEmpty extends StatelessWidget {
 
 class _EventRow extends StatelessWidget {
   final Map<String, dynamic> event;
-  const _EventRow(this.event);
+
+  /// Muted edge: the primary colour reads as still on.
+  final bool past;
+  const _EventRow(this.event, {this.past = false});
 
   @override
   Widget build(BuildContext context) {
@@ -208,7 +217,10 @@ class _EventRow extends StatelessWidget {
           margin: const EdgeInsets.symmetric(vertical: KSpace.xs),
           padding: const EdgeInsets.only(left: 10),
           decoration: BoxDecoration(
-            border: Border(left: BorderSide(color: scheme.primary, width: 3)),
+            border: Border(
+                left: BorderSide(
+                    color: past ? scheme.outlineVariant : scheme.primary,
+                    width: 3)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

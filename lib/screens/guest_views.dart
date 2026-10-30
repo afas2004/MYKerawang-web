@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
+import '../utils/event_live.dart';
 import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
 import '../utils/formatters.dart';
@@ -124,7 +125,7 @@ class _GuestProfileScreenState extends State<GuestProfileScreen> {
       results[0] as Map<String, dynamic>?,
       results[1] as Map<String, dynamic>?,
       list(results[2]),
-      list(results[3]),
+      [...list(results[3])]..sort(compareForBrowse),
       list(results[4]),
     );
   }

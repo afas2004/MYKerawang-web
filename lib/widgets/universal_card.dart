@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../language_cubit.dart';
 import '../utils/formatters.dart';
 import 'brand/brand.dart';
+import 'status_badge.dart';
 
 /// Small event / listing card for horizontal lists: photo, title, and the
 /// date range or price — the same style as the market and event cards.
@@ -49,7 +50,8 @@ class UniversalCard extends StatelessWidget {
             )
           : null,
     );
-    final photo = image != null && image.isNotEmpty
+    final badge = cardLabelFor(data, s, isEvent: isEvent);
+    final cover = image != null && image.isNotEmpty
         ? CachedNetworkImage(
             imageUrl: image,
             memCacheWidth: 600,
@@ -60,6 +62,7 @@ class UniversalCard extends StatelessWidget {
             errorWidget: (_, __, ___) => generated,
           )
         : generated;
+    final photo = photoWithStatus(cover, badge);
 
     final text = Padding(
       padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.s, KSpace.m, KSpace.m),

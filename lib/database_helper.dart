@@ -25,7 +25,18 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(path, version: 1, onCreate: _createDB);
+    return await openDatabase(path,
+        version: 2, onCreate: _createDB, onUpgrade: _upgradeDB);
+  }
+
+  /// v2: the columns a closed event or reserved listing is read from. The
+  /// cache refills on the next fetch, so old rows simply stay null.
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE listings ADD COLUMN status TEXT');
+      await db.execute('ALTER TABLE events ADD COLUMN end_datetime TEXT');
+      await db.execute('ALTER TABLE events ADD COLUMN cancelled_at TEXT');
+    }
   }
 
   Future _createDB(Database db, int version) async {
@@ -39,7 +50,8 @@ class DatabaseHelper {
         category TEXT,
         image_url TEXT,
         seller_id TEXT,
-        is_sold INTEGER
+        is_sold INTEGER,
+        status TEXT
       )
     ''');
     
@@ -51,7 +63,9 @@ class DatabaseHelper {
         location TEXT,
         start_datetime TEXT,
         image_url TEXT,
-        organizer_id TEXT
+        organizer_id TEXT,
+        end_datetime TEXT,
+        cancelled_at TEXT
       )
     ''');
   }
@@ -72,6 +86,7 @@ class DatabaseHelper {
           'image_url': item['image_url'],
           'seller_id': item['seller_id'],
           'is_sold': (item['is_sold'] ?? false) ? 1 : 0,
+          'status': item['status'],
         });
       }
     });
@@ -90,6 +105,8 @@ class DatabaseHelper {
           'start_datetime': item['start_datetime'],
           'image_url': item['image_url'],
           'organizer_id': item['organizer_id'],
+          'end_datetime': item['end_datetime'],
+          'cancelled_at': item['cancelled_at'],
         });
       }
     });

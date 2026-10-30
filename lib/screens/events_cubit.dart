@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database_helper.dart';
+import '../utils/event_live.dart';
 import '../utils/guest_access.dart';
 import '../widgets/profile_avatar_action.dart' show ShellAuth;
 
@@ -53,23 +54,6 @@ class EventsState {
     );
   }
 }
-
-/// Has this event finished? Ended events stay visible (greyed out) —
-/// history is content (DESIGN_SPEC §6).
-bool isEventEnded(Map<String, dynamic> event) {
-  final raw = event['end_datetime'] ?? event['start_datetime'];
-  final end = DateTime.tryParse(raw ?? '');
-  if (end == null) return false;
-  return end.toUtc().isBefore(DateTime.now().toUtc());
-}
-
-/// Cancelled by the organiser (events.cancelled_at, see
-/// 20261019002200_event_soft_cancel.sql).
-bool isEventCancelled(Map<String, dynamic> event) => event['cancelled_at'] != null;
-
-/// Ended or cancelled: either way it's history, greyed and sorted last.
-bool isEventClosed(Map<String, dynamic> event) =>
-    isEventEnded(event) || isEventCancelled(event);
 
 class EventsCubit extends Cubit<EventsState> {
   EventsCubit() : super(EventsState()) {
@@ -240,19 +224,7 @@ class EventsCubit extends Cubit<EventsState> {
       return matchesSearch && matchesTag;
     }).toList();
 
-    // Upcoming first (soonest first), then ended or cancelled (most
-    // recent first).
-    DateTime start(Map<String, dynamic> e) =>
-        DateTime.tryParse(e['start_datetime'] ?? '') ?? DateTime(1970);
-
-    filtered.sort((a, b) {
-      final aEnded = isEventClosed(a);
-      final bEnded = isEventClosed(b);
-      if (aEnded != bEnded) return aEnded ? 1 : -1;
-      return aEnded
-          ? start(b).compareTo(start(a))
-          : start(a).compareTo(start(b));
-    });
+    filtered.sort(compareForBrowse);
 
     return filtered;
   }

@@ -65,7 +65,7 @@ Map<String, dynamic> samplePost({
   };
 }
 
-Map<String, dynamic> sampleEvent(String id) => {
+Map<String, dynamic> sampleEvent(String id, {String? cancelledAt}) => {
       'id': id,
       'type': 'event',
       'title': 'Malam Kebudayaan $id',
@@ -73,14 +73,18 @@ Map<String, dynamic> sampleEvent(String id) => {
       'end_datetime': DateTime.now().add(const Duration(days: 2, hours: 3)).toIso8601String(),
       'location': 'Dewan Kolej',
       'image_url': null,
+      'cancelled_at': cancelledAt,
+      'is_hidden': false,
     };
 
-Map<String, dynamic> sampleListing(String id) => {
+Map<String, dynamic> sampleListing(String id, {String status = 'available'}) => {
       'id': id,
       'type': 'listing',
       'title': 'Kettle $id',
       'price': 15,
       'image_url': null,
+      'status': status,
+      'is_sold': status == 'sold',
     };
 
 /// MaterialApp + LanguageCubit at a fixed logical size.

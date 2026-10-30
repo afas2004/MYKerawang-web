@@ -194,7 +194,9 @@ abstract final class AnnouncementService {
   static Future<List<Map<String, dynamic>>> linkableEvents({String? clubId}) async {
     var q = _db
         .from('events')
-        .select('id, title, start_datetime, location, image_url');
+        .select('id, title, start_datetime, location, image_url')
+        .eq('is_hidden', false)
+        .isFilter('cancelled_at', null);
     // Any event can be linked, not only your own: a club announcement often
     // points at a college event, and an admin at anything on the calendar.
     if (clubId != null) q = q.eq('club_id', clubId);

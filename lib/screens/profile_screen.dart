@@ -17,6 +17,7 @@ import '../l10n/feed_strings.dart';
 import '../l10n/social_strings.dart';
 import '../widgets/post_card.dart';
 import '../widgets/saved_items_view.dart';
+import '../utils/event_live.dart';
 import '../widgets/status_badge.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../utils/formatters.dart';
@@ -92,7 +93,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       // That's deliberate: a profile page is public, so listing them here
       // would deanonymise them.
       final posts = await _supabase.from('posts_public').select('*').eq('user_id', targetUid).order('created_at', ascending: false);
-      final events = await _supabase.from('events').select().eq('organizer_id', targetUid).order('start_datetime', ascending: false);
+      final events = (await _supabase.from('events').select().eq('organizer_id', targetUid).order('start_datetime', ascending: false))..sort(compareForBrowse);
       
       // <--- NEW: Fetch Listings
       final listings = await _supabase.from('listings').select().eq('seller_id', targetUid).order('created_at', ascending: false);
@@ -792,14 +793,10 @@ class _ProfileTile extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final start = parseLocal(item['start_datetime']);
-    final end = parseLocal(item['end_datetime']) ?? start;
-    final ended = isEvent && end != null && end.isBefore(DateTime.now());
     final subtitle = isEvent
         ? (start != null ? formatEventDate(start) : s.dateTba)
         : formatPrice(item['price']);
-    final badge = isEvent
-        ? (ended ? s.ended : null)
-        : (item['is_sold'] == true ? s.sold : null);
+    final badge = statusLabelFor(item, s, isEvent: isEvent);
 
     return KCard(
       padding: EdgeInsets.zero,
