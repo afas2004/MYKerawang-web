@@ -34,6 +34,46 @@ Then verify **from the site**, not the log: `https://kerawang.my/build.json`,
 cannot render the wasm build (it stalls on the splash for a local copy too), so
 a visual check needs a real browser.
 
+## The eight unmanaged objects — adopted 2026-10-29
+
+An audit compared every live function, trigger and policy against every
+`supabase/**/*.sql` (and `git log --all -S`, which found nothing). Eight objects
+had been created by hand in the dashboard and existed **only** in the database:
+
+| Object | Attached to | Now |
+|---|---|---|
+| `handle_new_user()` | `on_auth_user_created` on **auth.users** | adopted, `search_path` added, `on conflict (id) do nothing` |
+| `update_comment_count()` | `on_comment_change` on **comments** | adopted; count can no longer go below zero |
+| `notify_new_event()` | `on_event_created` on **events** | adopted; `search_path` added |
+| `events_insert_own` | INSERT policy on **events** | adopted — `authenticated`, `organizer_id = auth.uid()` |
+| `listings_insert_own` | INSERT policy on **listings** | adopted — `authenticated`, `seller_id = auth.uid()` |
+| `ensure_profile_exists(uuid)` | callable, **anon had EXECUTE** | **dropped** — no caller in `lib/` or `test/`, and it inserted a hard-coded name and avatar |
+
+Why it mattered: without these, a database built from `migrations/` alone would
+sign people up with **no profile row**, lose comment counts, lose new-event
+notifications, and lose the ability to insert an event or listing.
+
+Two things to know about the file:
+
+- The `auth.users` trigger is created **only when `auth.users.raw_user_meta_data`
+  exists** — i.e. on a real Supabase project. The PGlite stub models `auth.users`
+  with four columns and every test creates its own profile row, so attaching the
+  trigger there would collide with 13 helper inserts rather than test anything.
+  Verified after applying: the trigger **is** live on `auth.users`.
+- The migration also adds `set search_path = public` to the three definer
+  functions. `handle_new_user` and friends had none, which is the classic
+  definer-escalation shape.
+
+The harness got two fidelity fixes so the other three objects are exercised:
+`profiles.notify_new_events` and `notifications.message` exist in the stub now,
+and `notifications.actor_id` is nullable (as it is in production).
+
+**Three suites fail for reasons that predate this work** — verified by stashing
+the migration and re-running: `create/announce_edit_test.mjs` and
+`create/create_test.mjs` die on `invalid input syntax for type uuid:
+"Debate Society"`, and `posts_v13/posts_v13_test.mjs` needs the `citext`
+extension it does not load.
+
 ## The 2026-10-28 club review
 
 Four findings; three fixed here, one left to the owner.
@@ -101,6 +141,7 @@ https and Firebase sends HSTS (one year).
 | `20261026014100_storage_image_limits.sql` | `images` and `avatars` buckets: `allowed_mime_types` (jpeg/png/webp/gif) and a 5 MB `file_size_limit`. Applied 2026-10-25. |
 | `20261026015100_security_review_fixes.sql` | Form text caps, hidden-event counts, exact signup domain, verification-domain trigger, execute grants, and the `images` bucket write policies. **Applied 2026-10-28.** Verified: an anonymous PNG upload to `images` now fails with `new row violates row-level security policy` (it returned 200 before). |
 | `20261028120000_club_review_fixes.sql` | The club-review fixes: a **rejected** request releases its registry entry, the **pin guard covers the club columns**, and the roster notice credits **the president**. **Applied 2026-10-28**, history recorded |
+| `20261029230000_formalise_unmanaged_objects.sql` | **Applied 2026-10-29.** Adopts the eight objects that only ever existed in the dashboard — `handle_new_user` (trigger on `auth.users`), `update_comment_count` (comments), `notify_new_event` (events), the `events_insert_own` / `listings_insert_own` policies — and **drops `ensure_profile_exists`**, which was anon-executable and inserted a hard-coded identity. Adds `set search_path = public` to the three security-definer functions. See "The eight unmanaged objects" below. |
 
 Seeded data: `supabase/seed/2026-10-25_ki_test_event.sql` created **Malam Ujian
 KI** — the event to test the whole report loop on. Re-runnable.

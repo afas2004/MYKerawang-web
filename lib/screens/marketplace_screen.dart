@@ -249,7 +249,7 @@ class _MarketplaceViewState extends State<MarketplaceView>
               itemBuilder: (context, index) {
                 final item = state.items[index];
                 final card = MarketCard(item: item, onTap: () => context.goItem(item));
-                return index < 8 ? KEntrance(index: index, child: card) : card;
+                return index < 3 ? KEntrance(index: index, child: card) : card;
               },
             ),
           ),

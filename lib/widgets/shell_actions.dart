@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/form_strings.dart';
 import 'package:go_router/go_router.dart';
 
 import '../l10n/app_strings.dart';
@@ -48,6 +49,7 @@ Future<void> showCreateSheet(BuildContext context) async {
               onEvent: () => open(ctx, context.goCreateEvent),
               onSell: () => open(ctx, context.goCreateListing),
               onAnnouncement: () => open(ctx, () => context.push('/create/announcement')),
+              onForm: () => open(ctx, () => context.push('/forms/new')),
             ),
           ],
         ),
@@ -80,6 +82,9 @@ class CreateOptionsList extends StatelessWidget {
   final VoidCallback onSell;
   final VoidCallback onAnnouncement;
 
+  /// "Form" → My forms. Optional: older callers have no form entry.
+  final VoidCallback? onForm;
+
   const CreateOptionsList({
     super.key,
     required this.ability,
@@ -87,6 +92,7 @@ class CreateOptionsList extends StatelessWidget {
     required this.onEvent,
     required this.onSell,
     required this.onAnnouncement,
+    this.onForm,
   });
 
   @override
@@ -128,6 +134,13 @@ class CreateOptionsList extends StatelessWidget {
           subtitle: s.shell.sellItemSub,
           onTap: onSell,
         ),
+        if (onForm != null)
+          _CreateOption(
+            icon: AppIcons.list,
+            title: s.formsNew,
+            subtitle: s.formsCreateSub,
+            onTap: onForm!,
+          ),
       ],
     );
   }

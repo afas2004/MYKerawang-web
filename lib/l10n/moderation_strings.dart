@@ -23,6 +23,7 @@ class ModerationStrings {
   final String typeComment;
   final String typeEvent;
   final String typeListing;
+  final String typeForm;
   final String typeUser;
   final String catSpam;
   final String catScam;
@@ -269,6 +270,7 @@ class ModerationStrings {
   final String sNewComments;
   final String sNewListings;
   final String sNewEvents;
+  final String sNewForms;
   final String sReporterMin;
   final String sReporterRatio;
   final String sMaxPins;
@@ -301,6 +303,7 @@ class ModerationStrings {
     required this.typeComment,
     required this.typeEvent,
     required this.typeListing,
+    required this.typeForm,
     required this.typeUser,
     required this.catSpam,
     required this.catScam,
@@ -525,6 +528,7 @@ class ModerationStrings {
     required this.sNewComments,
     required this.sNewListings,
     required this.sNewEvents,
+    required this.sNewForms,
     required this.sReporterMin,
     required this.sReporterRatio,
     required this.sMaxPins,
@@ -556,6 +560,7 @@ class ModerationStrings {
     typeComment: "Comment",
     typeEvent: "Event",
     typeListing: "Listing",
+    typeForm: "Form",
     typeUser: "Profile",
     catSpam: "Spam",
     catScam: "Scam or fraud",
@@ -780,6 +785,7 @@ class ModerationStrings {
     sNewComments: "New accounts: comments per hour",
     sNewListings: "New accounts: listings per hour",
     sNewEvents: "New accounts: events per hour",
+    sNewForms: "New accounts: forms per hour",
     sReporterMin: "Reporter quality: resolved reports before it applies",
     sReporterRatio: "Ignore reporters whose dismissed share is above (0–1)",
     sMaxPins: "Pinned posts per club",
@@ -811,6 +817,7 @@ class ModerationStrings {
     typeComment: "Komen",
     typeEvent: "Acara",
     typeListing: "Barang",
+    typeForm: "Borang",
     typeUser: "Profil",
     catSpam: "Spam",
     catScam: "Penipuan",
@@ -1035,6 +1042,7 @@ class ModerationStrings {
     sNewComments: "Akaun baharu: komen sejam",
     sNewListings: "Akaun baharu: barang sejam",
     sNewEvents: "Akaun baharu: acara sejam",
+    sNewForms: "Akaun baharu: borang sejam",
     sReporterMin: "Kualiti pelapor: laporan selesai sebelum ia digunakan",
     sReporterRatio: "Abaikan pelapor dengan nisbah ditolak melebihi (0–1)",
     sMaxPins: "Siaran disemat bagi setiap kelab",
@@ -1064,6 +1072,7 @@ class ModerationStrings {
         'comment' => typeComment,
         'event' => typeEvent,
         'listing' => typeListing,
+        'form' => typeForm,
         _ => typeUser,
       };
 

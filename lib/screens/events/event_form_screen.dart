@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../l10n/form_strings.dart';
 import '../../language_cubit.dart';
 import '../../services/form_service.dart';
+import '../../services/my_forms_service.dart';
 import '../../theme/app_icons.dart';
 import '../../theme/tokens.dart';
 import '../../utils/adaptive.dart';
@@ -12,6 +13,7 @@ import '../../utils/app_nav.dart';
 import '../../utils/feedback.dart';
 import '../../utils/form_rules.dart';
 import '../../utils/guest_access.dart';
+import '../../utils/report_helper.dart';
 import '../../utils/text_rules.dart';
 import '../../widgets/form_style.dart';
 import '../../widgets/restriction_gate.dart';
@@ -27,13 +29,19 @@ import '../../widgets/restriction_gate.dart';
 /// organiser arranged is what the student sees. A rating is five equal
 /// segments rather than a row of chips, and the progress and the submit button
 /// stay together at the bottom.
+///
+/// The same page answers a standalone form (`/f/:id`, [eventId] null): it then
+/// says who made it, that it is not an official college form, and offers a
+/// report button and a way to take an answer back.
 class EventFormScreen extends StatefulWidget {
-  final String eventId;
+  /// The event whose open form to show; null for a standalone form.
+  final String? eventId;
 
   /// Open this form directly; null means "the event's open form, if any".
   final String? formId;
 
-  const EventFormScreen({super.key, required this.eventId, this.formId});
+  const EventFormScreen({super.key, this.eventId, this.formId})
+      : assert(eventId != null || formId != null);
 
   @override
   State<EventFormScreen> createState() => _EventFormScreenState();
@@ -84,7 +92,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
     });
     try {
       var id = widget.formId;
-      id ??= await FormService.instance.openFormId(widget.eventId);
+      if (id == null && widget.eventId != null) {
+        id = await FormService.instance.openFormId(widget.eventId!);
+      }
       if (id == null) {
         if (!mounted) return;
         setState(() {
@@ -236,7 +246,40 @@ class _EventFormScreenState extends State<EventFormScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _sending = false);
-      showErrorWithRetry(context, e, onRetry: _submit);
+      showErrorWithRetry(context, e,
+          onRetry: _submit, message: context.l10nRead.formServerError(formErrorCode(e)));
+    }
+  }
+
+  Future<void> _withdraw() async {
+    final doc = _doc;
+    if (doc == null) return;
+    final s = context.l10nRead;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(s.formWithdrawTitle),
+        content: Text(s.formWithdrawBody),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(s.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(s.formWithdraw)),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await MyFormsService.instance.withdraw(doc.id);
+      if (!mounted) return;
+      for (final c in _texts.values) {
+        c.dispose();
+      }
+      _texts.clear();
+      _touched.clear();
+      _errors.clear();
+      _toast(s.formWithdrawn);
+      await _open();
+    } catch (e) {
+      if (mounted) showErrorWithRetry(context, e, onRetry: _withdraw);
     }
   }
 
@@ -272,9 +315,17 @@ class _EventFormScreenState extends State<EventFormScreen> {
               // Edit *this* form: an event can hold more than one, and the
               // editor would otherwise open the newest.
               onPressed: () => context.push(
-                '/event/${widget.eventId}/form/edit?f=${view.doc.id}',
+                widget.eventId != null
+                    ? '/event/${widget.eventId}/form/edit?f=${view.doc.id}'
+                    : view.doc.editPath,
               ),
             ),
+          // Anyone signed in can report a student-made form; its makers can't.
+          if (view != null &&
+              view.doc.standalone &&
+              !view.doc.canEdit &&
+              view.reason != 'signed_out')
+            ReportMenuButton(targetId: view.doc.id, type: 'form'),
         ],
       ),
       body: _loading
@@ -289,7 +340,33 @@ class _EventFormScreenState extends State<EventFormScreen> {
 
   Widget _form(BuildContext context, FormView view) {
     final doc = view.doc;
-    if (!view.canAnswer) return _Blocked(reason: view.reason);
+    if (!view.canAnswer) {
+      final blocked = _Blocked(reason: view.reason);
+      if (!doc.standalone || view.reason == 'removed') return blocked;
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.all(KSpace.l),
+            children: [
+              Text(doc.title,
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: KSpace.m),
+              MadeByNotice(doc: doc),
+              blocked,
+              if (view.answered && view.reason != 'signed_out')
+                Center(
+                  child: TextButton(onPressed: _withdraw, child: Text(context.l10n.formWithdraw)),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
 
     final (done, total) = answerProgress(doc.fields, _answers);
 
@@ -305,10 +382,21 @@ class _EventFormScreenState extends State<EventFormScreen> {
                 padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, KSpace.xl),
                 children: [
                   _head(context, doc, done, total),
+                  if (doc.standalone) ...[
+                    MadeByNotice(doc: doc),
+                    const SizedBox(height: KSpace.l),
+                  ],
                   if (_justSent)
                     _SuccessCard(onEdit: () => setState(() => _justSent = false))
                   else
                     for (final section in _sections(doc.fields)) _sectionCard(context, section),
+                  if (doc.standalone && view.answered && !_sending)
+                    Center(
+                      child: TextButton(
+                        onPressed: _withdraw,
+                        child: Text(context.l10n.formWithdraw),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -1074,6 +1162,8 @@ class _Blocked extends StatelessWidget {
         return _Notice(icon: AppIcons.people, text: s.formAnswerJoinFirst);
       case 'full':
         return _Notice(icon: AppIcons.warning, text: s.formAnswerFull);
+      case 'removed':
+        return _Notice(icon: AppIcons.warning, text: s.formAnswerRemoved);
       default:
         return _Notice(icon: AppIcons.lock, text: s.formAnswerClosed);
     }
@@ -1125,6 +1215,59 @@ class _ErrorBody extends StatelessWidget {
             FilledButton(onPressed: onRetry, child: Text(s.refresh)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// "Made by @user — not an official college form", and the never-a-password
+/// line. On every standalone form, above the questions: a form anyone can make
+/// is a phishing tool unless the page says plainly who is asking.
+class MadeByNotice extends StatelessWidget {
+  final FormDoc doc;
+  const MadeByNotice({super.key, required this.doc});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final who = doc.clubName != null
+        ? '${doc.clubName}${doc.clubHandle == null ? '' : ' (@${doc.clubHandle})'}'
+        : doc.ownerUsername != null
+            ? '@${doc.ownerUsername}'
+            : (doc.ownerName ?? '—');
+    return Container(
+      key: const ValueKey('made-by'),
+      padding: const EdgeInsets.all(KSpace.m),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh,
+        borderRadius: KRadius.card,
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(AppIcons.info, size: 20, color: scheme.onSurfaceVariant),
+          const SizedBox(width: KSpace.s),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(s.formMadeBy(who),
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 2),
+                Text(s.formNeverPassword,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: scheme.onSurfaceVariant)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

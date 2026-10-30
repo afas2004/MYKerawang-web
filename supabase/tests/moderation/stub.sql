@@ -11,7 +11,8 @@ alter default privileges in schema public grant select, insert, update, delete o
 create table public.profiles (id uuid primary key references auth.users(id) on delete cascade,
   username text, display_name text, full_name text, avatar_url text, bio text,
   role text not null default 'student', is_verified boolean default false,
-  is_banned boolean default false, ban_reason text, phone_number text, payment_qr_url text, created_at timestamptz default now());
+  is_banned boolean default false, ban_reason text, phone_number text, payment_qr_url text,
+  notify_new_events boolean default true, created_at timestamptz default now());
 create table public.events (id uuid primary key default gen_random_uuid(), organizer_id uuid references public.profiles(id),
   title text, description text, location text, start_datetime timestamptz, end_datetime timestamptz,
   image_url text, gallery_urls text[], tags text[], is_public boolean default true, registration_link text,
@@ -35,8 +36,8 @@ create table public.event_participants (event_id uuid references public.events(i
 create table public.followers (follower_id uuid, following_id uuid);
 create table public.reports (id uuid primary key default gen_random_uuid(), reporter_id uuid, target_id uuid,
   target_type text, reason text);
-create table public.notifications (id uuid primary key default gen_random_uuid(), user_id uuid, actor_id uuid not null,
-  type text, title text, body text, data jsonb, is_read boolean default false, created_at timestamptz default now());
+create table public.notifications (id uuid primary key default gen_random_uuid(), user_id uuid, actor_id uuid,
+  type text, title text, body text, message text, data jsonb, is_read boolean default false, created_at timestamptz default now());
 
 alter table public.posts enable row level security;
 create policy p_ins on public.posts for insert with check (user_id = auth.uid());

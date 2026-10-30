@@ -35,17 +35,17 @@ void main() {
 
     expect(find.byType(InputChip), findsNothing);
 
-    await tester.enterText(find.byType(TextField).first, 'semi');
+    await tester.enterText(find.byType(TextField).first, 'enter');
     await tester.pumpAndSettle();
 
-    expect(find.text('Seminar'), findsWidgets);
+    expect(find.text('Entertainment'), findsWidgets);
 
-    await tester.tap(find.text('Seminar').last);
+    await tester.tap(find.text('Entertainment').last);
     await tester.pumpAndSettle();
 
-    expect(changes.last, ['seminar']);
+    expect(changes.last, ['entertainment']);
     expect(find.byType(InputChip), findsOneWidget);
-    expect(find.text('Seminar'), findsOneWidget);
+    expect(find.text('Entertainment'), findsOneWidget);
   });
 
   testWidgets('the field clears after a pick, ready for the next one', (tester) async {
@@ -54,7 +54,7 @@ void main() {
 
     await tester.enterText(find.byType(TextField).first, 'work');
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Workshop').last);
+    await tester.tap(find.text('Workshops & training').last);
     await tester.pumpAndSettle();
 
     final field = tester.widget<TextField>(find.byType(TextField).first);
@@ -63,7 +63,7 @@ void main() {
 
   testWidgets('a selected chip can be removed', (tester) async {
     final changes = <List<String>>[];
-    await pumpAt(tester, kCompact, host(const ['seminar', 'workshop'], changes.add));
+    await pumpAt(tester, kCompact, host(const ['games', 'workshop'], changes.add));
     await tester.pumpAndSettle();
 
     expect(find.byType(InputChip), findsNWidgets(2));
@@ -78,15 +78,15 @@ void main() {
   testWidgets('the maximum is enforced', (tester) async {
     final changes = <List<String>>[];
     await pumpAt(tester, kCompact,
-        host(const ['academic', 'seminar', 'workshop'], changes.add));
+        host(const ['academic', 'games', 'workshop'], changes.add));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField).first, 'forum');
+    await tester.enterText(find.byType(TextField).first, 'tech');
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Forum').last);
+    await tester.tap(find.text('Tech').last);
     await tester.pumpAndSettle();
 
-    // three + forum is still under five, so it lands
+    // three + tech is still under five, so it lands
     expect(changes.last.length, 4);
   });
 }

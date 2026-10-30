@@ -7,6 +7,7 @@ import '../services/unread_notifications.dart';
 import '../utils/app_nav.dart';
 import 'admin_nav_entry.dart';
 import 'clubs_nav_entry.dart';
+import '../theme/transitions.dart';
 import 'brand/brand.dart';
 import 'profile_avatar_action.dart';
 import 'shell_actions.dart';
@@ -29,6 +30,11 @@ class AppSidebar extends StatelessWidget {
   final void Function(int index)? onSelect;
 
   const AppSidebar({super.key, required this.selectedIndex, this.onSelect});
+
+  /// The tab the shell last showed. Pushed pages highlight it, so opening
+  /// a post from Market keeps Market lit, unless the page has its own
+  /// sidebar row (clubs, notifications, settings, admin).
+  static int lastTab = 0;
 
   /// Tab routes in branch order (see ShellBranch in main_scaffold.dart).
   static const routes = [
@@ -67,6 +73,13 @@ class AppSidebar extends StatelessWidget {
     final onNotifications = path.startsWith('/notifications');
     final onSettings = path.startsWith('/settings');
     final loggedIn = ShellAuth.of(context);
+    final ownRow = onNotifications ||
+        onSettings ||
+        path == '/clubs' ||
+        path.startsWith('/clubs/') ||
+        path.startsWith('/c/') ||
+        path.startsWith('/admin');
+    final selectedIndex = onSelect == null && ownRow ? -1 : this.selectedIndex;
 
     return Semantics(
       container: true,
@@ -286,12 +299,15 @@ class DesktopChrome extends StatelessWidget {
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const AppSidebar(selectedIndex: -1),
+          AppSidebar(selectedIndex: AppSidebar.lastTab),
+          // Only the content moves on a page change; the sidebar stays.
           Expanded(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxWidth),
-                child: child,
+            child: RouteContentFade(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxWidth),
+                  child: child,
+                ),
               ),
             ),
           ),

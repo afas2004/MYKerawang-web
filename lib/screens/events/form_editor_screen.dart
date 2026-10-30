@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../l10n/form_strings.dart';
 import '../../language_cubit.dart';
 import '../../services/form_service.dart';
+import '../../services/my_forms_service.dart';
+import '../../services/share_service.dart';
 import '../../theme/app_icons.dart';
 import '../../theme/tokens.dart';
 import '../../utils/adaptive.dart';
@@ -31,14 +34,21 @@ import '../../widgets/restriction_gate.dart';
 ///
 /// `save_event_form()` still writes the whole list at once, and the server
 /// still refuses the changes that would alter what a past answer meant.
+///
+/// A standalone form (`/f/:id/edit`, [eventId] null) uses the same editor
+/// without the event settings, plus a safety card: the no-personal-data note,
+/// and the questions the server would refuse or that ask for IC, bank or
+/// address details.
 class FormEditorScreen extends StatefulWidget {
-  final String eventId;
+  /// The event whose form this is; null for a standalone form.
+  final String? eventId;
 
   /// Open this form directly; null means "the event's newest form, or the
   /// start chooser if it has none".
   final String? formId;
 
-  const FormEditorScreen({super.key, required this.eventId, this.formId});
+  const FormEditorScreen({super.key, this.eventId, this.formId})
+      : assert(eventId != null || formId != null);
 
   @override
   State<FormEditorScreen> createState() => _FormEditorScreenState();
@@ -55,6 +65,10 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
   bool _requireRsvp = false;
   bool _afterCheckin = false;
 
+  /// General-form settings, saved with the form (see [FormDoc.header]).
+  DateTime? _closesAt;
+  final _limitCtrl = TextEditingController();
+
   bool _loading = true;
   bool _saving = false;
   bool _choosing = false;
@@ -64,6 +78,12 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
   Object? _error;
 
   bool get _readOnly => _doc != null && _doc!.status == 'closed';
+
+  /// The KI report tools (counting tags, the KI coverage rail): event forms,
+  /// and any form that already counts something (a standalone copy of the KI
+  /// template). Everyone else gets the general panel instead.
+  bool get _kiMode =>
+      _doc != null && (!_doc!.standalone || _rows.any((r) => r.spec.analysis != null));
 
   @override
   void initState() {
@@ -80,6 +100,7 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
     }
     _titleCtrl.dispose();
     _introCtrl.dispose();
+    _limitCtrl.dispose();
     super.dispose();
   }
 
@@ -92,8 +113,8 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
     });
     try {
       String? id = widget.formId;
-      if (id == null) {
-        final summary = await FormService.instance.summary(widget.eventId);
+      if (id == null && widget.eventId != null) {
+        final summary = await FormService.instance.summary(widget.eventId!);
         id = summary?.id;
       }
       if (id == null) {
@@ -127,6 +148,8 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
     _rows = [for (final f in doc.fields) _Row(f)];
     _requireRsvp = doc.requireRsvp;
     _afterCheckin = doc.afterCheckin;
+    _closesAt = doc.closesAt;
+    _limitCtrl.text = doc.maxResponses?.toString() ?? '';
     _titleCtrl.text = doc.title;
     _introCtrl.text = doc.intro ?? '';
     _dirty = false;
@@ -154,10 +177,10 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
   }
 
   Future<void> _startBlank() =>
-      _start(() => FormService.instance.createBlank(widget.eventId));
+      _start(() => FormService.instance.createBlank(widget.eventId!));
 
   Future<void> _startTemplate(String slug) =>
-      _start(() => FormService.instance.createFromTemplate(widget.eventId, slug));
+      _start(() => FormService.instance.createFromTemplate(widget.eventId!, slug));
 
   Future<void> _startPaste() async {
     final text = await showDialog<String>(
@@ -175,7 +198,7 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
     // A form row is created first: every later write targets a form id.
     setState(() => _saving = true);
     try {
-      final id = await FormService.instance.createBlank(widget.eventId);
+      final id = await FormService.instance.createBlank(widget.eventId!);
       final view = await FormService.instance.load(id);
       if (!mounted) return;
       _apply(view.doc);
@@ -208,6 +231,11 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
       if (!quiet) _toast(context.l10nRead.formIssueText(problems.first.code));
       return false;
     }
+    // The server refuses these on a standalone form; say so before the trip.
+    if (doc.standalone && blockedFieldIndexes(_specs).isNotEmpty) {
+      _toast(context.l10nRead.formBlockedLabel);
+      return false;
+    }
 
     setState(() => _saving = true);
     try {
@@ -218,6 +246,11 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
         intro: cleanBlock(_introCtrl.text),
         requireRsvp: _requireRsvp,
         afterCheckin: _afterCheckin,
+        closesAt: () => _closesAt,
+        maxResponses: () {
+          final n = int.tryParse(_limitCtrl.text.trim());
+          return n == null || n <= 0 ? null : n;
+        },
         fields: _specs,
       ));
       // New fields only get their ids when they come back, and the next save
@@ -233,7 +266,8 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
     } catch (e) {
       if (!mounted) return false;
       setState(() => _saving = false);
-      showErrorWithRetry(context, e, onRetry: _save);
+      showErrorWithRetry(context, e,
+          onRetry: _save, message: context.l10nRead.formServerError(formErrorCode(e)));
       return false;
     }
   }
@@ -260,7 +294,10 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
       notifyContentChanged();
       _toast(context.l10nRead.formPublished);
     } catch (e) {
-      if (mounted) showErrorWithRetry(context, e, onRetry: _publish);
+      if (mounted) {
+        showErrorWithRetry(context, e,
+            onRetry: _publish, message: context.l10nRead.formServerError(formErrorCode(e)));
+      }
     }
   }
 
@@ -416,7 +453,7 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
         // Explicit, so a cold-opened link still has a way up (to the event).
         leading: const AppBackButton(),
         title: Text(
-          s.formEditorTitle,
+          doc != null && doc.standalone ? s.formEdit : s.formEditorTitle,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -429,7 +466,9 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
               // `from=edit` lets the responses page come back here instead of
               // pushing a second editor on top (that stack grew every round).
               onPressed: () => context.push(
-                '/event/${widget.eventId}/form/responses?f=${doc.id}&from=edit',
+                widget.eventId != null
+                    ? '/event/${widget.eventId}/form/responses?f=${doc.id}&from=edit'
+                    : '${doc.responsesPath}?from=edit',
               ),
             ),
           if (doc != null && !_readOnly)
@@ -619,7 +658,9 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
                 ),
               ),
               const SizedBox(height: KSpace.m),
-              _SummaryChips(specs: _specs),
+              _SummaryChips(specs: _specs, ki: _kiMode),
+              // RSVP and check-in belong to an event; a standalone form has none.
+              if (!doc.standalone) ...[
               const SizedBox(height: KSpace.m),
               Divider(height: 1, color: scheme.outlineVariant),
               const SizedBox(height: KSpace.m),
@@ -639,12 +680,22 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
                   ),
                 ],
               ),
+              ],
             ],
           ),
         ),
+        // On a wide general form the safety notes live in the side panel.
+        if (doc.standalone && (!wide || _kiMode)) ...[
+          const SizedBox(height: KSpace.m),
+          _SafetyCard(specs: _specs),
+        ],
         if (!wide) ...[
           const SizedBox(height: KSpace.m),
-          _CompactChecks(specs: _specs),
+          _CompactChecks(specs: _specs, ki: _kiMode),
+          if (!_kiMode) ...[
+            const SizedBox(height: KSpace.m),
+            _NarrowPanel(children: _generalPanel(context, doc, inRail: false)),
+          ],
         ],
         const SizedBox(height: KSpace.m),
       ],
@@ -660,6 +711,17 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
 
   Widget _rail(BuildContext context) {
     final s = context.l10n;
+    if (!_kiMode) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final w in _generalPanel(context, _doc!, inRail: true)) ...[
+            w,
+            const SizedBox(height: KSpace.m),
+          ],
+        ],
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -676,6 +738,145 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
         ),
       ],
     );
+  }
+
+  // ------------------------------------------------------- the general panel
+
+  /// Share, settings, checks and the question mix — what a general form needs
+  /// beside its questions. [inRail]: the desktop rail (all four cards); the
+  /// phone gets share and settings only, the checks are already above.
+  List<Widget> _generalPanel(BuildContext context, FormDoc doc, {required bool inRail}) {
+    final s = context.l10n;
+    return [
+      _RailCard(
+        key: const ValueKey('panel-share'),
+        title: s.panelShare,
+        sub: doc.isDraft ? s.panelShareDraft : s.panelShareSub,
+        child: _ShareBox(
+          doc: doc,
+          onResponses: () => context.push('${doc.responsesPath}?from=edit'),
+        ),
+      ),
+      _RailCard(
+        key: const ValueKey('panel-settings'),
+        title: s.panelSettings,
+        sub: s.panelSettingsSub,
+        child: _settings(context, doc),
+      ),
+      if (inRail) ...[
+        _RailCard(
+          title: s.formChecksTitle,
+          sub: s.formChecksSub,
+          child: _ChecksCard(specs: _specs, ki: false),
+        ),
+        _SafetyCard(specs: _specs),
+        _RailCard(
+          key: const ValueKey('panel-overview'),
+          title: s.panelOverview,
+          child: _KindMix(specs: _specs),
+        ),
+      ],
+    ];
+  }
+
+  Widget _settings(BuildContext context, FormDoc doc) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final loc = MaterialLocalizations.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(s.panelClosesAt, style: Theme.of(context).textTheme.labelMedium),
+        const SizedBox(height: KSpace.xs),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const ValueKey('closes-at'),
+                onPressed: _readOnly ? null : _pickCloseDate,
+                icon: const Icon(AppIcons.calendar, size: 16),
+                label: Text(
+                  _closesAt == null ? s.panelNoEnd : loc.formatMediumDate(_closesAt!),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            if (_closesAt != null && !_readOnly)
+              IconButton(
+                tooltip: s.panelClear,
+                icon: const Icon(AppIcons.close, size: 18),
+                onPressed: () => _editSetting(() => _closesAt = null),
+              ),
+          ],
+        ),
+        const SizedBox(height: KSpace.m),
+        TextField(
+          key: const ValueKey('response-limit'),
+          controller: _limitCtrl,
+          enabled: !_readOnly,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(4)],
+          onChanged: (_) => _markDirty(),
+          decoration: InputDecoration(
+            labelText: s.panelLimit,
+            hintText: s.panelLimitHint,
+            isDense: true,
+          ),
+        ),
+        if (doc.isOpen) ...[
+          const SizedBox(height: KSpace.m),
+          TextButton.icon(
+            key: const ValueKey('close-now'),
+            onPressed: _closeNow,
+            style: TextButton.styleFrom(foregroundColor: scheme.error),
+            icon: const Icon(AppIcons.lock, size: 16),
+            label: Text(s.panelCloseNow),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _pickCloseDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _closesAt ?? now.add(const Duration(days: 7)),
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: now.add(const Duration(days: 365)),
+    );
+    if (picked == null) return;
+    // The whole chosen day counts: answers stop at its end, local time.
+    _editSetting(() => _closesAt = DateTime(picked.year, picked.month, picked.day, 23, 59));
+  }
+
+  Future<void> _closeNow() async {
+    final doc = _doc;
+    if (doc == null) return;
+    final s = context.l10nRead;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(s.formsCloseTitle),
+        content: Text(s.formsCloseBody),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(s.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(s.formsClose)),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    if (_dirty && !await _save(quiet: true)) return;
+    try {
+      await MyFormsService.instance.close(doc.id);
+      final fresh = await FormService.instance.load(doc.id);
+      if (!mounted) return;
+      setState(() => _apply(fresh.doc));
+      notifyContentChanged();
+    } catch (e) {
+      if (mounted) showErrorWithRetry(context, e, onRetry: _closeNow);
+    }
   }
 
   Widget _belowList(BuildContext context) {
@@ -838,6 +1039,7 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
                 onChanged: _readOnly ? null : (k) => _setKind(index, k),
               ),
               if (f.isRating) ...[
+                if (_kiMode)
                 _menu(
                   context,
                   width: 118,
@@ -874,7 +1076,7 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
                       ? null
                       : (v) => _edit(index, f.copyWith(max: int.parse(v))),
                 ),
-              ] else
+              ] else if (_kiMode)
                 _notCounted(context),
               _RequiredChip(
                 value: f.required,
@@ -1499,7 +1701,10 @@ class _SettingChip extends StatelessWidget {
 /// The counts across the top: what this form collects, at a glance.
 class _SummaryChips extends StatelessWidget {
   final List<FormFieldSpec> specs;
-  const _SummaryChips({required this.specs});
+
+  /// Show the KI counting chips; a general form has nothing to count.
+  final bool ki;
+  const _SummaryChips({required this.specs, this.ki = true});
 
   @override
   Widget build(BuildContext context) {
@@ -1547,9 +1752,11 @@ class _SummaryChips extends StatelessWidget {
       runSpacing: KSpace.xs + 2,
       children: [
         chip('$questions ${s.formQuestionsShort}'),
-        chip('${count('ki_pre')} ${s.formCountedBeforeShort}', dot: scheme.primary),
-        chip('${count('ki_post')} ${s.formCountedAfterShort}', dot: scheme.tertiary),
-        chip('${count('feedback')} ${s.formCountedFeedbackShort}', dot: tokens.feedback),
+        if (ki) ...[
+          chip('${count('ki_pre')} ${s.formCountedBeforeShort}', dot: scheme.primary),
+          chip('${count('ki_post')} ${s.formCountedAfterShort}', dot: scheme.tertiary),
+          chip('${count('feedback')} ${s.formCountedFeedbackShort}', dot: tokens.feedback),
+        ],
         chip('$required ${s.formFieldRequired.toLowerCase()}'),
       ],
     );
@@ -1695,8 +1902,10 @@ class _CoverageCard extends StatelessWidget {
 
 /// Every publish-time check, in one place: the rail, the narrow strip and the
 /// publish dialog all read this.
-List<(bool, String)> _formChecks(BuildContext context, List<FormFieldSpec> specs) {
+List<(bool, String)> _formChecks(BuildContext context, List<FormFieldSpec> specs,
+    {bool ki = true}) {
   final s = context.l10n;
+  if (!ki) return _generalChecks(context, specs);
 
   final questions = specs.where((f) => f.isAnswerable).length;
   final missingLabels = specs.where((f) => f.label.trim().isEmpty).length;
@@ -1727,18 +1936,42 @@ List<(bool, String)> _formChecks(BuildContext context, List<FormFieldSpec> specs
   ];
 }
 
+/// The checks for a general form: labels, options, the questions the server
+/// refuses, personal data, and the 40-question budget.
+List<(bool, String)> _generalChecks(BuildContext context, List<FormFieldSpec> specs) {
+  final s = context.l10n;
+  final questions = specs.where((f) => f.isAnswerable).length;
+  final missingLabels = specs.where((f) => f.label.trim().isEmpty).length;
+  final thinChoices = specs
+      .where((f) => f.isChoice && f.choices.where((c) => c.trim().isNotEmpty).length < 2)
+      .length;
+  final blocked = blockedFieldIndexes(specs).length;
+  final personal = sensitiveFieldIndexes(specs).length;
+  return [
+    (
+      missingLabels == 0,
+      missingLabels == 0 ? s.formCheckLabels : s.formCheckMissingLabels(missingLabels),
+    ),
+    (thinChoices == 0, thinChoices == 0 ? s.checkChoicesOk : s.checkChoicesFail(thinChoices)),
+    (blocked == 0, blocked == 0 ? s.checkBlockedOk : s.checkBlockedFail(blocked)),
+    (personal == 0, personal == 0 ? s.checkPersonalOk : s.checkPersonalWarn(personal)),
+    (questions <= kMaxFormFields, s.formCheckBudget(questions)),
+  ];
+}
+
 class _ChecksCard extends StatelessWidget {
   final List<FormFieldSpec> specs;
   final bool onlyFailing;
+  final bool ki;
 
-  const _ChecksCard({required this.specs, this.onlyFailing = false});
+  const _ChecksCard({required this.specs, this.onlyFailing = false, this.ki = true});
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final tokens = KTokens.of(context);
     final checks = [
-      for (final c in _formChecks(context, specs))
+      for (final c in _formChecks(context, specs, ki: ki))
         if (!onlyFailing || !c.$1) c,
     ];
 
@@ -1787,14 +2020,15 @@ class _ChecksCard extends StatelessWidget {
 /// phone would push the form itself below the fold.
 class _CompactChecks extends StatelessWidget {
   final List<FormFieldSpec> specs;
-  const _CompactChecks({required this.specs});
+  final bool ki;
+  const _CompactChecks({required this.specs, this.ki = true});
 
   @override
   Widget build(BuildContext context) {
     final s = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final tokens = KTokens.of(context);
-    final failing = _formChecks(context, specs).where((c) => !c.$1).toList();
+    final failing = _formChecks(context, specs, ki: ki).where((c) => !c.$1).toList();
 
     if (failing.isEmpty) {
       return Row(
@@ -1811,7 +2045,7 @@ class _CompactChecks extends StatelessWidget {
 
     return _RailCard(
       title: s.formChecksTitle,
-      child: _ChecksCard(specs: specs, onlyFailing: true),
+      child: _ChecksCard(specs: specs, onlyFailing: true, ki: ki),
     );
   }
 }
@@ -1960,7 +2194,7 @@ class _RailCard extends StatelessWidget {
   final String? sub;
   final Widget child;
 
-  const _RailCard({required this.title, this.sub, required this.child});
+  const _RailCard({super.key, required this.title, this.sub, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -1990,6 +2224,228 @@ class _RailCard extends StatelessWidget {
           ],
           const SizedBox(height: KSpace.m),
           child,
+        ],
+      ),
+    );
+  }
+}
+
+/// A standalone form's safety card: the no-personal-data note, then every
+/// question the server will refuse (password, OTP, PIN, card) and every one
+/// asking for IC, bank or address details.
+class _SafetyCard extends StatelessWidget {
+  final List<FormFieldSpec> specs;
+  const _SafetyCard({required this.specs});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final blocked = blockedFieldIndexes(specs);
+    final sensitive = [
+      for (final i in sensitiveFieldIndexes(specs))
+        if (!blocked.contains(i)) i,
+    ];
+
+    Widget line(IconData icon, Color color, String text, {Key? key}) => Padding(
+          key: key,
+          padding: const EdgeInsets.only(top: KSpace.s),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 18, color: color),
+              const SizedBox(width: KSpace.s),
+              Expanded(child: Text(text, style: Theme.of(context).textTheme.bodySmall)),
+            ],
+          ),
+        );
+
+    String label(int i) {
+      final l = specs[i].label.trim();
+      return '${i + 1}. ${l.isEmpty ? '…' : l}';
+    }
+
+    return Container(
+      key: const ValueKey('form-safety'),
+      padding: const EdgeInsets.all(KSpace.m),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        borderRadius: KRadius.card,
+        border: Border.all(color: blocked.isEmpty ? scheme.outlineVariant : scheme.error),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(AppIcons.lock, size: 18, color: scheme.onSurfaceVariant),
+              const SizedBox(width: KSpace.s),
+              Expanded(child: Text(s.formPrivacyNote, style: Theme.of(context).textTheme.bodySmall)),
+            ],
+          ),
+          for (final i in blocked)
+            line(AppIcons.error, scheme.error, '${label(i)} — ${s.formBlockedLabel}',
+                key: ValueKey('blocked-$i')),
+          for (final i in sensitive)
+            line(AppIcons.warning, scheme.tertiary, '${label(i)} — ${s.formSensitiveLabel}',
+                key: ValueKey('sensitive-$i')),
+        ],
+      ),
+    );
+  }
+}
+
+/// The form's link, with copy, open and responses.
+class _ShareBox extends StatelessWidget {
+  final FormDoc doc;
+  final VoidCallback onResponses;
+  const _ShareBox({required this.doc, required this.onResponses});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final link = '$kAppBaseUrl${doc.answerPath}';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.xs, KSpace.xs, KSpace.xs),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHigh,
+            borderRadius: KRadius.input,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: SelectableText(
+                  link,
+                  maxLines: 1,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+              IconButton(
+                key: const ValueKey('copy-link'),
+                tooltip: s.formsCopyLink,
+                icon: const Icon(AppIcons.copy, size: 18),
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: link));
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(SnackBar(content: Text(s.formsLinkCopied)));
+                },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: KSpace.s),
+        Wrap(
+          spacing: KSpace.s,
+          runSpacing: KSpace.xs,
+          children: [
+            TextButton.icon(
+              onPressed: () => context.push(doc.answerPath),
+              icon: const Icon(AppIcons.externalLink, size: 16),
+              label: Text(s.panelOpen),
+            ),
+            TextButton.icon(
+              onPressed: onResponses,
+              icon: const Icon(AppIcons.list, size: 16),
+              label: Text(s.formOpenAnswers),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// How many of each question type: a quick read of what the form asks.
+class _KindMix extends StatelessWidget {
+  final List<FormFieldSpec> specs;
+  const _KindMix({required this.specs});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final counts = <String, int>{};
+    for (final f in specs) {
+      if (f.isAnswerable) counts[f.kind] = (counts[f.kind] ?? 0) + 1;
+    }
+    if (counts.isEmpty) {
+      return Text(s.formNoFields,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant));
+    }
+    final total = counts.values.fold<int>(0, (a, b) => a + b);
+    final entries = counts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    return Column(
+      children: [
+        for (final e in entries)
+          Padding(
+            padding: const EdgeInsets.only(bottom: KSpace.s),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 112,
+                  child: Text(s.galleryKind(e.key),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: scheme.onSurface)),
+                ),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: KRadius.pill,
+                    child: LinearProgressIndicator(
+                      value: e.value / total,
+                      minHeight: 6,
+                      backgroundColor: scheme.surfaceContainerHighest,
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 28,
+                  child: Text('${e.value}',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w700, color: scheme.onSurfaceVariant)),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Share and settings on a phone: folded under one line, so the questions
+/// stay near the top of the screen.
+class _NarrowPanel extends StatelessWidget {
+  final List<Widget> children;
+  const _NarrowPanel({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        borderRadius: KRadius.card,
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        key: const ValueKey('narrow-panel'),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        leading: const Icon(AppIcons.settings, size: 20),
+        title: Text(s.panelSettingsAndShare, style: Theme.of(context).textTheme.titleSmall),
+        childrenPadding: const EdgeInsets.fromLTRB(KSpace.s, 0, KSpace.s, KSpace.s),
+        children: [
+          for (final c in children) ...[c, const SizedBox(height: KSpace.s)],
         ],
       ),
     );

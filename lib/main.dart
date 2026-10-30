@@ -30,6 +30,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'screens/profile_cubit.dart';
 import 'screens/search_screen.dart';
 import 'screens/login_cubit.dart';
+import 'utils/realtime_gate.dart';
 
 /// Lets mouse users drag-scroll lists (like touch), on top of the wheel.
 class AppScrollBehavior extends MaterialScrollBehavior {
@@ -145,6 +146,8 @@ class SessionWatcher extends StatefulWidget {
 class _SessionWatcherState extends State<SessionWatcher> {
   late final StreamSubscription<AuthState> _authSubscription;
   StreamSubscription<List<Map<String, dynamic>>>? _notificationSubscription;
+  String? _liveUserId;
+  Object? _lastShownId;
 
   @override
   void initState() {
@@ -155,9 +158,8 @@ class _SessionWatcherState extends State<SessionWatcher> {
     if (session != null) {
       KnownAccounts.remember(session.user);
       _checkUserProfile(session.user.id);
-      _startNotificationStream(session.user.id);
-      UnreadNotifications.instance.start(session.user.id);
       SavedItems.instance.start(session.user.id);
+      _syncRealtime(null, session);
     }
 
     _authSubscription =
@@ -166,17 +168,15 @@ class _SessionWatcherState extends State<SessionWatcher> {
       final event = data.event;
 
       if (session == null) {
-        _notificationSubscription?.cancel();
-        _notificationSubscription = null;
-        UnreadNotifications.instance.stop();
+        _syncRealtime(event, null);
         SavedItems.instance.stop();
         AdminUnlock.instance.reset();
         return;
       }
 
       // No-ops for the same user; swap state on an account switch.
-      UnreadNotifications.instance.start(session.user.id);
       SavedItems.instance.start(session.user.id);
+      _syncRealtime(event, session);
 
       if (event == AuthChangeEvent.signedIn) {
         NotificationService.requestPermission();
@@ -185,7 +185,6 @@ class _SessionWatcherState extends State<SessionWatcher> {
         _checkUserProfile(session.user.id).then((needsOnboarding) {
           if (!needsOnboarding) _warnOtherAccount(session.user);
         });
-        _startNotificationStream(session.user.id);
       }
     });
   }
@@ -239,6 +238,32 @@ class _SessionWatcherState extends State<SessionWatcher> {
     }
   }
 
+  /// Joins, rejoins or leaves the live channels for [session] — never
+  /// with an expired token (see [realtimeStepFor]).
+  void _syncRealtime(AuthChangeEvent? event, Session? session) {
+    final step = realtimeStepFor(
+      event,
+      signedIn: session != null,
+      expired: session?.isExpired ?? false,
+      live: session != null && _liveUserId == session.user.id,
+    );
+    switch (step) {
+      case RealtimeStep.stop:
+        _notificationSubscription?.cancel();
+        _notificationSubscription = null;
+        _liveUserId = null;
+        UnreadNotifications.instance.stop();
+      case RealtimeStep.start:
+        _liveUserId = session!.user.id;
+        _startNotificationStream(session.user.id);
+        UnreadNotifications.instance.start(session.user.id, rejoin: true);
+      case RealtimeStep.wait:
+        debugPrint("🔔 Notifications wait for a token refresh");
+      case RealtimeStep.keep:
+        break;
+    }
+  }
+
   void _startNotificationStream(String userId) {
     _notificationSubscription?.cancel();
     debugPrint("🔔 Notification Listener STARTED for $userId");
@@ -253,6 +278,8 @@ class _SessionWatcherState extends State<SessionWatcher> {
         .listen((List<Map<String, dynamic>> data) {
           if (data.isEmpty) return;
           final latest = data.first;
+          // A rejoin re-reads the newest row; don't pop it up twice.
+          if (latest['id'] == _lastShownId) return;
 
           // Timezone Fix
           final created = DateTime.parse(latest['created_at']).toUtc();
@@ -260,11 +287,16 @@ class _SessionWatcherState extends State<SessionWatcher> {
           final difference = now.difference(created).inSeconds.abs();
 
           if (difference < 30) {
+            _lastShownId = latest['id'];
             NotificationService.showNotification(
               latest['title'],
               latest['message'] ?? latest['body'] ?? context.l10nRead.notifications,
             );
           }
+        }, onError: (Object e) {
+          // Without this a channel error surfaces as an uncaught error. The
+          // next token refresh joins again.
+          debugPrint("🔔 Notification stream error: $e");
         });
   }
 

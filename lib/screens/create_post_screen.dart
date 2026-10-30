@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
+import '../l10n/form_strings.dart';
+import '../services/my_forms_service.dart';
+import '../widgets/form_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -115,6 +118,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   /// Existing URLs (`String`) and picked LocalImages; index 0 is the cover.
   final List<dynamic> _photos = [];
+
+  /// A form to link (`action_links` → "Fill in form", /f/:id). New posts only,
+  /// and never on an anonymous post: the form says who made it.
+  MyForm? _form;
 
   // Initial values, to know whether closing would lose anything.
   late final String _initialTitle;
@@ -291,6 +298,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
     final s = context.l10nRead;
     final ps = context.postL10nRead;
+    final formLabel = context.l10nRead.formLinkLabel;
     setState(() => _isLoading = true);
 
     try {
@@ -326,6 +334,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           'tags': _tags,
           'image_url': photoUrls.firstOrNull,
           'gallery_urls': photoUrls.skip(1).toList(),
+          if (_form != null && !(_isAnon && !_asClub))
+            'action_links': [
+              {'label': formLabel, 'url': _form!.path},
+            ],
         });
         final newPost = await Supabase.instance.client
             .from('posts')
@@ -524,6 +536,30 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           s.photosCount.fill([_photos.length, PostService.maxPhotos]),
         ),
         MediaPickerGrid(items: _photos, onChanged: _onPhotosChanged),
+        if (!_isEdit) ...[
+          const SizedBox(height: KSpace.m),
+          if (_isAnon && !_asClub)
+            Text(context.l10n.formAttachAnon,
+                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant))
+          else if (_form == null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: AttachFormButton(onPicked: (f) => setState(() => _form = f)),
+            )
+          else
+            ListTile(
+              key: const ValueKey('attached-form'),
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(AppIcons.list),
+              title: Text(_form!.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+              subtitle: _form!.isDraft ? Text(context.l10n.formAttachDraft) : null,
+              trailing: IconButton(
+                tooltip: context.l10n.formAttachRemove,
+                icon: const Icon(AppIcons.close),
+                onPressed: () => setState(() => _form = null),
+              ),
+            ),
+        ],
         const SizedBox(height: KSpace.xl),
 
         sectionLabel(s.addTags),

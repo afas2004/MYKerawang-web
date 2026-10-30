@@ -156,7 +156,9 @@ extension AccessStrings on AppStrings {
   String get evClosed => _t("Registration closed", "Pendaftaran ditutup", "Registration closed");
   String get evFull => _t("This event is full", "Acara ini sudah penuh", "This event is full");
   String get evCloseNow => _t("Close registration now", "Tutup pendaftaran sekarang", "Close registration now");
-  String get evCapacity => _t("Places (optional)", "Tempat (pilihan)", "Places (optional)");
+  String get evCapacity => _t("Capacity (optional)", "Had peserta (pilihan)", "Capacity (optional)");
+  // Event page row: same field, no "(optional)" once it has a value.
+  String get evCapacityShort => _t("Capacity", "Had peserta", "Capacity");
   String get evCapacityHint =>
       _t("Leave empty for unlimited", "Biarkan kosong untuk tanpa had", "Leave empty for unlimited");
   String get evFee => _t("Fee (RM)", "Yuran (RM)", "Fee (RM)");

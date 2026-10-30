@@ -321,7 +321,7 @@ class FeedView extends StatelessWidget {
   /// The first cards of the feed fade up in turn on load; the rest just
   /// appear.
   static Widget _enter(int index, Widget Function() build) =>
-      index < 6 ? KEntrance(index: index, child: build()) : build();
+      index < 3 ? KEntrance(index: index, child: build()) : build();
 
   static Widget _column(Widget sliver) => SliverLayoutBuilder(
         builder: (context, c) {

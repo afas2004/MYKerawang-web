@@ -74,6 +74,11 @@ class KGround extends StatefulWidget {
 }
 
 class _KGroundState extends State<KGround> {
+  /// Rendered tiles by theme/strength/dpr. Shared, so a page that carries
+  /// its own ground while it slides (see transitions.dart) paints the
+  /// drawings on its first frame instead of popping them in.
+  static final _cache = <String, ui.Image>{};
+
   ui.Image? _tile;
   String? _key;
 
@@ -99,6 +104,12 @@ class _KGroundState extends State<KGround> {
       setState(() => _tile = null);
       return;
     }
+    final cached = _cache[key];
+    if (cached != null) {
+      // Called just before a build, so no setState is needed.
+      _tile = cached;
+      return;
+    }
     try {
       final svg = KGround.tileSvg(theme.colorScheme.primary, widget.strength);
       final info = await vg.loadPicture(SvgStringLoader(svg), null);
@@ -110,6 +121,7 @@ class _KGroundState extends State<KGround> {
         ..drawPicture(info.picture);
       info.picture.dispose();
       final image = await rec.endRecording().toImage(px, px);
+      _cache[key] = image;
       if (!mounted || key != _key) return;
       setState(() => _tile = image);
     } catch (_) {

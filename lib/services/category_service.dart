@@ -64,6 +64,24 @@ class CategoryService {
     return slug;
   }
 
+  /// A row's category slugs: the `categories` array, or the single old
+  /// `category` column on rows written before it existed.
+  static List<String> slugsOf(Map<String, dynamic> row) {
+    final cats = row['categories'];
+    if (cats is List && cats.isNotEmpty) {
+      return [for (final c in cats) '$c'.trim()].where((c) => c.isNotEmpty).toList();
+    }
+    final one = '${row['category'] ?? ''}'.trim();
+    return one.isEmpty ? const [] : [one];
+  }
+
+  /// [slugsOf] as names, joined for a detail row; null when it has none.
+  static String? labelsFor(String kind, Map<String, dynamic> row, AppStrings s) {
+    final slugs = slugsOf(row);
+    if (slugs.isEmpty) return null;
+    return [for (final slug in slugs) labelOf(kind, slug, s)].join(', ');
+  }
+
   /// Best-effort warm-up at start-up, so filters can render labels
   /// synchronously. Never throws.
   static Future<void> warm() async {
@@ -90,8 +108,8 @@ class CategoryService {
         .from('content_categories')
         .select()
         .eq('kind', kind)
-        .order('sort')
-        .order('name_en');
+        .order('sort', ascending: true)
+        .order('name_en', ascending: true);
     return [
       for (final r in rows as List)
         ContentCategory.fromRow((r as Map).cast<String, dynamic>())
@@ -105,8 +123,8 @@ class CategoryService {
           .select()
           .eq('kind', kind)
           .eq('active', true)
-          .order('sort')
-          .order('name_en');
+          .order('sort', ascending: true)
+          .order('name_en', ascending: true);
       final list = [
         for (final r in rows as List)
           ContentCategory.fromRow((r as Map).cast<String, dynamic>())

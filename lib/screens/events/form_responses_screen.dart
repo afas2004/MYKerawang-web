@@ -22,10 +22,12 @@ import '../../widgets/restriction_gate.dart';
 /// for whoever processes them. Both come from the same server call, so they
 /// cannot disagree.
 class FormResponsesScreen extends StatefulWidget {
-  final String eventId;
+  /// The event whose form this is; null for a standalone form (`/f/:id/responses`).
+  final String? eventId;
   final String? formId;
 
-  const FormResponsesScreen({super.key, required this.eventId, this.formId});
+  const FormResponsesScreen({super.key, this.eventId, this.formId})
+      : assert(eventId != null || formId != null);
 
   @override
   State<FormResponsesScreen> createState() => _FormResponsesScreenState();
@@ -53,8 +55,8 @@ class _FormResponsesScreenState extends State<FormResponsesScreen> {
     });
     try {
       var id = widget.formId;
-      if (id == null) {
-        final summary = await FormService.instance.summary(widget.eventId);
+      if (id == null && widget.eventId != null) {
+        final summary = await FormService.instance.summary(widget.eventId!);
         id = summary?.id;
       }
       if (id == null) {
@@ -106,7 +108,8 @@ class _FormResponsesScreenState extends State<FormResponsesScreen> {
         .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
         .replaceAll(RegExp(r'^-|-$'), '');
     final stamp = DateTime.now().toIso8601String().substring(0, 10);
-    return 'ki-${slug.isEmpty ? 'borang' : slug}-$stamp.csv';
+    final prefix = doc.standalone ? 'borang' : 'ki';
+    return '$prefix-${slug.isEmpty ? 'borang' : slug}-$stamp.csv';
   }
 
   Future<void> _copy(String text) async {
@@ -169,7 +172,9 @@ class _FormResponsesScreenState extends State<FormResponsesScreen> {
                   context.pop();
                   return;
                 }
-                context.push('/event/${widget.eventId}/form/edit?f=${doc.id}');
+                context.push(widget.eventId != null
+                    ? '/event/${widget.eventId}/form/edit?f=${doc.id}'
+                    : doc.editPath);
               },
             ),
         ],
@@ -205,8 +210,11 @@ class _FormResponsesScreenState extends State<FormResponsesScreen> {
             const SizedBox(height: KSpace.xs),
             Text(
               // "Peserta 2 · Penganjur 1" — the nouns are the domain words, so
-              // there is no plural to get wrong.
-              '${s.formPeserta} ${a.peserta} · ${s.formPenganjur} ${a.penganjur}',
+              // there is no plural to get wrong. A standalone form has no
+              // roles: just the count.
+              doc.standalone
+                  ? s.formsResponses(_responses.length)
+                  : '${s.formPeserta} ${a.peserta} · ${s.formPenganjur} ${a.penganjur}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),

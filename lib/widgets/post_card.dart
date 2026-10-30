@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import '../utils/announcement_rules.dart';
 import 'package:flutter/services.dart';
 import 'package:mykerawang/utils/app_nav.dart';
 import 'package:mykerawang/utils/report_helper.dart';
@@ -24,6 +25,7 @@ import '../utils/formatters.dart';
 import '../utils/guest_access.dart';
 import '../utils/roles.dart';
 import '../utils/tags.dart';
+import 'form_link_card.dart';
 import 'mention_text.dart';
 import 'owner_menu.dart';
 import 'pin_controls.dart';
@@ -314,6 +316,7 @@ class _PostCardState extends State<PostCard> {
                   padding: const EdgeInsets.only(top: KSpace.m),
                   child: PostPhotoLayout(urls: photos),
                 ),
+              PostFormLinks(post: post),
             ],
           ),
         ),
@@ -791,6 +794,40 @@ class PostPhotoStrip extends StatelessWidget {
             child: _PhotoTile(urls: urls, index: i),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The form buttons of an ordinary post (`action_links` pointing at `/f/:id`,
+/// attached in the post composer). Announcements show their own buttons.
+class PostFormLinks extends StatelessWidget {
+  final Map<String, dynamic> post;
+  const PostFormLinks({super.key, required this.post});
+
+  @override
+  Widget build(BuildContext context) {
+    if (post['is_announcement'] == true) return const SizedBox.shrink();
+    final links = [
+      for (final l in ActionLink.listFrom(post['action_links']))
+        if (FormLinkCard.idFrom(l.url) != null) l,
+    ];
+    if (links.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: KSpace.m),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final l in links)
+            Padding(
+              padding: EdgeInsets.only(bottom: l == links.last ? 0 : KSpace.s),
+              child: FormLinkCard(
+                key: ValueKey('post-form-${l.url}'),
+                formId: FormLinkCard.idFrom(l.url)!,
+                label: l.label,
+              ),
+            ),
+        ],
       ),
     );
   }

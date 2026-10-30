@@ -14,6 +14,7 @@ import '../l10n/app_strings.dart';
 import '../l10n/form_strings.dart';
 import '../language_cubit.dart';
 import '../theme/app_themes.dart';
+import '../theme/transitions.dart';
 import '../utils/app_nav.dart';
 import '../utils/announcement_rules.dart';
 import '../utils/attendance_rules.dart';
@@ -1047,7 +1048,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     }
     final cap = e['capacity'];
     if (cap is num) {
-      rows.add((AppIcons.people, s.evCapacity, '$_participantCount / ${cap.toInt()}'));
+      rows.add((AppIcons.people, s.evCapacityShort, '$_participantCount / ${cap.toInt()}'));
     }
     if (e['merit_offered'] == true) {
       final note = '${e['merit_note'] ?? ''}'.trim();
@@ -1394,11 +1395,14 @@ class _EventDetailScreenState extends State<EventDetailScreen>
 
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => AttendanceLiveScreen(
-          eventId: '${_event['id']}',
-          title: '${_event['title'] ?? ''}',
-          withKi: choice.withKi,
-          formId: form?.id,
+        // Full window (a door screen), so the whole page takes the fade.
+        builder: (_) => RouteContentFade(
+          child: AttendanceLiveScreen(
+            eventId: '${_event['id']}',
+            title: '${_event['title'] ?? ''}',
+            withKi: choice.withKi,
+            formId: form?.id,
+          ),
         ),
       ),
     );
@@ -1410,9 +1414,11 @@ class _EventDetailScreenState extends State<EventDetailScreen>
 
   void _startCheckIn() {
     Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => CheckinScanScreen(
-        eventId: '${_event['id']}',
-        title: '${_event['title'] ?? ''}',
+      builder: (_) => RouteContentFade(
+        child: CheckinScanScreen(
+          eventId: '${_event['id']}',
+          title: '${_event['title'] ?? ''}',
+        ),
       ),
     ));
   }

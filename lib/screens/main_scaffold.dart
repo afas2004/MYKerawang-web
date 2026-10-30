@@ -11,6 +11,7 @@ import '../widgets/brand/brand.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/admin_icon_button.dart';
+import '../theme/transitions.dart';
 import '../widgets/app_sidebar.dart';
 import '../widgets/profile_avatar_action.dart';
 import '../widgets/right_rail.dart';
@@ -48,6 +49,8 @@ class MainScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Pushed pages light this tab in their sidebar (see AppSidebar.lastTab).
+    AppSidebar.lastTab = navigationShell.currentIndex;
     return ShellBackScope(
       currentIndex: navigationShell.currentIndex,
       goHome: () => selectTab(context, navigationShell, ShellBranch.home),
@@ -270,26 +273,29 @@ class ShellFrame extends StatelessWidget {
           AppSidebar(selectedIndex: currentIndex, onSelect: onSelect),
           // Feed and rail are one centred block, so on a wide window the
           // rail stays beside the feed instead of drifting to the far edge.
+          // Only this block fades when a page opens over the shell.
           Expanded(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: Responsive.feedMaxWidth +
-                      (showRail ? KSpace.xl + Responsive.rightRailWidth : 0),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(child: child),
-                    if (showRail) ...[
-                      const SizedBox(width: KSpace.xl),
-                      rightRail ??
-                          RightRail(
-                            showEvents: currentIndex != ShellBranch.events,
-                            showItems: currentIndex != ShellBranch.market,
-                          ),
+            child: RouteContentFade(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: Responsive.feedMaxWidth +
+                        (showRail ? KSpace.xl + Responsive.rightRailWidth : 0),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(child: child),
+                      if (showRail) ...[
+                        const SizedBox(width: KSpace.xl),
+                        rightRail ??
+                            RightRail(
+                              showEvents: currentIndex != ShellBranch.events,
+                              showItems: currentIndex != ShellBranch.market,
+                            ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),

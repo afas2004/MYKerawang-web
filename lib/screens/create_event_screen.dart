@@ -18,6 +18,8 @@ import '../widgets/form_layout.dart';
 import '../widgets/media_picker_grid.dart';
 import '../widgets/restriction_gate.dart';
 import '../l10n/create_strings.dart';
+import '../l10n/form_strings.dart';
+import '../widgets/form_picker.dart';
 import '../services/club_service.dart';
 import '../services/moderation_service.dart';
 import '../utils/categories.dart';
@@ -533,13 +535,20 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   ),
                   for (var i = 0; i < _links.length; i++) _linkEditor(i),
                   if (_links.length < kActionLinksMax)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton.icon(
-                        onPressed: () => setState(() => _links.add(_LinkRow())),
-                        icon: const Icon(AppIcons.create, size: 18),
-                        label: Text(s.eventAddButton),
-                      ),
+                    Wrap(
+                      spacing: KSpace.s,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () => setState(() => _links.add(_LinkRow())),
+                          icon: const Icon(AppIcons.create, size: 18),
+                          label: Text(s.eventAddButton),
+                        ),
+                        // A form becomes an ordinary button: "Fill in form" → /f/:id.
+                        AttachFormButton(
+                          onPicked: (f) => setState(() =>
+                              _links.add(_LinkRow()..set(s.formLinkLabel, f.path))),
+                        ),
+                      ],
                     ),
                 ],
               ),
@@ -592,9 +601,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   LayoutBuilder(builder: (context, c) {
                     final capacity = _input(_capacityCtrl, s.evCapacity,
                         icon: AppIcons.person,
+                        helper: s.evCapacityHint,
                         keyboard: TextInputType.number);
                     final fee = _input(_feeCtrl, s.evFee,
-                        icon: AppIcons.market, keyboard: TextInputType.number);
+                        icon: AppIcons.market,
+                        helper: s.evFeeHint,
+                        keyboard: TextInputType.number);
                     if (c.maxWidth < 420) {
                       return Column(children: [
                         capacity,
@@ -842,12 +854,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     return (v) => (v == null || v.trim().isEmpty) ? message : null;
   }
 
-  Widget _input(TextEditingController c, String h, {IconData? icon, bool readOnly = false, TextInputType? keyboard, String? Function(String?)? validator}) => TextFormField(
+  Widget _input(TextEditingController c, String h, {IconData? icon, String? helper, bool readOnly = false, TextInputType? keyboard, String? Function(String?)? validator}) => TextFormField(
     controller: c,
     readOnly: readOnly,
     validator: validator,
     keyboardType: keyboard,
-    decoration: _inputDeco(h, Theme.of(context), icon: icon)
+    decoration: _inputDeco(h, Theme.of(context), icon: icon).copyWith(helperText: helper)
   );
 
   InputDecoration _emptyDeco() => InputDecoration(
