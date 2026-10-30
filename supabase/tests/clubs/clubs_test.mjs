@@ -243,6 +243,11 @@ await as(admin, `select pin_post($1)`, [cp.id]);
 const g = (await as(null, `select is_pinned, is_club_pinned from posts_public where id=$1`, [cp.id], 'anon'))[0];
 ok(g.is_pinned === true && g.is_club_pinned === false, 'admin global pin leaves the club pin alone');
 await as(admin, `select unpin_post($1)`, [cp.id]);
+await as(admin, `select pin_post($1, false, true)`, [cp.id]);
+ok((await q(`select pin_mandatory m, is_pinned p from posts_public where id = $1`, [cp.id]))[0].m === true, 'a mandatory pin is flagged and live');
+ok((await q(`select isfinite(pinned_until) f from posts where id = $1`, [cp.id]))[0].f === false, 'a mandatory pin never expires');
+await as(admin, `select unpin_post($1)`, [cp.id]);
+ok((await q(`select pin_mandatory m from posts where id = $1`, [cp.id]))[0].m === false, 'unpin clears mandatory');
 
 await as(bob, `select club_pin_post($1)`, [cp.id]);
 const cp2 = (await as(alice, `insert into posts (user_id, title, club_id) values ($1,'Second',$2) returning id`, [alice, debate]))[0].id;

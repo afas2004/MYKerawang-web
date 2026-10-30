@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/moderation_strings.dart';
 import '../language_cubit.dart';
 import '../services/club_service.dart';
 import '../services/moderation_service.dart';
+import '../services/pinned_posts.dart';
 import '../theme/app_icons.dart';
 import '../utils/moderation_logic.dart';
 import 'moderation_ui.dart';
@@ -41,6 +43,40 @@ abstract final class PinActions {
   static bool canPin(Map<String, dynamic> post, String? role) =>
       role == 'admin' || role == 'owner';
 
+  /// Normal or mandatory? Null when the admin backs out.
+  static Future<bool?> _askMandatory(BuildContext context) {
+    final s = context.l10nRead;
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(s.pinChoiceTitle),
+        children: [
+          ListTile(
+            title: Text(s.pinNormal),
+            subtitle: Text(s.pinNormalHint),
+            onTap: () => Navigator.pop(ctx, false),
+          ),
+          ListTile(
+            title: Text(s.pinMandatory),
+            subtitle: Text(s.pinMandatoryHint),
+            onTap: () => Navigator.pop(ctx, true),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Turns a live pin mandatory or back to normal.
+  static Future<void> setMandatory(
+      BuildContext context, Map<String, dynamic> post, bool mandatory) async {
+    try {
+      await ModerationService.pin('${post['id']}', mandatory: mandatory);
+      await PinnedPosts.refresh();
+    } catch (e) {
+      if (context.mounted) showModError(context, e);
+    }
+  }
+
   /// Pins or unpins globally; completes with the new state (unchanged on
   /// failure).
   static Future<bool> toggle(BuildContext context, Map<String, dynamic> post,
@@ -48,18 +84,24 @@ abstract final class PinActions {
     final id = '${post['id']}';
     try {
       if (pinned) {
+        final mandatory = post['pin_mandatory'] == true;
         await ModerationService.unpin(id);
         onChanged?.call(false);
+        await PinnedPosts.refresh();
         if (context.mounted) {
           showModSnack(context, modStrings(context).unpinnedDone,
               onUndo: () async {
-            await ModerationService.pin(id, replace: true);
+            await ModerationService.pin(id, replace: true, mandatory: mandatory);
             onChanged?.call(true);
+            await PinnedPosts.refresh();
           });
         }
         return false;
       }
-      return await _pin(context, id, replace: false, onChanged: onChanged);
+      final mandatory = await _askMandatory(context);
+      if (mandatory == null || !context.mounted) return pinned;
+      return await _pin(context, id,
+          replace: false, mandatory: mandatory, onChanged: onChanged);
     } catch (e) {
       if (context.mounted) showModError(context, e);
       return pinned;
@@ -91,11 +133,24 @@ abstract final class PinActions {
   }
 
   static Future<bool> _pin(BuildContext context, String id,
-      {required bool replace, void Function(bool pinned)? onChanged}) async {
+      {required bool replace,
+      bool mandatory = false,
+      void Function(bool pinned)? onChanged}) async {
     try {
-      final r = await ModerationService.pin(id, replace: replace);
+      final r =
+          await ModerationService.pin(id, replace: replace, mandatory: mandatory);
       onChanged?.call(true);
+      await PinnedPosts.refresh();
       if (!context.mounted) return true;
+      // A mandatory pin has no end date ('infinity' doesn't parse).
+      if (mandatory) {
+        showModSnack(context, context.l10nRead.pinMandatoryDone, onUndo: () async {
+          await ModerationService.unpin(id);
+          onChanged?.call(false);
+          await PinnedPosts.refresh();
+        });
+        return true;
+      }
       final until = DateTime.tryParse('${r['pinned_until']}');
       final days = until == null
           ? 0
@@ -104,6 +159,7 @@ abstract final class PinActions {
           onUndo: () async {
         await ModerationService.unpin(id);
         onChanged?.call(false);
+        await PinnedPosts.refresh();
       });
       return true;
     } catch (e) {
@@ -121,7 +177,8 @@ abstract final class PinActions {
         confirmLabel: m.replace,
       );
       if (!ok || !context.mounted) return false;
-      return _pin(context, id, replace: true, onChanged: onChanged);
+      return _pin(context, id,
+          replace: true, mandatory: mandatory, onChanged: onChanged);
     }
   }
 

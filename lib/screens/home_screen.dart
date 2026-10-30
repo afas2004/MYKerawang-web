@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +9,7 @@ import '../l10n/app_strings.dart';
 import '../l10n/feed_strings.dart';
 import '../language_cubit.dart';
 import '../l10n/social_strings.dart';
+import '../services/pinned_posts.dart';
 import '../services/unread_notifications.dart';
 import '../utils/app_nav.dart';
 import '../utils/guest_access.dart';
@@ -16,6 +19,7 @@ import '../widgets/embed_card.dart';
 import '../widgets/error_state.dart';
 import '../widgets/feed_composer.dart';
 import '../widgets/hover_carousel.dart';
+import '../widgets/pin_bar.dart';
 import '../widgets/shell_actions.dart';
 import '../widgets/universal_card.dart';
 import '../utils/announcement_rules.dart';
@@ -32,12 +36,17 @@ List<Map<String, dynamic>> buildFeedItems(
   List<Map<String, dynamic>> injectables, {
   bool inject = true,
   int every = 6,
+  Set<dynamic> hidden = const {},
 }) {
   final out = <Map<String, dynamic>>[];
   var next = 0;
   // Announcements may opt out of Home (show_in_feed = false); scheduled
   // ones wait for publish_at (the view hides them too).
-  final shown = posts.where((p) => showInHomeFeed(p)).toList();
+  // Pins in the pin bar are left out here, not in the query: the feed's
+  // offsets then never depend on what is pinned.
+  final shown = posts
+      .where((p) => showInHomeFeed(p) && !hidden.contains(p['id']))
+      .toList();
   for (var i = 0; i < shown.length; i++) {
     out.add({...shown[i], 'type': 'post'});
     if (inject && (i + 1) % every == 0 && next < injectables.length) {
@@ -106,6 +115,10 @@ class _HomeScreenState extends State<HomeScreen>
   bool _loadingMore = false;
   bool _loadMoreError = false;
 
+  /// Bumped by each refresh, so a page still on its way when the feed is
+  /// replaced isn't appended to the new one.
+  int _feedGeneration = 0;
+
   @override
   void initState() {
     super.initState();
@@ -114,6 +127,8 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _fetchFeedData() async {
     if (mounted && _hasError) setState(() => _hasError = false);
+    _feedGeneration++;
+    unawaited(PinnedPosts.refresh());
     try {
       final now = DateTime.now().toUtc().toIso8601String();
 
@@ -174,11 +189,10 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   /// Posts from the view, which blanks user_id/profiles on anonymous
-  /// rows (joins are baked in), [_pageSize] at a time. Active pins first.
+  /// rows (joins are baked in), [_pageSize] at a time, newest first.
   Future<List<Map<String, dynamic>>> _postsPage(int from) => _supabase
       .from('posts_public')
       .select('*')
-      .order('is_pinned', ascending: false) // active pins first (20261019004500)
       .order('created_at', ascending: false)
       .range(from, from + _pageSize - 1);
 
@@ -186,13 +200,14 @@ class _HomeScreenState extends State<HomeScreen>
   /// offsets) are skipped.
   Future<void> _loadMore() async {
     if (_loadingMore || !_hasMore || _isLoading) return;
+    final generation = _feedGeneration;
     setState(() {
       _loadingMore = true;
       _loadMoreError = false;
     });
     try {
       final page = await _postsPage(_posts.length);
-      if (!mounted) return;
+      if (!mounted || generation != _feedGeneration) return;
       setState(() {
         for (final p in page) {
           if (_postIds.add(p['id'])) _posts.add(p);
@@ -221,8 +236,12 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    return FeedView(
+    return ValueListenableBuilder(
+      valueListenable: PinnedPosts.pins,
+      builder: (context, pins, _) => FeedView(
       posts: _posts,
+      pins: pins,
+      onDismissPin: PinnedPosts.dismiss,
       injectables: _injectables,
       events: _featuredEvents,
       listings: _freshMarketItems,
@@ -237,6 +256,7 @@ class _HomeScreenState extends State<HomeScreen>
       // Search and notifications only. Settings live in Profile; refresh
       // is pull-to-refresh, with a button only for mouse users on desktop.
       actions: homeAppBarActions(context, onRefresh: _fetchFeedData),
+      ),
     );
   }
 
@@ -246,12 +266,16 @@ class _HomeScreenState extends State<HomeScreen>
 /// tested at any width.
 ///
 /// Every size: app bar, composer, then posts in one ≤680 px column
-/// (pinned first, gold-framed by [PostCard]). Without the right rail
+/// (pins in their own bar above them). Without the right rail
 /// (< [Responsive.railBreakpoint]) discovery moves into the feed:
 /// "Happening soon" and "Fresh finds" sections, plus one event/listing
 /// embed after every 6th post.
 class FeedView extends StatelessWidget {
   final List<Map<String, dynamic>> posts;
+
+  /// What the pin bar shows; these posts leave the list below it.
+  final List<Map<String, dynamic>> pins;
+  final ValueChanged<Map<String, dynamic>>? onDismissPin;
   final List<Map<String, dynamic>> injectables;
   final List<Map<String, dynamic>> events;
   final List<Map<String, dynamic>> listings;
@@ -268,6 +292,8 @@ class FeedView extends StatelessWidget {
   const FeedView({
     super.key,
     required this.posts,
+    this.pins = const [],
+    this.onDismissPin,
     this.injectables = const [],
     this.events = const [],
     this.listings = const [],
@@ -315,7 +341,10 @@ class FeedView extends StatelessWidget {
     final width = MediaQuery.sizeOf(context).width;
     final size = Responsive.sizeFor(width);
     final railVisible = size.isLarge; // MainScaffold shows the rail here
-    final items = buildFeedItems(posts, injectables, inject: !railVisible);
+    final showPins = !isLoading && pins.isNotEmpty;
+    final items = buildFeedItems(posts, injectables,
+        inject: !railVisible,
+        hidden: {if (showPins) ...pins.map((p) => p['id'])});
     final topPadding = MediaQuery.paddingOf(context).top + KBand.heightOf(context);
 
     return Scaffold(
@@ -331,6 +360,12 @@ class FeedView extends StatelessWidget {
               KBand.sliverAppBar(
                 context,
                 tone: KBand.home,
+                // The bar takes over the rounded foot, and the band stays
+                // put so the bar always has something to sit under.
+                pinned: showPins,
+                floating: !showPins,
+                snap: !showPins,
+                rounded: !showPins,
                 // Desktop: the sidebar carries the wordmark, so the page
                 // header just names the page.
                 title: size.isExpanded ? Text(s.navHome) : Text(
@@ -342,6 +377,15 @@ class FeedView extends StatelessWidget {
                 ),
                 actions: actions,
               ),
+
+              if (showPins)
+                PinnedHeaderSliver(
+                  child: PinBar(
+                    pins: pins,
+                    onOpen: (p) => context.goPost(p),
+                    onDismiss: (p) => onDismissPin?.call(p),
+                  ),
+                ),
 
               _column(SliverToBoxAdapter(child: FeedComposer(onTap: onCompose))),
 

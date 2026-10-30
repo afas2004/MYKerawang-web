@@ -22,7 +22,7 @@ import '../../widgets/tap_card.dart';
 import 'announcements_repository.dart';
 import 'hub_strings.dart';
 
-/// Official news hub: a hero carousel (featured → pinned → newest),
+/// Official news hub: a hero carousel (featured → newest),
 /// channel chips (clubs and staff), category tabs, upcoming official
 /// events and the announcement list. Readable by guests; people allowed
 /// to post announcements get a "New announcement" action.
@@ -93,12 +93,22 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
     if (mounted) _load();
   }
 
-  List<Announcement> _visible(AnnouncementsData d) => [
-        for (final a in d.items)
-          if ((_category == null || a.category == _category) &&
-              (_channel == null || a.channel?.key == _channel))
-            a,
-      ];
+  /// A club's chip acts as its front page: its pinned post leads.
+  List<Announcement> _visible(AnnouncementsData d) {
+    final rows = [
+      for (final a in d.items)
+        if ((_category == null || a.category == _category) &&
+            (_channel == null || a.channel?.key == _channel))
+          a,
+    ];
+    if (!_showClubPins) return rows;
+    return [
+      ...rows.where((a) => a.clubPinned),
+      ...rows.where((a) => !a.clubPinned),
+    ];
+  }
+
+  bool get _showClubPins => _channel?.startsWith('club:') ?? false;
 
   @override
   Widget build(BuildContext context) {
@@ -216,7 +226,8 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                 itemCount: visible.length,
                 separatorBuilder: (_, __) => const SizedBox(height: KSpace.m),
                 itemBuilder: (context, i) =>
-                    AnnouncementCard(announcement: visible[i]),
+                    AnnouncementCard(
+                        announcement: visible[i], showClubPin: _showClubPins),
               ),
             ),
         ],
@@ -381,11 +392,7 @@ class _HeroSlide extends StatelessWidget {
     final s = context.l10n;
     final cover = item.coverUrl;
     final title = item.title.isNotEmpty ? item.title : _excerpt(item.body);
-    final badge = item.featured
-        ? (s.hub.featured, AppIcons.sparkle)
-        : item.pinned
-            ? (s.hub.pinned, AppIcons.pin)
-            : null;
+    final badge = item.featured ? (s.hub.featured, AppIcons.sparkle) : null;
 
     return TapCard(
       borderRadius: KRadius.card,
@@ -702,6 +709,9 @@ class _EventTile extends StatelessWidget {
 class AnnouncementCard extends StatelessWidget {
   final Announcement announcement;
 
+  /// Under a club's chip: mark the club's pinned post.
+  final bool showClubPin;
+
   /// Opens an external CTA link; tests inject a recorder.
   final Future<void> Function(Uri url) openLink;
 
@@ -711,6 +721,7 @@ class AnnouncementCard extends StatelessWidget {
   const AnnouncementCard({
     super.key,
     required this.announcement,
+    this.showClubPin = false,
     this.openLink = openAnnouncementLink,
     this.openPath,
   });
@@ -734,8 +745,8 @@ class AnnouncementCard extends StatelessWidget {
     final channel = a.channel;
 
     return KCard(
-      official: a.pinned,
-      officialLabel: a.pinned ? s.hub.pinned : null,
+      official: showClubPin && a.clubPinned,
+      officialLabel: showClubPin && a.clubPinned ? s.hub.pinned : null,
       onTap: () => context.goPost(a.post),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

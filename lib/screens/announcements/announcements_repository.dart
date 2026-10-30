@@ -150,7 +150,7 @@ class Announcement {
   }
 
   String get id => post['id'] as String;
-  bool get pinned => post['is_pinned'] == true;
+  bool get clubPinned => post['is_club_pinned'] == true;
   String get title => (post['title'] as String?)?.trim() ?? '';
   String get body => (post['body'] as String?)?.trim() ?? '';
 
@@ -171,7 +171,7 @@ class Announcement {
 
 /// Everything the hub shows, loaded together.
 class AnnouncementsData {
-  /// Newest first; pinned ones first.
+  /// Newest first.
   final List<Announcement> items;
 
   /// Upcoming events from clubs / announcement authors.
@@ -189,12 +189,11 @@ class AnnouncementsData {
 
   static const empty = AnnouncementsData(items: [], upcomingEvents: []);
 
-  /// Hero: featured (feature_until > now), else pinned, else newest 3.
+  /// Hero: featured (feature_until > now), else newest 3. Pins aren't news:
+  /// they live in Home's pin bar.
   List<Announcement> get featured {
     final f = items.where((a) => a.featured).toList();
     if (f.isNotEmpty) return f.take(5).toList();
-    final p = items.where((a) => a.pinned).toList();
-    if (p.isNotEmpty) return p.take(5).toList();
     return items.take(3).toList();
   }
 
@@ -212,13 +211,10 @@ class AnnouncementsData {
     return [...clubs, ...people];
   }
 
-  /// Orders rows: pinned first, then newest published.
+  /// Orders rows: newest published first.
   static List<Announcement> sorted(Iterable<Announcement> items) =>
       items.toList()
-        ..sort((a, b) {
-          if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
-          return b.publishedAt.compareTo(a.publishedAt);
-        });
+        ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
 }
 
 /// Can the signed-in user post announcements? Asks the
@@ -259,9 +255,13 @@ class AnnouncementsRepository {
         .eq('is_announcement', true)
         .order('created_at', ascending: false)
         .limit(80);
+    final seen = {for (final r in rows) r['id']};
 
-    var items = AnnouncementsData.sorted(
-        [for (final r in rows) Announcement.fromRow(r)]);
+    var items = AnnouncementsData.sorted([
+      for (final r in rows) Announcement.fromRow(r),
+      for (final r in await _clubPins())
+        if (!seen.contains(r['id'])) Announcement.fromRow(r),
+    ]);
     var legacy = false;
     if (items.isEmpty) {
       items = await _legacy();
@@ -273,6 +273,20 @@ class AnnouncementsRepository {
       upcomingEvents: await _upcomingEvents(items),
       legacy: legacy,
     );
+  }
+
+  /// Club pins older than the newest 80 still lead their club's chip.
+  Future<List<Map<String, dynamic>>> _clubPins() async {
+    try {
+      return List<Map<String, dynamic>>.from(await _db
+          .from('posts_public')
+          .select('*')
+          .eq('is_announcement', true)
+          .eq('is_club_pinned', true)
+          .limit(20));
+    } catch (_) {
+      return const []; // only the order under a chip depends on it
+    }
   }
 
   /// Pre-v1.4: official authors' recent posts.

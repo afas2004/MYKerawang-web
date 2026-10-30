@@ -539,7 +539,8 @@ class _MoreMenu extends StatelessWidget {
           },
           itemBuilder: (_) => [
             item('link', AppIcons.link, s.copyLink),
-            if (canPin) item('pin', AppIcons.pin, pinned ? m.unpin : m.pin),
+            // On its club's page the club pin is the one on offer.
+            if (canPin && !canClubPin) item('pin', AppIcons.pin, pinned ? m.unpin : m.pin),
             if (canClubPin)
               item('clubPin', AppIcons.pin, clubPinned ? m.unpinFromClub : m.pinToClub),
             if (mine) ...[
