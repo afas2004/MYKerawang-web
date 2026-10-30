@@ -27,6 +27,7 @@ import 'profile_cubit.dart';
 import 'login_cubit.dart';
 import 'verification/verify_sheet.dart';
 import '../services/update_service.dart';
+import '../widgets/app_toast.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -102,16 +103,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _exportData() async {
     final s = context.l10nRead;
-    final messenger = ScaffoldMessenger.of(context);
     setState(() => _exporting = true);
     try {
       await AccountData.exportToFile();
-      messenger.showSnackBar(SnackBar(content: Text(s.social.exportReady)));
+      showToast(s.social.exportReady);
     } catch (e) {
-      messenger.showSnackBar(SnackBar(
-        content: Text(s.social.exportFailed.fill([e])),
-        action: SnackBarAction(label: s.social.retry, onPressed: _exportData),
-      ));
+      showToast(s.social.exportFailed.fill([e]), actionLabel: s.social.retry, onAction: _exportData);
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
@@ -140,15 +137,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _deleteAccount() async {
     final s = context.l10nRead;
-    final messenger = ScaffoldMessenger.of(context);
     final String? username;
     try {
       username = await _myUsername();
     } catch (e) {
-      messenger.showSnackBar(SnackBar(
-        content: Text(s.social.deleteAccountFailed.fill([e])),
-        action: SnackBarAction(label: s.social.retry, onPressed: _deleteAccount),
-      ));
+      showToast(s.social.deleteAccountFailed.fill([e]), actionLabel: s.social.retry, onAction: _deleteAccount);
       return;
     }
     if (!mounted) return;
@@ -178,7 +171,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
 
     if (username == null || username.isEmpty) {
-      messenger.showSnackBar(SnackBar(content: Text(s.deleteNeedsUsername)));
+      showToast(s.deleteNeedsUsername);
       return;
     }
 
@@ -207,7 +200,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await AccountData.deleteAccount(username);
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).pop();
-      messenger.showSnackBar(SnackBar(content: Text(s.social.accountDeleted)));
+      showToast(s.social.accountDeleted);
       context.go('/login');
     } catch (e) {
       if (!mounted) return;
@@ -216,10 +209,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ? s.social.ownerCannotDelete
           : s.social.deleteAccountFailed.fill(
               [e is PostgrestException ? e.message : e]);
-      messenger.showSnackBar(SnackBar(
-        content: Text(msg),
-        action: SnackBarAction(label: s.social.retry, onPressed: _deleteAccount),
-      ));
+      showToast(msg, actionLabel: s.social.retry, onAction: _deleteAccount);
     }
   }
 
@@ -230,7 +220,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _checkingUpdate = false);
     // When newer, the button itself turns into "Update"; only confirm the no-op case.
     if (!newer) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.upToDate)));
+      showToast(context.l10nRead.upToDate);
     }
   }
 
@@ -262,14 +252,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) context.go('/home');
     } catch (e) {
       if (mounted) {
-        final scheme = Theme.of(context).colorScheme;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(context.l10nRead.errorWithDetail.fill([e]),
-                style: TextStyle(color: scheme.onError)),
-            backgroundColor: scheme.error,
-          ),
-        );
+        showToast(context.l10nRead.errorWithDetail.fill([e]), error: true);
       }
     }
   }

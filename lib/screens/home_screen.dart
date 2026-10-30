@@ -122,7 +122,29 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void initState() {
     super.initState();
+    PinnedPosts.pins.addListener(_syncPins);
     _fetchFeedData();
+  }
+
+  @override
+  void dispose() {
+    PinnedPosts.pins.removeListener(_syncPins);
+    super.dispose();
+  }
+
+  /// Rows already in the feed follow pin changes, so a post that drops back
+  /// out of the bar doesn't still offer Unpin in its menu.
+  void _syncPins() {
+    final active = PinnedPosts.activeIds.toSet();
+    var changed = false;
+    for (var i = 0; i < _posts.length; i++) {
+      final pinned = active.contains(_posts[i]['id']);
+      if ((_posts[i]['is_pinned'] == true) != pinned) {
+        _posts[i] = {..._posts[i], 'is_pinned': pinned};
+        changed = true;
+      }
+    }
+    if (changed && mounted) setState(() {});
   }
 
   Future<void> _fetchFeedData() async {

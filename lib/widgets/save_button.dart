@@ -5,6 +5,7 @@ import '../language_cubit.dart';
 import '../theme/app_icons.dart';
 import '../services/saved_items.dart';
 import 'brand/k_motion.dart';
+import 'app_toast.dart';
 
 export '../services/saved_items.dart' show SavedType;
 
@@ -47,22 +48,13 @@ class _SaveButtonState extends State<SaveButton> {
 
   Future<void> _toggle() async {
     final s = context.l10nRead.social;
-    final messenger = ScaffoldMessenger.maybeOf(context);
     setState(() => _busy = true);
     try {
       final saved = await SavedItems.instance.toggle(widget.type, widget.id);
       widget.onChanged?.call(saved);
-      messenger
-        ?..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(
-          content: Text(saved ? s.savedToast : s.unsavedToast),
-          duration: const Duration(seconds: 2),
-        ));
+      showToast(saved ? s.savedToast : s.unsavedToast, duration: const Duration(seconds: 2));
     } catch (_) {
-      messenger?.showSnackBar(SnackBar(
-        content: Text(s.saveFailed),
-        action: SnackBarAction(label: s.retry, onPressed: _toggle),
-      ));
+      showToast(s.saveFailed, actionLabel: s.retry, onAction: _toggle);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

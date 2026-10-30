@@ -8,6 +8,7 @@ import '../l10n/moderation_strings.dart';
 import '../language_cubit.dart';
 import '../utils/moderation_logic.dart';
 import 'brand/brand.dart';
+import 'app_toast.dart';
 
 /// Shared moderation feedback: error text, snackbars, confirm and
 /// reason dialogs, empty states. Every moderation interaction goes
@@ -121,39 +122,26 @@ String restrictionSentence(ModerationStrings m, Restriction? r, [String? scope])
   return parts.join(' ');
 }
 
-/// Snackbar with an optional Undo. Undo failures surface their own
-/// error instead of disappearing.
+/// Pop-up with an optional Undo. Undo failures surface their own error
+/// instead of disappearing.
 void showModSnack(BuildContext context, String text,
     {Future<void> Function()? onUndo, bool error = false}) {
-  final messenger = ScaffoldMessenger.maybeOf(context);
-  if (messenger == null) return;
   final m = modStrings(context);
-  final scheme = Theme.of(context).colorScheme;
-  messenger
-    ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(
-      content: Text(text),
-      backgroundColor: error ? scheme.errorContainer : null,
-      showCloseIcon: error,
-      closeIconColor: error ? scheme.onErrorContainer : null,
-      duration: Duration(seconds: onUndo != null ? 8 : 4),
-      action: onUndo == null
-          ? null
-          : SnackBarAction(
-              label: m.undo,
-              onPressed: () async {
-                try {
-                  await onUndo();
-                  messenger.showSnackBar(SnackBar(content: Text(m.undone)));
-                } catch (e) {
-                  if (context.mounted) {
-                    messenger.showSnackBar(
-                        SnackBar(content: Text(modErrorText(context, e))));
-                  }
-                }
-              },
-            ),
-    ));
+  showToast(
+    text,
+    error: error,
+    actionLabel: onUndo == null ? null : m.undo,
+    onAction: onUndo == null
+        ? null
+        : () async {
+            try {
+              await onUndo();
+              showToast(m.undone);
+            } catch (e) {
+              if (context.mounted) showToast(modErrorText(context, e), error: true);
+            }
+          },
+  );
 }
 
 void showModError(BuildContext context, Object e) =>

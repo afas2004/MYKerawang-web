@@ -18,6 +18,7 @@ import '../widgets/brand/brand.dart';
 import '../widgets/media_picker_grid.dart';
 import '../widgets/mention_input.dart';
 import '../widgets/restriction_gate.dart';
+import '../widgets/app_toast.dart';
 
 /// Composer for announcements (/create/announcement, and
 /// /post/:id/edit-announcement with [editPost]).
@@ -118,8 +119,7 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
       if (issue != null) {
         if (mounted) {
           final s = context.l10nRead;
-          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-              SnackBar(content: Text(photoProblemText(s, issue))));
+          showToast(photoProblemText(s, issue));
         }
         return;
       }
@@ -215,14 +215,11 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
         _preview = false;
       });
       final a = context.announceL10nRead;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(_issueText(issues.first, a))));
+      showToast(_issueText(issues.first, a));
       return;
     }
     if (!await ensureCanWrite(context, ModScope.post) || !mounted) return;
     final a = context.announceL10nRead;
-    final messenger = ScaffoldMessenger.of(context);
     setState(() => _saving = true);
     try {
       final id = await AnnouncementService.save(_d, editId: widget.editPost?['id'] as String?);
@@ -236,15 +233,9 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
       }
     } catch (e) {
       if (mounted) {
-        messenger.showSnackBar(SnackBar(
-          content: Text(describeWriteError(context, e)),
-          action: SnackBarAction(
-            label: context.l10nRead.tryAgain,
-            onPressed: () {
+        showToast(describeWriteError(context, e), actionLabel: context.l10nRead.tryAgain, onAction: () {
               if (mounted) _submit(p);
-            },
-          ),
-        ));
+            });
       }
     } finally {
       if (mounted) setState(() => _saving = false);

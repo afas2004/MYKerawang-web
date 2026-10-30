@@ -11,6 +11,7 @@ import '../utils/formatters.dart';
 import '../utils/adaptive.dart';
 import '../utils/roles.dart';
 import '../widgets/brand/brand.dart';
+import '../widgets/app_toast.dart';
 
 /// Icon per notification type so the list is scannable.
 IconData _iconFor(String? type) => switch (type) {
@@ -192,8 +193,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
       await UnreadNotifications.instance.markAllRead();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+        showToast(s.errorWithDetail.fill([e]));
       }
     }
   }

@@ -8,6 +8,7 @@ import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../theme/app_themes.dart';
+import '../widgets/app_toast.dart';
 
 /// Where deep links point when we're not running on the web. On the web the
 /// share link uses the origin it is running on, so both hosts work.
@@ -28,9 +29,7 @@ class ShareService {
 
     // 2. Safety Check: If they typed nonsense/links, 'phone' is now empty.
     if (phone.length < 9) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(s.invalidPhone.fill([rawPhone]))),
-      );
+      showToast(s.invalidPhone.fill([rawPhone]));
       return;
     }
 
@@ -56,9 +55,7 @@ class ShareService {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(s.whatsAppFailed)),
-        );
+        showToast(s.whatsAppFailed);
       }
     }
   }
@@ -266,9 +263,7 @@ class _ShareSheetState extends State<_ShareSheet> {
                           await Clipboard.setData(
                               ClipboardData(text: widget.link!));
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(s.linkCopied)),
-                            );
+                            showToast(s.linkCopied);
                           }
                         },
                       ),
@@ -372,9 +367,7 @@ class _ShareSheetState extends State<_ShareSheet> {
                   : '${_ctrl.text}\n\n${widget.link}',
             ));
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(s.textCopied)),
-              );
+              showToast(s.textCopied);
             }
           },
           icon: const Icon(Icons.copy, size: 16),

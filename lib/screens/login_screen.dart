@@ -9,6 +9,7 @@ import '../widgets/app_logo.dart';
 import '../widgets/brand/brand.dart';
 import '../utils/guest_access.dart';
 import '../services/registration_policy.dart';
+import '../widgets/app_toast.dart';
 import 'login_cubit.dart'; // This looks in the SAME folder
 
 class LoginScreen extends StatefulWidget {
@@ -66,14 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showError(String code) {
-    final scheme = Theme.of(context).colorScheme;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(_errorText(context.l10nRead, code),
-            style: TextStyle(color: scheme.onError)),
-        backgroundColor: scheme.error,
-      ),
-    );
+    showToast(_errorText(context.l10nRead, code), error: true);
   }
 
   @override
@@ -86,19 +80,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _sendPasswordReset() async {
     final email = _emailCtrl.text.trim();
-    final messenger = ScaffoldMessenger.of(context);
     final s = context.l10n;
 
     if (email.isEmpty) {
-      messenger.showSnackBar(SnackBar(content: Text(s.enterEmailFirst)));
+      showToast(s.enterEmailFirst);
       return;
     }
 
     try {
       await Supabase.instance.client.auth.resetPasswordForEmail(email);
-      messenger.showSnackBar(SnackBar(content: Text(s.resetLinkSent)));
+      showToast(s.resetLinkSent);
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text("$e")));
+      showToast("$e");
     }
   }
 

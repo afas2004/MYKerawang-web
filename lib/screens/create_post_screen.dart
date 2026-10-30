@@ -24,6 +24,7 @@ import '../widgets/restriction_gate.dart';
 import 'clubs/post_as_selector.dart';
 import 'profile_cubit.dart';
 import '../services/club_service.dart';
+import '../widgets/app_toast.dart';
 
 /// Width at or above which the editor opens as a dialog over the feed;
 /// below it is a full-screen page.
@@ -230,13 +231,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   void _onPhotosChanged() {
     if (_photos.length > PostService.maxPhotos) {
       _photos.removeRange(PostService.maxPhotos, _photos.length);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            context.postL10nRead.photoLimit.fill([PostService.maxPhotos]),
-          ),
-        ),
-      );
+      showToast(context.postL10nRead.photoLimit.fill([PostService.maxPhotos]));
     }
     setState(() {});
   }
@@ -281,17 +276,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     // Title is optional; a post needs something — title, text or a photo.
     final title = _titleCtrl.text.trim();
     final body = _bodyCtrl.text.trim();
-    final messenger = ScaffoldMessenger.of(context);
     if (title.isEmpty && body.isEmpty && _photos.isEmpty) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(context.postL10nRead.postEmpty)),
-      );
+      showToast(context.postL10nRead.postEmpty);
       return;
     }
     if (_bodyCtrl.text.length > _bodyMax) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(context.feedL10nRead.tooLong.fill([_bodyMax]))),
-      );
+      showToast(context.feedL10nRead.tooLong.fill([_bodyMax]));
       return;
     }
     if (!await ensureCanWrite(context, ModScope.post) || !mounted) return;
@@ -369,17 +359,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       }
     } catch (e) {
       if (mounted) {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(describeWriteError(context, e)),
-            action: SnackBarAction(
-              label: s.tryAgain,
-              onPressed: () {
+        showToast(describeWriteError(context, e), actionLabel: s.tryAgain, onAction: () {
                 if (mounted) _submit();
-              },
-            ),
-          ),
-        );
+              });
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

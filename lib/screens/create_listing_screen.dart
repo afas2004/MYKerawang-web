@@ -19,6 +19,7 @@ import '../widgets/restriction_gate.dart';
 import '../l10n/create_strings.dart';
 import '../services/club_service.dart';
 import '../widgets/post_as_selector.dart';
+import '../widgets/app_toast.dart';
 
 class CreateListingScreen extends StatefulWidget {
   final Map<String, dynamic>? itemToEdit; 
@@ -135,11 +136,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
   void _showDraftRestored() {
     final s = context.l10nRead;
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-      content: Text(s.draftRestored),
-      action: SnackBarAction(
-        label: s.discard,
-        onPressed: () {
+    showToast(s.draftRestored, actionLabel: s.discard, onAction: () {
           if (!mounted) return;
           setState(() {
             _titleController.clear();
@@ -147,9 +144,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
             _descriptionController.clear();
           });
           _draft.clear();
-        },
-      ),
-    ));
+        });
   }
 
   late final String _initialSnapshot;
@@ -228,12 +223,11 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     final s = context.l10nRead;
 
     if (_mediaItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.addPhotoRequired)));
+      showToast(s.addPhotoRequired);
       return;
     }
     if (_categories.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(s.categoryRequired)));
+      showToast(s.categoryRequired);
       return;
     }
 
@@ -250,7 +244,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+        showToast(s.errorWithDetail.fill([e]));
         setState(() => _isLoading = false);
       }
       return;
@@ -317,7 +311,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
       }
 
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeWriteError(context, e))));
+      if (mounted) showToast(describeWriteError(context, e));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

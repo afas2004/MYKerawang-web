@@ -14,6 +14,7 @@ import '../../utils/form_csv.dart';
 import '../../utils/responsive.dart';
 import '../../utils/csv_saver.dart';
 import '../../widgets/restriction_gate.dart';
+import '../../widgets/app_toast.dart';
 
 /// The three analyses the KI report asks for, plus the answers behind them.
 ///
@@ -120,9 +121,7 @@ class _FormResponsesScreenState extends State<FormResponsesScreen> {
 
   void _toast(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    showToast(message);
   }
 
   /// Free-text answers, newest first — what goes in "Cadangan penambah baikan".

@@ -14,6 +14,9 @@ abstract final class PinnedPosts {
       ValueNotifier(const []);
 
   static List<Map<String, dynamic>> _all = const [];
+
+  /// Every live pin, closed ones included: a closed pin is still pinned.
+  static Iterable<dynamic> get activeIds => _all.map((p) => p['id']);
   static Set<String> _dismissed = {};
 
   /// Tests inject rows here instead of Supabase.

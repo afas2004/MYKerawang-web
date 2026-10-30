@@ -23,6 +23,7 @@ import '../widgets/brand/brand.dart';
 import '../widgets/tap_card.dart';
 import 'gallery_view_screen.dart';
 import '../widgets/save_button.dart';
+import '../widgets/app_toast.dart';
 
 class ItemDetailScreen extends StatefulWidget {
   final Map<String, dynamic> item;
@@ -151,7 +152,7 @@ int _currentImageIndex = 0;
       try {
         await Supabase.instance.client.from('listings').delete().eq('id', _itemData['id']);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.listingDeleted)));
+          showToast(s.listingDeleted);
           notifyContentChanged(); // lists drop the deleted listing
           popOrHome(context);
         }
@@ -240,9 +241,7 @@ int _currentImageIndex = 0;
                     onPressed: () {
                       final raw = (phone ?? '').toString().trim();
                       if (raw.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(s.sellerNoPhone)),
-                        );
+                        showToast(s.sellerNoPhone);
                         return;
                       }
                       ShareService.openWhatsApp(

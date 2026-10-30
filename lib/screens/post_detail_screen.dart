@@ -28,6 +28,7 @@ import '../utils/adaptive.dart';
 import '../widgets/brand/brand.dart';
 import '../utils/guest_access.dart';
 import '../widgets/restriction_gate.dart';
+import '../widgets/app_toast.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final Map<String, dynamic> post;
@@ -154,17 +155,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       message: ps.deletePostConfirm,
     );
     if (!ok || !mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
     try {
       await PostService.deletePost(_postData);
-      messenger.showSnackBar(SnackBar(content: Text(ps.postDeleted)));
+      showToast(ps.postDeleted);
       notifyContentChanged();
       if (mounted) _leave();
     } catch (e) {
       if (mounted) {
-        messenger.showSnackBar(
-          SnackBar(content: Text(describeWriteError(context, e))),
-        );
+        showToast(describeWriteError(context, e));
       }
     }
   }
@@ -310,8 +308,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     );
     ctrl.dispose();
     if (body == null || body.isEmpty || body == c['body'] || !mounted) return;
-
-    final messenger = ScaffoldMessenger.of(context);
     try {
       await PostService.updateComment(c['id'], body);
       await MentionService.notify(
@@ -321,12 +317,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         anonymous: c['is_anonymous'] ?? false,
         alreadyNotified: MentionService.usernamesIn(c['body'] ?? ''),
       );
-      messenger.showSnackBar(SnackBar(content: Text(ps.commentUpdated)));
+      showToast(ps.commentUpdated);
       await _loadComments();
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(s.errorWithDetail.fill([e]))),
-      );
+      showToast(s.errorWithDetail.fill([e]));
     }
   }
 
@@ -339,15 +333,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       message: ps.deleteCommentConfirm,
     );
     if (!ok || !mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
     try {
       await PostService.deleteComment(c['id']);
-      messenger.showSnackBar(SnackBar(content: Text(ps.commentDeleted)));
+      showToast(ps.commentDeleted);
       await _refreshData();
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(s.errorWithDetail.fill([e]))),
-      );
+      showToast(s.errorWithDetail.fill([e]));
     }
   }
 
@@ -362,7 +353,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (!await ensureCanWrite(context, ModScope.comment) || !mounted) return;
     final s = context.l10nRead;
     final ps = context.postL10nRead;
-    final messenger = ScaffoldMessenger.of(context);
 
     setState(() => _isSending = true);
     try {
@@ -388,21 +378,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       // The text is only cleared once it is safely posted.
       _commentCtrl.clear();
       if (mounted) FocusScope.of(context).unfocus();
-      messenger.showSnackBar(SnackBar(content: Text(ps.commentPosted)));
+      showToast(ps.commentPosted);
       await _refreshData();
     } catch (e) {
       debugPrint("Comment failed: $e");
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(ps.commentFailed),
-          action: SnackBarAction(
-            label: s.tryAgain,
-            onPressed: () {
+      showToast(ps.commentFailed, actionLabel: s.tryAgain, onAction: () {
               if (mounted) _submitComment();
-            },
-          ),
-        ),
-      );
+            });
     } finally {
       if (mounted) setState(() => _isSending = false);
     }

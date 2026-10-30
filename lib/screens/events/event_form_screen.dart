@@ -17,6 +17,7 @@ import '../../utils/report_helper.dart';
 import '../../utils/text_rules.dart';
 import '../../widgets/form_style.dart';
 import '../../widgets/restriction_gate.dart';
+import '../../widgets/app_toast.dart';
 
 /// Filling in an event's form — the KI report survey, in practice.
 ///
@@ -285,9 +286,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
 
   void _toast(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    showToast(message);
   }
 
   @override

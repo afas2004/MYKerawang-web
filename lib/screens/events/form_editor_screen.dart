@@ -18,6 +18,7 @@ import '../../utils/responsive.dart';
 import '../../utils/text_rules.dart';
 import '../../widgets/form_style.dart';
 import '../../widgets/restriction_gate.dart';
+import '../../widgets/app_toast.dart';
 
 /// The form editor: one row per question, and every setting a question has is
 /// on that row.
@@ -303,9 +304,7 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
 
   void _toast(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    showToast(message);
   }
 
   // ------------------------------------------------------------------ editing
@@ -2332,9 +2331,7 @@ class _ShareBox extends StatelessWidget {
                 onPressed: () async {
                   await Clipboard.setData(ClipboardData(text: link));
                   if (!context.mounted) return;
-                  ScaffoldMessenger.of(context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(SnackBar(content: Text(s.formsLinkCopied)));
+                  showToast(s.formsLinkCopied);
                 },
               ),
             ],

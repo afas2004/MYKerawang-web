@@ -9,6 +9,7 @@ import '../utils/adaptive.dart';
 import '../utils/local_image.dart';
 import '../utils/photo_rules.dart';
 import 'tap_card.dart';
+import 'app_toast.dart';
 
 /// Photo strip for the create/edit forms (listing, event).
 ///
@@ -63,8 +64,7 @@ class MediaPickerGrid extends StatelessWidget {
       items.addAll(accepted);
       if (problem != null && context.mounted) {
         final s = context.l10nRead;
-        ScaffoldMessenger.maybeOf(context)
-            ?.showSnackBar(SnackBar(content: Text(photoProblemText(s, problem))));
+        showToast(photoProblemText(s, problem));
       }
       onChanged();
     } catch (e) {

@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Navigation behaviour with go_router and stand-in pages: the same
 /// helpers the app's router uses (selectTab, ShellBackScope, appBack,
 /// leaveFormRoute, completePublish), without Supabase.
+import 'helpers/toast_host.dart';
 void main() {
   const en = AppStrings.en;
 
@@ -88,7 +89,7 @@ void main() {
     );
     return BlocProvider(
       create: (_) => LanguageCubit(),
-      child: MaterialApp.router(routerConfig: router),
+      child: MaterialApp.router(builder: withToasts, routerConfig: router),
     );
   }
 
@@ -192,7 +193,7 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(BlocProvider(
       create: (_) => LanguageCubit(),
-      child: MaterialApp(home: form),
+      child: MaterialApp(builder: withToasts, home: form),
     ));
     await tester.pump();
   }

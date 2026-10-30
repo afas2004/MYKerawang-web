@@ -37,6 +37,7 @@ import 'events/checkin_screens.dart';
 import '../widgets/restriction_gate.dart';
 import '../widgets/save_button.dart';
 import '../utils/url_rules.dart';
+import '../widgets/app_toast.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final Map<String, dynamic> event;
@@ -460,8 +461,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     final uri = launchableUri(url);
     if (uri == null) {
       final s = context.l10nRead;
-      ScaffoldMessenger.maybeOf(context)
-          ?.showSnackBar(SnackBar(content: Text(s.linkUnsupported)));
+      showToast(s.linkUnsupported);
       return;
     }
     final host = uri.host.toLowerCase().replaceFirst('www.', '');
@@ -516,8 +516,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     if (_joining) return;
     if (!_isJoined && (_registrationClosed || _isFullAtCapacity)) {
       final s = context.l10nRead;
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_isFullAtCapacity ? s.evFull : s.evClosed)));
+      showToast(_isFullAtCapacity ? s.evFull : s.evClosed);
       return;
     }
     if (!_isJoined && (!await ensureCanWrite(context, ModScope.events) || !mounted)) return;
@@ -1305,8 +1304,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     final uri = launchableUri(link.url);
     if (uri == null) {
       final s = context.l10nRead;
-      ScaffoldMessenger.maybeOf(context)
-          ?.showSnackBar(SnackBar(content: Text(s.linkUnsupported)));
+      showToast(s.linkUnsupported);
       return;
     }
     try {
@@ -1376,8 +1374,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
 
     if (choice.withKi && form == null) {
       // There is nothing to ask after check-in yet.
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(s.evNoOpenFormYet)));
+      showToast(s.evNoOpenFormYet);
       _openReportForm();
       return;
     }

@@ -24,6 +24,7 @@ import '../services/club_service.dart';
 import '../services/moderation_service.dart';
 import '../utils/categories.dart';
 import '../widgets/post_as_selector.dart';
+import '../widgets/app_toast.dart';
 
 class CreateEventScreen extends StatefulWidget {
   final Map<String, dynamic>? eventToEdit; 
@@ -218,11 +219,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
   void _showDraftRestored() {
     final s = context.l10nRead;
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-      content: Text(s.draftRestored),
-      action: SnackBarAction(
-        label: s.discard,
-        onPressed: () {
+    showToast(s.draftRestored, actionLabel: s.discard, onAction: () {
           if (!mounted) return;
           setState(() {
             _titleController.clear();
@@ -232,9 +229,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             _categories = [];
           });
           _draft.clear();
-        },
-      ),
-    ));
+        });
   }
 
   late final String _initialSnapshot;
@@ -277,8 +272,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     // every list renders it. (It used to be required, which made a seeded or
     // quickly-created event impossible to open and re-save.)
     if (_categories.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(s.categoryRequired)));
+      showToast(s.categoryRequired);
       return;
     }
     if (!await ensureCanWrite(context, ModScope.events) || !mounted) return;
@@ -380,7 +374,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       }
 
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeWriteError(context, e))));
+      if (mounted) showToast(describeWriteError(context, e));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

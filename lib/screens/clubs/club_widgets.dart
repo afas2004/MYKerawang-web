@@ -5,6 +5,7 @@ import '../../language_cubit.dart';
 import '../../services/club_service.dart';
 import '../../widgets/brand/brand.dart';
 import 'club_strings.dart';
+import '../../widgets/app_toast.dart';
 
 /// Rounded-square club logo with an initial when there's no image.
 /// A club's colour until officers can choose one (that needs a database
@@ -225,15 +226,7 @@ String? handleIssueText(ClubStrings c, HandleIssue? issue) => switch (issue) {
     };
 
 void showClubSnack(BuildContext context, String text, {bool error = false}) {
-  final scheme = Theme.of(context).colorScheme;
-  ScaffoldMessenger.maybeOf(context)
-    ?..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(
-      content: Text(text),
-      backgroundColor: error ? scheme.errorContainer : null,
-      showCloseIcon: error,
-      closeIconColor: error ? scheme.onErrorContainer : null,
-    ));
+  showToast(text, error: true);
 }
 
 /// Plain yes/no confirmation.

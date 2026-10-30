@@ -6,6 +6,7 @@ import '../language_cubit.dart';
 import '../utils/app_nav.dart';
 import '../utils/club_mentions.dart';
 import 'club_mention_chip.dart';
+import 'app_toast.dart';
 
 /// User-written text with tappable `@username` mentions (posts, comments,
 /// event descriptions). Mentions use the primary colour; tapping one looks
@@ -29,8 +30,7 @@ class MentionText extends StatelessWidget {
     if (user != null) {
       context.goUser(user['id']);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10nRead.userNotFound)));
+      showToast(context.l10nRead.userNotFound);
     }
   }
 

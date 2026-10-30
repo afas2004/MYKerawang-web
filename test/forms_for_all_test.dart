@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'helpers/toast_host.dart';
 import 'package:mykerawang/l10n/app_strings.dart';
 import 'package:mykerawang/l10n/form_strings.dart';
 import 'package:mykerawang/language_cubit.dart';
@@ -167,7 +168,7 @@ Future<GoRouter> pump(WidgetTester tester, double width, Widget child,
   ]);
   await tester.pumpWidget(BlocProvider(
     create: (_) => LanguageCubit(),
-    child: MaterialApp.router(
+    child: MaterialApp.router(builder: withToasts, 
       theme: ThemeData(useMaterial3: true),
       darkTheme: ThemeData(useMaterial3: true, brightness: Brightness.dark),
       themeMode: dark ? ThemeMode.dark : ThemeMode.light,

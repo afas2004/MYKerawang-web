@@ -17,6 +17,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 
 /// Clubs: pure rules the UI relies on, and every screen at phone (375)
 /// and desktop (1280) widths with injected data. Overflow fails a test.
+import 'helpers/toast_host.dart';
 void main() {
   const c = ClubStrings.en;
 
@@ -126,7 +127,7 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(BlocProvider(
       create: (_) => LanguageCubit(),
-      child: MaterialApp(home: scaffold ? Scaffold(body: child) : child),
+      child: MaterialApp(builder: withToasts, home: scaffold ? Scaffold(body: child) : child),
     ));
     await tester.pumpAndSettle();
   }

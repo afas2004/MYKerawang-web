@@ -7,6 +7,7 @@ import '../language_cubit.dart';
 import '../services/club_service.dart';
 import '../services/moderation_service.dart';
 import '../services/pinned_posts.dart';
+import '../services/post_service.dart';
 import '../theme/app_icons.dart';
 import '../utils/moderation_logic.dart';
 import 'moderation_ui.dart';
@@ -43,6 +44,15 @@ abstract final class PinActions {
   static bool canPin(Map<String, dynamic> post, String? role) =>
       role == 'admin' || role == 'owner';
 
+  /// After any global pin change: every card showing the post updates at
+  /// once, and the pin bar reloads, so nothing needs a manual refresh.
+  static Future<void> _pinChanged(String id, bool pinned,
+      {bool mandatory = false}) async {
+    PostService.notifyPatched(
+        id, {'is_pinned': pinned, 'pin_mandatory': pinned && mandatory});
+    await PinnedPosts.refresh();
+  }
+
   /// Normal or mandatory? Null when the admin backs out.
   static Future<bool?> _askMandatory(BuildContext context) {
     final s = context.l10nRead;
@@ -71,7 +81,7 @@ abstract final class PinActions {
       BuildContext context, Map<String, dynamic> post, bool mandatory) async {
     try {
       await ModerationService.pin('${post['id']}', mandatory: mandatory);
-      await PinnedPosts.refresh();
+      await _pinChanged('${post['id']}', true, mandatory: mandatory);
     } catch (e) {
       if (context.mounted) showModError(context, e);
     }
@@ -87,13 +97,13 @@ abstract final class PinActions {
         final mandatory = post['pin_mandatory'] == true;
         await ModerationService.unpin(id);
         onChanged?.call(false);
-        await PinnedPosts.refresh();
+        await _pinChanged(id, false);
         if (context.mounted) {
           showModSnack(context, modStrings(context).unpinnedDone,
               onUndo: () async {
             await ModerationService.pin(id, replace: true, mandatory: mandatory);
             onChanged?.call(true);
-            await PinnedPosts.refresh();
+            await _pinChanged(id, true, mandatory: mandatory);
           });
         }
         return false;
@@ -140,14 +150,14 @@ abstract final class PinActions {
       final r =
           await ModerationService.pin(id, replace: replace, mandatory: mandatory);
       onChanged?.call(true);
-      await PinnedPosts.refresh();
+      await _pinChanged(id, true, mandatory: mandatory);
       if (!context.mounted) return true;
       // A mandatory pin has no end date ('infinity' doesn't parse).
       if (mandatory) {
         showModSnack(context, context.l10nRead.pinMandatoryDone, onUndo: () async {
           await ModerationService.unpin(id);
           onChanged?.call(false);
-          await PinnedPosts.refresh();
+          await _pinChanged(id, false);
         });
         return true;
       }
@@ -159,7 +169,7 @@ abstract final class PinActions {
           onUndo: () async {
         await ModerationService.unpin(id);
         onChanged?.call(false);
-        await PinnedPosts.refresh();
+        await _pinChanged(id, false);
       });
       return true;
     } catch (e) {

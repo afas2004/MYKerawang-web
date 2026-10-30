@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../language_cubit.dart';
+import '../widgets/app_toast.dart';
 import 'browser_history_stub.dart'
     if (dart.library.js_interop) 'browser_history_web.dart';
 
@@ -407,10 +408,9 @@ void completePublish(BuildContext context, String location,
     {Object? extra, String? message}) {
   FormGuard.clear();
   notifyContentChanged();
-  final messenger = ScaffoldMessenger.maybeOf(context);
   Router.neglect(context, () => context.pushReplacement(location, extra: extra));
   if (message != null) {
-    messenger?.showSnackBar(SnackBar(content: Text(message)));
+    showToast(message);
   }
 }
 
@@ -419,10 +419,9 @@ void completePublish(BuildContext context, String location,
 void completeEdit(BuildContext context, {String? message}) {
   FormGuard.clear();
   notifyContentChanged();
-  final messenger = ScaffoldMessenger.maybeOf(context);
   appBack(context);
   if (message != null) {
-    messenger?.showSnackBar(SnackBar(content: Text(message)));
+    showToast(message);
   }
 }
 

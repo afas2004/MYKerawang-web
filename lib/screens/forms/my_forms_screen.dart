@@ -14,6 +14,7 @@ import '../../utils/app_nav.dart';
 import '../../utils/feedback.dart';
 import '../../utils/form_rules.dart';
 import '../../utils/responsive.dart';
+import '../../widgets/app_toast.dart';
 
 /// "My forms" (`/forms`): every standalone form the user made, and those of
 /// the clubs they are an officer of. New forms start here; each row opens the
@@ -45,9 +46,7 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
     }
   }
 
-  void _toast(String text) => ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(text)));
+  void _toast(String text) => showToast(text);
 
   void _fail(Object e, VoidCallback retry) => showErrorWithRetry(context, e,
       onRetry: retry, message: context.l10nRead.formServerError(formErrorCode(e)));

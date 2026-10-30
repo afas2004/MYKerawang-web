@@ -18,6 +18,7 @@ import '../widgets/brand/brand.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
 import 'profile_cubit.dart';
+import '../widgets/app_toast.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -126,8 +127,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (issue != null) {
       if (!mounted) return;
       final s = context.l10nRead;
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text(photoProblemText(s, issue))));
+      showToast(photoProblemText(s, issue));
       return;
     }
 
@@ -197,7 +197,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     final s = context.l10nRead;
-    final scheme = Theme.of(context).colorScheme;
 
     setState(() => _isSaving = true);
     final user = Supabase.instance.client.auth.currentUser;
@@ -209,9 +208,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // 1. Check Username Uniqueness
       if (await _isUsernameTaken(newUsername)) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(s.usernameTaken.fill([newUsername]), style: TextStyle(color: scheme.onError)), backgroundColor: scheme.error),
-          );
+          showToast(s.usernameTaken.fill([newUsername]), error: true);
           setState(() => _isSaving = false);
         }
         return;
@@ -272,16 +269,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         // Composer avatar / name elsewhere read from the cubit.
         context.read<ProfileCubit>().loadProfile();
         Navigator.pop(context, true); 
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.profileUpdated)));
+        showToast(s.profileUpdated);
       }
     } on PostgrestException catch (e) {
       // Unique index on username: someone took it between check and save.
       final msg = e.code == '23505'
           ? s.usernameTaken.fill([_usernameCtrl.text.trim().toLowerCase()])
           : s.errorWithDetail.fill([e.message]);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg, style: TextStyle(color: scheme.onError)), backgroundColor: scheme.error));
+      if (mounted) showToast(msg, error: true);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.errorWithDetail.fill([e]), style: TextStyle(color: scheme.onError)), backgroundColor: scheme.error));
+      if (mounted) showToast(s.errorWithDetail.fill([e]), error: true);
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }

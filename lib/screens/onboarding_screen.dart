@@ -8,6 +8,7 @@ import '../l10n/social_strings.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/shell_actions.dart';
 import '../language_cubit.dart';
+import '../widgets/app_toast.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -137,7 +138,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         context.go('/home');
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.errorWithDetail.fill([e]))));
+      if (mounted) showToast(context.l10nRead.errorWithDetail.fill([e]));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -147,7 +148,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     // Validate Step 1 before moving
     if (_step == 0) {
       if (_usernameCtrl.text.isEmpty || _nameCtrl.text.isEmpty || _usernameError != null) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10nRead.fixErrorsFirst)));
+        showToast(context.l10nRead.fixErrorsFirst);
         return;
       }
     }

@@ -13,6 +13,7 @@ import '../../utils/csv_saver.dart';
 import '../../utils/feedback.dart';
 import '../../utils/form_csv.dart';
 import '../../widgets/brand/brand.dart';
+import '../../widgets/app_toast.dart';
 
 /// The door, while it is open.
 ///
@@ -206,8 +207,7 @@ class _AttendanceLiveScreenState extends State<AttendanceLiveScreen> {
         showErrorWithRetry(context, e, onRetry: () => _export(attendance: attendance, ki: ki));
         return;
       }
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(s.evExportFailed)));
+      showToast(s.evExportFailed);
     }
   }
 

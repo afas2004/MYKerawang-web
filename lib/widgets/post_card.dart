@@ -30,6 +30,7 @@ import 'mention_text.dart';
 import 'owner_menu.dart';
 import 'pin_controls.dart';
 import 'save_button.dart';
+import 'app_toast.dart';
 
 /// One post in a feed (or the head of a thread).
 ///
@@ -151,14 +152,12 @@ class _PostCardState extends State<PostCard> {
     final ok = await confirmDelete(context,
         title: ps.deletePost, message: ps.deletePostConfirm);
     if (!ok || !mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
     try {
       await PostService.deletePost(_post);
-      messenger.showSnackBar(SnackBar(content: Text(ps.postDeleted)));
+      showToast(ps.postDeleted);
       widget.onDeleted?.call();
     } catch (e) {
-      messenger.showSnackBar(
-          SnackBar(content: Text(s.errorWithDetail.fill([e]))));
+      showToast(s.errorWithDetail.fill([e]));
     }
   }
 
@@ -208,10 +207,9 @@ class _PostCardState extends State<PostCard> {
   }
 
   Future<void> _copyLink() async {
-    final messenger = ScaffoldMessenger.of(context);
     final s = context.l10nRead;
     await Clipboard.setData(ClipboardData(text: postShareUrl(_post['id'])));
-    messenger.showSnackBar(SnackBar(content: Text(s.linkCopied)));
+    showToast(s.linkCopied);
   }
 
   @override

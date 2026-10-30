@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Create forms autosave their text so a reload (Android discarding the
 /// tab while the camera is open, or the GPU-context recovery reload in
 /// web/index.html) doesn't lose it.
+import 'helpers/toast_host.dart';
 void main() {
   setUp(() => FormDraft.delay = Duration.zero);
 
@@ -46,7 +47,7 @@ void main() {
     });
     await tester.pumpWidget(BlocProvider(
       create: (_) => LanguageCubit(),
-      child: const MaterialApp(home: CreateListingScreen()),
+      child: const MaterialApp(builder: withToasts, home: CreateListingScreen()),
     ));
     await tester.pumpAndSettle();
 

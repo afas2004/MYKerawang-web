@@ -5,6 +5,7 @@ import '../l10n/app_strings.dart';
 import '../l10n/feed_strings.dart';
 import '../utils/moderation_logic.dart';
 import '../widgets/moderation_ui.dart';
+import '../widgets/app_toast.dart';
 
 /// Pinned comments (migration 20261022003200): the post's author, the
 /// event's organiser, or an admin pins up to [kMaxPinnedComments] per
@@ -40,20 +41,15 @@ abstract final class CommentPins {
       BuildContext context, Map<String, dynamic> comment) async {
     final pin = !isCommentPinned(comment);
     final fs = context.feedL10nRead;
-    final messenger = ScaffoldMessenger.of(context);
     try {
       await _rpc('${comment['id']}', pin);
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(
-            content: Text(pin ? fs.commentPinnedToast : fs.commentUnpinnedToast)));
+      showToast(pin ? fs.commentPinnedToast : fs.commentUnpinnedToast);
       return pin;
     } catch (e) {
       final err = parseModError(e);
       if (err?.code == 'comment_pin_limit') {
         final max = err!.detail['max'] ?? kMaxPinnedComments;
-        messenger.showSnackBar(
-            SnackBar(content: Text(fs.commentPinLimit.fill([max]))));
+        showToast(fs.commentPinLimit.fill([max]));
       } else if (context.mounted) {
         showModError(context, e);
       }

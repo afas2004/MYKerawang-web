@@ -26,6 +26,7 @@ import '../widgets/admin_icon_button.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/shell_actions.dart';
 import 'login_cubit.dart';
+import '../widgets/app_toast.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId; 
@@ -157,11 +158,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         setState(() => _loadError = true);
       } else {
         // Keep what's on screen; just say the refresh failed.
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(context.l10nRead.connectionError),
-          action: SnackBarAction(
-              label: context.l10nRead.tryAgain, onPressed: _fetchProfileData),
-        ));
+        showToast(context.l10nRead.connectionError, actionLabel: context.l10nRead.tryAgain, onAction: _fetchProfileData);
       }
     }
   }
@@ -212,8 +209,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           _isFollowing = !_isFollowing;
           _followerCount += _isFollowing ? 1 : -1;
         });
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(context.l10nRead.errorWithDetail.fill([e]))));
+        showToast(context.l10nRead.errorWithDetail.fill([e]));
       }
     }
   }

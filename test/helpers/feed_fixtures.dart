@@ -6,6 +6,7 @@ import 'package:mykerawang/services/moderation_service.dart';
 import 'package:mykerawang/services/post_service.dart';
 import 'package:mykerawang/services/saved_items.dart';
 import 'package:mykerawang/widgets/comment_tile.dart';
+import 'toast_host.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Supabase-free hooks for widgets that read the session (PostCard,
@@ -95,7 +96,7 @@ Future<void> pumpAt(WidgetTester tester, Size size, Widget child) async {
   await tester.pumpWidget(
     BlocProvider(
       create: (_) => LanguageCubit(),
-      child: MaterialApp(home: child),
+      child: MaterialApp(builder: withToasts, home: child),
     ),
   );
   await tester.pump();

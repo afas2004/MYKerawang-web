@@ -49,6 +49,10 @@ class PostService {
   /// post (feed, profile, detail) can update without a refetch.
   static Stream<PostChange> get changes => _changes.stream;
 
+  /// Tells every card showing [postId] that these fields changed.
+  static void notifyPatched(String postId, Map<String, dynamic> patch) =>
+      _changes.add(PostChange.updated(postId, patch));
+
   @visibleForTesting
   static void debugEmit(PostChange change) => _changes.add(change);
 

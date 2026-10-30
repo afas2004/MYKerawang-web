@@ -31,6 +31,7 @@ import 'screens/profile_cubit.dart';
 import 'screens/search_screen.dart';
 import 'screens/login_cubit.dart';
 import 'utils/realtime_gate.dart';
+import 'widgets/app_toast.dart';
 
 /// Lets mouse users drag-scroll lists (like touch), on top of the wheel.
 class AppScrollBehavior extends MaterialScrollBehavior {
@@ -118,7 +119,9 @@ class _MyAppState extends State<MyApp> {
               child: UpdateBanner(
                 // The one ground behind every page (doodle wallpaper).
                 child: KGround(
-                  child: ResponsiveShell(clampMidBand: false, child: child!),
+                  child: AppToastHost(
+                    child: ResponsiveShell(clampMidBand: false, child: child!),
+                  ),
                 ),
               ),
             ),

@@ -14,6 +14,7 @@ import '../../widgets/brand/brand.dart';
 import '../../widgets/error_state.dart';
 import 'club_strings.dart';
 import 'club_widgets.dart';
+import '../../widgets/app_toast.dart';
 
 /// What the manage page can do; injected so tests run without Supabase.
 class ClubManageActions {
@@ -120,8 +121,7 @@ class _ClubManageScreenState extends State<ClubManageScreen> {
     final problem = checkPhoto(img.bytes);
     if (problem == null) return true;
     if (mounted) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text(photoProblemText(context.l10nRead, problem))));
+      showToast(photoProblemText(context.l10nRead, problem));
     }
     return false;
   }
