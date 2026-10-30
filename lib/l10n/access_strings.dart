@@ -403,6 +403,8 @@ extension AccessStrings on AppStrings {
 
   // ---- pin bar ----
   String get pinClose => _t("Close pin", "Tutup pin", "ピンを閉じる");
+  String get pinExpand => _t("Show more", "Tunjuk lagi", "もっと見る");
+  String get pinCollapse => _t("Show less", "Tunjuk kurang", "閉じる");
   String get pinOpenPost => _t("Opens the post", "Buka hantaran", "投稿を開く");
   String get pinChoiceTitle => _t("Pin this post", "Pin hantaran ini", "この投稿をピン留め");
   String get pinNormal => _t("Normal pin", "Pin biasa", "通常のピン");

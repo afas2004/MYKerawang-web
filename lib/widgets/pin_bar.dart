@@ -11,10 +11,10 @@ import 'pin_controls.dart';
 
 /// Home's pins, in their own layer under the header: one row at a time,
 /// swipe between them. The first tap expands a preview, the second opens
-/// the post. Mandatory pins have no close button.
-///
-/// On phones it wears the header's colour and takes over its rounded foot,
-/// so the two read as one piece. Desktop has no band, so it's a quiet strip.
+/// the post, and the chevron folds it back. Mandatory pins have no close
+/// button.
+const _fg = KBand.onBand;
+
 class PinBar extends StatefulWidget {
   final List<Map<String, dynamic>> pins;
   final ValueChanged<Map<String, dynamic>> onOpen;
@@ -33,11 +33,22 @@ class PinBar extends StatefulWidget {
 
 class _PinBarState extends State<PinBar> {
   static const _rowHeight = 48.0;
-  static const _previewHeight = 124.0;
+  static const _previewHeight = 92.0;
+  static const _manageHeight = 124.0;
 
   final _pages = PageController();
   int _page = 0;
   bool _expanded = false;
+  bool _canManage = false;
+
+  @override
+  void initState() {
+    super.initState();
+    ModerationService.myRole().then((role) {
+      final can = PinActions.canPin(const {}, role);
+      if (mounted && can != _canManage) setState(() => _canManage = can);
+    });
+  }
 
   @override
   void didUpdateWidget(PinBar old) {
@@ -67,82 +78,155 @@ class _PinBarState extends State<PinBar> {
   @override
   Widget build(BuildContext context) {
     final desktop = Responsive.isDesktop(context);
-    final scheme = Theme.of(context).colorScheme;
-    final fg = desktop ? scheme.onSurface : KBand.onBand;
     final count = widget.pins.length;
     final current = widget.pins[_page.clamp(0, count - 1)];
     final s = context.l10n;
+    final radius = desktop
+        ? KRadius.card
+        : const BorderRadius.vertical(bottom: Radius.circular(KBand.footRadius));
+    final height = _expanded
+        ? (_canManage ? _manageHeight : _previewHeight)
+        : _rowHeight;
+
+    Widget control(IconData icon, String tooltip, VoidCallback onPressed) =>
+        IconButton(
+          tooltip: tooltip,
+          visualDensity: VisualDensity.compact,
+          icon: Icon(icon, size: 18, color: _fg),
+          onPressed: onPressed,
+        );
+
+    final row = AnimatedContainer(
+      duration: KMotion.of(context).fast,
+      height: height + KSpace.xs,
+      padding: const EdgeInsets.only(left: KSpace.m, right: KSpace.xs),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: _rowHeight, child: Center(child: _PinBadge())),
+          const SizedBox(width: KSpace.s + 2),
+          Expanded(
+            child: PageView.builder(
+              controller: _pages,
+              itemCount: count,
+              onPageChanged: (i) => setState(() {
+                _page = i;
+                _expanded = false;
+              }),
+              itemBuilder: (context, i) => _PinPage(
+                post: widget.pins[i],
+                expanded: _expanded,
+                color: _fg,
+                onTap: () => _tap(widget.pins[i]),
+              ),
+            ),
+          ),
+          SizedBox(
+            height: _rowHeight,
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (count > 1)
+                Padding(
+                  padding: const EdgeInsets.only(left: KSpace.s),
+                  child: Text('${_page + 1}/$count',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: _fg,
+                          fontFeatures: const [FontFeature.tabularFigures()])),
+                ),
+              control(
+                _expanded ? AppIcons.up : AppIcons.down,
+                _expanded ? s.pinCollapse : s.pinExpand,
+                () => setState(() => _expanded = !_expanded),
+              ),
+              if (current['pin_mandatory'] != true)
+                control(AppIcons.close, s.pinClose,
+                    () => widget.onDismiss(current)),
+            ]),
+          ),
+        ],
+      ),
+    );
 
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(
             maxWidth: desktop ? Responsive.feedMaxWidth : double.infinity),
         child: Material(
-          color: desktop
-              ? scheme.surfaceContainerLow
-              : KBand.colorOf(context, KBand.home),
-          shape: RoundedRectangleBorder(
-            borderRadius: desktop
-                ? KRadius.card
-                : const BorderRadius.vertical(
-                    bottom: Radius.circular(KBand.footRadius)),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: AnimatedContainer(
-            duration: KMotion.of(context).fast,
-            height: (_expanded ? _previewHeight : _rowHeight) + KSpace.xs,
-            padding: const EdgeInsets.only(left: KSpace.l, right: KSpace.xs),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          type: MaterialType.transparency,
+          child: ClipRRect(
+            borderRadius: radius,
+            child: Stack(
               children: [
-                SizedBox(
-                  height: _rowHeight,
-                  child: Icon(AppIcons.pin,
-                      size: 16, color: KTokens.of(context).accent),
-                ),
-                const SizedBox(width: KSpace.s),
-                Expanded(
-                  child: PageView.builder(
-                    controller: _pages,
-                    itemCount: count,
-                    onPageChanged: (i) => setState(() {
-                      _page = i;
-                      _expanded = false;
-                    }),
-                    itemBuilder: (context, i) => _PinPage(
-                      post: widget.pins[i],
-                      expanded: _expanded,
-                      color: fg,
-                      onTap: () => _tap(widget.pins[i]),
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  height: _rowHeight,
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    if (count > 1)
-                      Padding(
-                        padding: const EdgeInsets.only(left: KSpace.s),
-                        child: Text('${_page + 1}/$count',
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: fg, fontFeatures: const [
-                              FontFeature.tabularFigures()
-                            ])),
+                const Positioned.fill(child: _PinGround()),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // The header's rounded foot, laid over the bar, so the
+                    // header keeps its shape and the bar reads as its own
+                    // layer tucked beneath it.
+                    if (!desktop)
+                      Container(
+                        height: KBand.footRadius,
+                        decoration: BoxDecoration(
+                          color: KBand.colorOf(context, KBand.home),
+                          borderRadius: const BorderRadius.vertical(
+                              bottom: Radius.circular(KBand.footRadius)),
+                        ),
                       ),
-                    if (current['pin_mandatory'] == true)
-                      const SizedBox(width: KSpace.m)
-                    else
-                      IconButton(
-                        tooltip: s.pinClose,
-                        icon: Icon(AppIcons.close, size: 18, color: fg),
-                        onPressed: () => widget.onDismiss(current),
-                      ),
-                  ]),
+                    row,
+                  ],
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The bar's own ground: a warm gradient, away from the plum header, with a
+/// faint songket star. Decorative, so hidden from screen readers.
+class _PinGround extends StatelessWidget {
+  const _PinGround();
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    Color tone(Color c) => dark ? Color.lerp(c, Colors.black, 0.25)! : c;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [tone(KPalette.jingga), tone(KPalette.merahSaga)],
+        ),
+      ),
+      child: KPattern(
+        kind: KPatternKind.star8,
+        color: _fg.withValues(alpha: 0.1),
+        cell: 30,
+      ),
+    );
+  }
+}
+
+/// A gold disc with the pin, tilted, so the bar reads as a notice at a glance.
+class _PinBadge extends StatelessWidget {
+  const _PinBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 30,
+      height: 30,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: KTokens.of(context).accent,
+        shape: BoxShape.circle,
+      ),
+      child: Transform.rotate(
+        angle: 0.6,
+        child: const Icon(AppIcons.pin, size: 16, color: KPalette.kelabuArang),
       ),
     );
   }

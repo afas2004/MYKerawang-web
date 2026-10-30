@@ -63,17 +63,12 @@ void main() {
     expect(find.text('+2'), findsOneWidget);
   });
 
-  testWidgets('pinned post is an official card labelled Pinned', (tester) async {
+  testWidgets('a pinned post looks like any other card: the pin bar marks it', (tester) async {
     await pumpAt(
       tester,
       kCompact,
       Scaffold(body: PostCard(post: samplePost(pinned: true))),
     );
-    expect(find.text('Pinned'), findsOneWidget);
-    expect(find.widgetWithIcon(KCard, AppIcons.pin), findsOneWidget);
-
-    await pumpAt(tester, kCompact,
-        Scaffold(body: PostCard(post: samplePost(id: 'plain'))));
     expect(find.text('Pinned'), findsNothing);
   });
 

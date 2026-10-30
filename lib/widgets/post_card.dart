@@ -34,8 +34,7 @@ import 'save_button.dart';
 /// Header: avatar · name ✓ @handle · time ········ more (edit/delete or
 /// report, plus pin for those allowed). Then an optional title, the body
 /// with @mentions, hashtags as plain links, photos, a shared event/listing,
-/// and one action row: comment · save · share. Pinned posts are an
-/// official [KCard] with a "Pinned" label.
+/// and one action row: comment · save · share.
 /// Route of a post's page — what every share / copy-link points at.
 String postSharePath(Object id) => '/post/$id';
 
@@ -226,7 +225,6 @@ class _PostCardState extends State<PostCard> {
         .map(normalizeTag)
         .where((t) => t.isNotEmpty)
         .toSet();
-    final pinned = post['is_pinned'] == true;
     final sharedIsEvent = post['events'] != null;
     final Map<String, dynamic>? shared =
         (post['events'] ?? post['listings']) as Map<String, dynamic>?;
@@ -337,8 +335,6 @@ class _PostCardState extends State<PostCard> {
           : const EdgeInsets.symmetric(
               horizontal: KSpace.gutter, vertical: KSpace.m / 2),
       child: KCard(
-        official: pinned,
-        officialLabel: pinned ? context.l10n.mod.pinned : null,
         padding: EdgeInsets.zero,
         onTap: widget.onTap,
         child: content,

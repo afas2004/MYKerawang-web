@@ -37,6 +37,9 @@ void main() {
         'lib/screens/announcements/announcements_screen.dart',
         // The skeleton shimmer sweep.
         'lib/widgets/brand/k_skeleton.dart',
+        // The pin bar's ground: the owner's choice, to set it apart from the
+        // plum header.
+        'lib/widgets/pin_bar.dart',
       }),
       isEmpty,
     );

@@ -48,6 +48,17 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
+  testWidgets('the chevron folds the preview back', (t) async {
+    await pumpAt(t, kCompact, bar([pin('a', mandatory: true)]));
+    await t.tap(find.byTooltip('Show more'));
+    await t.pumpAndSettle();
+    expect(find.text('Body of a'), findsOneWidget);
+    await t.tap(find.byTooltip('Show less'));
+    await t.pumpAndSettle();
+    expect(find.text('Body of a'), findsNothing);
+    expect(t.takeException(), isNull);
+  });
+
   testWidgets('swipe moves to the next pin and the counter follows', (t) async {
     await pumpAt(t, kCompact, bar([pin('a'), pin('b')]));
     expect(find.text('1/2'), findsOneWidget);
@@ -59,9 +70,9 @@ void main() {
 
   testWidgets('a mandatory pin has no close button', (t) async {
     await pumpAt(t, kCompact, bar([pin('a', mandatory: true)]));
-    expect(find.byType(IconButton), findsNothing);
+    expect(find.byTooltip('Close pin'), findsNothing);
     await pumpAt(t, kCompact, bar([pin('b')]));
-    expect(find.byType(IconButton), findsOneWidget);
+    expect(find.byTooltip('Close pin'), findsOneWidget);
   });
 
   for (final size in [kCompact, kExpanded]) {
