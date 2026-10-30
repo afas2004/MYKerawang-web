@@ -210,6 +210,14 @@ class AppStrings {
   final String leavingApp;
   final String externalLinkWarning;
   final String openAnyway;
+
+  /// Shown when a stored link is not a scheme the app will launch
+  /// (`javascript:`, `data:`, `intent:` …).
+  final String linkUnsupported;
+
+  /// Upload refusals, decided on the bytes before anything is sent.
+  final String photoNotImage;
+  final String photoTooLarge;
   final String locationTba;
   final String dateTba;
   final String attendingCount;
@@ -521,6 +529,9 @@ class AppStrings {
     required this.leavingApp,
     required this.externalLinkWarning,
     required this.openAnyway,
+    required this.linkUnsupported,
+    required this.photoNotImage,
+    required this.photoTooLarge,
     required this.locationTba,
     required this.dateTba,
     required this.attendingCount,
@@ -729,7 +740,7 @@ class AppStrings {
     searchEvents: "Search events...",
     eventsTitle: "Events",
     profileTitle: "Profile",
-    threadTitle: "Thread",
+    threadTitle: "Post thread",
     notificationsTitle: "Notifications",
     settingsTitle: "Settings",
     updateAvailable: "A new version of MYKerawang is available",
@@ -815,6 +826,9 @@ class AppStrings {
     leavingApp: "Leaving MYKerawang",
     externalLinkWarning: "This link goes to an external site:\n\n{0}\n\nAre you sure it's safe?",
     openAnyway: "Open anyway",
+    linkUnsupported: "That link cannot be opened.",
+    photoNotImage: "That file is not a photo.",
+    photoTooLarge: "That photo is too large. Pick a smaller one.",
     locationTba: "TBA",
     dateTba: "Date TBA",
     attendingCount: "{0} attending",
@@ -1109,6 +1123,9 @@ class AppStrings {
     leavingApp: "Keluar dari MYKerawang",
     externalLinkWarning: "Pautan ni ke laman luar:\n\n{0}\n\nPasti ia selamat?",
     openAnyway: "Buka juga",
+    linkUnsupported: "Pautan itu tidak boleh dibuka.",
+    photoNotImage: "Fail itu bukan gambar.",
+    photoTooLarge: "Gambar itu terlalu besar. Pilih yang lebih kecil.",
     locationTba: "Belum ditetapkan",
     dateTba: "Tarikh belum ditetapkan",
     attendingCount: "{0} join",
@@ -1317,7 +1334,7 @@ class AppStrings {
     searchEvents: "イベントを検索...",
     eventsTitle: "イベント",
     profileTitle: "プロフィール",
-    threadTitle: "スレッド",
+    threadTitle: "投稿スレッド",
     notificationsTitle: "通知",
     settingsTitle: "設定",
     updateAvailable: "MYKerawangの新しいバージョンがあります",
@@ -1403,6 +1420,9 @@ class AppStrings {
     leavingApp: "MYKerawangを離れます",
     externalLinkWarning: "外部サイトへのリンクです：\n\n{0}\n\n安全ですか？",
     openAnyway: "それでも開く",
+    linkUnsupported: "このリンクは開けません。",
+    photoNotImage: "画像ファイルではありません。",
+    photoTooLarge: "画像が大きすぎます。小さいものを選んでください。",
     locationTba: "未定",
     dateTba: "日程未定",
     attendingCount: "{0}人参加",

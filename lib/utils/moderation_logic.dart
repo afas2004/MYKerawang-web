@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 
+import 'text_rules.dart' show csvSafe;
+
 /// Pure moderation logic: no widgets, no network. The database is the
 /// source of truth (supabase/migrations/20261019004*); this mirrors just
 /// enough of it for the app to explain itself before and after a write.
@@ -211,10 +213,14 @@ String compactAge(Duration d,
 
 /// RFC 4180 CSV. Fields with a comma, quote or newline are quoted, and
 /// quotes doubled. Maps/lists are written as JSON.
+///
+/// A cell that would open as a spreadsheet formula is neutralised first
+/// ([csvSafe]) — these exports carry names and free-text answers typed by
+/// other people.
 String toCsv(List<String> columns, Iterable<Map<String, dynamic>> rows) {
   String cell(Object? v) {
     if (v == null) return '';
-    final s = (v is Map || v is List) ? jsonEncode(v) : '$v';
+    final s = csvSafe((v is Map || v is List) ? jsonEncode(v) : '$v');
     final needsQuotes =
         s.contains(',') || s.contains('"') || s.contains('\n') || s.contains('\r');
     return needsQuotes ? '"${s.replaceAll('"', '""')}"' : s;

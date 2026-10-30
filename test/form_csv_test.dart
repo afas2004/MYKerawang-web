@@ -100,6 +100,21 @@ void main() {
     expect(lines[2], startsWith('B,,'));
   });
 
+  test('an answer that looks like a formula cannot run in a spreadsheet', () {
+    final csv = responsesCsv(fields, [
+      person(answers: const {
+        'f1': '=HYPERLINK("http://example.invalid","click")',
+        'f7': '@SUM(1+1)',
+      }),
+    ]);
+    expect(csv, contains("'=HYPERLINK"));
+    expect(csv, contains("'@SUM(1+1)"));
+    // and a plain negative number is still a number
+    final numbers = responsesCsv(fields, [person(answers: const {'f7': '-5'})]);
+    expect(numbers, contains(',-5'));
+    expect(numbers, isNot(contains("'-5")));
+  });
+
   group('the copied tables', () {
     const ki = [
       KiMean(kiCode: 1, label: 'KI1 Komunikasi', nBefore: 8, meanBefore: 4.5, nAfter: 8, meanAfter: 4.75, delta: 0.25),

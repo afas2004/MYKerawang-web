@@ -10,9 +10,11 @@ import '../utils/announcement_rules.dart';
 import '../utils/app_nav.dart';
 import '../utils/formatters.dart';
 import '../utils/local_image.dart';
+import '../utils/photo_rules.dart';
 import '../widgets/announcement_view.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/media_picker_grid.dart';
+import '../widgets/mention_input.dart';
 import '../widgets/restriction_gate.dart';
 
 /// Composer for announcements (/create/announcement, and
@@ -44,7 +46,7 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
       ? AnnouncementDraft.fromPost(widget.editPost!)
       : AnnouncementDraft();
   late final _title = TextEditingController(text: _d.title);
-  late final _body = TextEditingController(text: _d.body);
+  late final _body = MentionEditingController(text: _d.body);
   final List<_ActionRow> _actions = [];
 
   late final Future<AnnouncePermission> _permission = AnnouncementService.permission();
@@ -110,6 +112,15 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
       );
       if (picked == null) return;
       final img = await LocalImage.fromXFile(picked);
+      final issue = checkPhoto(img.bytes);
+      if (issue != null) {
+        if (mounted) {
+          final s = context.l10nRead;
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+              SnackBar(content: Text(photoProblemText(s, issue))));
+        }
+        return;
+      }
       _set(() => _d.cover
         ..clear()
         ..add(img));
@@ -427,13 +438,18 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
           ),
         ),
         label(a.body),
-        TextField(
+        // "@" and a club's name suggests the club; it goes in as a club
+        // mention, highlighted here and a chip on the page.
+        MentionInput(
           controller: _body,
+          hintText: a.bodyHint,
+          isMultiLine: true,
           minLines: 6,
           maxLines: 20,
           maxLength: kAnnouncementBodyMax,
-          keyboardType: TextInputType.multiline,
-          decoration: InputDecoration(hintText: a.bodyHint, helperText: a.formattingHelp, helperMaxLines: 2),
+          suggestClubs: true,
+          suggestPeople: false,
+          decoration: InputDecoration(hintText: a.bodyHint, helperText: a.formattingHelp, helperMaxLines: 3),
         ),
 
         // Cover

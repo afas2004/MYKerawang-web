@@ -63,7 +63,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final _feeCtrl = TextEditingController();
   final _meritNoteCtrl = TextEditingController();
   final _activityRefCtrl = TextEditingController();
-  final _coOrganiserCtrl = TextEditingController();
+  final _coOrganiserCtrl = MentionEditingController();
   final _picCtrl = TextEditingController();
 
   /// Buttons with links, like an announcement's (max two). Each row keeps its
@@ -98,7 +98,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     
     _titleController = TextEditingController(text: event?['title'] ?? '');
     _locationController = TextEditingController(text: event?['location'] ?? '');
-    _descController = TextEditingController(text: event?['description'] ?? '');
+    _descController = MentionEditingController(text: event?['description'] ?? '');
     _linkController = TextEditingController(text: event?['registration_link'] ?? '');
     
     if (event != null) {
@@ -489,6 +489,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                       controller: _descController,
                       hintText: s.eventDescHint,
                       isMultiLine: true,
+                      suggestClubs: true,
                     ),
                   ),
                   // Same light markup the announcement composer documents:
@@ -559,7 +560,20 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   _label(s.location),
                   _input(_locationController, s.locationHint, validator: _required(s.location)),
                   _label(s.registrationLinkOptional),
-                  _input(_linkController, "https://forms.gle/...", icon: AppIcons.link),
+                  // The registration link is launched from the event page, so
+                  // it has to be an https URL — not `javascript:`.
+                  _input(
+                    _linkController,
+                    "https://forms.gle/...",
+                    icon: AppIcons.link,
+                    validator: (v) {
+                      final text = (v ?? '').trim();
+                      if (text.isEmpty) return null;
+                      return validateHttpsUrl(text) == null
+                          ? null
+                          : context.announceL10nRead.errActionNotHttps;
+                    },
+                  ),
                 ],
               ),
               FormSection(
@@ -629,8 +643,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   ],
                   const SizedBox(height: 12),
                   // "Dengan kerjasama": usually a club, sometimes a person.
-                  // Typing suggests both — clubs insert their name (a club has
-                  // no profile to @mention), people insert "@username".
+                  // Typing suggests both — clubs insert a club mention,
+                  // "@[handle]" (a chip on the event page), people "@username".
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(

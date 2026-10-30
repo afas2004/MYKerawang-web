@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // 1. The State
@@ -115,20 +114,9 @@ class ProfileCubit extends Cubit<ProfileState> {
       }
   }
 
-  Future<void> uploadAvatar(XFile imageFile) async {
-    try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) return;
-      emit(state.copyWith(isLoading: true));
-      final fileExt = imageFile.name.split('.').last;
-      final fileName = '${user.id}/avatar_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
-      final bytes = await imageFile.readAsBytes();
-      await _supabase.storage.from('avatars').uploadBinary(fileName, bytes, fileOptions: const FileOptions(upsert: true));
-      final imageUrl = _supabase.storage.from('avatars').getPublicUrl(fileName);
-      await _supabase.from('profiles').update({'avatar_url': imageUrl}).eq('id', user.id);
-      await loadProfile();
-    } catch (e) {
-      emit(state.copyWith(isLoading: false, errorMessage: "Upload failed: $e"));
-    }
-  }
+  // There used to be an uploadAvatar() here that named the object with the
+  // picked file's own extension and set no content type — the one upload path
+  // where a user-supplied string reached a storage key. It was never called;
+  // avatars are uploaded from edit_profile_screen (fixed .jpg name, sniffed
+  // content type). Removed rather than left as a trap.
 }

@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import '../../l10n/moderation_strings.dart';
 import '../../language_cubit.dart';
 import '../../services/club_service.dart';
+import '../../services/admin_unlock.dart';
 import '../../services/moderation_service.dart';
 import '../../utils/app_nav.dart';
 import '../../widgets/brand/brand.dart';
 import '../../widgets/moderation_ui.dart';
 import '../clubs/club_strings.dart';
 import '../clubs/club_widgets.dart';
+import 'admin_lock_screen.dart';
 import 'admin_screen.dart';
 
 /// /admin/clubs/registry — the recognised-club list registration selects
@@ -32,8 +34,26 @@ class ClubRegistryScreen extends StatefulWidget {
 }
 
 class _ClubRegistryScreenState extends State<ClubRegistryScreen> {
-  late final Future<bool> _access = (widget.checkAdmin ?? ModerationService.isAdmin)();
+  late final Future<bool> _access = _checkAccess();
   late Future<List<ClubRegistryEntry>> _future = _load();
+
+  /// The registry is an admin surface like the console, so it asks for the same
+  /// PIN and re-locks on the same idle timer. It used to check `isAdmin` only,
+  /// which let anyone who knew the route edit the recognised-club list.
+  Future<bool> _checkAccess() async {
+    final ok = await (widget.checkAdmin ?? ModerationService.isAdmin)();
+    if (ok) {
+      var configured = false;
+      try {
+        configured = await ModerationService.adminPinConfigured();
+      } catch (_) {
+        // A transient failure must not lock an admin out of the registry.
+        configured = false;
+      }
+      AdminUnlock.instance.setConfigured(configured);
+    }
+    return ok;
+  }
 
   Future<List<ClubRegistryEntry>> _load() => (widget.load ?? ClubService.adminRegistry)();
 
@@ -75,39 +95,65 @@ class _ClubRegistryScreenState extends State<ClubRegistryScreen> {
             body: ModEmptyState(icon: ModIcons.lock, title: m.adminOnly, body: m.adminOnlyBody),
           );
         }
-        return Scaffold(
-          appBar: AppBar(leading: const AppBackButton(), title: Text(c.registryTitle)),
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => _edit(null),
-            icon: const Icon(AppIcons.create),
-            label: Text(c.addRegistryClub),
-          ),
-          body: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, 0),
-                child: Text(
-                  c.registrySub,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+
+        return ListenableBuilder(
+          listenable: AdminUnlock.instance,
+          builder: (context, _) {
+            if (AdminUnlock.instance.configured && !AdminUnlock.instance.unlocked) {
+              return Scaffold(
+                appBar: AppBar(leading: const AppBackButton(), title: Text(c.registryTitle)),
+                body: AdminLockScreen(
+                  unlock: AdminUnlock.instance.unlock,
+                  onUnlocked: () {},
                 ),
-              ),
-              Expanded(
-                child: AdminAsyncList<ClubRegistryEntry>(
-                  future: _future,
-                  onRetry: _reload,
-                  empty: ModEmptyState(icon: AppIcons.people, title: c.registryEmpty),
-                  itemBuilder: (context, e) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: KSpace.xs + 2),
-                    child: ClubRegistryCard(entry: e, onTap: () => _edit(e)),
-                  ),
-                ),
-              ),
-            ],
-          ),
+              );
+            }
+            return _registry(context);
+          },
         );
       },
+    );
+  }
+
+  Widget _registry(BuildContext context) {
+    final c = context.l10n.club;
+    return Scaffold(
+      appBar: AppBar(leading: const AppBackButton(), title: Text(c.registryTitle)),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _edit(null),
+        icon: const Icon(AppIcons.create),
+        label: Text(c.addRegistryClub),
+      ),
+      body: Listener(
+        // Idle timer: touching the list keeps the unlock alive.
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => AdminUnlock.instance.touch(),
+        onPointerSignal: (_) => AdminUnlock.instance.touch(),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, 0),
+              child: Text(
+                c.registrySub,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ),
+            Expanded(
+              child: AdminAsyncList<ClubRegistryEntry>(
+                future: _future,
+                onRetry: _reload,
+                empty: ModEmptyState(icon: AppIcons.people, title: c.registryEmpty),
+                itemBuilder: (context, e) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: KSpace.xs + 2),
+                  child: ClubRegistryCard(entry: e, onTap: () => _edit(e)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

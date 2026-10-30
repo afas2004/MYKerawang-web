@@ -100,6 +100,17 @@ ActionLinkIssue? validateActionLink(String label, String url) {
   if (u.startsWith('/')) {
     return isKnownInternalRoute(u) ? null : ActionLinkIssue.unknownRoute;
   }
+  return validateHttpsUrl(u);
+}
+
+/// The URL half of [validateActionLink], for fields that only hold a link —
+/// an event's registration page, which is launched the same way.
+///
+/// https only: a `javascript:` or `data:` URL in a saved event is code that
+/// runs when a student taps the button.
+ActionLinkIssue? validateHttpsUrl(String url) {
+  final u = url.trim();
+  if (u.isEmpty) return ActionLinkIssue.emptyUrl;
   final uri = Uri.tryParse(u);
   if (uri == null || !uri.hasScheme || uri.host.isEmpty) return ActionLinkIssue.badUrl;
   if (uri.scheme != 'https') return ActionLinkIssue.notHttps;
@@ -163,18 +174,15 @@ bool showInHomeFeed(Map<String, dynamic> post, {DateTime? now}) {
 /// Comments default to on; announcements may turn them off.
 bool commentsEnabled(Map<String, dynamic> post) => post['comments_enabled'] != false;
 
-/// The app bar title of a post's page: the post's own headline, or a
-/// generic label for one that has none.
+/// The app bar title of a post's page: what kind of page it is, never the
+/// post's headline (that is already the first thing in the body).
 ///
-/// [thread] is the fallback for an ordinary post, [announcement] for an
-/// announcement without a headline.
+/// [thread] labels an ordinary post, [announcement] an announcement.
 String postPageTitle(
   Map<String, dynamic> post, {
   required String thread,
   required String announcement,
 }) {
-  final title = '${post['title'] ?? ''}'.trim();
-  if (title.isNotEmpty) return title;
   return post['is_announcement'] == true ? announcement : thread;
 }
 
@@ -234,21 +242,29 @@ class InlineSpan {
   final String text;
   final bool bold;
   final String? url;
-  const InlineSpan(this.text, {this.bold = false, this.url});
+
+  /// Set for a club mention (`@[handle]`, see club_mentions.dart): the handle.
+  final String? club;
+  const InlineSpan(this.text, {this.bold = false, this.url, this.club});
 
   @override
   bool operator ==(Object other) =>
-      other is InlineSpan && other.text == text && other.bold == bold && other.url == url;
+      other is InlineSpan &&
+      other.text == text &&
+      other.bold == bold &&
+      other.url == url &&
+      other.club == club;
   @override
-  int get hashCode => Object.hash(text, bold, url);
+  int get hashCode => Object.hash(text, bold, url, club);
   @override
-  String toString() => 'InlineSpan($text${bold ? ', bold' : ''}${url != null ? ', $url' : ''})';
+  String toString() =>
+      'InlineSpan($text${bold ? ', bold' : ''}${url != null ? ', $url' : ''}${club != null ? ', club $club' : ''})';
 }
 
-final _inline = RegExp(r'\*\*(.+?)\*\*|(https://[^\s)]+)');
+final _inline = RegExp(r'\*\*(.+?)\*\*|(https://[^\s)]+)|@\[([A-Za-z0-9_.\-]+)\]');
 
-/// Splits a line into plain / bold / link runs. Only https links are
-/// linkified (same rule as action buttons).
+/// Splits a line into plain / bold / link / club-mention runs. Only https
+/// links are linkified (same rule as action buttons).
 List<InlineSpan> parseInline(String text) {
   final out = <InlineSpan>[];
   var i = 0;
@@ -256,6 +272,8 @@ List<InlineSpan> parseInline(String text) {
     if (m.start > i) out.add(InlineSpan(text.substring(i, m.start)));
     if (m.group(1) != null) {
       out.add(InlineSpan(m.group(1)!, bold: true));
+    } else if (m.group(3) != null) {
+      out.add(InlineSpan(m.group(0)!, club: m.group(3)));
     } else {
       var url = m.group(2)!;
       // Trailing punctuation belongs to the sentence, not the link.

@@ -6,6 +6,7 @@ import '../l10n/access_strings.dart';
 import '../language_cubit.dart';
 import 'report_helper.dart';
 import 'app_nav.dart';
+import '../widgets/brand/app_illustration.dart';
 
 /// Shared links open read-only for visitors who aren't logged in
 /// (/event, /item, /post, /u). These helpers gate the actions on those
@@ -50,6 +51,7 @@ bool requireLogin(BuildContext context) {
   showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
+      icon: const AppIllustration(AppIllo.guestGate, size: 160),
       title: Text(s.guestPromptTitle),
       content: Text(s.guestPromptBody),
       actions: [

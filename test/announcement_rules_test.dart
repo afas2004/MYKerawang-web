@@ -99,17 +99,11 @@ void main() {
     String title(Map<String, dynamic> post) =>
         postPageTitle(post, thread: 'Thread', announcement: 'Announcement');
 
-    test('the headline leads, for announcements and posts alike', () {
-      expect(title({'title': 'Kelas tambahan'}), 'Kelas tambahan');
+    test('names the kind of page, not the headline', () {
+      expect(title({'title': 'Kelas tambahan'}), 'Thread');
       expect(title({'title': 'Kelas tambahan', 'is_announcement': true}),
-          'Kelas tambahan');
-    });
-
-    test('untrimmed and missing headlines fall back by kind', () {
-      expect(title({'title': '   '}), 'Thread');
-      expect(title({'title': null}), 'Thread');
+          'Announcement');
       expect(title({}), 'Thread');
-      expect(title({'is_announcement': true}), 'Announcement');
       expect(title({'is_announcement': true, 'title': '  '}), 'Announcement');
     });
   });

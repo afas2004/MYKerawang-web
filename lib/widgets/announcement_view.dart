@@ -12,6 +12,7 @@ import '../utils/announcement_rules.dart';
 import '../utils/formatters.dart';
 import '../utils/local_image.dart';
 import 'brand/brand.dart';
+import 'club_mention_chip.dart';
 import 'embed_card.dart';
 
 // ---------------------------------------------------------------- links
@@ -47,7 +48,7 @@ Future<void> openAnnouncementLink(BuildContext context, String url) async {
 // ---------------------------------------------------------------- body
 
 /// Light-formatted body: paragraphs, bullets, **bold**, tappable https
-/// links (through [openAnnouncementLink]).
+/// links (through [openAnnouncementLink]) and club mentions as chips.
 class FormattedBody extends StatelessWidget {
   final String text;
   final TextStyle? style;
@@ -64,7 +65,15 @@ class FormattedBody extends StatelessWidget {
           style: base,
           children: [
             for (final span in parseInline(line))
-              if (span.url != null)
+              if (span.club != null)
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.middle,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 1),
+                    child: ClubMentionChip(span.club!, style: base),
+                  ),
+                )
+              else if (span.url != null)
                 TextSpan(
                   text: span.text,
                   style: TextStyle(

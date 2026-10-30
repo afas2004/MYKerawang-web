@@ -1,26 +1,38 @@
 # Illustrations
 
-All SVGs in this folder are from **unDraw** by Katerina Limpitsouni —
-https://undraw.co — downloaded 2026-10-19.
+The scenes in `AppIllustration` (`lib/widgets/brand/app_illustration.dart`)
+are composed in code from the files below plus the stitch motifs in
+`assets/brand/motifs/` (see `assets/brand/LICENSE.md`). Downloaded 2026-10-28.
 
-unDraw's licence (https://undraw.co/license) grants free use of the
-illustrations, commercial and non-commercial, with no attribution
-required; modification is allowed. You may not redistribute them as an
-illustration pack / competing service. This repo uses them as UI assets
-only, which is within those terms.
+The files were slimmed for bundling (comments and editor metadata removed,
+path numbers rounded to one decimal). Colours are swapped at runtime:
+black ink → theme text, white fill → surface, Open Doodles pink → accent.
 
-The accent colour `#6c63ff` (and, in the dark theme, the ink / light-grey
-tones) is replaced at runtime by `AppIllustration`
-(`lib/widgets/brand/app_illustration.dart`) so the art follows the active
-theme. The files themselves are unmodified.
+## people/ — Open Peeps and Open Doodles, by Pablo Stanley
 
-| File                    | unDraw source                 | Used for (AppIllo)   |
-|-------------------------|-------------------------------|----------------------|
-| empty_feed.svg          | add-post_prex                 | emptyFeed            |
-| empty_market.svg        | empty-cart_574u               | emptyMarket          |
-| no_events.svg           | events-calendar_sudy          | noEvents             |
-| no_notifications.svg    | empty-mailbox_ef0e            | noNotifications      |
-| no_results.svg          | file-searching_yska           | noResults            |
-| welcome.svg             | welcome-aboard_y4e9           | welcome              |
-| login.svg               | login_weas                    | login                |
-| offline.svg             | no-signal_nqfa                | offline              |
+- https://www.openpeeps.com — CC0 1.0 (public domain)
+- https://www.opendoodles.com — CC0 1.0 (public domain)
+
+No attribution required; credited anyway in the app's licences page.
+
+| File | Source |
+|---|---|
+| peep-63.svg, peep-72.svg | Open Peeps "Grab and go" busts (hijab) |
+| peep-standing-5.svg | Open Peeps standing (hijab) |
+| peep-standing-12/16/20/22/26.svg | Open Peeps standing |
+| peep-sitting-2.svg, peep-sitting-14.svg | Open Peeps sitting |
+| doodle-meditating.svg | Open Doodles "meditating" |
+
+## emoji/ — Fluent Emoji (Flat), by Microsoft
+
+- https://github.com/microsoft/fluentui-emoji — MIT License,
+  Copyright (c) Microsoft Corporation.
+
+| File | Fluent name |
+|---|---|
+| magnifier.svg | Magnifying glass tilted left |
+| locked.svg | Locked |
+| woman_headscarf.svg | Woman with headscarf (default tone) |
+| graduation_cap.svg | Graduation cap |
+
+The previous unDraw set was removed on 2026-10-29.

@@ -12,7 +12,8 @@ import '../../utils/app_nav.dart';
 import '../../utils/feedback.dart';
 import '../../utils/form_rules.dart';
 import '../../utils/guest_access.dart';
-import '../../utils/responsive.dart';
+import '../../utils/text_rules.dart';
+import '../../widgets/form_style.dart';
 import '../../widgets/restriction_gate.dart';
 
 /// Filling in an event's form — the KI report survey, in practice.
@@ -20,6 +21,12 @@ import '../../widgets/restriction_gate.dart';
 /// The page is open to guests (they see the questions and a sign-in bar); the
 /// server decides whether an answer is accepted. `form_public()` already
 /// carries the caller's own answer, so re-opening shows what they said.
+///
+/// Layout: the form's own sections are the cards, tinted the same way the
+/// editor tints them (purple before, gold after, teal feedback), so what the
+/// organiser arranged is what the student sees. A rating is five equal
+/// segments rather than a row of chips, and the progress and the submit button
+/// stay together at the bottom.
 class EventFormScreen extends StatefulWidget {
   final String eventId;
 
@@ -47,6 +54,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
   FormView? _view;
   bool _loading = true;
   bool _sending = false;
+  bool _justSent = false;
   bool _noForm = false;
   Object? _error;
 
@@ -96,6 +104,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
       setState(() {
         _view = view;
         _noForm = false;
+        _justSent = false;
         _loading = false;
       });
     } catch (e) {
@@ -221,9 +230,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
       setState(() {
         _view = fresh;
         _sending = false;
+        _justSent = true;
       });
       notifyContentChanged();
-      _toast(context.l10nRead.formAnswerThanks);
     } catch (e) {
       if (!mounted) return;
       setState(() => _sending = false);
@@ -246,7 +255,10 @@ class _EventFormScreenState extends State<EventFormScreen> {
     return Scaffold(
       appBar: appBarConstrained(
         context,
-        maxWidth: Responsive.detailMaxWidth,
+        maxWidth: 760,
+        // Explicit: a form opened from a QR code or a shared link has no page
+        // beneath it, and without this the app bar shows no way up.
+        leading: const AppBackButton(),
         title: Text(
           view?.doc.title ?? s.formAnswerTitle,
           maxLines: 1,
@@ -257,7 +269,11 @@ class _EventFormScreenState extends State<EventFormScreen> {
             IconButton(
               tooltip: s.formEditThis,
               icon: const Icon(AppIcons.edit),
-              onPressed: () => context.push('/event/${widget.eventId}/form/edit'),
+              // Edit *this* form: an event can hold more than one, and the
+              // editor would otherwise open the newest.
+              onPressed: () => context.push(
+                '/event/${widget.eventId}/form/edit?f=${view.doc.id}',
+              ),
             ),
         ],
       ),
@@ -272,105 +288,743 @@ class _EventFormScreenState extends State<EventFormScreen> {
   }
 
   Widget _form(BuildContext context, FormView view) {
-    final s = context.l10n;
     final doc = view.doc;
-    final scheme = Theme.of(context).colorScheme;
+    if (!view.canAnswer) return _Blocked(reason: view.reason);
 
-    if (!view.canAnswer) {
-      return _Blocked(reason: view.reason);
-    }
+    final (done, total) = answerProgress(doc.fields, _answers);
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: Responsive.feedMaxWidth),
+        constraints: const BoxConstraints(maxWidth: 760),
         child: Column(
           children: [
             if (view.answered)
-              _Banner(text: s.formAnswerAlready, icon: AppIcons.check),
-            _Progress(doc: doc, answers: _answers),
+              _Banner(text: context.l10n.formAnswerAlready, icon: AppIcons.check),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.l, KSpace.l, KSpace.xxl),
+                padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, KSpace.xl),
                 children: [
-                  if ((doc.intro ?? '').trim().isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: KSpace.m),
-                      child: Text(
-                        doc.intro!,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(color: scheme.onSurfaceVariant),
-                      ),
-                    ),
-                  for (final f in doc.fields)
-                    Container(
-                      key: f.id == null ? null : _keyFor(f),
-                      child: _FieldInput(
-                        field: f,
-                        value: f.id == null ? null : _answers[f.id],
-                        controller: f.id == null ? null : _textController(f),
-                        focusNode: f.id == null ? null : _focusFor(f),
-                        errorText: _showsError(f)
-                            ? s.formAnswerIssueText(_errors[f.id] ?? '')
-                            : null,
-                        done: _showsDone(f),
-                        enabled: !_sending,
-                        onChanged: (v) {
-                          if (f.id == null) return;
-                          _answers[f.id!] = v;
-                          // Discrete answers are complete the moment they are
-                          // tapped, so they are checked there; a text field is
-                          // not, and waits for blur.
-                          if (f.kind != 'short_text' &&
-                              f.kind != 'long_text' &&
-                              f.kind != 'number' &&
-                              f.kind != 'email' &&
-                              f.kind != 'phone' &&
-                              f.kind != 'student_id') {
-                            _check(f);
-                          } else if (_errors.containsKey(f.id)) {
-                            _check(f);
-                          } else {
-                            setState(() {});
-                          }
-                        },
-                        onText: (v) {
-                          if (f.id == null) return;
-                          _answers[f.id!] = v;
-                          // Hybrid timing: once a field has an error, it clears
-                          // as soon as the input becomes valid.
-                          if (_errors.containsKey(f.id)) _check(f);
-                        },
-                      ),
-                    ),
+                  _head(context, doc, done, total),
+                  if (_justSent)
+                    _SuccessCard(onEdit: () => setState(() => _justSent = false))
+                  else
+                    for (final section in _sections(doc.fields)) _sectionCard(context, section),
                 ],
               ),
             ),
-            SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.s, KSpace.l, KSpace.m),
-                child: FilledButton(
-                  onPressed: _sending ? null : _submit,
-                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-                  child: _sending
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2.5))
-                      : Text(view.answered ? s.formAnswerUpdate : s.formAnswerSend),
-                ),
-              ),
-            ),
+            if (!_justSent) _bottomBar(context, doc, done, total),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _head(BuildContext context, FormDoc doc, int done, int total) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final intro = (doc.intro ?? '').trim();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(KSpace.xs, 0, KSpace.xs, KSpace.l),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            doc.title,
+            style: Theme.of(context)
+                .textTheme
+                .headlineSmall
+                ?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.2),
+          ),
+          if (intro.isNotEmpty) ...[
+            const SizedBox(height: KSpace.xs),
+            Text(
+              intro,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+          ],
+          const SizedBox(height: KSpace.l),
+          Row(
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: KRadius.pill,
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: total == 0 ? 0 : done / total),
+                    duration: const Duration(milliseconds: 350),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, v, _) => LinearProgressIndicator(
+                      value: v,
+                      minHeight: 6,
+                      backgroundColor: scheme.surfaceContainerHighest,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: KSpace.m),
+              Text(
+                s.formAnswerProgress(done, total),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _bottomBar(BuildContext context, FormDoc doc, int done, int total) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final missing = missingRequired(doc.fields, _answers).length;
+    final answered = _view?.answered ?? false;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        border: Border(top: BorderSide(color: scheme.outlineVariant)),
+      ),
+      padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, KSpace.m),
+      child: SafeArea(
+        top: false,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final info = Text(
+              missing == 0 ? s.formAllAnswered : s.formRequiredLeft(missing),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+            );
+            final button = FilledButton(
+              onPressed: _sending ? null : _submit,
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+              child: _sending
+                  ? const SizedBox(
+                      width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5))
+                  : Text(answered ? s.formAnswerUpdate : s.formAnswerSend),
+            );
+
+            // Phones get the button full width under the count, so a long
+            // label ("Update answers") cannot squeeze the button.
+            if (constraints.maxWidth < 420) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  info,
+                  const SizedBox(height: KSpace.s),
+                  button,
+                ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(child: info),
+                const SizedBox(width: KSpace.m),
+                button,
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionCard(BuildContext context, _Section section) {
+    final scheme = Theme.of(context).colorScheme;
+    final style = AnalysisStyle.of(context, _laneAnalysis(section));
+    final head = section.head;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: KSpace.l),
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLowest,
+          borderRadius: KRadius.card,
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (head != null)
+              Container(
+                padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, KSpace.m),
+                decoration: BoxDecoration(
+                  color: style.soft,
+                  border: Border(left: BorderSide(color: style.accent, width: 3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      head.label,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    if ((head.help ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(head.help!, style: Theme.of(context).textTheme.bodySmall),
+                    ],
+                  ],
+                ),
+              ),
+            for (var i = 0; i < section.fields.length; i++) ...[
+              if (i > 0) Divider(height: 1, color: scheme.outlineVariant),
+              _answerFor(context, section.fields[i]),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The analysis tag of the section: its first tagged question.
+  String? _laneAnalysis(_Section section) {
+    for (final f in section.fields) {
+      if (f.analysis != null) return f.analysis;
+    }
+    return null;
+  }
+
+  Widget _answerFor(BuildContext context, FormFieldSpec field) {
+    final s = context.l10n;
+    return Container(
+      key: field.id == null ? null : _keyFor(field),
+      padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m + 2, KSpace.l, KSpace.m + 2),
+      child: _AnswerField(
+        field: field,
+        value: field.id == null ? null : _answers[field.id],
+        controller: field.id == null ? null : _textController(field),
+        focusNode: field.id == null ? null : _focusFor(field),
+        errorText: _showsError(field) ? s.formAnswerIssueText(_errors[field.id] ?? '') : null,
+        done: _showsDone(field),
+        enabled: !_sending,
+        onChanged: (v) {
+          if (field.id == null) return;
+          _answers[field.id!] = v;
+          // Discrete answers are complete the moment they are tapped, so they
+          // are checked there; a text field is not, and waits for blur.
+          if (field.kind != 'short_text' &&
+              field.kind != 'long_text' &&
+              field.kind != 'number' &&
+              field.kind != 'email' &&
+              field.kind != 'phone' &&
+              field.kind != 'student_id') {
+            _check(field);
+          } else if (_errors.containsKey(field.id)) {
+            _check(field);
+          } else {
+            setState(() {});
+          }
+        },
+        onText: (v) {
+          if (field.id == null) return;
+          _answers[field.id!] = v;
+          // Hybrid timing: once a field has an error, it clears as soon as the
+          // input becomes valid.
+          if (_errors.containsKey(field.id)) _check(field);
+        },
       ),
     );
   }
 }
 
 // --------------------------------------------------------------------- pieces
+
+/// A card's worth of questions: the heading field and the questions under it.
+class _Section {
+  final FormFieldSpec? head;
+  final List<FormFieldSpec> fields;
+  const _Section(this.head, this.fields);
+}
+
+List<_Section> _sections(List<FormFieldSpec> fields) {
+  final out = <_Section>[];
+  FormFieldSpec? head;
+  var items = <FormFieldSpec>[];
+  for (final f in fields) {
+    if (f.kind == 'heading') {
+      if (head != null || items.isNotEmpty) out.add(_Section(head, items));
+      head = f;
+      items = [];
+    } else {
+      items.add(f);
+    }
+  }
+  if (head != null || items.isNotEmpty) out.add(_Section(head, items));
+  return out;
+}
+
+/// One question, rendered by kind. Keeps the state in the parent so a submit
+/// can read it all at once.
+class _AnswerField extends StatelessWidget {
+  final FormFieldSpec field;
+  final dynamic value;
+  final TextEditingController? controller;
+  final FocusNode? focusNode;
+
+  /// Shown under the field once it has been touched; null while pristine.
+  final String? errorText;
+
+  /// A required field that is answered — a tick, not just an absent error.
+  final bool done;
+  final bool enabled;
+  final ValueChanged<dynamic> onChanged;
+  final ValueChanged<String> onText;
+
+  const _AnswerField({
+    required this.field,
+    required this.value,
+    required this.controller,
+    this.focusNode,
+    this.errorText,
+    this.done = false,
+    required this.enabled,
+    required this.onChanged,
+    required this.onText,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final s = context.l10n;
+    final label = field.required && field.kind != 'heading'
+        ? '${field.label} *'
+        : field.label;
+    final error = errorText;
+
+    // The label is a label, not a placeholder: it stays above the control.
+    final header = Padding(
+      padding: const EdgeInsets.only(bottom: KSpace.s),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+          if (done)
+            Icon(AppIcons.check, size: 17, color: scheme.primary),
+        ],
+      ),
+    );
+
+    final help = (field.help ?? '').isNotEmpty
+        ? Padding(
+            padding: const EdgeInsets.only(bottom: KSpace.s),
+            child: Text(field.help!, style: Theme.of(context).textTheme.bodySmall),
+          )
+        : const SizedBox.shrink();
+
+    final problem = error == null
+        ? const SizedBox.shrink()
+        : Padding(
+            padding: const EdgeInsets.only(top: KSpace.s),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(AppIcons.warning, size: 13, color: scheme.error),
+                const SizedBox(width: KSpace.xs),
+                Expanded(
+                  child: Text(
+                    error,
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: scheme.error),
+                  ),
+                ),
+              ],
+            ),
+          );
+
+    Widget body;
+    switch (field.kind) {
+      case 'rating':
+        body = _Scale(
+          field: field,
+          value: value,
+          enabled: enabled,
+          onChanged: onChanged,
+        );
+
+      case 'single_choice':
+        body = Wrap(
+          spacing: KSpace.s,
+          runSpacing: KSpace.s,
+          children: [
+            for (final choice in field.choices)
+              _ChoicePill(
+                key: ValueKey('choice-${field.id}-$choice'),
+                label: choice,
+                selected: value == choice,
+                enabled: enabled,
+                onTap: () => onChanged(choice),
+              ),
+          ],
+        );
+
+      case 'multi_choice':
+        final picked = value is List ? List<String>.from(value as List) : <String>[];
+        body = Wrap(
+          spacing: KSpace.s,
+          runSpacing: KSpace.s,
+          children: [
+            for (final choice in field.choices)
+              _ChoicePill(
+                key: ValueKey('choice-${field.id}-$choice'),
+                label: choice,
+                selected: picked.contains(choice),
+                enabled: enabled,
+                onTap: () {
+                  final next = List<String>.from(picked);
+                  if (next.contains(choice)) {
+                    next.remove(choice);
+                  } else {
+                    next.add(choice);
+                  }
+                  onChanged(next);
+                },
+              ),
+          ],
+        );
+
+      case 'consent':
+        body = _ChoicePill(
+          key: ValueKey('consent-${field.id}'),
+          label: s.formAgree,
+          selected: value == true,
+          enabled: enabled,
+          onTap: () => onChanged(value != true),
+        );
+
+      case 'long_text':
+        body = TextField(
+          key: ValueKey('input-${field.id}'),
+          controller: controller,
+          focusNode: focusNode,
+          enabled: enabled,
+          minLines: 4,
+          maxLines: 8,
+          // The counter stays visible here: a long answer is the one place a
+          // limit is worth watching while typing.
+          maxLength: kLongAnswerMax,
+          onChanged: onText,
+          decoration: _decoration(context, error, hintText: ''),
+        );
+
+      case 'date':
+        body = InkWell(
+          onTap: enabled ? () => _pickDate(context) : null,
+          borderRadius: KRadius.input,
+          child: InputDecorator(
+            decoration: _decoration(context, error).copyWith(
+              suffixIcon: const Icon(AppIcons.calendar, size: 18),
+            ),
+            child: Text(
+              (value as String?)?.isNotEmpty == true ? value as String : '—',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+        );
+
+      default:
+        final keyboard = switch (field.kind) {
+          'number' || 'phone' || 'student_id' => TextInputType.number,
+          'email' => TextInputType.emailAddress,
+          _ => TextInputType.text,
+        };
+        final formatters = switch (field.kind) {
+          'student_id' => [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(12),
+            ],
+          'number' => [FilteringTextInputFormatter.allow(RegExp(r'[0-9.\-]'))],
+          _ => null,
+        };
+        body = TextField(
+          key: ValueKey('input-${field.id}'),
+          controller: controller,
+          focusNode: focusNode,
+          enabled: enabled,
+          keyboardType: keyboard,
+          inputFormatters: formatters,
+          // Mirrors submit_form_response: 200 for a one-line answer.
+          maxLength: kShortAnswerMax,
+          buildCounter: quietCounter,
+          onChanged: onText,
+          decoration: _decoration(context, error, hintText: field.kind == 'email' ? 'name@example.com' : ''),
+        );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [header, help, body, problem],
+    );
+  }
+
+  InputDecoration _decoration(BuildContext context, String? error, {String? hintText}) {
+    final scheme = Theme.of(context).colorScheme;
+    return InputDecoration(
+      isDense: true,
+      hintText: (hintText ?? '').isEmpty ? null : hintText,
+      filled: true,
+      fillColor: scheme.surfaceContainerLowest,
+      contentPadding: const EdgeInsets.symmetric(horizontal: KSpace.m, vertical: KSpace.m),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: KRadius.input,
+        borderSide: BorderSide(color: error == null ? scheme.outlineVariant : scheme.error),
+      ),
+      disabledBorder: OutlineInputBorder(
+        borderRadius: KRadius.input,
+        borderSide: BorderSide(color: scheme.outlineVariant),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: KRadius.input,
+        borderSide: BorderSide(color: scheme.primary, width: 1.6),
+      ),
+    );
+  }
+
+  Future<void> _pickDate(BuildContext context) async {
+    final now = DateTime.now();
+    final current = DateTime.tryParse((value as String?) ?? '') ?? now;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: DateTime(now.year - 5),
+      lastDate: DateTime(now.year + 5),
+    );
+    if (picked != null) onChanged(picked.toIso8601String().substring(0, 10));
+  }
+}
+
+/// Five equal segments instead of five chips: one tap, no ambiguity about
+/// which number was chosen, and the same size on every row.
+class _Scale extends StatelessWidget {
+  final FormFieldSpec field;
+  final dynamic value;
+  final bool enabled;
+  final ValueChanged<dynamic> onChanged;
+
+  const _Scale({
+    required this.field,
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final numbers = [for (var n = field.min; n <= field.max; n++) n];
+
+    return Row(
+      children: [
+        for (var i = 0; i < numbers.length; i++) ...[
+          if (i > 0) const SizedBox(width: KSpace.xs + 2),
+          Expanded(
+            child: _ScaleButton(
+              key: ValueKey('rate-${field.id}-${numbers[i]}'),
+              value: numbers[i],
+              selected: value == numbers[i],
+              enabled: enabled,
+              primary: scheme.primary,
+              onPrimary: scheme.onPrimary,
+              outline: scheme.outlineVariant,
+              surface: scheme.surfaceContainerLowest,
+              muted: scheme.onSurfaceVariant,
+              onTap: () => onChanged(numbers[i]),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ScaleButton extends StatelessWidget {
+  final int value;
+  final bool selected;
+  final bool enabled;
+  final Color primary;
+  final Color onPrimary;
+  final Color outline;
+  final Color surface;
+  final Color muted;
+  final VoidCallback onTap;
+
+  const _ScaleButton({
+    super.key,
+    required this.value,
+    required this.selected,
+    required this.enabled,
+    required this.primary,
+    required this.onPrimary,
+    required this.outline,
+    required this.surface,
+    required this.muted,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '$value',
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: KRadius.small,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOut,
+          height: 46,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? primary : surface,
+            borderRadius: KRadius.small,
+            border: Border.all(color: selected ? primary : outline),
+          ),
+          child: Text(
+            '$value',
+            style: TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+              color: selected ? onPrimary : muted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A choice as a pill, with a radio dot that reads at a glance.
+class _ChoicePill extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _ChoicePill({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: selected ? scheme.primaryContainer : Colors.transparent,
+      clipBehavior: Clip.antiAlias,
+      shape: StadiumBorder(
+        side: BorderSide(color: selected ? Colors.transparent : scheme.outlineVariant),
+      ),
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        customBorder: const StadiumBorder(),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: KSpace.m + 3, vertical: KSpace.s + 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 15,
+                height: 15,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: selected ? scheme.primary : scheme.outlineVariant,
+                    width: selected ? 4.5 : 1.5,
+                  ),
+                ),
+              ),
+              const SizedBox(width: KSpace.s),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  color: selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The end state: what happened, in one sentence, and a way back in.
+class _SuccessCard extends StatelessWidget {
+  final VoidCallback onEdit;
+  const _SuccessCard({required this.onEdit});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 440),
+        margin: const EdgeInsets.symmetric(vertical: KSpace.xl),
+        padding: const EdgeInsets.all(KSpace.xl),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLowest,
+          borderRadius: KRadius.card,
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(color: scheme.primaryContainer, shape: BoxShape.circle),
+              child: Icon(AppIcons.check, size: 26, color: scheme.onPrimaryContainer),
+            ),
+            const SizedBox(height: KSpace.m),
+            Text(
+              s.formAnswerSentTitle,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: KSpace.xs),
+            Text(
+              s.formAnswerSentBody,
+              textAlign: TextAlign.center,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: KSpace.l),
+            OutlinedButton(onPressed: onEdit, child: Text(s.formEditAnswers)),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _Banner extends StatelessWidget {
   final String text;
@@ -397,311 +1051,6 @@ class _Banner extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-/// How far through the form you are.
-///
-/// The guidance for long forms is a visible progress signal; 28 questions is a
-/// long form, and "7 of 24 answered" is the honest version of it.
-class _Progress extends StatelessWidget {
-  final FormDoc doc;
-  final Map<String, dynamic> answers;
-
-  const _Progress({required this.doc, required this.answers});
-
-  @override
-  Widget build(BuildContext context) {
-    final s = context.l10n;
-    final (done, total) = answerProgress(doc.fields, answers);
-    if (total == 0) return const SizedBox.shrink();
-    final scheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.s, KSpace.l, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0, end: done / total),
-              duration: const Duration(milliseconds: 350),
-              curve: Curves.easeOutCubic,
-              builder: (context, v, _) => LinearProgressIndicator(
-                value: v,
-                minHeight: 6,
-                backgroundColor: scheme.surfaceContainerHighest,
-              ),
-            ),
-          ),
-          const SizedBox(height: KSpace.xs),
-          Text(
-            s.formAnswerProgress(done, total),
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: scheme.onSurfaceVariant),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// One question, rendered by kind. Keeps the state in the parent so a submit
-/// can read it all at once.
-class _FieldInput extends StatelessWidget {
-  final FormFieldSpec field;
-  final dynamic value;
-  final TextEditingController? controller;
-  final FocusNode? focusNode;
-
-  /// Shown under the field once it has been touched; null while pristine.
-  final String? errorText;
-
-  /// A required field that is answered — a tick, not just an absent error.
-  final bool done;
-  final bool enabled;
-  final ValueChanged<dynamic> onChanged;
-  final ValueChanged<String> onText;
-
-  const _FieldInput({
-    required this.field,
-    required this.value,
-    required this.controller,
-    this.focusNode,
-    this.errorText,
-    this.done = false,
-    required this.enabled,
-    required this.onChanged,
-    required this.onText,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final label = field.label + (field.required && field.kind != 'heading' ? ' *' : '');
-
-    if (field.kind == 'heading') {
-      return Padding(
-        padding: const EdgeInsets.only(top: KSpace.l, bottom: KSpace.s),
-        child: Text(
-          field.label,
-          style: Theme.of(context)
-              .textTheme
-              .titleSmall
-              ?.copyWith(fontWeight: FontWeight.w700),
-        ),
-      );
-    }
-
-    final error = errorText;
-    final tick = done
-        ? Padding(
-            padding: const EdgeInsets.only(right: KSpace.s, top: KSpace.xs),
-            child: Icon(AppIcons.check, size: 18, color: scheme.primary),
-          )
-        : null;
-
-    switch (field.kind) {
-      case 'long_text':
-        return Padding(
-          padding: const EdgeInsets.only(bottom: KSpace.m),
-          child: TextField(
-            key: ValueKey('input-${field.id}'),
-            controller: controller,
-            focusNode: focusNode,
-            enabled: enabled,
-            minLines: 3,
-            maxLines: 6,
-            onChanged: onText,
-            decoration: InputDecoration(labelText: label, helperText: field.help, errorText: error),
-          ),
-        );
-
-      case 'rating':
-        return Padding(
-          padding: const EdgeInsets.only(bottom: KSpace.m),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: Theme.of(context).textTheme.bodyLarge),
-              if ((field.help ?? '').isNotEmpty)
-                Text(
-                  field.help!,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: scheme.onSurfaceVariant),
-                ),
-              const SizedBox(height: KSpace.xs),
-              Wrap(
-                spacing: KSpace.s,
-                children: [
-                  for (var v = field.min; v <= field.max; v++)
-                    ChoiceChip(
-                      key: ValueKey('rate-${field.id}-$v'),
-                      label: Text('$v'),
-                      selected: value == v,
-                      onSelected: enabled ? (_) => onChanged(v) : null,
-                    ),
-                ],
-              ),
-              if (error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: KSpace.xs),
-                  child: Text(error, style: TextStyle(color: scheme.error, fontSize: 12)),
-                ),
-            ],
-          ),
-        );
-
-      case 'single_choice':
-        return Padding(
-          padding: const EdgeInsets.only(bottom: KSpace.m),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: Theme.of(context).textTheme.bodyLarge),
-              RadioGroup<String>(
-                groupValue: value is String ? value as String : null,
-                onChanged: (v) {
-                  if (enabled) onChanged(v);
-                },
-                child: Column(
-                  children: [
-                    for (final choice in field.choices)
-                      RadioListTile<String>(
-                        key: ValueKey('choice-${field.id}-$choice'),
-                        value: choice,
-                        title: Text(choice),
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                      ),
-                  ],
-                ),
-              ),
-              if (error != null)
-                Text(error, style: TextStyle(color: scheme.error, fontSize: 12)),
-            ],
-          ),
-        );
-
-      case 'multi_choice':
-        final picked = value is List ? List<String>.from(value as List) : <String>[];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: KSpace.m),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: Theme.of(context).textTheme.bodyLarge),
-              for (final choice in field.choices)
-                CheckboxListTile(
-                  value: picked.contains(choice),
-                  onChanged: enabled
-                      ? (on) {
-                          final next = List<String>.from(picked);
-                          if (on == true) {
-                            next.add(choice);
-                          } else {
-                            next.remove(choice);
-                          }
-                          onChanged(next);
-                        }
-                      : null,
-                  title: Text(choice),
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                ),
-              if (error != null)
-                Text(error, style: TextStyle(color: scheme.error, fontSize: 12)),
-            ],
-          ),
-        );
-
-      case 'consent':
-        return Padding(
-          padding: const EdgeInsets.only(bottom: KSpace.m),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CheckboxListTile(
-                value: value == true,
-                onChanged: enabled ? (on) => onChanged(on == true) : null,
-                title: Text(label),
-                subtitle: (field.help ?? '').isEmpty ? null : Text(field.help!),
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-              ),
-              if (error != null)
-                Text(error, style: TextStyle(color: scheme.error, fontSize: 12)),
-            ],
-          ),
-        );
-
-      case 'date':
-        return Padding(
-          padding: const EdgeInsets.only(bottom: KSpace.m),
-          child: InkWell(
-            onTap: enabled ? () => _pickDate(context) : null,
-            child: InputDecorator(
-              decoration: InputDecoration(
-                labelText: label,
-                helperText: field.help,
-                errorText: error,
-                suffixIcon: const Icon(AppIcons.calendar, size: 18),
-              ),
-              child: Text(
-                (value as String?)?.isNotEmpty == true ? value as String : '—',
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-            ),
-          ),
-        );
-
-      default:
-        // short_text, number, email, phone, student_id
-        final keyboard = switch (field.kind) {
-          'number' || 'phone' || 'student_id' => TextInputType.number,
-          'email' => TextInputType.emailAddress,
-          _ => TextInputType.text,
-        };
-        return Padding(
-          padding: const EdgeInsets.only(bottom: KSpace.m),
-          child: TextField(
-            key: ValueKey('input-${field.id}'),
-            controller: controller,
-            focusNode: focusNode,
-            enabled: enabled,
-            keyboardType: keyboard,
-            inputFormatters: field.kind == 'student_id'
-                ? [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(12)]
-                : null,
-            onChanged: onText,
-            decoration: InputDecoration(
-              labelText: label,
-              helperText: field.help,
-              errorText: error,
-              suffixIcon: tick,
-            ),
-          ),
-        );
-    }
-  }
-
-  Future<void> _pickDate(BuildContext context) async {
-    final now = DateTime.now();
-    final current = DateTime.tryParse((value as String?) ?? '') ?? now;
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: current,
-      firstDate: DateTime(now.year - 5),
-      lastDate: DateTime(now.year + 5),
-    );
-    if (picked != null) {
-      onChanged(picked.toIso8601String().substring(0, 10));
-    }
   }
 }
 

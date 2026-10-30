@@ -53,11 +53,13 @@ abstract final class AppIcons {
   static const IconData download = LucideIcons.download;
   static const IconData upload = LucideIcons.upload;
   static const IconData refresh = LucideIcons.refreshCw;
+  static const IconData wifiOff = LucideIcons.wifiOff;
   static const IconData filter = LucideIcons.slidersHorizontal;
   static const IconData sort = LucideIcons.funnel;
   static const IconData grid = LucideIcons.layoutGrid;
   static const IconData list = LucideIcons.list;
   static const IconData check = LucideIcons.check;
+  static const IconData drag = LucideIcons.gripVertical;
 
   // --- Status / meaning ---
   static const IconData pin = LucideIcons.pin;

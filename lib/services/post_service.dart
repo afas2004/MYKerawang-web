@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../utils/image_compressor.dart';
 import '../utils/local_image.dart';
+import '../utils/photo_rules.dart';
 
 /// Something changed about one post: either [deleted], or [patch] holds
 /// the new column values (title, body, tags, image_url, gallery_urls).
@@ -176,6 +177,11 @@ class PostService {
         continue;
       }
       final bytes = await ImageCompressor.compressBytes(item.bytes);
+      // Last gate before the bucket: every picker already checks at pick
+      // time, but a new caller must not be able to skip the sniff/size/pixel
+      // checks by calling this directly.
+      final problem = checkPhoto(bytes);
+      if (problem != null) throw PhotoUploadException(problem);
       final path = 'posts/${stamp}_$i.jpg';
       await _db.storage.from('images').uploadBinary(
             path,

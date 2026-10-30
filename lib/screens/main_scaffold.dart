@@ -268,27 +268,43 @@ class ShellFrame extends StatelessWidget {
         children: [
           // Shared with pushed pages — see AppSidebar / DesktopChrome.
           AppSidebar(selectedIndex: currentIndex, onSelect: onSelect),
+          // Feed and rail are one centred block, so on a wide window the
+          // rail stays beside the feed instead of drifting to the far edge.
           Expanded(
             child: Center(
               child: ConstrainedBox(
-                constraints:
-                    const BoxConstraints(maxWidth: Responsive.feedMaxWidth),
-                child: child,
+                constraints: BoxConstraints(
+                  maxWidth: Responsive.feedMaxWidth +
+                      (showRail ? KSpace.xl + Responsive.rightRailWidth : 0),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: child),
+                    if (showRail) ...[
+                      const SizedBox(width: KSpace.xl),
+                      rightRail ??
+                          RightRail(
+                            showEvents: currentIndex != ShellBranch.events,
+                            showItems: currentIndex != ShellBranch.market,
+                          ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ),
-          if (showRail) rightRail ?? const RightRail(),
         ],
       ),
     );
   }
 }
 
-/// Phone bottom bar in the Material 3 NavigationBar style: Home,
-/// Announcements, Create, Market, Events. Each slot is the same height —
-/// icon in a pill indicator over a label. Create is a filled accent pill in
-/// the middle slot (it opens the create sheet; guests are asked to log in
-/// first). Search has no slot; it's in the tab app bars. Profile is
+/// Phone bottom bar, the foot to the app bar's head: a white bar with softly
+/// rounded top corners. Home, Announcements, Create, Market, Events. The
+/// active tab is plum with a small rounded marigold mark above it; Create is
+/// the MYKerawang logo, big and rising above the bar in the middle slot (it
+/// opens the create sheet; guests are asked to log in first). Search has no slot; it's in the tab app bars. Profile is
 /// reached from [ProfileAvatarAction] in the app bars.
 class CompactNavBar extends StatelessWidget {
   final int currentIndex;
@@ -319,7 +335,12 @@ class CompactNavBar extends StatelessWidget {
       container: true,
       label: s.shell.mainNavigation,
       child: Material(
-        color: scheme.surfaceContainer,
+        color: scheme.surfaceContainerLowest,
+        elevation: 6,
+        shadowColor: scheme.primary.withValues(alpha: 0.25),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
         child: SafeArea(
           top: false,
           child: SizedBox(
@@ -349,6 +370,8 @@ class CompactNavBar extends StatelessWidget {
   }
 }
 
+const double _logoSize = 44;
+
 class _BarItem extends StatelessWidget {
   final IconData icon;
   final IconData selectedIcon;
@@ -372,12 +395,10 @@ class _BarItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final Color? pill = accent
-        ? scheme.primary
-        : (selected ? scheme.primaryContainer : null);
     final Color fg = accent
         ? scheme.onPrimary
-        : (selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant);
+        : (selected ? scheme.primary : scheme.onSurfaceVariant);
+    final motion = KMotion.of(context);
 
     return Semantics(
       button: true,
@@ -395,26 +416,76 @@ class _BarItem extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              AnimatedContainer(
-                duration: KMotion.of(context).medium,
-                curve: KMotion.curve,
-                width: 64,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: pill,
-                  borderRadius: KRadius.pill,
+              if (accent)
+                // Create: the MYKerawang logo, big, rising above the bar. It
+                // keeps the 32 px slot of the tab icons so every label shares
+                // one baseline; the extra height paints upward.
+                SizedBox(
+                  width: 64,
+                  height: 32,
+                  child: OverflowBox(
+                    alignment: Alignment.bottomCenter,
+                    // Loose and square: the slot is 64 wide, the logo isn't.
+                    minWidth: _logoSize,
+                    maxWidth: _logoSize,
+                    minHeight: _logoSize,
+                    maxHeight: _logoSize,
+                    // The logo tile itself, with only a soft shadow behind it.
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(_logoSize * 0.26),
+                        boxShadow: [
+                          BoxShadow(
+                            color: scheme.primary.withValues(alpha: 0.28),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const AppLogo(size: _logoSize),
+                    ),
+                  ),
+                )
+              else
+                SizedBox(
+                  width: 64,
+                  height: 32,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(selected ? selectedIcon : icon, color: fg, size: 22),
+                      // The active tab's soft marigold mark.
+                      Positioned(
+                        top: -5,
+                        child: AnimatedScale(
+                          scale: selected ? 1 : 0,
+                          duration: motion.medium,
+                          curve: KMotion.curve,
+                          child: Container(
+                            width: 14,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: KTokens.of(context).accent,
+                              borderRadius: KRadius.pill,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Icon(selected ? selectedIcon : icon, color: fg, size: 22),
-              ),
               const SizedBox(height: KSpace.xs),
               Text(
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.labelMedium?.copyWith(
-                  color: selected || accent
-                      ? scheme.onSurface
-                      : scheme.onSurfaceVariant,
+                  color: selected
+                      ? scheme.primary
+                      : accent
+                          ? scheme.onSurface
+                          : scheme.onSurfaceVariant,
                   fontWeight:
                       selected || accent ? FontWeight.w600 : FontWeight.w500,
                 ),

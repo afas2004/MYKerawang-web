@@ -7,9 +7,10 @@ import 'transitions.dart';
 export 'app_icons.dart';
 export 'tokens.dart';
 
-/// The three named MYKerawang themes. They share one modern system —
-/// Plus Jakarta Sans, 16-radius cards, stadium buttons, 1px borders, one
-/// amber accent used sparingly — and differ only in palette:
+/// The three named MYKerawang themes. They share one system — Fraunces for
+/// headlines, Plus Jakarta Sans for everything else, 16-radius cards,
+/// stadium buttons, 1px borders, the logo's plum with one marigold accent
+/// used sparingly — and differ only in palette:
 /// Kampus Bold (clean light), Istana Modern (warm light), Songket Noir (dark).
 enum AppTheme { kampus, istana, noir }
 
@@ -39,11 +40,16 @@ class AppThemeSpec {
   /// Sheets, dialogs, menus, pressed fills (tier 2).
   final Color elevated;
 
-  /// Brand purple.
+  /// Brand plum (from the logo).
   final Color primary;
 
-  /// The single accent: prices, verified, pinned. Used sparingly.
+  /// The single accent (the logo's marigold): prices, verified, pinned, and
+  /// the one accent button per screen. Used sparingly.
   final Color gold;
+
+  /// The third analysis colour: programme feedback in the KI form editor and
+  /// answer page, beside [primary] (KI before) and [gold] (KI after).
+  final Color feedback;
 
   final Color text;
 
@@ -61,6 +67,7 @@ class AppThemeSpec {
     required this.elevated,
     required this.primary,
     required this.gold,
+    required this.feedback,
     required this.text,
     required this.textMuted,
     required this.border,
@@ -68,44 +75,47 @@ class AppThemeSpec {
 }
 
 const Map<AppTheme, AppThemeSpec> kThemeSpecs = {
-  // Clean, cool near-white.
+  // Cool near-white; the logo's plum and marigold.
   AppTheme.kampus: AppThemeSpec(
     displayName: "Kampus Bold",
     brightness: Brightness.light,
-    background: Color(0xFFF6F6F9),
+    background: Color(0xFFF6F5F8),
     surface: Color(0xFFFFFFFF),
     elevated: Color(0xFFFFFFFF),
-    primary: Color(0xFF5B3E96),
-    gold: Color(0xFFE9A21B),
-    text: Color(0xFF16141D),
-    textMuted: Color(0xFF5E5A6B),
-    border: Color(0xFFE5E3EC),
+    primary: Color(0xFF5E1A4F),
+    gold: Color(0xFFE07128),
+    feedback: Color(0xFF16786B),
+    text: Color(0xFF22101E),
+    textMuted: Color(0xFF625660),
+    border: Color(0xFFE7E1E6),
   ),
-  // Warm paper tones, same purple.
+  // Warm paper tones, a deeper plum.
   AppTheme.istana: AppThemeSpec(
     displayName: "Istana Modern",
     brightness: Brightness.light,
-    background: Color(0xFFF7F4EE),
+    background: Color(0xFFF7F3EE),
     surface: Color(0xFFFFFDF9),
     elevated: Color(0xFFFFFFFF),
-    primary: Color(0xFF4E3680),
-    gold: Color(0xFFC98A1E),
-    text: Color(0xFF1F1A16),
-    textMuted: Color(0xFF615849),
-    border: Color(0xFFE9E2D6),
+    primary: Color(0xFF55163F),
+    gold: Color(0xFFD0661F),
+    feedback: Color(0xFF146C60),
+    text: Color(0xFF22140F),
+    textMuted: Color(0xFF645549),
+    border: Color(0xFFEAE1D6),
   ),
-  // Near-black, lifted purple for contrast.
+  // Plum-tinted near-black, lifted plum for contrast.
   AppTheme.noir: AppThemeSpec(
     displayName: "Songket Noir",
     brightness: Brightness.dark,
-    background: Color(0xFF0F0E13),
-    surface: Color(0xFF18171E),
-    elevated: Color(0xFF221F2A),
-    primary: Color(0xFFA48BEA),
-    gold: Color(0xFFE8C062),
-    text: Color(0xFFF1EFF6),
-    textMuted: Color(0xFFA9A4B8),
-    border: Color(0xFF2B2833),
+    background: Color(0xFF130C11),
+    surface: Color(0xFF1D141A),
+    elevated: Color(0xFF271C24),
+    primary: Color(0xFFD9A0C8),
+    gold: Color(0xFFF29550),
+    feedback: Color(0xFF6FD3C4),
+    text: Color(0xFFF3EAF0),
+    textMuted: Color(0xFFB7A6B1),
+    border: Color(0xFF33252E),
   ),
 };
 
@@ -113,6 +123,22 @@ const Map<AppTheme, AppThemeSpec> kThemeSpecs = {
 /// Plus Jakarta Sans (layout is otherwise identical).
 @visibleForTesting
 bool debugUseSystemFonts = false;
+
+/// Requests the theme's web fonts and waits for them (at most [timeout])
+/// before the app's first frame; the HTML splash covers the wait.
+///
+/// Text laid out before a font arrives keeps the fallback font's size in
+/// places that measure once — chips lost the last letter of their label —
+/// and the page visibly swapped fonts a moment after it appeared.
+Future<void> preloadThemeFonts({Duration timeout = const Duration(seconds: 2)}) async {
+  if (debugUseSystemFonts) return;
+  buildAppTheme(AppTheme.values.first); // asks GoogleFonts for every style
+  try {
+    await GoogleFonts.pendingFonts().timeout(timeout);
+  } catch (_) {
+    // Slow or offline: start anyway; AfterFontsLoad re-measures chip rows.
+  }
+}
 
 /// Nudges [fg]'s lightness away from [bg] until the pair reaches [min]
 /// contrast (WCAG). Keeps hue, so brand colours stay recognisable.
@@ -202,24 +228,32 @@ ThemeData buildAppTheme(AppTheme theme) {
     cardBorder: spec.border,
     cardBorderHover: Color.lerp(spec.border, spec.textMuted, 0.35)!,
     skeletonBase: fillHigh,
-    skeletonHighlight: spec.surface,
+    // The shimmer sweep carries a little plum instead of plain white/grey.
+    skeletonHighlight: Color.alphaBlend(
+        primary.withValues(alpha: isDark ? 0.14 : 0.08), spec.surface),
+    feedback: _ensureOnBoth(spec.feedback, spec.background, spec.surface, 4.5),
+    onAccent: _onColor(spec.gold),
   );
 
   final base = ThemeData(useMaterial3: true, colorScheme: scheme);
 
-  // One family for everything; hierarchy comes from size and weight.
+  // Two families: Fraunces (a soft serif) for display, headline and the
+  // large title — page names, empty-state titles, the wordmark — and
+  // Plus Jakarta Sans for everything people read or tap.
   final t = debugUseSystemFonts
       ? base.textTheme
       : GoogleFonts.plusJakartaSansTextTheme(base.textTheme);
+  TextStyle? display(TextStyle? s) =>
+      debugUseSystemFonts || s == null ? s : GoogleFonts.fraunces(textStyle: s);
   final textTheme = t
       .copyWith(
-        displayLarge: t.displayLarge?.copyWith(fontSize: 40, fontWeight: FontWeight.w700, letterSpacing: -0.8),
-        displayMedium: t.displayMedium?.copyWith(fontSize: 34, fontWeight: FontWeight.w700, letterSpacing: -0.6),
-        displaySmall: t.displaySmall?.copyWith(fontSize: 30, fontWeight: FontWeight.w700, letterSpacing: -0.4),
-        headlineLarge: t.headlineLarge?.copyWith(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.4),
-        headlineMedium: t.headlineMedium?.copyWith(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.3),
-        headlineSmall: t.headlineSmall?.copyWith(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.2),
-        titleLarge: t.titleLarge?.copyWith(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.2),
+        displayLarge: display(t.displayLarge?.copyWith(fontSize: 40, fontWeight: FontWeight.w700, letterSpacing: -0.6, height: 1.1)),
+        displayMedium: display(t.displayMedium?.copyWith(fontSize: 34, fontWeight: FontWeight.w700, letterSpacing: -0.5, height: 1.12)),
+        displaySmall: display(t.displaySmall?.copyWith(fontSize: 30, fontWeight: FontWeight.w700, letterSpacing: -0.3, height: 1.15)),
+        headlineLarge: display(t.headlineLarge?.copyWith(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.3, height: 1.2)),
+        headlineMedium: display(t.headlineMedium?.copyWith(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.2, height: 1.2)),
+        headlineSmall: display(t.headlineSmall?.copyWith(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.2, height: 1.2)),
+        titleLarge: display(t.titleLarge?.copyWith(fontSize: 22, fontWeight: FontWeight.w600, letterSpacing: -0.1, height: 1.25)),
         titleMedium: t.titleMedium?.copyWith(fontSize: 16, fontWeight: FontWeight.w600),
         titleSmall: t.titleSmall?.copyWith(fontSize: 14, fontWeight: FontWeight.w600),
         bodyLarge: t.bodyLarge?.copyWith(fontSize: 16, height: 1.5),
@@ -227,7 +261,7 @@ ThemeData buildAppTheme(AppTheme theme) {
         bodySmall: t.bodySmall?.copyWith(fontSize: 12, height: 1.4, color: muted),
         labelLarge: t.labelLarge?.copyWith(fontSize: 14, fontWeight: FontWeight.w600),
         labelMedium: t.labelMedium?.copyWith(fontSize: 12, fontWeight: FontWeight.w600),
-        labelSmall: t.labelSmall?.copyWith(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.4),
+        labelSmall: t.labelSmall?.copyWith(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.1),
       )
       .apply(bodyColor: spec.text, displayColor: spec.text);
   // apply() overwrote bodySmall's muted colour; restore it.
@@ -259,7 +293,9 @@ ThemeData buildAppTheme(AppTheme theme) {
   return base.copyWith(
     extensions: [tokens],
     textTheme: finalText,
-    scaffoldBackgroundColor: spec.background,
+    // Transparent so the one ground (KGround, behind the router) shows
+    // through every page. Opaque page-coloured fills use colorScheme.surface.
+    scaffoldBackgroundColor: Colors.transparent,
     canvasColor: spec.background,
     cardColor: spec.surface,
     dividerColor: spec.border,
@@ -454,6 +490,11 @@ ThemeData buildAppTheme(AppTheme theme) {
       labelColor: spec.text,
       unselectedLabelColor: muted,
       indicatorColor: primary,
+      // A rounded 3 px bar that slides between tabs.
+      indicator: UnderlineTabIndicator(
+        borderSide: BorderSide(color: primary, width: 3),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+      ),
       dividerColor: spec.border,
       labelStyle: finalText.titleSmall,
       unselectedLabelStyle: finalText.titleSmall,

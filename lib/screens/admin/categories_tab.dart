@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../l10n/access_strings.dart';
-import '../../l10n/app_strings.dart';
 import '../../language_cubit.dart';
 import '../../services/category_service.dart';
 import '../../widgets/brand/brand.dart';

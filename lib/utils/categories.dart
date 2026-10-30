@@ -107,5 +107,15 @@ const List<CategorySeed> kListingCategorySeeds = [
 List<String> get kEventCategorySlugs => [for (final c in kEventCategorySeeds) c.slug];
 List<String> get kListingCategorySlugs => [for (final c in kListingCategorySeeds) c.slug];
 
+/// The chips shown above the event and market lists: the common
+/// categories only (with All, eight chips). The rest stay searchable and,
+/// for the market, in the filter sheet.
+const kCommonEventCategories = [
+  'academic', 'workshop', 'sports', 'religious', 'career', 'volunteering', 'competition',
+];
+const kCommonListingCategories = [
+  'books', 'electronics', 'clothing', 'food', 'room', 'services', 'others',
+];
+
 /// How many categories one post may carry. Mirrors the DB check.
 const kMaxCategoriesPerItem = 5;

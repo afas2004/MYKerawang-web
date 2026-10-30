@@ -284,7 +284,7 @@ class ClubCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClubLogo(url: club.logoUrl, name: club.name, size: 56),
+          ClubLogo(url: club.logoUrl, name: club.name, size: 56, color: clubColor(club)),
           const SizedBox(width: KSpace.m),
           Expanded(
             child: Column(

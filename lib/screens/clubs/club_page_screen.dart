@@ -6,6 +6,7 @@ import '../../language_cubit.dart';
 import '../../l10n/access_strings.dart';
 import '../../services/club_service.dart';
 import '../../utils/app_nav.dart';
+import '../../utils/club_posts.dart';
 import '../../widgets/brand/brand.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/post_card.dart';
@@ -221,7 +222,7 @@ class _ClubPageViewState extends State<ClubPageView> {
                   tabAlignment: TabAlignment.start,
                   tabs: [for (final t in tabs) Tab(text: t)],
                 ),
-                Theme.of(context).scaffoldBackgroundColor,
+                Theme.of(context).colorScheme.surface,
               ),
             ),
           ],
@@ -278,17 +279,11 @@ class _ClubPageViewState extends State<ClubPageView> {
                   height: 140,
                   margin: const EdgeInsets.symmetric(horizontal: KSpace.l),
                   decoration: BoxDecoration(
-                    color: scheme.primaryContainer,
+                    color: clubColor(club),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   clipBehavior: Clip.antiAlias,
-                  child: club.coverUrl == null
-                      ? null
-                      : CachedNetworkImage(
-                          imageUrl: club.coverUrl!,
-                          fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => const SizedBox.shrink(),
-                        ),
+                  child: ClubCover(club: club),
                 ),
                 Positioned(
                   left: KSpace.xl,
@@ -296,10 +291,10 @@ class _ClubPageViewState extends State<ClubPageView> {
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: theme.scaffoldBackgroundColor,
+                      color: theme.colorScheme.surface,
                       borderRadius: BorderRadius.circular(26),
                     ),
-                    child: ClubLogo(url: club.logoUrl, name: club.name, size: 80),
+                    child: ClubLogo(url: club.logoUrl, name: club.name, size: 80, color: clubColor(club)),
                   ),
                 ),
               ],
@@ -339,17 +334,21 @@ class _ClubPageViewState extends State<ClubPageView> {
                     children: [
                       if (widget.signedIn && club.isActive)
                         Expanded(
-                          child: _following
-                              ? OutlinedButton.icon(
-                                  onPressed: _busy ? null : _toggleFollow,
-                                  icon: const Icon(AppIcons.following, size: 18),
-                                  label: Text(c.following),
-                                )
-                              : FilledButton.icon(
-                                  onPressed: _busy ? null : _toggleFollow,
-                                  icon: const Icon(AppIcons.follow, size: 18),
-                                  label: Text(c.follow),
-                                ),
+                          child: KStampSwitcher(
+                            child: _following
+                                ? OutlinedButton.icon(
+                                    key: const ValueKey('following'),
+                                    onPressed: _busy ? null : _toggleFollow,
+                                    icon: const Icon(AppIcons.following, size: 18),
+                                    label: Text(c.following),
+                                  )
+                                : FilledButton.icon(
+                                    key: const ValueKey('follow'),
+                                    onPressed: _busy ? null : _toggleFollow,
+                                    icon: const Icon(AppIcons.follow, size: 18),
+                                    label: Text(c.follow),
+                                  ),
+                          ),
                         ),
                       if (officer) ...[
                         if (widget.signedIn && club.isActive) const SizedBox(width: KSpace.s),
@@ -465,8 +464,9 @@ class _PostsTab extends StatelessWidget {
       future: future,
       empty: BrandEmptyState(illo: AppIllo.emptyFeed, title: c.noAnnouncements, compact: true),
       builder: (posts) {
-        final pinned = posts.where((p) => p['is_club_pinned'] == true).toList();
-        final rest = posts.where((p) => p['is_club_pinned'] != true).toList();
+        final sections = splitClubPosts(posts);
+        final pinned = sections.pinned;
+        final rest = sections.rest;
         return ListView(
           padding: const EdgeInsets.symmetric(vertical: KSpace.s),
           children: [

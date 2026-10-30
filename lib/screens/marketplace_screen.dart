@@ -7,6 +7,7 @@ import '../l10n/access_strings.dart';
 import '../utils/app_nav.dart';
 import '../utils/guest_access.dart';
 import '../services/unread_notifications.dart';
+import '../widgets/after_fonts_load.dart';
 import '../widgets/profile_avatar_action.dart';
 import '../widgets/shell_actions.dart';
 import '../services/category_service.dart';
@@ -14,6 +15,7 @@ import '../utils/formatters.dart';
 import '../utils/listing_status.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/brand/brand.dart';
+import '../utils/categories.dart' show kCommonListingCategories;
 import 'marketplace_cubit.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
@@ -92,7 +94,9 @@ class _MarketplaceViewState extends State<MarketplaceView>
         return LayoutBuilder(builder: (context, constraints) {
           final sidePanel = constraints.maxWidth >= _kSidePanelFrom;
           return Scaffold(
-            appBar: AppBar(
+            appBar: KBand.appBar(
+              context,
+              tone: KBand.market,
               title: Text(s.marketplaceTitle),
               actions: [
                 const ShellClubsButton(),
@@ -244,7 +248,8 @@ class _MarketplaceViewState extends State<MarketplaceView>
               itemCount: state.items.length,
               itemBuilder: (context, index) {
                 final item = state.items[index];
-                return MarketCard(item: item, onTap: () => context.goItem(item));
+                final card = MarketCard(item: item, onTap: () => context.goItem(item));
+                return index < 8 ? KEntrance(index: index, child: card) : card;
               },
             ),
           ),
@@ -340,11 +345,12 @@ class MarketCard extends StatelessWidget {
                   color: isSold ? scheme.outline : null,
                   colorBlendMode: isSold ? BlendMode.saturation : null,
                   placeholder: (_, __) => ColoredBox(color: scheme.surfaceContainerHighest),
-                  errorWidget: (_, __, ___) => ColoredBox(
-                    color: scheme.surfaceContainerHighest,
-                    child: Center(
-                      child: Icon(AppIcons.photo, color: scheme.onSurfaceVariant, size: 28),
-                    ),
+                  // No photo (or a broken one): a soft wash with one stitch
+                  // drawing, never an empty grey box.
+                  errorWidget: (_, __, ___) => KTintCover(
+                    seed: '${item['id'] ?? title}',
+                    color: KPalette.forKey('${item['id'] ?? title}'),
+                    motifs: KTintCover.listingMotifs,
                   ),
                 ),
                 if (badge != null)
@@ -393,8 +399,16 @@ class _CategoryChipRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final categories = CategoryService.cached('listing');
-    return SizedBox(
+    // The common categories only; a selected one outside them (picked in
+    // the filter sheet) keeps its chip.
+    final all = CategoryService.cached('listing');
+    final categories = [
+      for (final slug in kCommonListingCategories) ...all.where((c) => c.slug == slug),
+      ...all.where((c) => c.slug == selected && !kCommonListingCategories.contains(c.slug)),
+    ];
+    // Rebuilt once the web fonts load, or the labels keep their fallback
+    // width and the last letter fades out.
+    return AfterFontsLoad(child: SizedBox(
       height: 52,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
@@ -421,7 +435,7 @@ class _CategoryChipRow extends StatelessWidget {
           );
         },
       ),
-    );
+    ));
   }
 }
 

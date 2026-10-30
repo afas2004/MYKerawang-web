@@ -8,6 +8,7 @@ library;
 import '../services/form_service.dart';
 import 'form_rules.dart';
 import 'moderation_logic.dart' show toCsv;
+import 'text_rules.dart' show tsvCell;
 
 /// One answer as it should read in a spreadsheet.
 String answerText(FormFieldSpec field, Object? value) {
@@ -94,8 +95,8 @@ String _tsv(List<String> columns, List<List<String>> rows) {
   // No trimRight: a row's trailing empty cells are columns too, and the header
   // is what a spreadsheet aligns against.
   final lines = <String>[
-    columns.join('\t'),
-    for (final r in rows) r.join('\t'),
+    columns.map(tsvCell).join('\t'),
+    for (final r in rows) r.map(tsvCell).join('\t'),
   ];
   return lines.join('\n');
 }

@@ -289,6 +289,11 @@ class FeedView extends StatelessWidget {
   }
 
   /// Centres slivers in a column of at most [Responsive.feedMaxWidth].
+  /// The first cards of the feed fade up in turn on load; the rest just
+  /// appear.
+  static Widget _enter(int index, Widget Function() build) =>
+      index < 6 ? KEntrance(index: index, child: build()) : build();
+
   static Widget _column(Widget sliver) => SliverLayoutBuilder(
         builder: (context, c) {
           final side = ((c.crossAxisExtent - Responsive.feedMaxWidth) / 2)
@@ -308,10 +313,9 @@ class FeedView extends StatelessWidget {
     final size = Responsive.sizeFor(width);
     final railVisible = size.isLarge; // MainScaffold shows the rail here
     final items = buildFeedItems(posts, injectables, inject: !railVisible);
-    final topPadding = MediaQuery.paddingOf(context).top + kToolbarHeight;
+    final topPadding = MediaQuery.paddingOf(context).top + KBand.heightOf(context);
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
       body: LinearRefresher(
         onRefresh: onRefresh,
         offset: topPadding,
@@ -320,15 +324,19 @@ class FeedView extends StatelessWidget {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              SliverAppBar(
-                floating: true,
-                snap: true,
-                title: Text(
+              // Kepala kain: Home's band is plum.
+              KBand.sliverAppBar(
+                context,
+                tone: KBand.home,
+                // Desktop: the sidebar carries the wordmark, so the page
+                // header just names the page.
+                title: size.isExpanded ? Text(s.navHome) : Text(
                   AppStrings.appName,
-                  style: theme.textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w700),
+                  // 20 px so the wordmark fits beside four actions on a
+                  // 360 px phone.
+                  style: theme.textTheme.titleLarge?.copyWith(
+                      fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.3, color: KBand.onBand),
                 ),
-                centerTitle: false,
                 actions: actions,
               ),
 
@@ -365,7 +373,7 @@ class FeedView extends StatelessWidget {
                 else
                   _column(SliverList(
                     delegate: SliverChildBuilderDelegate(
-                      (context, index) {
+                      (context, index) => _enter(index, () {
                         final item = items[index];
                         if (item['type'] == 'event' || item['type'] == 'listing') {
                           final isEvent = item['type'] == 'event';
@@ -389,7 +397,7 @@ class FeedView extends StatelessWidget {
                           post: item,
                           onTap: () => context.goPost(item),
                         );
-                      },
+                      }),
                       childCount: items.length,
                     ),
                   )),

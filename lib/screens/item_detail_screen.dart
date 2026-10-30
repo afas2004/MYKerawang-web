@@ -864,12 +864,13 @@ int _currentImageIndex = 0;
 
     return FilledButton.icon(
       onPressed: isSold ? null : _showPurchaseDialog,
-      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+      // The page's one accent action.
+      style: accentButtonStyle(context, minimumSize: const Size.fromHeight(52)),
       icon: _loadingContact
           ? SizedBox(
               width: 16,
               height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onPrimary))
+              child: CircularProgressIndicator(strokeWidth: 2, color: KTokens.of(context).onAccent))
           : const Icon(AppIcons.comment),
       // Sold = onPressed null, so the theme's disabled colours apply
       label: Text(isSold ? s.sold : s.contactOrBuy),

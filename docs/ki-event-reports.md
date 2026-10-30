@@ -94,7 +94,7 @@ Two things the workbook itself shows, which the design has to respect:
 | **Templates are data, and multiple** | `form_templates` + fields, seeded with the club's KI version now; **another version is a new template row, not a release**. | The owner confirmed versions differ (MPP's is extended). If adding a version needed a deploy, the feature would be useless within a club year. |
 | **The app offers options, not policy** | Three ways in — **blank**, **a template**, or **a pasted question list (CSV)** — and all three land in the same editor. The shipped templates are starting points, never a fixed form. | "We only just give them options. If they want to use templates, they select that and edit." A club that must hand in a slightly different version is the normal case, not the exception. |
 | **A template is copied, then edited** | Picking a template copies its fields into the event's form; every subsequent edit is to that copy. | Nothing a club edits can change the template other clubs see, and a correction to a template cannot rewrite a form that already has answers. |
-| **The editor is deliberately plain** | A list of fields with: label, kind, required, options (for choices), scale (for ratings), analysis tag (for ratings), and move up/down, add, delete. No drag-and-drop, no sections, no live preview beyond opening the draft. | "The editor just simple one." Everything the analyses need is settable; everything that needs a diagram is out. |
+| **The editor is plain, but nothing is hidden** | One list, one row per question, and every setting that row has is on the row: label, kind, counting tag, KI element, scale, required, options. Reorder by drag or by arrows. No sections-as-nesting, no conditional fields. | "The editor just simple one" — but the owner rejected the first version's dialogs: *"hidden options is tiring … someone who edits should know how the field was handled in first glance."* Simple means few concepts, not concealed ones. |
 | **Fields carry an analysis tag** | Each field may be tagged `analysis` = `ki_pre` / `ki_post` / `feedback`, plus `ki_code` 1–7 for the KI ones — and the tag is **editable in the editor**, on the row itself. | This is what makes S1/S2/S3 computable no matter how a version words or orders its questions. Without tags the app would guess from labels — and the source form already has two questions numbered "6)". |
 | **Ratings are a first-class field kind** | `kind = 'rating'`, with `options {"min":1,"max":5}`. Not a bare number field. | The analysis is means of 1–5 ratings; a generic number field would let 7 and 0 into the average. |
 | **Who answers** | **Students answer for themselves** (owner's decision). The role — Peserta or Penganjur — is **derived**: club officer or event committee → Penganjur, otherwise Peserta, correctable by the respondent. | The Google Form asked, and 5 of 13 respondents said Penganjur. Deriving removes a question and a class of error; the overview still needs an override because a committee member may attend as a participant. |
@@ -206,6 +206,32 @@ server is authoritative; its message is shown as-is through `describeWriteError`
 | Required | present and non-empty; a heading is never required |
 | Analysis tags | `ki_code` only on `ki_pre` / `ki_post`, exactly one per field; `feedback` carries none; at most 7 `ki_pre` and 7 `ki_post` per template |
 
+### Text, cleaned and capped on the way in
+
+`lib/utils/text_rules.dart` is the client half of that contract: the inputs
+enforce the cap while typing, so nobody types 3,000 characters and is told at
+the end. Label 200, title 120, introduction 500, help 300, one choice 60 (at
+most 40 choices). `cleanLine` drops control characters, collapses whitespace
+and trims — a pasted multi-line label cannot become a three-line heading;
+`cleanBlock` keeps paragraphs for the introduction; `cleanChoices` drops
+blanks and duplicates. Both screens and the save path use the same functions.
+
+### What leaves the app is a spreadsheet
+
+Answers are exported as CSV and the S1/S2/S3 tables are copied as TSV, both
+opened in Excel and pasted into Word. A cell starting with `=`, `+`, `-` or `@`
+is a formula there, so every exported cell goes through `csvSafe`: a leading
+apostrophe forces text, except for plain numbers (`-5` stays a number). This
+covers the response CSV, the attendance CSV and the copied tables. It is the
+only injection surface that matters here — Flutter draws text, it does not
+render markup, so answers cannot script the page.
+
+**Not** done on the server: title, introduction, help text and the choice
+strings themselves are stored as sent (the RPC only caps the label and the
+answers). The write path is organiser-only, and the client caps all of them;
+enforcing it against a crafted RPC call would mean another `form_check_field`
+migration.
+
 ## Attendance link: optional
 
 `checkin_with_token` is untouched. When `after_checkin` is on **and** a survey is
@@ -213,23 +239,40 @@ open, the success screen offers it as a skippable next step. Nothing gates.
 
 ## The editor — what "simple" means
 
+Simpler than it was, not smaller in what it shows. The first version put each
+question's settings behind a dialog; the owner's verdict was "hidden options is
+tiring — someone who edits should know how the field was handled in first
+glance". The editor is now a **ledger**: every setting a question has sits on
+its own row, in the same place on every row.
+
 One screen, one list. Opening it asks **what to start from**: blank, a shipped
 template, or a pasted question list. All three produce the same editable list.
 
-Each row:
+Each row, left to right:
 
-| Control | Notes |
-|---|---|
-| Label | the question, 1–200 chars |
-| Kind | short / long text, rating, single choice, multi choice, number, date, email, phone, matric, consent, heading |
-| Required | on/off (never for a heading) |
-| Options | only for choices: add/remove option rows |
-| Scale | only for ratings: min and max (default 1–5) |
-| Analysis | only for ratings: none / KI before / KI after / feedback, plus KI1–KI7 when it is a KI field |
-| Up / Down / Delete | reordering, and removal |
+| Where | Control | Notes |
+|---|---|---|
+| label line | Label | the question, 1–200 chars, edited in place |
+| under the label | Help text | only when it has one, or after "Add help" |
+| control strip | Kind | short / long text, rating, single choice, multi choice, number, date, email, phone, matric, consent, heading |
+| control strip | Analysis | ratings only: none / KI before / KI after / feedback, tinted purple / gold / teal |
+| control strip | KI element | only for a KI tag; defaults to the first free element in that phase |
+| control strip | Scale | ratings only, 1–10 |
+| control strip | Required | a pill that reads "Required" or "Optional" |
+| row edge | Drag / Up / Down / Duplicate / Delete | one group at the card's border: drag the handle, or use the arrows |
 
-Not in it: drag-and-drop, sections, help-text editing, conditional fields,
-duplicate-field, live preview. The published form is the preview.
+A row that is **not** counted in the report says so — a "Not counted" chip in the
+place the analysis pill would be — instead of hiding the control. That was the
+core complaint: absence read as "maybe there is a setting I have not found".
+
+On a wide window the right rail shows what the form *measures* — the KI1–KI7
+before/after grid, the feedback count, S1 pairs complete — and the publish
+checks, all recomputed as you type. On a phone that collapses to one line
+("Ready to publish") or the failing checks.
+
+Not in it: sections as a nesting level (headings are rows, and the lane they
+open is a colour), conditional fields, live preview. Duplicate and drag are in;
+the published form is still the preview.
 
 Pasting a question list is the only bulk path: one question per line, with the
 same columns as `docs/ki-template-fields.csv` (`kind, label, required, options,

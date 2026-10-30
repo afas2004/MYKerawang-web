@@ -39,13 +39,17 @@ class _FollowListScreenState extends State<FollowListScreen> {
         // Get rows where 'following_id' is target. Expand 'follower_id' profile.
         response = await _supabase
             .from('followers')
-            .select('profiles!follower_id(*)') // <--- Magic Line
+            // Name the columns. `profiles!follower_id(*)` returned every column
+            // granted to a signed-in user (full_name, device_id, ban_reason,
+            // last_active_at…) for every follower, while the tile only draws a
+            // name, a handle and an avatar.
+            .select('profiles!follower_id(id, username, display_name, avatar_url)')
             .eq('following_id', widget.userId);
       } else {
         // Get rows where 'follower_id' is target. Expand 'following_id' profile.
         response = await _supabase
             .from('followers')
-            .select('profiles!following_id(*)') // <--- Magic Line
+            .select('profiles!following_id(id, username, display_name, avatar_url)')
             .eq('follower_id', widget.userId);
       }
 

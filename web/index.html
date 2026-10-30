@@ -18,7 +18,7 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="theme-color" content="#F6F6F9">
+  <meta name="theme-color" content="#F6F5F8">
   <meta name="description" content="MYKerawang — community marketplace and events platform.">
 
   <!-- Link previews (WhatsApp, Telegram, X…). Crawlers don't run Flutter,
@@ -29,14 +29,14 @@
   <meta property="og:site_name" content="MYKerawang">
   <meta property="og:title" content="MYKerawang">
   <meta property="og:description" content="Events, marketplace and community posts for the UiTM Kerawang college community.">
-  <meta property="og:image" content="https://mykerawang-app.web.app/icons/Icon-512.png">
+  <meta property="og:image" content="https://kerawang.my/icons/Icon-512.png">
   <meta property="og:image:width" content="512">
   <meta property="og:image:height" content="512">
   <meta property="og:image:alt" content="MYKerawang logo">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="MYKerawang">
   <meta name="twitter:description" content="Events, marketplace and community posts for the UiTM Kerawang college community.">
-  <meta name="twitter:image" content="https://mykerawang-app.web.app/icons/Icon-512.png">
+  <meta name="twitter:image" content="https://kerawang.my/icons/Icon-512.png">
 
   <!-- Open connections early: engine (skwasm/canvaskit), fonts, backend -->
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
@@ -58,26 +58,27 @@
   <!-- Splash: shown while the engine + app download (several seconds on
        mobile data), removed on Flutter's first frame. Background follows the
        saved theme (same values as lib/theme/app_themes.dart) so there's no
-       flash when Flutter paints: plain background, logo, small spinner. -->
+       flash when Flutter paints: plain background, the K tile, and a soft
+       rounded bar that fills while loading (static under reduced motion). -->
   <style>
-    :root { --bg: #F6F6F9; --primary: #5B3E96; --track: rgba(91,62,150,.15); }
-    html[data-theme="istana"] { --bg: #F7F4EE; --primary: #4E3680; --track: rgba(78,54,128,.15); }
-    html[data-theme="noir"]   { --bg: #0F0E13; --primary: #A48BEA; --track: rgba(164,139,234,.18); }
+    :root { --bg: #F6F5F8; --primary: #5E1A4F; --track: rgba(94,26,79,.14); }
+    html[data-theme="istana"] { --bg: #F7F3EE; --primary: #55163F; --track: rgba(85,22,63,.14); }
+    html[data-theme="noir"]   { --bg: #130C11; --primary: #D9A0C8; --track: rgba(217,160,200,.18); }
     html, body { margin: 0; height: 100%; background: var(--bg); }
     #splash {
       position: fixed; inset: 0; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 28px;
       background: var(--bg); transition: opacity .2s ease;
     }
-    #splash img { width: 88px; height: 88px; border-radius: 50%; background: #fff; }
-    #splash .spinner {
-      width: 22px; height: 22px; border-radius: 50%;
-      border: 2.5px solid var(--track); border-top-color: var(--primary);
-      animation: spin .8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    #splash img { width: 88px; height: 88px; border-radius: 22px; background: #fff;
+      box-shadow: 0 1px 0 var(--track); animation: settle .5s cubic-bezier(.2,.8,.2,1) both; }
+    #splash .hem { width: 96px; height: 6px; border-radius: 999px; background: var(--track); position: relative; overflow: hidden; }
+    #splash .hem::after { content: ""; position: absolute; inset: 0; border-radius: 999px; background: var(--primary);
+      transform-origin: left; animation: weave 1.4s cubic-bezier(.6,0,.2,1) infinite; }
+    @keyframes settle { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @keyframes weave { 0% { transform: scaleX(0); } 60%, 100% { transform: scaleX(1); } }
     @media (prefers-reduced-motion: reduce) {
-      #splash .spinner { animation: none; border-color: var(--track); }
+      #splash img, #splash .hem::after { animation: none; }
     }
   </style>
   <script>
@@ -88,7 +89,7 @@
       try { t = JSON.parse(localStorage.getItem('flutter.appTheme')) || t; } catch (e) {}
       if (t !== 'istana' && t !== 'noir') t = 'kampus';
       document.documentElement.setAttribute('data-theme', t);
-      var c = { kampus: '#F6F6F9', istana: '#F7F4EE', noir: '#0F0E13' }[t];
+      var c = { kampus: '#F6F5F8', istana: '#F7F3EE', noir: '#130C11' }[t];
       var m = document.querySelector('meta[name="theme-color"]');
       if (m) m.setAttribute('content', c);
     })();
@@ -97,7 +98,7 @@
 <body>
   <div id="splash" role="progressbar" aria-label="Loading MYKerawang">
     <img src="icons/Icon-192.png" alt="">
-    <div class="spinner"></div>
+    <div class="hem"></div>
   </div>
   <script>
     window.addEventListener('flutter-first-frame', function () {

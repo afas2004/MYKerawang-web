@@ -72,6 +72,9 @@ extension FormStrings on AppStrings {
   String get formTagKiPre => _t("KI before the programme", "KI sebelum program", "KI before");
   String get formTagKiPost => _t("KI after the programme", "KI selepas program", "KI after");
   String get formTagFeedback => _t("Programme feedback", "Maklum balas program", "Programme feedback");
+  String get formTagKiPreShort => _t("KI before", "KI sebelum", "KI before");
+  String get formTagKiPostShort => _t("KI after", "KI selepas", "KI after");
+  String get formTagFeedbackShort => _t("Feedback", "Maklum balas", "Feedback");
   String get formMoveUp => _t("Move up", "Naik", "Move up");
   String get formMoveDown => _t("Move down", "Turun", "Move down");
   String get formTitleLabel => _t("Form title", "Tajuk borang", "Form title");
@@ -84,6 +87,74 @@ extension FormStrings on AppStrings {
       "Offer this form after a successful check-in",
       "Tawarkan borang ini selepas daftar masuk berjaya",
       "Offer this form after a successful check-in");
+
+  // ---- editor: the row's own vocabulary ----
+  String get formOptional => _t("Optional", "Pilihan", "Optional");
+  String get formDuplicate => _t("Duplicate", "Salin", "Duplicate");
+  String get formDragHint =>
+      _t("Drag to reorder", "Seret untuk susun", "Drag to reorder");
+  String get formAddHelp => _t("Add help", "Tambah bantuan", "Add help");
+  String get formOnlyRatingsCounted => _t(
+      "Only ratings are counted in S1, S2 and S3",
+      "Hanya penilaian dikira dalam S1, S2 dan S3",
+      "Only ratings count.");
+  String get formSection => _t("Section", "Bahagian", "Section");
+  String get formQuestionsShort => _t("questions", "soalan", "questions");
+  String get formElementLabel => _t("Element", "Elemen", "Element");
+  String get formAgree => _t("I agree", "Saya setuju", "I agree");
+  String get formAddOption => _t("Add option", "Tambah pilihan", "Add option");
+  String get formCountedBeforeShort =>
+      _t("counted before", "dikira sebelum", "counted before");
+  String get formCountedAfterShort =>
+      _t("counted after", "dikira selepas", "counted after");
+  String get formCountedFeedbackShort =>
+      _t("counted as feedback", "dikira sebagai maklum balas", "counted as feedback");
+  String formScaleSummary(int max) =>
+      _t("1–$max scale", "skala 1–$max", "1–$max scale");
+
+  // ---- editor: the coverage rail ----
+  String get formMeasuresTitle =>
+      _t("What this form measures", "Apa yang borang ini ukur", "What this form measures");
+  String get formMeasuresSub => _t(
+      "Read from the tags on each row.",
+      "Dibaca daripada tag pada setiap baris.",
+      "Read from the tags on each row.");
+  String get formChecksTitle =>
+      _t("Before you publish", "Sebelum terbitkan", "Before you publish");
+  String get formChecksSub => _t(
+      "Checked as you type, not on submit.",
+      "Disemak semasa menaip, bukan semasa hantar.",
+      "Checked as you type, not on submit.");
+  String get formCheckLabels =>
+      _t("Every question has a label", "Setiap soalan ada label", "Every question has a label");
+  String get formCheckDupes => _t(
+      "Each KI element is counted once per phase",
+      "Setiap elemen KI dikira sekali per fasa",
+      "Each KI element counts once per phase");
+  String get formCheckPairs => _t(
+      "Every after-rating has a before-rating",
+      "Setiap penilaian selepas ada pasangan sebelum",
+      "Every after-rating has a before-rating");
+  String formCheckBudget(int n) =>
+      _t("$n of 40 questions used", "$n daripada 40 soalan digunakan", "$n of 40 used");
+  String formCheckMissingLabels(int n) => _t(
+      n == 1 ? "1 question missing a label" : "$n questions missing a label",
+      "$n soalan tiada label",
+      "$n questions missing a label");
+  String formCheckDupesCount(int n) => _t(
+      n == 1
+          ? "1 row counts a KI element twice"
+          : "$n rows count the same KI element twice",
+      "$n baris mengira elemen KI sama dua kali",
+      "$n rows count a KI element twice");
+  String formCheckOrphan(String codes) => _t(
+      "KI$codes counted after but not before",
+      "KI$codes dikira selepas tetapi tidak sebelum",
+      "KI$codes counted after but not before");
+  String get formPairsLabel =>
+      _t("S1 pairs complete", "Pasangan S1 lengkap", "S1 pairs complete");
+  String get formReadyToPublish =>
+      _t("Ready to publish", "Sedia diterbitkan", "Ready to publish");
 
   // ---- kinds ----
   String formKindLabel(String kind) => switch (kind) {
@@ -160,6 +231,18 @@ extension FormStrings on AppStrings {
       _t("Please answer the required questions.", "Sila jawab soalan wajib.", "Please answer the required questions.");
   String formAnswerProgress(int done, int total) =>
       _t("$done of $total answered", "$done daripada $total dijawab", "$done of $total answered");
+  String formRequiredLeft(int n) =>
+      _t("$n required left", "$n wajib tinggal", "$n required left");
+  String get formAllAnswered =>
+      _t("All questions answered", "Semua soalan dijawab", "All questions answered");
+  String get formAnswerSentTitle =>
+      _t("Answers sent", "Jawapan dihantar", "Answers sent");
+  String get formAnswerSentBody => _t(
+      "The organiser can see them now, and they count towards S1, S2 and S3 in the report.",
+      "Penganjur boleh lihat sekarang, dan ia dikira dalam S1, S2 dan S3 laporan.",
+      "The organiser can see them now.");
+  String get formEditAnswers =>
+      _t("Edit my answers", "Ubah jawapan saya", "Edit my answers");
   String formAnswerMissing(int n) => _t(
       n == 1 ? "1 question still needs an answer" : "$n questions still need an answer",
       "$n soalan belum dijawab",

@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="kampus">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MYKerawang — form editor (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ------------------------------------------------------------------ tokens */
+:root{
+  --bg:#F6F6F9; --surface:#FFFFFF; --elev:#FFFFFF;
+  --primary:#5B3E96; --primary-soft:#EFEAF7; --primary-ink:#4B3179;
+  --gold:#E9A21B; --gold-soft:#FCF1D9; --gold-ink:#8A5A05;
+  --feedback:#17786B; --feedback-soft:#E4F2EF; --feedback-ink:#0F5E53;
+  --text:#16141D; --muted:#5E5A6B; --faint:#8F8B9C;
+  --border:#E5E3EC; --line:#EFEDF4;
+  --danger:#B3261E; --danger-soft:#FBEAE8;
+  --shadow:0 1px 2px rgba(22,20,29,.04), 0 10px 30px rgba(22,20,29,.05);
+  --r-card:16px; --r-input:12px;
+}
+[data-theme="istana"]{
+  --bg:#F7F4EE; --surface:#FFFDF9; --elev:#FFFFFF;
+  --primary:#4E3680; --primary-soft:#ECE7F4; --primary-ink:#3E2B66;
+  --gold:#C98A1E; --gold-soft:#F7EBD4; --gold-ink:#7A5209;
+  --feedback:#146C60; --feedback-soft:#E3EFEB; --feedback-ink:#0D544A;
+  --text:#1F1A16; --muted:#615849; --faint:#928878;
+  --border:#E9E2D6; --line:#F1EBE1;
+}
+[data-theme="noir"]{
+  --bg:#0F0E13; --surface:#18171E; --elev:#221F2A;
+  --primary:#A48BEA; --primary-soft:#2A2438; --primary-ink:#C6B4F5;
+  --gold:#E8C062; --gold-soft:#332B18; --gold-ink:#E8C062;
+  --feedback:#6FD3C4; --feedback-soft:#17322F; --feedback-ink:#8FE3D6;
+  --text:#F1EFF6; --muted:#A9A4B8; --faint:#807B90;
+  --border:#2B2833; --line:#221F29;
+  --danger:#F2A9A2; --danger-soft:#3A1E1B;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;overflow-x:hidden}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:"Plus Jakarta Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:14px; line-height:1.45; -webkit-font-smoothing:antialiased;
+}
+svg{width:1em;height:1em;display:block;flex:none}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0}
+::selection{background:var(--primary-soft)}
+
+/* ------------------------------------------------------- mockup control bar */
+.mockbar{
+  position:sticky; top:0; z-index:80; height:46px;
+  display:flex; align-items:center; gap:14px; padding:0 18px;
+  background:#121016; color:#EFEDF4; font-size:12px;
+  border-bottom:1px solid #000; overflow-x:auto; scrollbar-width:none;
+}
+.mockbar::-webkit-scrollbar{display:none}
+.mockbar .tag{
+  font-weight:800; font-size:10px; letter-spacing:.16em; text-transform:uppercase;
+  color:#121016; background:#E8C062; padding:3px 7px; border-radius:5px;
+}
+.mockbar .where{color:#8F8A9E; font-weight:500}
+.mockbar .spacer{flex:1}
+.mockbar .grp{display:flex;align-items:center;gap:8px;color:#8F8A9E}
+.seg{display:inline-flex;background:#221F2A;border-radius:999px;padding:2px;gap:2px}
+.seg button{
+  color:#A9A4B8; font-size:11.5px; font-weight:600; padding:4px 10px; border-radius:999px;
+  transition:background .15s ease,color .15s ease;
+}
+.seg button:hover{color:#EFEDF4}
+.seg button.on{background:#EFEDF4;color:#121016}
+@media (max-width:900px){
+  .mockbar{gap:8px;padding:0 10px}
+  .mockbar .where{display:none}
+  .mockbar .tag{padding:3px 5px}
+  .seg button{padding:4px 7px;font-size:11px}
+  .mockbar .grp{gap:5px}
+}
+@media (max-width:620px){
+  .mockbar .grp.theme{display:none}
+}
+
+/* ---------------------------------------------------------------- app chrome */
+.topbar{
+  position:sticky; top:46px; z-index:70; height:62px;
+  display:flex; align-items:center; gap:12px; padding:0 20px;
+  background:var(--surface); border-bottom:1px solid var(--border);
+}
+.brandmark{
+  width:34px; height:34px; border-radius:11px; display:grid; place-items:center;
+  background:var(--primary); color:#fff; font-weight:800; font-size:13px; flex:none;
+}
+[data-theme="noir"] .brandmark{color:#14121A}
+.crumbs{display:flex;flex-direction:column;line-height:1.2;min-width:0}
+.crumbs .k{font-size:10.5px;color:var(--faint);font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.crumbs .v{font-weight:700;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grow{flex:1}
+
+.btn{
+  display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 16px;
+  border-radius:999px;font-weight:650;font-size:13.5px;border:1px solid transparent;
+  transition:transform .12s ease, background .15s ease, border-color .15s ease;
+  white-space:nowrap;
+}
+.btn:active{transform:translateY(1px)}
+.btn svg{width:16px;height:16px}
+.btn.ghost{color:var(--text);border-color:var(--border);background:var(--surface)}
+.btn.ghost:hover{background:var(--primary-soft);border-color:transparent}
+.btn.solid{background:var(--primary);color:#fff}
+[data-theme="noir"] .btn.solid{color:#14121A}
+.btn.solid:hover{filter:brightness(1.06)}
+.btn.quiet{color:var(--muted);padding:0 12px;height:34px;font-size:13px}
+.btn.quiet:hover{background:var(--primary-soft);color:var(--primary-ink)}
+:focus-visible{outline:2px solid var(--primary); outline-offset:2px}
+
+.savestate{
+  display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--faint);
+  padding:0 6px; white-space:nowrap;
+}
+.savestate .dot{width:7px;height:7px;border-radius:50%;background:#C9C5D4}
+.savestate.dirty .dot{background:var(--gold)}
+.savestate.dirty{color:var(--gold-ink)}
+
+/* ------------------------------------------------------------------- layout */
+.shell{
+  max-width:1300px;margin:0 auto;padding:26px 24px 96px;
+  display:grid;grid-template-columns:minmax(0,1fr) 322px;gap:26px;align-items:start;
+}
+.card{
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--r-card); box-shadow:var(--shadow);
+}
+
+/* --------------------------------------------------------------- form header */
+.formhead{padding:20px 22px 16px;margin-bottom:18px}
+.fh-top{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.badge{
+  display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:999px;
+  font-size:10.5px;font-weight:750;letter-spacing:.06em;text-transform:uppercase;
+}
+.badge.draft{background:var(--gold-soft);color:var(--gold-ink)}
+.badge.live{background:var(--feedback-soft);color:var(--feedback-ink)}
+.meta-line{font-size:12.5px;color:var(--muted)}
+.meta-line b{color:var(--text);font-weight:650}
+
+input.bare{
+  width:100%;border:0;background:transparent;padding:3px 0;border-bottom:1px solid transparent;
+  transition:border-color .15s ease;
+}
+input.bare:hover{border-bottom-color:var(--line)}
+input.bare:focus{outline:none;border-bottom-color:var(--primary)}
+input.title{font-size:23px;font-weight:800;letter-spacing:-.015em;line-height:1.25}
+input.intro{font-size:13.5px;color:var(--muted)}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;
+  background:var(--bg);border:1px solid var(--border);font-size:12px;font-weight:600;color:var(--muted);
+}
+.chip b{color:var(--text);font-weight:750;font-variant-numeric:tabular-nums}
+.chip .sw{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+.chip.p .sw{background:var(--primary)}
+.chip.g .sw{background:var(--gold)}
+.chip.f .sw{background:var(--feedback)}
+
+.toggles{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.togchip{
+  display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px 0 10px;border-radius:999px;
+  border:1px solid var(--border);background:var(--surface);font-size:12.5px;font-weight:600;color:var(--muted);
+  transition:border-color .15s, background .15s, color .15s;
+}
+.togchip:hover{border-color:var(--primary)}
+.togchip.on{background:var(--primary-soft);border-color:transparent;color:var(--primary-ink)}
+.togchip .box{
+  width:16px;height:16px;border-radius:5px;border:1.5px solid currentColor;display:grid;place-items:center;
+}
+.togchip .box svg{width:11px;height:11px;opacity:0}
+.togchip.on .box{background:var(--primary);border-color:var(--primary);color:#fff}
+[data-theme="noir"] .togchip.on .box{color:#14121A}
+.togchip.on .box svg{opacity:1}
+
+/* -------------------------------------------------------------------- lanes */
+.listcard{overflow:hidden}
+.lane{border-left:3px solid var(--lane,var(--border))}
+.lane + .lane{border-top:1px solid var(--border)}
+.lane-head{
+  display:flex;align-items:center;gap:9px;padding:10px 14px 9px 12px;
+  background:var(--lane-soft); border-bottom:1px solid var(--line);
+}
+.lane-head .grip{
+  font-size:9.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--lane-ink);
+  background:color-mix(in srgb, var(--lane) 16%, transparent); padding:3px 6px;border-radius:5px;flex:none;
+}
+.lane-head input{
+  flex:1;min-width:0;border:0;background:transparent;font-weight:750;font-size:13.5px;padding:3px 5px;
+  border-radius:6px;
+}
+.lane-head input:hover{background:rgba(255,255,255,.5)}
+[data-theme="noir"] .lane-head input:hover{background:rgba(255,255,255,.06)}
+.lane-head input:focus{outline:none;background:var(--surface);box-shadow:0 0 0 2px var(--lane)}
+.lane-count{font-size:11.5px;font-weight:650;color:var(--lane-ink);opacity:.9;white-space:nowrap}
+.lane-actions{display:flex;gap:1px;opacity:0;transition:opacity .15s}
+.lane-head:hover .lane-actions{opacity:1}
+
+/* -------------------------------------------------------------- question row */
+.qwrap{border-bottom:1px solid var(--line);transition:background .13s ease}
+.qwrap:last-child{border-bottom:0}
+.qwrap:hover{background:color-mix(in srgb, var(--primary) 3.5%, transparent)}
+.qwrap.problem{background:var(--danger-soft)}
+.qrow{
+  display:grid;grid-template-columns:26px minmax(0,1fr);
+  gap:0 10px;align-items:start;padding:10px 76px 11px 12px;
+}
+.idx{padding-top:6px;color:var(--faint);font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
+.qmain{min-width:0}
+
+.qlabel{
+  width:100%;border:1px solid transparent;background:transparent;border-radius:7px;
+  padding:3px 6px;margin-left:-6px;font-size:14px;font-weight:600;line-height:1.4;
+}
+.qlabel:hover{border-color:var(--border);background:var(--surface)}
+.qlabel:focus{outline:none;border-color:var(--primary);background:var(--surface);box-shadow:0 0 0 3px var(--primary-soft)}
+.qlabel.empty{border-color:var(--danger);background:var(--surface)}
+.qhelp{
+  width:calc(100% + 6px);border:1px solid transparent;background:transparent;border-radius:6px;
+  padding:1px 6px;margin-left:-6px;font-size:12px;color:var(--muted);
+}
+.qhelp::placeholder{color:var(--faint)}
+.qhelp:hover{border-color:var(--border)}
+.qhelp:focus{outline:none;border-color:var(--primary);background:var(--surface)}
+
+/* control strip */
+.ctl{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:6px}
+.sel{position:relative;display:flex;align-items:center}
+.sel::after{
+  content:"";position:absolute;right:9px;top:50%;width:6px;height:6px;margin-top:-4px;
+  border-right:1.5px solid var(--faint);border-bottom:1.5px solid var(--faint);
+  transform:rotate(45deg);pointer-events:none;
+}
+.sel select{
+  appearance:none;height:30px;border:1px solid var(--border);border-radius:8px;
+  background:var(--surface);padding:0 24px 0 9px;font-size:12.5px;font-weight:600;
+  color:var(--text);transition:border-color .15s, background .15s;
+}
+.sel select:hover{border-color:var(--primary)}
+.sel select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.sel.type select{width:134px}
+.sel.counted select{width:124px}
+.sel.ki select{width:72px}
+.sel.scale select{width:74px}
+.sel.tag-before select{background:var(--primary-soft);border-color:transparent;color:var(--primary-ink)}
+.sel.tag-after select{background:var(--gold-soft);border-color:transparent;color:var(--gold-ink)}
+.sel.tag-feedback select{background:var(--feedback-soft);border-color:transparent;color:var(--feedback-ink)}
+
+/* "not counted" is stated, not omitted */
+.na{
+  display:inline-flex;align-items:center;height:30px;padding:0 10px;border-radius:8px;
+  background:transparent;border:1px dashed var(--border);color:var(--faint);
+  font-size:12px;font-weight:600;white-space:nowrap;
+}
+
+/* required chip */
+.reqchip{
+  display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 10px 0 6px;border-radius:999px;
+  font-size:12px;font-weight:650;color:var(--faint);border:1px solid transparent;
+  transition:background .15s,color .15s;
+}
+.reqchip:hover{background:var(--bg);color:var(--muted)}
+.reqchip.on{color:var(--primary-ink)}
+.reqchip .pill{
+  position:relative;width:30px;height:18px;border-radius:999px;background:var(--border);
+  transition:background .16s ease;flex:none;
+}
+.reqchip .pill::after{
+  content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+  background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.22);
+  transition:transform .16s cubic-bezier(.2,.8,.3,1);
+}
+.reqchip.on .pill{background:var(--primary)}
+.reqchip.on .pill::after{transform:translateX(12px)}
+
+.addhelp{
+  font-size:11.5px;font-weight:650;color:var(--faint);padding:4px 6px;border-radius:6px;
+  opacity:0;transition:opacity .15s;
+}
+.qwrap:hover .addhelp,.addhelp:focus{opacity:1}
+.addhelp:hover{background:var(--bg);color:var(--primary)}
+
+/* options for choice rows */
+.qopts{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:2px 0 9px 36px;padding-bottom:2px}
+.opts-label{
+  font-size:9.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
+  margin-right:2px;
+}
+.opt{
+  display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 5px 0 9px;border-radius:999px;
+  background:var(--bg);border:1px solid var(--border);font-size:12px;font-weight:600;
+}
+.opt button{width:15px;height:15px;border-radius:50%;display:grid;place-items:center;color:var(--faint)}
+.opt button:hover{background:var(--danger-soft);color:var(--danger)}
+.opt button svg{width:9px;height:9px}
+.opt-add{
+  height:26px;padding:0 9px;border-radius:999px;border:1px dashed var(--border);color:var(--muted);
+  font-size:12px;font-weight:650;display:inline-flex;align-items:center;gap:4px;
+}
+.opt-add svg{width:10px;height:10px}
+.opt-add:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-soft)}
+
+/* per-row problem */
+.problem-note{
+  display:flex;align-items:flex-start;gap:6px;color:var(--danger);
+  font-size:11.5px;font-weight:650;margin:4px 0 2px 36px;
+}
+.problem-note svg{width:12px;height:12px;margin-top:2px}
+
+/* row actions — one group, pinned to the card's edge */
+.qwrap{position:relative}
+.qact{
+  position:absolute;top:0;right:0;bottom:0;width:64px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  border-left:1px solid var(--line);
+  background:color-mix(in srgb, var(--bg) 75%, transparent);
+  transition:background .15s ease;
+}
+.qwrap:hover .qact,.qwrap:focus-within .qact{background:var(--bg)}
+.qact .cluster{display:flex;gap:2px}
+.iconb{
+  width:26px;height:26px;border-radius:7px;display:grid;place-items:center;color:var(--muted);
+  transition:background .13s,color .13s,opacity .13s;
+}
+.iconb svg{width:14px;height:14px}
+.iconb:hover{background:var(--primary-soft);color:var(--primary-ink)}
+.iconb:disabled{opacity:.22;cursor:default}
+.iconb:disabled:hover{background:none;color:var(--faint)}
+.qact .iconb{opacity:.78}
+.qwrap:hover .qact .iconb,.qwrap:focus-within .qact .iconb{opacity:1}
+.qact .danger{opacity:.45}
+.qwrap:hover .qact .danger,.qwrap:focus-within .qact .danger{opacity:.9}
+.qwrap:hover .qact .danger:hover{opacity:1;color:var(--danger);background:var(--danger-soft)}
+.qact .handle{cursor:grab;opacity:.55;border:1px dashed transparent}
+.qact .handle:hover{border-color:var(--border);background:var(--surface);color:var(--text)}
+.qact .handle:active{cursor:grabbing}
+.qact .sep{width:18px;height:1px;background:var(--line);margin:3px 0}
+
+/* drop indicator while dragging */
+.qwrap.drop-target::before{
+  content:"";position:absolute;left:0;right:64px;top:-1px;height:2px;background:var(--primary);z-index:5;
+}
+.qwrap.dragging{opacity:.45}
+
+/* add footer */
+.listfoot{display:flex;gap:10px;padding:14px;background:var(--surface);border-top:1px solid var(--line)}
+.addbtn{
+  flex:1;height:44px;border-radius:var(--r-input);border:1px dashed var(--border);
+  display:flex;align-items:center;justify-content:center;gap:7px;font-weight:650;font-size:13px;color:var(--muted);
+}
+.addbtn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-soft)}
+.addbtn svg{width:14px;height:14px}
+
+/* -------------------------------------------------------------------- rail */
+.rail{position:sticky;top:130px;display:flex;flex-direction:column;gap:14px}
+.rail .card{padding:16px}
+.rail h3{
+  margin:0 0 3px;font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
+}
+.rail .sub{font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.45}
+.cov{width:100%;border-collapse:collapse;font-size:12.5px}
+.cov th{
+  text-align:left;font-size:9.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--faint);padding:0 0 6px;
+}
+.cov th:not(:first-child){text-align:center;width:58px}
+.cov td{padding:4.5px 0;border-top:1px solid var(--line);color:var(--muted)}
+.cov td:not(:first-child){text-align:center}
+.cov .ki{color:var(--text);font-weight:650}
+.cov .dot{width:11px;height:11px;border-radius:50%;display:inline-block;border:1.5px solid var(--border)}
+.cov .dot.on{background:var(--primary);border-color:var(--primary)}
+.cov .dot.on.after{background:var(--gold);border-color:var(--gold)}
+.sum{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--muted);padding:5px 0}
+.sum + .sum{border-top:1px solid var(--line)}
+.sum b{color:var(--text)}
+.pill-count{
+  font-size:11px;font-weight:750;padding:2px 8px;border-radius:999px;
+  background:var(--feedback-soft);color:var(--feedback-ink);font-variant-numeric:tabular-nums;
+}
+.pill-count.warn{background:var(--gold-soft);color:var(--gold-ink)}
+
+.checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+.checks li{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;color:var(--muted);line-height:1.35}
+.checks .ic{width:16px;height:16px;border-radius:50%;display:grid;place-items:center;flex:none;margin-top:1px}
+.checks .ic svg{width:9px;height:9px}
+.checks .ok .ic{background:var(--feedback-soft);color:var(--feedback-ink)}
+.checks .warn .ic{background:var(--gold-soft);color:var(--gold-ink)}
+.checks b{color:var(--text);font-weight:650}
+
+.note{font-size:12px;color:var(--muted);line-height:1.55;margin:0}
+.note b{color:var(--text)}
+
+/* ------------------------------------------------------------- answer sheet */
+.avatar{
+  width:34px;height:34px;border-radius:50%;background:var(--primary-soft);color:var(--primary-ink);
+  display:grid;place-items:center;font-size:11.5px;font-weight:750;flex:none;letter-spacing:.02em;
+}
+.answer-wrap{max-width:760px;margin:0 auto;padding:22px 18px 130px}
+.ans-head{padding:2px 4px 18px}
+.ans-head h1{margin:0 0 6px;font-size:22px;font-weight:800;letter-spacing:-.015em;line-height:1.25}
+.ans-head p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.progrow{display:flex;align-items:center;gap:12px;margin-top:16px}
+.bar{flex:1;height:6px;border-radius:999px;background:var(--border);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:999px;background:var(--primary);transition:width .35s cubic-bezier(.2,.8,.3,1)}
+.progtext{font-size:12px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.progtext b{color:var(--text)}
+
+.ans-section{margin-bottom:16px;border-left:3px solid var(--lane,var(--border));overflow:hidden}
+.ans-sec-head{padding:14px 18px;background:var(--lane-soft);border-bottom:1px solid var(--line)}
+.ans-sec-head h2{margin:0;font-size:13.5px;font-weight:750}
+.ans-sec-head p{margin:4px 0 0;font-size:12.5px;color:var(--muted);line-height:1.45}
+.aq{padding:15px 18px;border-bottom:1px solid var(--line);transition:background .15s}
+.aq:last-child{border-bottom:0}
+.aq.has-error{background:var(--danger-soft)}
+.aqlabel{font-size:14px;font-weight:600;line-height:1.4;display:flex;gap:5px;align-items:baseline}
+.must{color:var(--danger);font-weight:800}
+.ahelp{font-size:12px;color:var(--muted);margin-top:3px}
+.ainput{
+  width:100%;height:44px;border:1px solid var(--border);border-radius:10px;background:var(--surface);
+  padding:0 12px;font-size:14px;margin-top:10px;transition:border-color .15s, box-shadow .15s;
+}
+.ainput:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.ainput.bad{border-color:var(--danger)}
+textarea.ainput{height:auto;min-height:92px;padding:11px 12px;line-height:1.5;resize:vertical}
+.counter{font-size:11px;color:var(--faint);text-align:right;margin-top:4px;font-variant-numeric:tabular-nums}
+.aerr{display:flex;gap:6px;align-items:center;color:var(--danger);font-size:12px;font-weight:650;margin-top:7px}
+.aerr svg{width:12px;height:12px}
+
+.scale{display:flex;gap:6px;margin-top:11px;max-width:380px}
+.scale button{
+  flex:1;height:46px;border-radius:10px;border:1px solid var(--border);background:var(--surface);
+  font-size:14.5px;font-weight:700;color:var(--muted);transition:all .14s ease;
+}
+.scale button:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-soft)}
+.scale button.on{background:var(--primary);border-color:var(--primary);color:#fff;box-shadow:0 2px 8px rgba(91,62,150,.22)}
+[data-theme="noir"] .scale button.on{color:#14121A}
+.scale button:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+.choices{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.choice{
+  height:40px;padding:0 15px;border-radius:999px;border:1px solid var(--border);background:var(--surface);
+  font-size:13px;font-weight:600;color:var(--muted);display:inline-flex;align-items:center;gap:8px;
+}
+.choice .dot{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--border);transition:border .14s}
+.choice:hover{border-color:var(--primary);color:var(--primary)}
+.choice.on{border-color:var(--primary);background:var(--primary-soft);color:var(--primary-ink);font-weight:650}
+.choice.on .dot{border:5px solid var(--primary);background:var(--surface)}
+.consent{display:flex;gap:9px;align-items:center;margin-top:10px;font-size:13.5px;color:var(--muted)}
+
+.ansfoot{
+  position:fixed;left:0;right:0;bottom:0;z-index:65;background:var(--surface);
+  border-top:1px solid var(--border);padding:12px 18px;box-shadow:0 -8px 24px rgba(22,20,29,.06);
+}
+.ansfoot-inner{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:14px}
+.foot-info{font-size:12.5px;color:var(--muted)}
+.foot-info b{color:var(--text);font-variant-numeric:tabular-nums}
+.foot-info .dotsep{margin:0 7px;opacity:.45}
+.ansfoot .btn{margin-left:auto;height:44px;padding:0 22px}
+.ansfoot.error{border-top-color:var(--danger);background:var(--danger-soft)}
+.ansfoot.error .foot-info{color:var(--danger);font-weight:650}
+
+.success{max-width:440px;margin:32px auto;text-align:center;padding:30px 26px}
+.success .tick{
+  width:54px;height:54px;border-radius:50%;background:var(--primary-soft);color:var(--primary);
+  display:grid;place-items:center;margin:0 auto 16px;
+}
+.success h2{margin:0 0 8px;font-size:19px;font-weight:800}
+.success p{margin:0 0 20px;color:var(--muted);font-size:13.5px;line-height:1.55}
+
+/* ------------------------------------------------------------------ phone */
+body.phone .shell{
+  grid-template-columns:minmax(0,1fr);max-width:430px;padding:14px 12px 80px;gap:16px;
+  border-left:1px solid var(--border);border-right:1px solid var(--border);min-height:100vh;
+}
+body.phone .rail{position:static;order:2}
+body.phone .qrow{grid-template-columns:20px minmax(0,1fr);gap:0 8px;padding:11px 62px 12px 10px}
+body.phone .qact{width:52px}
+body.phone .qact .iconb{width:24px;height:24px;opacity:.72}
+body.phone .qact .danger{opacity:.7}
+body.phone .qact .sep{margin:2px 0}
+body.phone .qopts,body.phone .problem-note{margin-left:28px}
+body.phone .wide-only{display:none}
+body.phone .qopts,body.phone .problem-note{margin-left:30px}
+body.phone .lane-head{flex-wrap:wrap;gap:5px 8px;padding:10px 12px}
+body.phone .lane-head .grip{display:none}
+body.phone .lane-head input{flex:1 1 100%;order:1;font-size:13.5px;padding-left:0}
+body.phone .lane-count{order:2}
+body.phone .lane-actions{opacity:1;order:3;margin-left:auto}
+body.phone .sel.type,body.phone .sel.counted{flex:1 1 130px}
+body.phone .sel.type select,body.phone .sel.counted select{width:100%;font-size:12.5px;padding-right:22px}
+body.phone .formhead{padding:16px}
+body.phone input.title{font-size:19px}
+body.phone .listfoot{flex-direction:column}
+body.phone .topbar{padding:0 12px;gap:8px}
+body.phone .topbar .crumbs .k{display:none}
+body.phone .btn .lbl{display:none}
+body.phone .btn{padding:0 12px;height:36px}
+body.phone .savestate{display:none}
+body.phone .addhelp{opacity:1}
+@media (max-width:620px){
+  body.phone .shell{max-width:none;border-left:0;border-right:0}
+}
+body.phone .sel select{height:34px;font-size:13px}
+body.phone .na,body.phone .reqchip{height:34px}
+
+/* answer sheet on a narrow screen */
+body.phone .answer-wrap{padding:16px 12px 120px}
+body.phone .ans-head h1{font-size:19px}
+body.phone .ans-head{padding:2px 2px 16px}
+body.phone .aq{padding:13px 14px}
+body.phone .ans-sec-head{padding:12px 14px}
+body.phone .scale button{height:44px}
+body.phone .ansfoot{padding:10px 12px}
+body.phone .ansfoot .btn{padding:0 16px}
+body.phone .ansfoot .foot-info{font-size:12px}
+
+/* toast + dialog */
+.toast{
+  position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);z-index:200;
+  background:var(--text);color:var(--bg);padding:10px 18px;border-radius:999px;
+  font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;
+  box-shadow:0 10px 30px rgba(0,0,0,.3);
+}
+[data-theme="noir"] .toast{background:var(--elev);color:var(--text);border:1px solid var(--border)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+dialog{
+  border:1px solid var(--border);border-radius:20px;background:var(--surface);color:var(--text);
+  padding:0;max-width:min(470px,calc(100vw - 32px));box-shadow:0 24px 60px rgba(0,0,0,.28);
+}
+dialog::backdrop{background:rgba(16,14,20,.45)}
+.dlg{padding:22px 22px 18px}
+.dlg h2{margin:0 0 8px;font-size:17px;font-weight:800}
+.dlg p{margin:0 0 12px;font-size:13px;color:var(--muted);line-height:1.55}
+.dlg ul{margin:0;padding-left:18px;font-size:13px;color:var(--muted);line-height:1.6}
+.dlg .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
+</style>
+</head>
+<body>
+
+<!-- ===================================================== mockup controls -->
+<div class="mockbar">
+  <span class="tag">Mockup</span>
+  <span class="where">Form editor · proposal v2</span>
+  <span class="spacer"></span>
+  <span class="grp">View
+    <span class="seg" id="viewSeg">
+      <button data-view="editor" class="on">Editor</button>
+      <button data-view="answer">Answer sheet</button>
+    </span>
+  </span>
+  <span class="grp theme">Theme
+    <span class="seg" id="themeSeg">
+      <button data-theme="kampus" class="on">Kampus</button>
+      <button data-theme="istana">Istana</button>
+      <button data-theme="noir">Noir</button>
+    </span>
+  </span>
+  <span class="grp">Width
+    <span class="seg" id="widthSeg">
+      <button data-w="desktop" class="on">Desktop</button>
+      <button data-w="phone">Phone</button>
+    </span>
+  </span>
+</div>
+
+<!-- ============================================================ app bar -->
+<div id="screen-editor">
+<header class="topbar">
+  <button class="iconb" title="Back to event" style="width:32px;height:32px">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+  </button>
+  <div class="brandmark">MK</div>
+  <div class="crumbs">
+    <span class="k">Program form</span>
+    <span class="v">Malam Ujian KI</span>
+  </div>
+  <span class="grow"></span>
+  <span class="savestate" id="saveState"><span class="dot"></span><span id="saveText">Saved</span></span>
+  <button class="btn quiet" title="Responses">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="3.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="3.5" cy="18" r="1.3" fill="currentColor" stroke="none"/></svg>
+    <span class="lbl">Responses</span>
+  </button>
+  <button class="btn ghost" id="saveBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+    <span class="lbl">Save</span>
+  </button>
+  <button class="btn solid" id="publishBtn">
+    <span class="lbl">Publish</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+  </button>
+</header>
+
+<div class="shell">
+  <!-- ========================================================== main column -->
+  <main>
+    <section class="card formhead">
+      <div class="fh-top">
+        <span class="badge draft" id="statusBadge">Draft</span>
+        <span class="meta-line"><b>Malam Ujian KI</b> · 25 Oct 2026 · report due 8 Nov</span>
+      </div>
+      <input class="bare title" value="KI report — Malam Ujian KI" aria-label="Form title">
+      <input class="bare intro" value="Please rate yourself honestly. Your answers are used only for the club's KI report." aria-label="Introduction">
+
+      <div class="chips" id="summaryChips"></div>
+
+      <div class="toggles">
+        <button class="togchip on" id="togRsvp" aria-pressed="true">
+          <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+          Only people who joined may answer
+        </button>
+        <button class="togchip" id="togCheckin" aria-pressed="false">
+          <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+          Offer after check-in
+        </button>
+      </div>
+    </section>
+
+    <section class="card listcard">
+      <div id="list"></div>
+      <div class="listfoot">
+        <button class="addbtn" id="addQ">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Add question
+        </button>
+        <button class="addbtn" id="addH">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h10M4 17h7"/></svg>
+          Add section heading
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ================================================================= rail -->
+  <aside class="rail">
+    <section class="card">
+      <h3>What this form measures</h3>
+      <p class="sub">Read straight off the tags below. Two rows tagged with the same KI element cannot both count.</p>
+      <table class="cov" id="covTable"></table>
+      <div class="sum" style="margin-top:8px"><span>S3 · Programme feedback</span><b id="fbCount">6 items</b></div>
+      <div class="sum"><span>S1 pairs complete</span><span class="pill-count" id="pairPill">7 / 7</span></div>
+    </section>
+
+    <section class="card">
+      <h3>Before you publish</h3>
+      <p class="sub" style="margin-bottom:12px">Checked as you type, not on submit.</p>
+      <ul class="checks" id="checks"></ul>
+    </section>
+
+    <section class="card">
+      <p class="note"><b>Nothing behind a dialog.</b> Type, counting, scale and required are on every row. Rows that aren't counted say so, rather than hiding the control.</p>
+      <p class="note" style="margin-top:10px"><b>Moving rows.</b> Drag the six dots, or use the arrows — they sit together in the strip on the card's edge.</p>
+    </section>
+  </aside>
+</div>
+</div><!-- /screen-editor -->
+
+<!-- ======================================================= answer sheet -->
+<div id="screen-answer" hidden>
+  <header class="topbar">
+    <button class="iconb" title="Back to event" style="width:32px;height:32px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="brandmark">MK</div>
+    <div class="crumbs">
+      <span class="k">Program form</span>
+      <span class="v" id="ansCrumb">KI report</span>
+    </div>
+    <span class="grow"></span>
+    <span class="meta-line">Closes 8 Nov</span>
+    <div class="avatar">NA</div>
+  </header>
+
+  <div class="answer-wrap">
+    <div class="ans-head">
+      <h1 id="ansTitle">KI report — Malam Ujian KI</h1>
+      <p id="ansIntro">Please rate yourself honestly…</p>
+      <div class="progrow">
+        <div class="bar"><i id="ansBar" style="width:0%"></i></div>
+        <span class="progtext" id="ansProg"><b>0</b> of 24 answered</span>
+      </div>
+    </div>
+
+    <div id="answerList"></div>
+
+    <div class="card success" id="ansSuccess" hidden>
+      <div class="tick">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px"><path d="M20 6L9 17l-5-5"/></svg>
+      </div>
+      <h2>Answers sent</h2>
+      <p>The organiser can see them now, and they count towards S1, S2 and S3 in the KI report.</p>
+      <button class="btn ghost" id="editAnswers">Edit my answers</button>
+    </div>
+  </div>
+
+  <div class="ansfoot" id="ansFoot">
+    <div class="ansfoot-inner">
+      <div class="foot-info" id="ansFootInfo"><b>0</b> of 24 answered</div>
+      <button class="btn solid" id="sendAnswers">
+        <span>Send answers</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<dialog id="publishDlg">
+  <div class="dlg">
+    <h2>Publish this form?</h2>
+    <p>Students will see it and can start answering. Questions that already have answers can no longer change type, scale or KI element.</p>
+    <ul id="publishNotes"></ul>
+    <div class="acts">
+      <button class="btn ghost" id="cancelPublish">Cancel</button>
+      <button class="btn solid" id="confirmPublish">Publish</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+/* ------------------------------------------------------------------ data */
+const KI_NAMES = [
+  'Kemahiran Berkomunikasi',
+  'Pemikiran Kritis dan Kemahiran Menyelesaikan Masalah',
+  'Kemahiran Kerja Berpasukan',
+  'Pembelajaran Berterusan dan Pengurusan Maklumat',
+  'Kemahiran Keusahawanan',
+  'Etika dan Moral Profesional',
+  'Kemahiran Kepimpinan',
+];
+const FEEDBACK = [
+  'Pengisian program','Persembahan multimedia','Lokasi program',
+  'Aturcara dan pengendalian program','Mutu makanan dan minuman','Keseluruhan mutu aktiviti',
+];
+const KINDS = [
+  ['short_text','Short text'],['long_text','Long text'],['rating','Rating 1-5'],
+  ['single_choice','One choice'],['multi_choice','Several choices'],['number','Number'],
+  ['date','Date'],['email','Email'],['phone','Phone'],['student_id','Matric number'],
+  ['consent','Agreement'],['heading','Section heading'],
+];
+
+let uid = 1;
+const F = (o) => Object.assign({
+  uid: uid++, kind:'short_text', label:'', help:null, required:false,
+  choices:[], min:1, max:5, analysis:null, kiCode:null, editHelp:false,
+}, o);
+
+function seed(){
+  const out = [
+    F({kind:'heading', label:'Maklumat peserta'}),
+    F({kind:'short_text', label:'Nama penuh', help:'Prefilled from your profile.', required:true}),
+    F({kind:'student_id', label:'Nombor matrik', help:'Your UiTM student number.', required:true}),
+    F({kind:'single_choice', label:'Saya menyertai program ini sebagai', required:true, choices:['Peserta','Penganjur']}),
+    F({kind:'heading', label:'Penilaian Kemahiran Insaniah — sebelum program', help:'Rate yourself before the programme. 1 = very low, 5 = very high.'}),
+  ];
+  KI_NAMES.forEach((n,i)=>out.push(F({kind:'rating', label:`KI${i+1} ${n}`, required:true, analysis:'ki_pre', kiCode:i+1})));
+  out.push(F({kind:'heading', label:'Penilaian Kemahiran Insaniah — selepas program', help:'Rate yourself after the programme, on the same scale.'}));
+  KI_NAMES.forEach((n,i)=>out.push(F({kind:'rating', label:`KI${i+1} ${n}`, required:true, analysis:'ki_post', kiCode:i+1})));
+  out.push(F({kind:'heading', label:'Maklum balas program', help:'1 = very poor, 5 = very good.'}));
+  FEEDBACK.forEach(n=>out.push(F({kind:'rating', label:n, required:true, analysis:'feedback'})));
+  out.push(F({kind:'long_text', label:'Cadangan / maklum balas'}));
+  return out;
+}
+
+let fields = seed();
+let dirty = false;
+
+/* ----------------------------------------------------------------- utils */
+const $ = (s, r=document) => r.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ICON = {
+  up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
+  down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>',
+  dup:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 5H6a2 2 0 0 0-2 2v9"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2.4 17.4A2 2 0 0 0 4.1 20h15.8a2 2 0 0 0 1.7-2.6L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+  grip:'<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></svg>',
+};
+
+/* ------------------------------------------------------------- analysis */
+function analyse(){
+  const pre = fields.filter(f=>f.analysis==='ki_pre');
+  const post = fields.filter(f=>f.analysis==='ki_post');
+  const fb = fields.filter(f=>f.analysis==='feedback');
+  return {pre, post, fb,
+    preCodes: new Set(pre.map(f=>f.kiCode)),
+    postCodes: new Set(post.map(f=>f.kiCode)),
+    questions: fields.filter(f=>f.kind!=='heading').length,
+    required: fields.filter(f=>f.required && f.kind!=='heading').length};
+}
+
+function problemsOf(f){
+  const out = [];
+  if (!f.label.trim()) out.push('This question has no label.');
+  if ((f.analysis==='ki_pre'||f.analysis==='ki_post') && !f.kiCode)
+    out.push('Counted as KI, but no KI element chosen.');
+  if (f.analysis==='ki_pre'||f.analysis==='ki_post'){
+    if (fields.some(x=>x!==f && x.analysis===f.analysis && x.kiCode===f.kiCode))
+      out.push(`KI${f.kiCode} is already counted ${f.analysis==='ki_pre'?'before':'after'} on another row.`);
+  }
+  if ((f.kind==='single_choice'||f.kind==='multi_choice') && f.choices.length<2)
+    out.push('A choice question needs at least two options.');
+  return out;
+}
+
+/* ---------------------------------------------------------------- render */
+function rowHtml(f){
+  const isRating = f.kind==='rating';
+  const isChoice = f.kind==='single_choice'||f.kind==='multi_choice';
+  const probs = problemsOf(f);
+
+  const kindSel = `<div class="sel type"><select data-act="kind" data-uid="${f.uid}" aria-label="Answer type">
+    ${KINDS.map(([v,l])=>`<option value="${v}"${v===f.kind?' selected':''}>${l}</option>`).join('')}
+  </select></div>`;
+
+  const counted = isRating
+    ? `<div class="sel counted ${f.analysis ? 'tag-'+({ki_pre:'before',ki_post:'after',feedback:'feedback'}[f.analysis]) : ''}">
+        <select data-act="analysis" data-uid="${f.uid}" aria-label="Counted as">
+          <option value=""${!f.analysis?' selected':''}>Not counted</option>
+          <option value="ki_pre"${f.analysis==='ki_pre'?' selected':''}>KI before</option>
+          <option value="ki_post"${f.analysis==='ki_post'?' selected':''}>KI after</option>
+          <option value="feedback"${f.analysis==='feedback'?' selected':''}>Feedback</option>
+        </select></div>
+       ${(f.analysis==='ki_pre'||f.analysis==='ki_post')
+         ? `<div class="sel ki"><select data-act="ki" data-uid="${f.uid}" aria-label="KI element">
+              ${KI_NAMES.map((_,i)=>`<option value="${i+1}"${f.kiCode===i+1?' selected':''}>KI${i+1}</option>`).join('')}
+            </select></div>` : ''}
+       ${isRating ? `<div class="sel scale"><select data-act="scale" data-uid="${f.uid}" aria-label="Scale">
+            ${[2,3,4,5,6,7,8,9,10].map(v=>`<option value="${v}"${f.max===v?' selected':''}>1–${v}</option>`).join('')}
+          </select></div>` : ''}`
+    : `<span class="na" title="Only ratings are counted in S1, S2 and S3">Not counted<span class="wide-only"> in the report</span></span>`;
+
+  const req = `<button class="reqchip${f.required?' on':''}" data-act="req" data-uid="${f.uid}"
+      role="switch" aria-checked="${f.required}" title="${f.required?'Required':'Optional'}">
+      <span class="pill"></span>${f.required?'Required':'Optional'}</button>`;
+
+  const helpInput = (f.help!==null || f.editHelp)
+    ? `<input class="qhelp" value="${esc(f.help||'')}" data-act="help" data-uid="${f.uid}" placeholder="Help text — shown under the question">`
+    : '';
+  const addHelp = (f.help===null && !f.editHelp)
+    ? `<button class="addhelp" data-act="helpadd" data-uid="${f.uid}">+ help text</button>`
+    : '';
+
+  const opts = isChoice ? `<div class="qopts">
+      <span class="opts-label">Options</span>
+      ${f.choices.map((c,i)=>`<span class="opt">${esc(c)}<button data-act="rmopt" data-uid="${f.uid}" data-i="${i}" aria-label="Remove ${esc(c)}">${ICON.x}</button></span>`).join('')}
+      <button class="opt-add" data-act="addopt" data-uid="${f.uid}">${ICON.plus} Add option</button>
+    </div>` : '';
+
+  const problem = probs.length ? `<div class="problem-note">${ICON.alert}<span>${esc(probs[0])}</span></div>` : '';
+
+  return `<div class="qwrap${probs.length?' problem':''}" data-uid="${f.uid}">
+    <div class="qrow">
+      <div class="idx">${f.index}</div>
+      <div class="qmain">
+        <input class="qlabel${f.label.trim()?'':' empty'}" value="${esc(f.label)}" data-act="label" data-uid="${f.uid}" placeholder="Untitled question">
+        ${helpInput}
+        <div class="ctl">${kindSel}${counted}${req}${addHelp}</div>
+      </div>
+      <div class="qact">
+        <button class="iconb handle" data-act="drag" data-uid="${f.uid}" draggable="true" title="Drag to reorder">${ICON.grip}</button>
+        <span class="sep"></span>
+        <div class="cluster">
+          <button class="iconb" data-act="up" data-uid="${f.uid}" title="Move up">${ICON.up}</button>
+          <button class="iconb" data-act="down" data-uid="${f.uid}" title="Move down">${ICON.down}</button>
+        </div>
+        <div class="cluster">
+          <button class="iconb danger" data-act="dup" data-uid="${f.uid}" title="Duplicate">${ICON.dup}</button>
+          <button class="iconb danger" data-act="del" data-uid="${f.uid}" title="Delete">${ICON.trash}</button>
+        </div>
+      </div>
+    </div>
+    ${opts}
+    ${problem}
+  </div>`;
+}
+
+function buildLanes(){
+  const lanes = [];
+  let cur = {head:null, items:[]};
+  fields.forEach(f=>{
+    if (f.kind==='heading'){
+      if (cur.head || cur.items.length) lanes.push(cur);
+      cur = {head:f, items:[]};
+    } else cur.items.push(f);
+  });
+  lanes.push(cur);
+  return lanes;
+}
+
+function laneColour(lane){
+  const analysis = lane.items.find(f=>f.analysis)?.analysis || null;
+  return analysis==='ki_pre' ? ['var(--primary)','var(--primary-soft)','var(--primary-ink)']
+    : analysis==='ki_post' ? ['var(--gold)','var(--gold-soft)','var(--gold-ink)']
+    : analysis==='feedback' ? ['var(--feedback)','var(--feedback-soft)','var(--feedback-ink)']
+    : ['var(--border)','var(--bg)','var(--muted)'];
+}
+
+function render(){
+  const lanes = buildLanes();
+
+  let n = 0;
+  fields.forEach(f=>{ if (f.kind!=='heading') f.index = ++n; });
+
+  const laneMeta = (lane) => {
+    const ratings = lane.items.filter(f=>f.kind==='rating');
+    const analysis = lane.items.find(f=>f.analysis)?.analysis || null;
+    const colour = laneColour(lane);
+    const parts = [`${lane.items.length} question${lane.items.length===1?'':'s'}`];
+    const tagged = lane.items.filter(f=>f.analysis).length;
+    const all = tagged === lane.items.length;
+    if (analysis==='ki_pre') parts.push(all ? 'counted before' : `${tagged} counted before`);
+    if (analysis==='ki_post') parts.push(all ? 'counted after' : `${tagged} counted after`);
+    if (analysis==='feedback') parts.push(all ? 'counted as feedback' : `${tagged} counted as feedback`);
+    if (ratings.length && new Set(ratings.map(f=>f.max)).size===1) parts.push(`1–${ratings[0].max} scale`);
+    return {colour, label: parts.join(' · ')};
+  };
+
+  $('#list').innerHTML = lanes.map(lane=>{
+    const {colour, label} = laneMeta(lane);
+    const head = lane.head ? `<div class="lane-head">
+        <span class="grip">Section</span>
+        <input value="${esc(lane.head.label)}" data-act="label" data-uid="${lane.head.uid}" placeholder="Section heading">
+        <span class="lane-count">${label}</span>
+        <span class="lane-actions">
+          <button class="iconb" data-act="up" data-uid="${lane.head.uid}" title="Move up">${ICON.up}</button>
+          <button class="iconb" data-act="down" data-uid="${lane.head.uid}" title="Move down">${ICON.down}</button>
+          <button class="iconb" data-act="del" data-uid="${lane.head.uid}" title="Delete section">${ICON.trash}</button>
+        </span>
+      </div>` : '';
+    return `<div class="lane" style="--lane:${colour[0]};--lane-soft:${colour[1]};--lane-ink:${colour[2]}">
+      ${head}${lane.items.map(rowHtml).join('')}</div>`;
+  }).join('');
+
+  const a = analyse();
+  $('#summaryChips').innerHTML = `
+    <span class="chip"><b>${a.questions}</b> questions</span>
+    <span class="chip p"><span class="sw"></span><b>${a.pre.length}</b> counted before</span>
+    <span class="chip g"><span class="sw"></span><b>${a.post.length}</b> counted after</span>
+    <span class="chip f"><span class="sw"></span><b>${a.fb.length}</b> feedback</span>
+    <span class="chip"><b>${a.required}</b> required</span>`;
+
+  $('#covTable').innerHTML =
+    `<thead><tr><th>Element</th><th>Before</th><th>After</th></tr></thead><tbody>` +
+    KI_NAMES.map((_,i)=>{
+      const c = i+1;
+      return `<tr><td class="ki">KI${c}</td>
+        <td><span class="dot${a.preCodes.has(c)?' on':''}"></span></td>
+        <td><span class="dot after${a.postCodes.has(c)?' on':''}"></span></td></tr>`;
+    }).join('') + '</tbody>';
+  $('#fbCount').textContent = `${a.fb.length} items`;
+
+  const pairs = KI_NAMES.filter((_,i)=>a.preCodes.has(i+1) && a.postCodes.has(i+1)).length;
+  const pairPill = $('#pairPill');
+  pairPill.textContent = `${pairs} / 7`;
+  pairPill.className = 'pill-count' + (pairs===7 ? '' : ' warn');
+
+  const noLabel = fields.filter(f=>!f.label.trim());
+  const dupes = fields.filter(f=>(f.analysis==='ki_pre'||f.analysis==='ki_post') &&
+    fields.some(x=>x!==f && x.analysis===f.analysis && x.kiCode===f.kiCode));
+  const orphan = [...a.postCodes].filter(c=>!a.preCodes.has(c));
+  const checks = [
+    noLabel.length
+      ? ['warn', `<b>${noLabel.length}</b> question${noLabel.length>1?'s':''} missing a label`]
+      : ['ok', 'Every question has a label'],
+    dupes.length
+      ? ['warn', `<b>${dupes.length}</b> row${dupes.length>1?'s':''} count the same KI element twice`]
+      : ['ok', 'Each KI element is counted once per phase'],
+    orphan.length
+      ? ['warn', `KI${orphan.join(', KI')} counted after but not before — S1 needs both`]
+      : ['ok', 'Every after-rating has a before-rating'],
+    a.questions > 40
+      ? ['warn', `<b>${a.questions}</b> questions — the limit is 40`]
+      : ['ok', `<b>${a.questions}</b> of 40 questions used`],
+  ];
+  $('#checks').innerHTML = checks.map(([kind,text])=>
+    `<li class="${kind}"><span class="ic">${kind==='ok'?ICON.check:ICON.alert}</span><span>${text}</span></li>`).join('');
+
+  const st = $('#saveState');
+  st.className = 'savestate' + (dirty ? ' dirty' : '');
+  $('#saveText').textContent = dirty ? 'Unsaved changes' : 'Saved';
+}
+
+/* --------------------------------------------------------------- actions */
+const find = (uid) => fields.find(f=>f.uid===uid);
+function touch(){ dirty = true; render(); }
+function move(f, delta){
+  const i = fields.indexOf(f), to = i + delta;
+  if (to < 0 || to >= fields.length) return;
+  fields.splice(i,1); fields.splice(to,0,f);
+  touch();
+}
+
+document.addEventListener('input', (e)=>{
+  const el = e.target, act = el.dataset.act;
+  if (act!=='label' && act!=='help') return;
+  const f = find(+el.dataset.uid); if (!f) return;
+  if (act==='label'){ f.label = el.value; el.classList.toggle('empty', !el.value.trim()); }
+  else { f.help = el.value || ''; }
+  dirty = true;
+  $('#saveState').className = 'savestate dirty';
+  $('#saveText').textContent = 'Unsaved changes';
+  if (act==='label'){
+    const wrap = el.closest('.qwrap');
+    if (wrap) wrap.classList.toggle('problem', problemsOf(f).length>0);
+  }
+});
+
+document.addEventListener('change', (e)=>{
+  const el = e.target, act = el.dataset.act;
+  if (!act) return;
+  const f = find(+el.dataset.uid); if (!f) return;
+
+  if (act==='kind'){
+    f.kind = el.value;
+    if (f.kind==='heading'){ f.analysis = null; f.kiCode = null; f.required = false; }
+    if (f.kind!=='rating'){ f.analysis = null; f.kiCode = null; }
+    if (!['single_choice','multi_choice'].includes(f.kind)) f.choices = [];
+    if (['single_choice','multi_choice'].includes(f.kind) && f.choices.length<2) f.choices = ['Option 1','Option 2'];
+    touch(); return;
+  }
+  if (act==='analysis'){
+    f.analysis = el.value || null;
+    if (!f.analysis || f.analysis==='feedback') f.kiCode = null;
+    if ((f.analysis==='ki_pre'||f.analysis==='ki_post') && !f.kiCode){
+      f.kiCode = 1;
+      while (fields.some(x=>x!==f && x.analysis===f.analysis && x.kiCode===f.kiCode) && f.kiCode<7) f.kiCode++;
+    }
+    touch(); return;
+  }
+  if (act==='ki'){ f.kiCode = +el.value; touch(); return; }
+  if (act==='scale'){ f.max = +el.value; touch(); return; }
+});
+
+document.addEventListener('click', (e)=>{
+  const btn = e.target.closest('[data-act]');
+  if (!btn || btn.tagName==='SELECT') return;
+  const act = btn.dataset.act;
+  if (act==='label' || act==='help' || act==='drag') return;
+  const f = find(+btn.dataset.uid); if (!f) return;
+
+  if (act==='req'){ f.required = !f.required; touch(); }
+  else if (act==='up'){ move(f,-1); }
+  else if (act==='down'){ move(f,1); }
+  else if (act==='del'){ fields = fields.filter(x=>x!==f); touch(); }
+  else if (act==='dup'){
+    fields.splice(fields.indexOf(f)+1, 0,
+      Object.assign({}, f, {uid: uid++, label: f.label + ' (copy)', choices:[...f.choices]}));
+    touch();
+  }
+  else if (act==='addopt'){ f.choices = [...f.choices, `Option ${f.choices.length+1}`]; touch(); }
+  else if (act==='rmopt'){ f.choices = f.choices.filter((_,i)=>i!==+btn.dataset.i); touch(); }
+  else if (act==='helpadd'){
+    f.editHelp = true; render();
+    const el = document.querySelector(`[data-act="help"][data-uid="${f.uid}"]`);
+    if (el) el.focus();
+  }
+});
+
+document.addEventListener('focusout', (e)=>{
+  const el = e.target;
+  if (el.dataset && el.dataset.act==='help' && !el.value.trim()){
+    const f = find(+el.dataset.uid);
+    if (f){ f.help = null; f.editHelp = false; render(); }
+  }
+});
+
+$('#addQ').onclick = ()=>{
+  const f = F({kind:'short_text', label:''});
+  fields.push(f); touch();
+  requestAnimationFrame(()=>{
+    const el = document.querySelector(`[data-act="label"][data-uid="${f.uid}"]`);
+    if (el) el.focus();
+  });
+};
+$('#addH').onclick = ()=>{ fields.push(F({kind:'heading', label:'New section'})); touch(); };
+
+/* --------------------------------------------------------------- drag drop */
+let dragUid = null;
+function clearDrag(){
+  dragUid = null;
+  document.querySelectorAll('.qwrap.dragging,.qwrap.drop-target')
+    .forEach(x=>x.classList.remove('dragging','drop-target'));
+}
+
+document.addEventListener('dragstart', (e)=>{
+  const h = e.target.closest && e.target.closest('.handle');
+  if (!h) return;
+  dragUid = +h.dataset.uid;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(dragUid));
+  const w = h.closest('.qwrap');
+  if (w){
+    w.classList.add('dragging');
+    // drag the row, not just the 6-dot handle
+    if (e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(w, 24, 18);
+  }
+});
+
+document.addEventListener('dragover', (e)=>{
+  if (dragUid===null) return;
+  const w = e.target.closest && e.target.closest('.qwrap');
+  if (!w || +w.dataset.uid === dragUid) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.qwrap.drop-target').forEach(x=>x.classList.remove('drop-target'));
+  w.classList.add('drop-target');
+});
+
+document.addEventListener('drop', (e)=>{
+  if (dragUid===null) return;
+  const w = e.target.closest && e.target.closest('.qwrap');
+  if (!w) return;
+  e.preventDefault();
+  const moved = find(dragUid);
+  const target = find(+w.dataset.uid);
+  if (!moved || !target || moved===target){ clearDrag(); return; }
+  const rect = w.getBoundingClientRect();
+  const after = e.clientY > rect.top + rect.height / 2;
+  fields = fields.filter(x=>x!==moved);
+  const at = fields.indexOf(target) + (after ? 1 : 0);
+  fields.splice(at, 0, moved);
+  clearDrag();
+  touch();
+});
+
+document.addEventListener('dragend', clearDrag);
+
+/* ------------------------------------------------------------- answer sheet */
+let answers = {};
+let answerErrors = new Set();
+
+function isAnswered(f){
+  const v = answers[f.uid];
+  if (v === undefined || v === null) return false;
+  return typeof v === 'string' ? v.trim().length > 0 : true;
+}
+
+function answerErrorText(f){
+  if (f.kind==='rating') return `Choose a rating, ${f.min} to ${f.max}.`;
+  if (f.kind==='single_choice' || f.kind==='multi_choice') return 'Choose one of the options.';
+  if (f.kind==='long_text') return 'Write an answer before sending.';
+  return 'This question needs an answer.';
+}
+
+function answerBlock(f){
+  const v = answers[f.uid];
+  const bad = answerErrors.has(f.uid);
+  const must = f.required ? '<span class="must">*</span>' : '';
+  const help = f.help ? `<div class="ahelp">${esc(f.help)}</div>` : '';
+  let body = '';
+
+  if (f.kind === 'rating'){
+    const nums = [];
+    for (let n = f.min; n <= f.max; n++) nums.push(n);
+    body = `<div class="scale" role="radiogroup" aria-label="${esc(f.label)}">` +
+      nums.map(n=>`<button data-ans="${f.uid}" data-val="${n}" class="${v===n?'on':''}"
+        role="radio" aria-checked="${v===n}">${n}</button>`).join('') + `</div>`;
+  } else if (f.kind === 'single_choice' || f.kind === 'multi_choice'){
+    body = `<div class="choices">` + f.choices.map(c=>
+      `<button class="choice ${v===c?'on':''}" data-ans="${f.uid}" data-val="${esc(c)}">
+        <span class="dot"></span>${esc(c)}</button>`).join('') + `</div>`;
+  } else if (f.kind === 'long_text'){
+    body = `<textarea class="ainput ${bad?'bad':''}" data-ans-text="${f.uid}" rows="4"
+      placeholder="Your answer">${esc(v || '')}</textarea>
+      <div class="counter"><span data-count="${f.uid}">${(v||'').length}</span> / 2000</div>`;
+  } else if (f.kind === 'consent'){
+    body = `<label class="consent"><input type="checkbox" data-ans-check="${f.uid}" ${v?'checked':''}>
+      <span>I agree</span></label>`;
+  } else {
+    const type = f.kind === 'date' ? 'date'
+      : (f.kind === 'email' ? 'email' : (f.kind === 'phone' || f.kind === 'student_id' || f.kind === 'number') ? 'text' : 'text');
+    body = `<input class="ainput ${bad?'bad':''}" data-ans-text="${f.uid}" type="${type}"
+      value="${esc(v || '')}" placeholder="${f.kind==='date' ? '' : 'Your answer'}">`;
+  }
+
+  const err = bad ? `<div class="aerr">${ICON.alert}${esc(answerErrorText(f))}</div>` : '';
+  return `<div class="aq${bad?' has-error':''}" data-q="${f.uid}">
+    <div class="aqlabel">${esc(f.label)}${must}</div>${help}${body}${err}</div>`;
+}
+
+function renderAnswer(){
+  const title = ($('.formhead input.title')?.value || 'Program form').trim();
+  const intro = ($('.formhead input.intro')?.value || '').trim();
+  $('#ansTitle').textContent = title;
+  $('#ansCrumb').textContent = title;
+  $('#ansIntro').textContent = intro || 'Please answer the questions below.';
+
+  $('#answerList').innerHTML = buildLanes().map(lane=>{
+    const colour = laneColour(lane);
+    const head = lane.head ? `<div class="ans-sec-head">
+        <h2>${esc(lane.head.label)}</h2>
+        ${lane.head.help ? `<p>${esc(lane.head.help)}</p>` : ''}
+      </div>` : '';
+    return `<section class="card ans-section"
+      style="--lane:${colour[0]};--lane-soft:${colour[1]};--lane-ink:${colour[2]}">
+      ${head}${lane.items.map(answerBlock).join('')}</section>`;
+  }).join('');
+
+  $('#ansSuccess').hidden = true;
+  $('#answerList').hidden = false;
+  $('#ansFoot').hidden = false;
+  updateAnswerChrome();
+}
+
+function updateAnswerChrome(){
+  const items = fields.filter(f=>f.kind!=='heading');
+  const done = items.filter(isAnswered).length;
+  const left = items.filter(f=>f.required && !isAnswered(f)).length;
+  const pct = items.length ? (done / items.length) * 100 : 0;
+  $('#ansBar').style.width = pct.toFixed(1) + '%';
+  $('#ansProg').innerHTML = `<b>${done}</b> of ${items.length} answered`;
+  $('#ansFootInfo').innerHTML =
+    `<b>${done}</b> of ${items.length} answered<span class="dotsep">·</span>${left} required left`;
+  $('#ansFoot').classList.remove('error');
+}
+
+/* typing in a text field or textarea */
+document.addEventListener('input', (e)=>{
+  const el = e.target;
+  if (el.dataset.ansText === undefined) return;
+  const uid = +el.dataset.ansText;
+  answers[uid] = el.value;
+  const block = el.closest('.aq');
+  if (block){
+    block.classList.remove('has-error');
+    el.classList.remove('bad');
+    const err = block.querySelector('.aerr'); if (err) err.remove();
+  }
+  const counter = document.querySelector(`[data-count="${uid}"]`);
+  if (counter) counter.textContent = el.value.length;
+  answerErrors.delete(uid);
+  updateAnswerChrome();
+});
+
+/* tapping a rating or a choice */
+document.addEventListener('click', (e)=>{
+  const b = e.target.closest('[data-ans]');
+  if (!b) return;
+  const uid = +b.dataset.ans;
+  const f = find(uid);
+  if (!f) return;
+  answers[uid] = f.kind === 'rating' ? +b.dataset.val : b.dataset.val;
+  const block = b.closest('.aq');
+  block.querySelectorAll('[data-ans]').forEach(x=>{
+    const on = x === b;
+    x.classList.toggle('on', on);
+    x.setAttribute('aria-checked', String(on));
+  });
+  block.classList.remove('has-error');
+  const err = block.querySelector('.aerr'); if (err) err.remove();
+  answerErrors.delete(uid);
+  updateAnswerChrome();
+});
+
+$('#sendAnswers').onclick = ()=>{
+  answerErrors = new Set();
+  const missing = fields.filter(f=>f.kind!=='heading' && f.required && !isAnswered(f));
+  if (missing.length){
+    missing.forEach(f=>answerErrors.add(f.uid));
+    renderAnswer();
+    const first = document.querySelector(`[data-q="${missing[0].uid}"]`);
+    if (first) first.scrollIntoView({behavior:'smooth', block:'center'});
+    const foot = $('#ansFoot');
+    foot.classList.add('error');
+    $('#ansFootInfo').innerHTML =
+      `<b>${missing.length}</b> required question${missing.length>1?'s':''} still need an answer`;
+    toast(`${missing.length} required question${missing.length>1?'s':''} still empty`);
+    return;
+  }
+  $('#answerList').hidden = true;
+  $('#ansFoot').hidden = true;
+  $('#ansSuccess').hidden = false;
+  window.scrollTo({top:0, behavior:'smooth'});
+};
+
+$('#editAnswers').onclick = ()=>{
+  $('#ansSuccess').hidden = true;
+  $('#answerList').hidden = false;
+  $('#ansFoot').hidden = false;
+};
+
+/* view switch */
+$('#viewSeg').onclick = (e)=>{
+  const b = e.target.closest('button'); if (!b) return;
+  const view = b.dataset.view;
+  [...e.currentTarget.children].forEach(x=>x.classList.toggle('on', x===b));
+  $('#screen-editor').hidden = view !== 'editor';
+  $('#screen-answer').hidden = view !== 'answer';
+  if (view === 'answer'){ renderAnswer(); window.scrollTo({top:0}); }
+};
+
+/* a few answers already given, so the states are visible */
+(function seedAnswers(){
+  const pick = (i, v) => { if (fields[i]) answers[fields[i].uid] = v; };
+  pick(1, 'Nurul Aisyah binti Ahmad');
+  pick(2, '2023837334');
+  pick(3, 'Peserta');
+  pick(5, 3); pick(6, 4); pick(7, 4);
+  pick(13, 4);
+})();
+
+$('#togRsvp').onclick = (e)=>{
+  const el = e.currentTarget;
+  el.classList.toggle('on');
+  el.setAttribute('aria-pressed', el.classList.contains('on'));
+  dirty = true; render();
+};
+$('#togCheckin').onclick = (e)=>{
+  const el = e.currentTarget;
+  el.classList.toggle('on');
+  el.setAttribute('aria-pressed', el.classList.contains('on'));
+  dirty = true; render();
+};
+
+let toastTimer;
+function toast(msg){
+  const t = $('#toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+$('#saveBtn').onclick = ()=>{ dirty = false; render(); toast('Form saved'); };
+
+const dlg = $('#publishDlg');
+$('#publishBtn').onclick = ()=>{
+  const a = analyse();
+  const noLabel = fields.filter(f=>!f.label.trim()).length;
+  const notes = [
+    `<li><b>${a.questions}</b> questions — <b>${a.pre.length}</b> counted before, <b>${a.post.length}</b> after, <b>${a.fb.length}</b> feedback.</li>`,
+    `<li><b>${a.required}</b> are required.</li>`,
+  ];
+  if (noLabel) notes.push(`<li><b>${noLabel}</b> still need a label.</li>`);
+  if (!a.questions) notes.push('<li>The form has no questions yet.</li>');
+  $('#publishNotes').innerHTML = notes.join('');
+  dlg.showModal();
+};
+$('#cancelPublish').onclick = ()=>dlg.close();
+$('#confirmPublish').onclick = ()=>{
+  dlg.close();
+  const badge = $('#statusBadge');
+  badge.className = 'badge live'; badge.textContent = 'Open';
+  dirty = false; render();
+  toast('Form published');
+};
+
+$('#themeSeg').onclick = (e)=>{
+  const b = e.target.closest('button'); if (!b) return;
+  document.documentElement.dataset.theme = b.dataset.theme;
+  [...e.currentTarget.children].forEach(x=>x.classList.toggle('on', x===b));
+};
+$('#widthSeg').onclick = (e)=>{
+  const b = e.target.closest('button'); if (!b) return;
+  document.body.classList.toggle('phone', b.dataset.w==='phone');
+  [...e.currentTarget.children].forEach(x=>x.classList.toggle('on', x===b));
+};
+
+/* ?theme=istana|noir and ?width=phone, so a state can be linked to */
+(function(){
+  const p = new URLSearchParams(location.search);
+  const th = p.get('theme');
+  if (th) {
+    document.documentElement.dataset.theme = th;
+    [...$('#themeSeg').children].forEach(x=>x.classList.toggle('on', x.dataset.theme===th));
+  }
+  if (p.get('width')==='phone'){
+    document.body.classList.add('phone');
+    [...$('#widthSeg').children].forEach(x=>x.classList.toggle('on', x.dataset.w==='phone'));
+  }
+  if (p.get('view')==='answer'){
+    $('#viewSeg').querySelector('[data-view="answer"]').click();
+  }
+  // ?state=errors|sent — jump straight to the two answer-sheet end states
+  const st = p.get('state');
+  if (st === 'errors'){
+    setTimeout(()=>{ const b = document.getElementById('sendAnswers'); if (b) b.click(); }, 150);
+  }
+  if (st === 'sent'){
+    setTimeout(()=>{
+      fields.filter(f=>f.kind!=='heading' && !isAnswered(f)).forEach(f=>{
+        answers[f.uid] = f.kind === 'rating' ? 4 : 'Terima kasih, program ini sangat bermanfaat.';
+      });
+      updateAnswerChrome();
+      document.getElementById('answerList').hidden = true;
+      document.getElementById('ansFoot').hidden = true;
+      document.getElementById('ansSuccess').hidden = false;
+    }, 150);
+  }
+})();
+
+render();
+</script>
+</body>
+</html>

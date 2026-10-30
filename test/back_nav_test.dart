@@ -132,6 +132,11 @@ class _FormState extends State<_Form> {
         body: Column(children: [
           TextButton(onPressed: () => setState(() => dirty = true), child: const Text('type')),
           TextButton(
+            // As the editor's list icon: the analyses of this form.
+            onPressed: () => context.push('/event/e1/form/responses?f=f1&from=edit'),
+            child: const Text('open responses'),
+          ),
+          TextButton(
             onPressed: () => completePublish(context, '/item/new'),
             child: const Text('publish'),
           ),
@@ -191,7 +196,18 @@ Widget app(String initial) {
       root('/u/:id', (s) => page('/u/${s.pathParameters['id']}', links: const ['/post/p2'])),
       root('/tag/:t', (s) => page('/tag/${s.pathParameters['t']}')),
       root('/item/:id', (s) => page('/item/${s.pathParameters['id']}')),
-      root('/event/:id', (s) => page('/event/${s.pathParameters['id']}')),
+      root('/event/:id', (s) => page('/event/${s.pathParameters['id']}', links: [
+            '/event/e1/form',
+            '/event/e1/form/responses',
+            '/event/e1/form/edit',
+          ])),
+      // The form screens, shaped exactly like lib/router.dart: the answer page
+      // and the analyses are pushed pages (historyAwareExit), the editor is a
+      // form (leaveFormRoute).
+      root('/event/:id/form', (s) => page('/event/${s.pathParameters['id']}/form')),
+      root('/event/:id/form/responses',
+          (s) => page('/event/${s.pathParameters['id']}/form/responses')),
+      root('/event/:id/form/edit', (_) => const _Form(), onExit: leaveFormRoute),
       root('/clubs', (_) => page('/clubs', links: const ['/c/kelab'])),
       root('/c/:h', (s) => page('/c/${s.pathParameters['h']}', links: const ['/c/kelab/manage'])),
       root('/c/:h/manage', (s) => page('/c/${s.pathParameters['h']}/manage')),
@@ -363,6 +379,10 @@ void main() {
       expect(backFallbackFor('/item/i1/edit'), '/item/i1');
       expect(backFallbackFor('/event/e1/edit'), '/event/e1');
       expect(backFallbackFor('/post/p1/edit'), '/post/p1');
+      // The form screens belong to their event, not to the events list.
+      expect(backFallbackFor('/event/e1/form'), '/event/e1');
+      expect(backFallbackFor('/event/e1/form/edit'), '/event/e1');
+      expect(backFallbackFor('/event/e1/form/responses'), '/event/e1');
     });
 
     testWidgets('two levels cold: settings -> back -> profile -> back -> home', (t) async {
@@ -466,6 +486,87 @@ void main() {
       expect(shown(), '/item/new');
       await b.back(t);
       expect(shown(), '/market');
+    });
+  });
+
+  // ------------------------------------------------- the form screens (KI)
+
+  group('event form screens', () {
+    testWidgets('web: leaving the answer page adds no history entry', (t) async {
+      final b = FakeBrowser()..attach(t);
+      await t.pumpWidget(app('/home'));
+      await t.pumpAndSettle();
+      await open(t, '/event/e1');
+      await open(t, '/event/e1/form');
+      expect(b.length, 3);
+
+      await arrow(t);
+      expect(shown(), '/event/e1');
+      // Was 4: the pop was reported as a new entry, so the browser's back
+      // returned to the form that had just been closed.
+      expect(b.length, 3);
+
+      await b.back(t);
+      expect(shown(), '/home');
+      expect(find.text('page:/event/e1/form'), findsNothing);
+    });
+
+    testWidgets('web: back from the analyses lands on the editor, not a copy', (t) async {
+      final b = FakeBrowser()..attach(t);
+      await t.pumpWidget(app('/home'));
+      await t.pumpAndSettle();
+      await open(t, '/event/e1');
+      await open(t, '/event/e1/form/edit');
+      await t.tap(find.text('open responses'));
+      await t.pumpAndSettle();
+      expect(b.length, 4);
+
+      await arrow(t);
+      expect(shown(), '/event/e1/form/edit');
+      expect(b.length, 4);
+    });
+
+    testWidgets('cold open: the answer page goes up to its event', (t) async {
+      final b = FakeBrowser()..attach(t);
+      await t.pumpWidget(app('/event/e1/form'));
+      await t.pumpAndSettle();
+      final before = b.length;
+      await arrow(t);
+      expect(shown(), '/event/e1');
+      expect(b.length, before);
+    });
+
+    testWidgets('cold open: the analyses go up to their event', (t) async {
+      FakeBrowser().attach(t);
+      await t.pumpWidget(app('/event/e1/form/responses'));
+      await t.pumpAndSettle();
+      await arrow(t);
+      expect(shown(), '/event/e1');
+    });
+
+    testWidgets('web: a dirty editor still asks, and Keep editing stays put', (t) async {
+      final b = FakeBrowser()..attach(t);
+      await t.pumpWidget(app('/home'));
+      await t.pumpAndSettle();
+      await open(t, '/event/e1');
+      await open(t, '/event/e1/form/edit');
+      await t.tap(find.text('type'));
+      await t.pump();
+
+      await b.back(t);
+      expect(find.text(en.discardChangesTitle), findsOneWidget);
+      await t.tap(find.text(en.keepEditing));
+      await t.pumpAndSettle();
+
+      // Still on the form, with the address bar back on it.
+      expect(find.text('page:/create/listing'), findsOneWidget);
+      expect(shown(), '/event/e1/form/edit');
+      expect(b.url, '/event/e1/form/edit');
+      // And the entry under it survived: discarding now leaves in one step.
+      await b.back(t);
+      await t.tap(find.text(en.discard));
+      await t.pumpAndSettle();
+      expect(shown(), '/event/e1');
     });
   });
 }

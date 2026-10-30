@@ -477,8 +477,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     final count =
         (_postData['comment_count'] as num?)?.toInt() ?? _comments.length;
 
-    // The headline is what the page is about, so it belongs in the bar;
-    // "Thread" / "Announcement" are only the fallback for an untitled one.
+    // The bar names the page ("Post thread" / "Announcement"); the
+    // headline is already the first thing in the body.
     final title = postPageTitle(
       _postData,
       thread: s.threadTitle,
@@ -693,7 +693,7 @@ class CommentComposer extends StatelessWidget {
     final fs = context.feedL10n;
 
     return Material(
-      color: theme.scaffoldBackgroundColor,
+      color: theme.colorScheme.surface,
       elevation: 0,
       child: Container(
         decoration: BoxDecoration(

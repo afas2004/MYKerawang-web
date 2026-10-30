@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,7 +14,7 @@ void main() {
   debugUseSystemFonts = true;
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  const widths = [375.0, 768.0, 1280.0];
+  const widths = [320.0, 375.0, 768.0, 1280.0];
 
   Widget gallery() => SingleChildScrollView(
         child: Column(
@@ -77,6 +79,13 @@ void main() {
               height: 200,
               child: BrandEmptyState(title: 'Compact', compact: true),
             ),
+            // Patterns, hems and covers fill whatever box they get: very
+            // short, very wide, and with a motif that must stay inside.
+            const SizedBox(height: 60, child: KPattern(kind: KPatternKind.star8, color: Colors.black12)),
+            const SizedBox(height: 24, child: KPattern(kind: KPatternKind.pucuk, color: Colors.black12, angle: 45)),
+            const SizedBox(height: 140, child: BrandCover(seed: 'kebudayaan', motif: AppMotif.wauBulan)),
+            const SizedBox(height: 40, child: BrandCover(seed: 'robotik', motif: AppMotif.sape)),
+            for (final i in AppIllo.values) AppIllustration(i, size: 160),
             SizedBox(
               height: 240,
               child: AdaptiveScaffoldBody(
@@ -135,31 +144,95 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('every illustration loads and renders', (tester) async {
-    await tester.pumpWidget(MaterialApp(
-      theme: buildAppTheme(AppTheme.noir),
-      home: Scaffold(
-        body: Wrap(children: [
-          for (final i in AppIllo.values) AppIllustration(i, size: 96),
-        ]),
-      ),
-    ));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
-    await tester.pump();
-    expect(tester.takeException(), isNull);
-    expect(find.byType(AppIllustration), findsNWidgets(AppIllo.values.length));
+  for (final size in [48.0, 200.0, 420.0]) {
+    testWidgets('every illustration loads and renders at ${size.toInt()}px',
+        (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        theme: buildAppTheme(AppTheme.noir),
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: Wrap(children: [
+              for (final i in AppIllo.values) AppIllustration(i, size: size),
+            ]),
+          ),
+        ),
+      ));
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      for (final i in AppIllo.values) {
+        expect(tester.getSize(find.byWidgetPredicate((w) => w is AppIllustration && w.illo == i)),
+            Size(size, size * 0.75));
+      }
+    });
+  }
+
+  for (final theme in AppTheme.values) {
+    testWidgets('the ground and tint covers render (${theme.name})', (tester) async {
+      tester.view.physicalSize = const Size(375, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(
+        theme: buildAppTheme(theme),
+        builder: (context, child) => KGround(child: child!),
+        home: Scaffold(
+          body: Column(children: [
+            for (final h in [24.0, 64.0, 140.0])
+              SizedBox(height: h, width: 200, child: KTintCover(seed: 'x$h', color: KPalette.biruLaut)),
+          ]),
+        ),
+      ));
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(find.byType(KTintCover), findsNWidgets(3));
+    });
+  }
+
+  test('every ground drawing is in the tile', () {
+    final svg = KGround.tileSvg(const Color(0xFF5E1A4F), 0.06);
+    for (final g in KGround.glyphs.values) {
+      expect(svg, contains(g));
+    }
   });
 
-  test('illustration recolour swaps the unDraw accent (and inks on dark)', () {
-    const svg = '<path fill="#6C63FF"/><path fill="#2f2e41"/><path fill="#a0616a"/>';
+  test('every scene asset is bundled', () {
+    final assets = {for (final i in AppIllo.values) ...AppIllustration.assetsOf(i)};
+    for (final a in assets) {
+      expect(File(a).existsSync(), isTrue, reason: a);
+    }
+    for (final m in AppMotif.values) {
+      expect(File(m.asset).existsSync(), isTrue, reason: m.asset);
+    }
+    // Path data must keep numbers apart: "0.30.5" (two numbers merged by a
+    // careless minifier) silently breaks the whole drawing on web.
+    final merged = RegExp(r'\d\.\d+\.\d');
+    for (final a in {...assets, for (final m in AppMotif.values) m.asset}) {
+      expect(merged.hasMatch(File(a).readAsStringSync()), isFalse, reason: a);
+    }
+  });
+
+  test('illustration recolour follows the theme (ink, fill, accent)', () {
+    const svg = '<path fill="#000000"/><path fill="#FFFFFF"/><path fill="#FF5678"/><path fill="#a0616a"/>';
     final light = buildAppTheme(AppTheme.kampus).colorScheme;
     final dark = buildAppTheme(AppTheme.noir).colorScheme;
-    final l = AppIllustration.recolor(svg, light);
-    final d = AppIllustration.recolor(svg, dark);
-    expect(l.toLowerCase(), isNot(contains('#6c63ff')));
-    expect(l, contains('#2f2e41')); // ink untouched on light themes
-    expect(d, isNot(contains('#2f2e41'))); // ink lifted on dark
-    expect(d, contains('#a0616a')); // skin tones never change
+    final l = AppIllustration.recolor(svg, light).toLowerCase();
+    final d = AppIllustration.recolor(svg, dark).toLowerCase();
+    expect(l, isNot(contains('#000000'))); // ink takes the text colour
+    expect(l, contains('#ffffff')); // fill stays white on light themes
+    expect(d, isNot(contains('#ffffff'))); // and darkens on Noir
+    expect(l, isNot(contains('#ff5678'))); // doodle pink becomes the accent
+    expect(d, contains('#a0616a')); // anything else is left alone
+  });
+
+  test('generated covers are stable and spread over the palette', () {
+    expect(KPalette.forKey('robotik'), KPalette.forKey('robotik'));
+    expect(stableHash('robotik'), stableHash('robotik'));
+    final used = {for (final h in ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']) KPalette.forKey(h)};
+    expect(used.length, greaterThan(2));
+    for (final c in KPalette.all) {
+      expect(contrastRatio(Colors.white, c), greaterThanOrEqualTo(4.5));
+    }
   });
 
   test('size classes and grid columns', () {

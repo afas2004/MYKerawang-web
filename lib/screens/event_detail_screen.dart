@@ -34,6 +34,7 @@ import 'events/attendance_live_screen.dart';
 import 'events/checkin_screens.dart';
 import '../widgets/restriction_gate.dart';
 import '../widgets/save_button.dart';
+import '../utils/url_rules.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final Map<String, dynamic> event;
@@ -439,7 +440,15 @@ class _EventDetailScreenState extends State<EventDetailScreen>
 
   // --- 2. SAFETY: LINK CHECKER ---
   Future<void> _launchSafeUrl(String url) async {
-    final uri = Uri.parse(url);
+    // First the scheme: a registration link is organiser text and must never
+    // be able to hand `javascript:` (or a file:) to the platform.
+    final uri = launchableUri(url);
+    if (uri == null) {
+      final s = context.l10nRead;
+      ScaffoldMessenger.maybeOf(context)
+          ?.showSnackBar(SnackBar(content: Text(s.linkUnsupported)));
+      return;
+    }
     final host = uri.host.toLowerCase().replaceFirst('www.', '');
 
     bool isTrusted = _trustedDomains.any((domain) => host.endsWith(domain));
@@ -598,7 +607,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                   _organiserRow(context),
                 ],
                 const SizedBox(height: KSpace.l),
-                _primaryAction(context),
+                KStampSwitcher(child: _primaryAction(context)),
                 const SizedBox(height: KSpace.m),
                 _secondaryActions(context),
               ],
@@ -693,7 +702,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         border: Border(top: BorderSide(color: scheme.outlineVariant)),
       ),
       padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, KSpace.m),
-      child: SafeArea(top: false, child: _primaryAction(context)),
+      child: SafeArea(top: false, child: KStampSwitcher(child: _primaryAction(context))),
     );
   }
 
@@ -1058,9 +1067,11 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                             ?.copyWith(color: scheme.onSurfaceVariant)),
                   ),
                   Expanded(
-                    child: Text(value,
+                    // FormattedBody so a club mention (the co-organiser,
+                    // usually) shows as its chip.
+                    child: FormattedBody(value,
                         style: theme.textTheme.bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.w500)),
+                            ?.copyWith(fontWeight: FontWeight.w500, color: scheme.onSurface)),
                   ),
                 ],
               ),
@@ -1273,8 +1284,16 @@ class _EventDetailScreenState extends State<EventDetailScreen>
 
   /// A contact button opens the channel straight away — no sheet, no list.
   Future<void> _openContact(ContactLink link) async {
-    final uri = Uri.tryParse(link.url);
-    if (uri == null) return;
+    // The channel values are typed by an organiser; a Telegram/Instagram
+    // "handle" that carries a scheme is used as a URL, so the scheme is
+    // checked here too (mailto and tel are legitimate contact channels).
+    final uri = launchableUri(link.url);
+    if (uri == null) {
+      final s = context.l10nRead;
+      ScaffoldMessenger.maybeOf(context)
+          ?.showSnackBar(SnackBar(content: Text(s.linkUnsupported)));
+      return;
+    }
     try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
@@ -1440,6 +1459,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     // newly join.
     if (_isJoined) {
       return OutlinedButton.icon(
+        key: const ValueKey('joined'),
         onPressed: _toggleJoin,
         style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
         icon: const Icon(AppIcons.calendarJoined, size: 18),
@@ -1447,10 +1467,12 @@ class _EventDetailScreenState extends State<EventDetailScreen>
       );
     }
     return FilledButton.icon(
+      key: const ValueKey('join'),
       onPressed: (_isClosed || _registrationClosed || _isFullAtCapacity)
           ? null
           : _toggleJoin,
-      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+      // The page's one accent action.
+      style: accentButtonStyle(context, minimumSize: const Size.fromHeight(52)),
       icon: Icon(_isCancelled ? AppIcons.cancel : AppIcons.calendarAdd, size: 18),
       label: Text(_isCancelled
           ? s.cancelled

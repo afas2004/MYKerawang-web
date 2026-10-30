@@ -37,7 +37,7 @@ Widget _guestBottomBar(BuildContext context, String label) {
     Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
+        color: theme.colorScheme.surface,
         boxShadow: [
           BoxShadow(
               color: theme.colorScheme.shadow.withValues(alpha: 0.05),

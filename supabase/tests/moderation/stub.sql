@@ -52,3 +52,24 @@ create policy pr_sel on public.profiles for select using (true);
 create policy pr_upd on public.profiles for update using (id = auth.uid());
 alter table public.notifications enable row level security;
 create policy n_sel on public.notifications for select using (user_id = auth.uid());
+
+-- Storage: the real project has these two buckets, and
+-- 20261026014100_storage_image_limits.sql updates storage.buckets. Without
+-- them every migration suite stopped at that file (found in the October
+-- security review: the harness had been red since the storage limits landed).
+-- storage.objects is NOT created here — tests that need bucket policies
+-- create it themselves (see supabase/tests/security/security_test.mjs).
+create schema if not exists storage;
+create table if not exists storage.buckets (
+  id                 text primary key,
+  name               text,
+  public             boolean default true,
+  allowed_mime_types text[],
+  file_size_limit    bigint,
+  created_at         timestamptz default now()
+);
+insert into storage.buckets (id, name) values ('images','images'), ('avatars','avatars')
+  on conflict (id) do nothing;
+grant usage on schema storage to anon, authenticated;
+grant select on storage.buckets to anon, authenticated;
+

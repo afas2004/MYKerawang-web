@@ -12,7 +12,7 @@ import '../utils/adaptive.dart';
 import '../utils/formatters.dart';
 import '../utils/app_nav.dart';
 import '../utils/form_draft.dart';
-import '../widgets/category_picker.dart';
+import '../widgets/category_field.dart';
 import '../widgets/form_layout.dart';
 import '../widgets/media_picker_grid.dart';
 import '../widgets/restriction_gate.dart';
@@ -459,10 +459,13 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                   const SizedBox(height: 16),
                   Text(s.category, style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 8),
-                  CategoryPicker(
+                  // Type-to-search, like the event form: the full chip
+                  // wall was too many to scan on a phone.
+                  CategoryField(
                     kind: 'listing',
                     value: _categories,
                     onChanged: (v) => setState(() => _categories = v),
+                    hintText: s.eventCategoryHint,
                   ),
                   const SizedBox(height: 6),
                   Text(

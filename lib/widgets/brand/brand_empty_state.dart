@@ -48,7 +48,7 @@ class BrandEmptyState extends StatelessWidget {
     final scheme = theme.colorScheme;
 
     final Widget art = (illo != null && !compact)
-        ? AppIllustration(illo!, size: 168)
+        ? AppIllustration(illo!, size: 200)
         : Container(
             width: compact ? 56 : 72,
             height: compact ? 56 : 72,

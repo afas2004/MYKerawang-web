@@ -347,6 +347,17 @@ class _PostCardState extends State<PostCard> {
   }
 }
 
+/// The author's colour (the same one their profile banner and ring use),
+/// or a quiet grey for anonymous posts.
+Color _authorColor(BuildContext context, Map<String, dynamic> post) {
+  final theme = Theme.of(context);
+  if (post['is_anonymous'] == true) return theme.colorScheme.outlineVariant;
+  final raw = post['profiles'];
+  final profile = raw is List && raw.isNotEmpty ? raw.first : (raw is Map ? raw : null);
+  final seed = '${profile?['id'] ?? post['user_id'] ?? profile?['username'] ?? post['id']}';
+  return KPalette.onTheme(KPalette.forKey(seed), theme.brightness);
+}
+
 /// Avatar 40 · name (semibold) ✓ role · @handle · time — one line.
 /// Anonymous posts: neutral avatar and just "Anonymous · time".
 class _AuthorRow extends StatelessWidget {
@@ -377,8 +388,15 @@ class _AuthorRow extends StatelessWidget {
     final meta = theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant);
     final canOpen = !isAnon && profile != null;
 
-    final avatar = CircleAvatar(
-      radius: 20,
+    // A thin ring in the author's colour, with a card-coloured gap.
+    final avatar = Container(
+      padding: const EdgeInsets.all(1.5),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: _authorColor(context, post), width: 1.5),
+      ),
+      child: CircleAvatar(
+      radius: 18.5,
       backgroundColor:
           isAnon ? scheme.surfaceContainerHighest : scheme.primaryContainer,
       backgroundImage:
@@ -388,6 +406,7 @@ class _AuthorRow extends StatelessWidget {
               size: 20,
               color: isAnon ? scheme.onSurfaceVariant : scheme.onPrimaryContainer)
           : null,
+      ),
     );
 
     return Row(

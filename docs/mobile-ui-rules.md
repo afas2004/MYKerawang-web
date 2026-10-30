@@ -68,6 +68,17 @@ Sources read (2026-10-25):
     `Answer the KI form`), and the error copy says what to do
     ("A matric number is 6-12 digits"), not what failed.
 
+### Editors
+
+16. **A setting the user can change is visible on the object it changes.** No
+    dialog that holds half a question's settings: the form editor puts type,
+    counting tag, KI element, scale and required on the row, aligned the same
+    way down the list. What a row does *not* have, it says ("Not counted"),
+    because an absent control reads as a control you have not found.
+    See `docs/ki-event-reports.md` ("The editor — what 'simple' means").
+17. **Reordering gets both affordances.** Drag for the pointer, arrows for the
+    keyboard and for touch; they mutate one list, so the two can never disagree.
+
 ## Where to look
 
 | Rule | Code |
@@ -75,6 +86,8 @@ Sources read (2026-10-25):
 | Field validation | `lib/utils/form_rules.dart` (`validateAnswer`, `answerProgress`) |
 | Answer page timing | `lib/screens/events/event_form_screen.dart` (`_touch`, `_check`, `_submit`) |
 | Progress | `_Progress` in the same file |
+| Analysis colours | `lib/widgets/form_style.dart` (`AnalysisStyle`) |
+| Form editor rows | `lib/screens/events/form_editor_screen.dart` |
 | Attendance flow | `lib/screens/events/attendance_live_screen.dart` |
 | Window rule | `lib/utils/event_live.dart` |
 | Copy | `lib/l10n/*.dart` |

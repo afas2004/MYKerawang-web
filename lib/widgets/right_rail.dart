@@ -28,7 +28,17 @@ class RightRail extends StatefulWidget {
   /// Defaults to Supabase; tests inject a fake.
   final RightRailLoader? loader;
 
-  const RightRail({super.key, this.loader});
+  /// Leave out the card for the page it sits beside (no "Events this week"
+  /// next to Events, no "Fresh in the market" next to Market).
+  final bool showEvents;
+  final bool showItems;
+
+  const RightRail({
+    super.key,
+    this.loader,
+    this.showEvents = true,
+    this.showItems = true,
+  });
 
   @override
   State<RightRail> createState() => _RightRailState();
@@ -83,16 +93,10 @@ class _RightRailState extends State<RightRail> {
           final loading = snap.connectionState != ConnectionState.done;
           final data = snap.data;
           return ListView(
-            padding: const EdgeInsets.fromLTRB(8, 12, 16, 16),
+            // Starts level with the tab's content, under its page header;
+            // no refresh button floating above (an error card keeps Retry).
+            padding: const EdgeInsets.fromLTRB(0, KBand.desktopHeight, KSpace.l, KSpace.l),
             children: [
-              Align(
-                alignment: Alignment.centerRight,
-                child: IconButton(
-                  tooltip: s.refresh,
-                  onPressed: loading ? null : _refresh,
-                  icon: const Icon(AppIcons.refresh),
-                ),
-              ),
               if (snap.hasError)
                 _RailCard(
                   child: Column(
@@ -107,7 +111,7 @@ class _RightRailState extends State<RightRail> {
                   ),
                 )
               else ...[
-                _RailCard(
+                if (widget.showEvents) _RailCard(
                   header: SectionHeader(
                     title: data?.pastEvents == true
                         ? s.pastEvents
@@ -126,8 +130,9 @@ class _RightRailState extends State<RightRail> {
                               ],
                             ),
                 ),
-                const SizedBox(height: KSpace.l),
-                _RailCard(
+                if (widget.showEvents && widget.showItems)
+                  const SizedBox(height: KSpace.l),
+                if (widget.showItems) _RailCard(
                   header: SectionHeader(
                     title: s.newInMarket,
                     seeAllLabel: s.seeAll,

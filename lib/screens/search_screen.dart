@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../utils/tags.dart';
+import '../utils/filter_rules.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -11,6 +12,7 @@ import '../language_cubit.dart';
 import '../utils/app_nav.dart';
 import '../utils/formatters.dart';
 import '../utils/roles.dart';
+import '../widgets/after_fonts_load.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/status_badge.dart';
 
@@ -89,15 +91,10 @@ class _SearchScreenState extends State<SearchScreen> {
     await _performSearch();
   }
 
-  /// The query as a safe PostgREST filter value. `,` `(` `)` split or
-  /// group `.or()` terms, `"` `\` quote, `:` casts — none mean anything
-  /// to a user, so they become spaces. A leading @ (handle search) is
-  /// dropped so "@ali" and "ali" match the same people.
-  static String _filterSafe(String raw) => raw
-      .replaceAll(RegExp(r'[,()"\\:]'), ' ')
-      .replaceAll(RegExp(r'\s+'), ' ')
-      .trim()
-      .replaceFirst(RegExp(r'^@+'), '');
+  /// The query as a safe PostgREST filter value (see [filterSafe]); a leading
+  /// @ (handle search) is dropped so "@ali" and "ali" match the same people.
+  static String _filterSafe(String raw) =>
+      filterSafe(raw).replaceFirst(RegExp(r'^@+'), '');
 
   bool _hasEnded(Map<String, dynamic> event) {
     final end = parseLocal(event['end_datetime']) ??
@@ -334,7 +331,10 @@ class _SearchScreenState extends State<SearchScreen> {
     // Search field lives in the app bar; filter chips sit right under it.
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 64,
+        // Desktop: the field sits in the page-header row, level with the
+        // other tabs' titles, on the page's own ground.
+        toolbarHeight: Responsive.isDesktop(context) ? KBand.desktopHeight : 64,
+        backgroundColor: Responsive.isDesktop(context) ? Colors.transparent : null,
         titleSpacing: KSpace.l,
         title: TextField(
           controller: _searchCtrl,
@@ -387,7 +387,9 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
-          child: SizedBox(
+          // Rebuilt once the web fonts load (labels otherwise keep the
+          // fallback width and lose their last letter).
+          child: AfterFontsLoad(child: SizedBox(
             height: 56,
             child: ListView(
               scrollDirection: Axis.horizontal,
@@ -405,7 +407,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
               ],
             ),
-          ),
+          )),
         ),
       ),
       body: Center(

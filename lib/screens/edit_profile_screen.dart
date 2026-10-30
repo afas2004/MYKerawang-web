@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import '../utils/image_compressor.dart'; // Ensure you have this file from previous steps
 import '../utils/local_image.dart';
+import '../utils/photo_rules.dart';
 import '../widgets/image_crop_dialog.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/account_strings.dart';
@@ -118,6 +119,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (picked == null) return;
 
     var img = await LocalImage.fromXFile(picked);
+
+    // Bytes, not the file name: refuse a renamed file or an oversized image
+    // before it reaches the crop dialog (which decodes it).
+    final issue = checkPhoto(img.bytes);
+    if (issue != null) {
+      if (!mounted) return;
+      final s = context.l10nRead;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text(photoProblemText(s, issue))));
+      return;
+    }
 
     // Avatars go through a crop popup so the user chooses the visible area
     // instead of the app blind-cropping the centre.
@@ -610,7 +622,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         child: Container(
           padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.s, KSpace.l, KSpace.m),
           decoration: BoxDecoration(
-            color: theme.scaffoldBackgroundColor,
+            color: theme.colorScheme.surface,
             border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
           ),
           // heightFactor: 1 — a bare Center expands to the full height the

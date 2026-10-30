@@ -9,9 +9,13 @@ import '../../l10n/app_strings.dart';
 import '../../theme/app_themes.dart' show kOnPhoto, photoScrim;
 import '../../language_cubit.dart';
 import '../../utils/app_nav.dart';
+import '../../utils/club_mentions.dart';
 import '../../utils/formatters.dart';
+import '../../utils/url_rules.dart';
 import '../../widgets/brand/brand.dart';
+import '../../widgets/club_mention_chip.dart';
 import '../../widgets/error_state.dart';
+import '../../widgets/linear_refresher.dart';
 import '../../widgets/profile_avatar_action.dart';
 import '../../widgets/shell_actions.dart';
 import '../../widgets/tap_card.dart';
@@ -100,7 +104,9 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   Widget build(BuildContext context) {
     final s = context.l10n;
     return Scaffold(
-      appBar: AppBar(
+      appBar: KBand.appBar(
+        context,
+        tone: KBand.news,
         title: Text(s.hub.title),
         actions: [
           const ShellSearchButton(),
@@ -111,13 +117,17 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
               icon: const Icon(AppIcons.compose),
               onPressed: _newAnnouncement,
             ),
-          IconButton(
-            tooltip: s.refresh,
-            icon: const Icon(AppIcons.refresh),
-            onPressed: _load,
-          ),
+          // No refresh button: pull down to refresh, like every other tab.
           const ProfileAvatarAction(),
           const SizedBox(width: KSpace.s),
+        ],
+        desktopActions: [
+          if (_canPost)
+            FilledButton.tonalIcon(
+              onPressed: _newAnnouncement,
+              icon: const Icon(AppIcons.compose, size: 18),
+              label: Text(s.hub.newAnnouncement),
+            ),
         ],
       ),
       body: _body(context),
@@ -131,7 +141,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
 
     final data = _data ?? AnnouncementsData.empty;
     if (data.items.isEmpty && data.upcomingEvents.isEmpty) {
-      return RefreshIndicator(
+      return LinearRefresher(
         onRefresh: _load,
         child: LayoutBuilder(
           builder: (context, c) => SingleChildScrollView(
@@ -158,25 +168,24 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
         _channel == null &&
         (_category == null || _category == AnnouncementCategory.event);
 
-    return RefreshIndicator(
+    return LinearRefresher(
       onRefresh: _load,
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           if (!filtering && data.featured.isNotEmpty)
             SliverToBoxAdapter(child: _HeroCarousel(items: data.featured)),
-          if (channels.isNotEmpty)
-            SliverToBoxAdapter(
-              child: _ChannelRow(
-                channels: channels,
-                selected: _channel,
-                onSelect: (key) => setState(() => _channel = key),
-              ),
-            ),
           SliverToBoxAdapter(
-            child: _CategoryTabs(
-              selected: _category,
-              onSelect: (c) => setState(() => _category = c),
+            child: _FilterRow(
+              category: _category,
+              channels: channels,
+              channel: _channel,
+              onCategory: (c) => setState(() => _category = c),
+              onChannel: (key) => setState(() => _channel = key),
+              onAll: () => setState(() {
+                _category = null;
+                _channel = null;
+              }),
             ),
           ),
           if (showEvents)
@@ -225,6 +234,19 @@ String categoryLabel(AppStrings s, AnnouncementCategory c) => switch (c) {
       AnnouncementCategory.general => s.hub.catGeneral,
     };
 
+/// Each category's colour, from the brand palette. Used for the card rail
+/// and the no-photo cover; lifted on dark themes so the rail still reads.
+Color categoryColor(AnnouncementCategory c, [Brightness b = Brightness.light]) {
+  final base = switch (c) {
+    AnnouncementCategory.kolej => KPalette.plum,
+    AnnouncementCategory.jpk => KPalette.biruLaut,
+    AnnouncementCategory.club => KPalette.jingga,
+    AnnouncementCategory.event => KPalette.hijauPucuk,
+    AnnouncementCategory.general => KPalette.kelabuArang,
+  };
+  return b == Brightness.dark ? Color.lerp(base, Colors.white, 0.45)! : base;
+}
+
 IconData categoryIcon(AnnouncementCategory c) => switch (c) {
       AnnouncementCategory.kolej => AppIcons.official,
       AnnouncementCategory.jpk => AppIcons.people,
@@ -234,8 +256,14 @@ IconData categoryIcon(AnnouncementCategory c) => switch (c) {
     };
 
 /// Opens an announcement's action link in a new tab / the browser app.
-Future<void> openAnnouncementLink(Uri url) =>
-    launchUrl(url, mode: LaunchMode.externalApplication, webOnlyWindowName: '_blank');
+///
+/// The link is DB text, so it goes through the same scheme allowlist as every
+/// other remote link: a host-less `https:javascript:…` is not launchable.
+Future<void> openAnnouncementLink(Uri url) async {
+  final safe = launchableUri(url.toString());
+  if (safe == null) return;
+  await launchUrl(safe, mode: LaunchMode.externalApplication, webOnlyWindowName: '_blank');
+}
 
 class _CategoryEmpty extends StatelessWidget {
   final AnnouncementCategory? category;
@@ -352,7 +380,7 @@ class _HeroSlide extends StatelessWidget {
     final theme = Theme.of(context);
     final s = context.l10n;
     final cover = item.coverUrl;
-    final title = item.title.isNotEmpty ? item.title : item.body;
+    final title = item.title.isNotEmpty ? item.title : _excerpt(item.body);
     final badge = item.featured
         ? (s.hub.featured, AppIcons.sparkle)
         : item.pinned
@@ -428,26 +456,20 @@ class _HeroSlide extends StatelessWidget {
   }
 }
 
-/// No cover photo: a tinted card with the category's icon.
+/// No cover photo: the category's colour and its icon (no pattern — the
+/// ground carries that — and no gradient placeholder).
 class _CategoryCover extends StatelessWidget {
   final AnnouncementCategory category;
   const _CategoryCover({required this.category});
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [scheme.primary, Color.lerp(scheme.primary, Colors.black, 0.35)!],
-        ),
-      ),
+    return ColoredBox(
+      color: categoryColor(category),
       child: Align(
         alignment: const Alignment(0.85, -0.6),
         child: Icon(categoryIcon(category),
-            size: 56, color: kOnPhoto.withValues(alpha: 0.25)),
+            size: 56, color: kOnPhoto.withValues(alpha: 0.3)),
       ),
     );
   }
@@ -482,63 +504,6 @@ class _Pill extends StatelessWidget {
 
 // ------------------------------------------------------------ channels
 
-class _ChannelRow extends StatelessWidget {
-  final List<AnnouncementChannel> channels;
-  final String? selected;
-  final ValueChanged<String?> onSelect;
-
-  const _ChannelRow({
-    required this.channels,
-    required this.selected,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final s = context.l10n;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SectionHeader(title: s.hub.channels),
-        SizedBox(
-          height: 48,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: KSpace.gutter),
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(right: KSpace.s),
-                child: ChoiceChip(
-                  label: Text(s.hub.allChannels),
-                  selected: selected == null,
-                  onSelected: (_) => onSelect(null),
-                ),
-              ),
-              for (final c in channels)
-                Padding(
-                  padding: const EdgeInsets.only(right: KSpace.s),
-                  child: ChoiceChip(
-                    avatar: _ChannelAvatar(channel: c, radius: 12),
-                    label: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Text(c.name),
-                      if (c.verified) ...[
-                        const SizedBox(width: 4),
-                        Icon(AppIcons.verified,
-                            size: 14, color: KTokens.of(context).accent),
-                      ],
-                    ]),
-                    selected: selected == c.key,
-                    onSelected: (on) => onSelect(on ? c.key : null),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _ChannelAvatar extends StatelessWidget {
   final AnnouncementChannel channel;
   final double radius;
@@ -561,21 +526,34 @@ class _ChannelAvatar extends StatelessWidget {
   }
 }
 
-// ------------------------------------------------------------ categories
+// --------------------------------------------------------------- filters
 
-class _CategoryTabs extends StatelessWidget {
-  final AnnouncementCategory? selected;
-  final ValueChanged<AnnouncementCategory?> onSelect;
+/// One row of filters: All, the categories, then the official channels
+/// (with their avatars) after a thin divider. All clears both; a category
+/// and a channel can be combined.
+class _FilterRow extends StatelessWidget {
+  final AnnouncementCategory? category;
+  final List<AnnouncementChannel> channels;
+  final String? channel;
+  final ValueChanged<AnnouncementCategory?> onCategory;
+  final ValueChanged<String?> onChannel;
+  final VoidCallback onAll;
 
-  const _CategoryTabs({required this.selected, required this.onSelect});
+  const _FilterRow({
+    required this.category,
+    required this.channels,
+    required this.channel,
+    required this.onCategory,
+    required this.onChannel,
+    required this.onAll,
+  });
 
   @override
   Widget build(BuildContext context) {
     final s = context.l10n;
-    final options = <(AnnouncementCategory?, String)>[
-      (null, s.hub.catAll),
-      for (final c in AnnouncementCategory.values) (c, categoryLabel(s, c)),
-    ];
+    final scheme = Theme.of(context).colorScheme;
+    Widget gap(Widget child) =>
+        Padding(padding: const EdgeInsets.only(right: KSpace.s), child: child);
     return Padding(
       padding: const EdgeInsets.only(top: KSpace.m),
       child: SizedBox(
@@ -584,16 +562,43 @@ class _CategoryTabs extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: KSpace.gutter),
           children: [
-            for (final (value, label) in options)
-              Padding(
-                padding: const EdgeInsets.only(right: KSpace.s),
-                child: ChoiceChip(
-                  label: Text(label),
-                  selected: selected == value,
-                  showCheckmark: false,
-                  onSelected: (_) => onSelect(value),
+            gap(ChoiceChip(
+              label: Text(s.hub.catAll),
+              selected: category == null && channel == null,
+              showCheckmark: false,
+              onSelected: (_) => onAll(),
+            )),
+            for (final c in AnnouncementCategory.values)
+              gap(ChoiceChip(
+                label: Text(categoryLabel(s, c)),
+                selected: category == c,
+                showCheckmark: false,
+                onSelected: (on) => onCategory(on ? c : null),
+              )),
+            if (channels.isNotEmpty)
+              Center(
+                child: Container(
+                  width: 1,
+                  height: 24,
+                  margin: const EdgeInsets.only(right: KSpace.s),
+                  color: scheme.outlineVariant,
                 ),
               ),
+            for (final c in channels)
+              gap(ChoiceChip(
+                avatar: _ChannelAvatar(channel: c, radius: 12),
+                label: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(c.name),
+                  if (c.verified) ...[
+                    const SizedBox(width: 4),
+                    Icon(AppIcons.verified,
+                        size: 14, color: KTokens.of(context).accent),
+                  ],
+                ]),
+                selected: channel == c.key,
+                showCheckmark: false,
+                onSelected: (on) => onChannel(on ? c.key : null),
+              )),
           ],
         ),
       ),
@@ -639,9 +644,11 @@ class _EventTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final start = parseLocal(event['start_datetime']);
     final image = event['image_url'] as String?;
+    final seed = '${event['id'] ?? event['title']}';
+    // No photo: the same calm tint cover as Home's event cards.
+    final tint = KTintCover(seed: seed, color: KPalette.forKey(seed));
     return SizedBox(
       width: 220,
       child: KCard(
@@ -658,13 +665,9 @@ class _EventTile extends StatelessWidget {
                       imageUrl: image,
                       fit: BoxFit.cover,
                       memCacheWidth: 500,
-                      errorWidget: (_, __, ___) =>
-                          ColoredBox(color: scheme.surfaceContainerHighest),
+                      errorWidget: (_, __, ___) => tint,
                     )
-                  : ColoredBox(
-                      color: scheme.primaryContainer,
-                      child: Icon(AppIcons.events,
-                          color: scheme.onPrimaryContainer)),
+                  : tint,
             ),
             Padding(
               padding: const EdgeInsets.all(KSpace.m),
@@ -745,8 +748,18 @@ class AnnouncementCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(children: [
-                      Text(categoryLabel(s, a.category).toUpperCase(),
-                          style: theme.textTheme.labelSmall
+                      // Category colour rail.
+                      Container(
+                        width: 4,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: categoryColor(a.category, theme.brightness),
+                          borderRadius: const BorderRadius.all(Radius.circular(2)),
+                        ),
+                      ),
+                      const SizedBox(width: KSpace.s),
+                      Text(categoryLabel(s, a.category),
+                          style: theme.textTheme.labelMedium
                               ?.copyWith(color: scheme.tertiary)),
                       const SizedBox(width: KSpace.s),
                       Flexible(
@@ -764,7 +777,7 @@ class AnnouncementCard extends StatelessWidget {
                           style: theme.textTheme.titleMedium),
                     if (a.body.isNotEmpty) ...[
                       const SizedBox(height: KSpace.xs),
-                      Text(a.body,
+                      Text(_excerpt(a.body),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodyMedium
@@ -871,4 +884,10 @@ class _HubSkeleton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A body shown as plain text: club mentions read as the club's name.
+String _excerpt(String body) {
+  ClubMentionDirectory.ensureLoaded();
+  return plainClubMentions(body, ClubMentionDirectory.names);
 }

@@ -19,7 +19,9 @@ import 'services/known_accounts.dart';
 import 'services/saved_items.dart';
 import 'services/unread_notifications.dart';
 import 'services/update_service.dart';
+import 'services/art_credits.dart';
 import 'widgets/update_banner.dart';
+import 'widgets/brand/k_ground.dart';
 import 'l10n/account_strings.dart';
 import 'l10n/app_strings.dart';
 import 'utils/responsive.dart';
@@ -71,6 +73,13 @@ void main() async {
   // Web: poll for newer deploys so phones don't sit on a stale build.
   UpdateService.instance.start();
 
+  // Credit the bundled illustrations on the licences page.
+  registerArtCredits();
+
+  // The fonts first, behind the splash, so no text is measured with a
+  // stand-in font.
+  await preloadThemeFonts();
+
   runApp(const MyApp());
 }
 
@@ -106,7 +115,10 @@ class _MyAppState extends State<MyApp> {
             // has a real medium (600–899) layout.
             builder: (context, child) => SessionWatcher(
               child: UpdateBanner(
-                child: ResponsiveShell(clampMidBand: false, child: child!),
+                // The one ground behind every page (doodle wallpaper).
+                child: KGround(
+                  child: ResponsiveShell(clampMidBand: false, child: child!),
+                ),
               ),
             ),
 
