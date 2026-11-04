@@ -42,6 +42,54 @@
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://zxjuqpqzyzmegdjttzyz.supabase.co" crossorigin>
+  <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin>
+
+  <!-- Google Analytics 4, using the measurement ID of the Firebase web app
+       "mykerawang-app" (Firebase Analytics for web is GA4 underneath, so the
+       numbers land in the property the Firebase console reads).
+       gtag.js rather than the Firebase JS SDK: the SDK's getAnalytics ships a
+       few hundred KB to send the same page_view, and Dart can't call it
+       without JS interop anyway. The measurement ID is a public identifier,
+       not a secret - restrict the key by HTTP referrer instead.
+       Honest limit: Flutter web is a single HTML page, so this records one
+       page_view per load. Moving between /market, /events and /post/:id does
+       not fire another; per-route events would need a gtag call from
+       lib/router.dart. -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-8WDECB3VBY"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+
+    // Report the route's SHAPE, never the real URL. Two of our URLs carry a
+    // credential in the query string, and this script runs in the page head, long
+    // before Flutter boots and the router can clean them up:
+    //   * /?code=<oauth code>         Google sign-in (lib/router.dart removes
+    //                                 `code`, but only once the app starts)
+    //   * /event/:id/checkin?t=<tok>  the attendance QR's camera fallback
+    // Ids stay out regardless: /u/<uuid> names a real student, and anyone
+    // holding that id can open their profile. Shapes also read better in the
+    // reports - one "/post/:id" row instead of hundreds of opaque URLs.
+    // utm_* and gclid survive, or campaign links would lose attribution.
+    function mkLocation() {
+      var seg = location.pathname.split('/'); // ["", "post", "<id>", ...]
+      var ids = { post: ':id', event: ':id', item: ':id', u: ':id',
+                  f: ':id', c: ':handle', tag: ':tag' };
+      if (seg.length > 2 && ids[seg[1]] && seg[2]) seg[2] = ids[seg[1]];
+      var keep = [];
+      try {
+        new URLSearchParams(location.search).forEach(function (v, k) {
+          if (k.indexOf('utm_') === 0 || k === 'gclid') {
+            keep.push(k + '=' + encodeURIComponent(v));
+          }
+        });
+      } catch (e) {}
+      return location.origin + seg.join('/') +
+             (keep.length ? '?' + keep.join('&') : '');
+    }
+
+    gtag('js', new Date());
+    gtag('config', 'G-8WDECB3VBY', { page_location: mkLocation() });
+  </script>
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
