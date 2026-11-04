@@ -73,3 +73,7 @@ android/build/
 
 # Node test harness dependencies (PGlite).
 node_modules/
+
+# Firebase CLI upload cache: rewritten by every deploy, read only by the
+# CLI on this machine, and regenerated if deleted.
+/.firebase/
