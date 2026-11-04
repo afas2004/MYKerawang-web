@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../l10n/access_strings.dart';
 import '../l10n/licenses_strings.dart';
 import '../language_cubit.dart';
+import '../services/art_credits.dart';
 import '../utils/adaptive.dart';
 import '../utils/app_nav.dart';
 import '../widgets/brand/brand.dart';
@@ -45,11 +46,6 @@ class _Credits {
   const _Credits(this.art, this.libraries, this.libraryCount);
 }
 
-/// pub package names are lowercase with underscores. Everything else in the
-/// registry was added by hand (see `registerArtCredits`) and has a readable
-/// name, which is how the two lists are told apart without a second source.
-final _pubName = RegExp(r'^[a-z0-9_]+$');
-
 /// Best-effort licence family from the text itself — the registry does not
 /// say which licence an entry is. Order matters: the broad phrases last.
 String _familyOf(String text) {
@@ -86,7 +82,7 @@ Future<_Credits> _loadCredits() async {
   texts.forEach((name, parts) {
     final text = parts.join('\n\n- - -\n\n');
     final credit = _Credit(name, _familyOf(text), text);
-    (_pubName.hasMatch(name) ? libs : art).add(credit);
+    (kArtCreditNames.contains(name) ? art : libs).add(credit);
   });
 
   int byName(_Credit a, _Credit b) =>

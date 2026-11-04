@@ -34,6 +34,12 @@ void main() {
         ['vector_math'],
         'Apache License, Version 2.0',
       );
+      // The engine bundles C++ libraries whose names are neither pub-style
+      // nor artwork. These belong with the packages, not in the credits.
+      yield const LicenseEntryWithLineBreaks(
+        ['abseil-cpp'],
+        'Redistribution and use in source and binary forms are permitted.',
+      );
     });
   });
 
@@ -58,6 +64,13 @@ void main() {
     expect(find.text('Apache 2.0'), findsOneWidget);
     expect(find.text(s.licItems(2)), findsOneWidget); // the two MIT packages
     expect(find.text('go_router'), findsNothing); // collapsed until opened
+
+    // An engine library is a package, however its name is spelled: it must
+    // not land in the artwork section, which is the attribution list.
+    expect(find.text('BSD'), findsOneWidget);
+    await tester.tap(find.text('BSD'));
+    await tester.pumpAndSettle();
+    expect(find.text('abseil-cpp'), findsOneWidget);
   });
 
   testWidgets('opening a licence group reveals its packages', (tester) async {

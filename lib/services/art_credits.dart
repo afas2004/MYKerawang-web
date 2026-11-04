@@ -4,17 +4,27 @@ import 'package:flutter/foundation.dart';
 /// credits), next to the packages. The WP25 Malaysia drawings are CC BY 4.0
 /// and must be credited; the rest are credited as a courtesy.
 /// Full list: assets/brand/LICENSE.md and assets/illustrations/LICENSE.md.
+const _stitch = 'Malaysian stitch illustrations (WP25 Malaysia)';
+const _peeps = 'Open Peeps, Open Doodles';
+const _emoji = 'Fluent Emoji';
+
+/// What [registerArtCredits] adds, so the credits page can show these apart
+/// from the packages. The registry gives no way to tell the two apart — and
+/// guessing from the name shape fails, because the engine bundles C++
+/// libraries called things like `abseil-cpp` and `libjpeg-turbo`.
+const kArtCreditNames = <String>{_stitch, _peeps, _emoji};
+
 void registerArtCredits() {
   LicenseRegistry.addLicense(() async* {
-    yield const LicenseEntryWithLineBreaks(['Malaysian stitch illustrations (WP25 Malaysia)'], '''
+    yield const LicenseEntryWithLineBreaks([_stitch], '''
 Wau Bulan, Wau Kucing, Wau Jala Budi, Nasi Lemak and Sape illustrations by Geleparaplu for Wikimedia Malaysia (Wikipedia 25), from Wikimedia Commons.
 
 Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0), https://creativecommons.org/licenses/by/4.0/
 
 Changes: recoloured, metadata removed, coordinates rounded.''');
-    yield const LicenseEntryWithLineBreaks(['Open Peeps, Open Doodles'], '''
+    yield const LicenseEntryWithLineBreaks([_peeps], '''
 Illustrations by Pablo Stanley, openpeeps.com and opendoodles.com. CC0 1.0 (public domain).''');
-    yield const LicenseEntryWithLineBreaks(['Fluent Emoji'], '''
+    yield const LicenseEntryWithLineBreaks([_emoji], '''
 MIT License
 
 Copyright (c) Microsoft Corporation.
