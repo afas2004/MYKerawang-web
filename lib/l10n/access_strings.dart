@@ -421,6 +421,26 @@ extension AccessStrings on AppStrings {
   String get pinMandatoryDone => _t("Pinned until you unpin it",
       "Dipin sampai anda nyahpin", "外すまでピン留めしました");
 
+  // ---- closed pins, brought back ----
+  String get pinClosedOne =>
+      _t("1 closed pin", "1 pin ditutup", "閉じたピン 1 件");
+  String get pinClosedMany =>
+      _t("{0} closed pins", "{0} pin ditutup", "閉じたピン {0} 件");
+  String get pinShowClosed => _t("Show", "Tunjuk", "表示");
+  String get pinClosedBack => _t("Closed pins are back",
+      "Pin yang ditutup kembali", "閉じたピンを戻しました");
+
+  // ---- admin: the Pins tab ----
+  String get pinsTabTitle => _t("Pins", "Pin", "ピン");
+  String get pinsEmpty => _t("Nothing is pinned", "Tiada yang dipin", "ピン留めはありません");
+  String get pinsEmptyBody => _t(
+      "Pin a post from its menu and it shows in Home's pin bar.",
+      "Pin hantaran dari menunya dan ia akan muncul di bar pin Laman Utama.",
+      "投稿のメニューからピン留めすると、ホームのピンバーに表示されます。");
+  String get pinUntil => _t("Until {0}", "Sampai {0}", "{0} まで");
+  String get pinNoEnd => _t("No end date", "Tiada tarikh tamat", "終了日なし");
+  String get pinOpen => _t("Open", "Buka", "開く");
+
   // ---- listing status ----
   String get statusAvailable => _t("Available", "Ada", "販売中");
   String get statusReserved => _t("Reserved", "Ditempah", "取引中");
