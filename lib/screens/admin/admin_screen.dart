@@ -17,6 +17,7 @@ import 'categories_tab.dart';
 import 'club_approvals_tab.dart';
 import 'join_requests_tab.dart';
 import 'log_tab.dart';
+import 'pins_tab.dart';
 import 'restrictions_tab.dart';
 import 'settings_tab.dart';
 import 'verifications_tab.dart';
@@ -120,6 +121,7 @@ class _AdminScreenState extends State<AdminScreen> {
       (m.tabRestrictions, ModIcons.ban, const RestrictionsTab()),
       (m.tabLog, ModIcons.log, const LogTab()),
       (context.l10n.catTitle, ModIcons.category, const CategoriesTab()),
+      (context.l10n.pinsTabTitle, ModIcons.pin, const PinsTab()),
       if (verifyEnabled)
         (context.l10n.verifyQueueTitle, ModIcons.verified, const VerificationsTab()),
       if (owner) (m.tabSettings, ModIcons.settings, const SettingsTab()),

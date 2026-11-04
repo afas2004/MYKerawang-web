@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/feed_strings.dart';
 import '../language_cubit.dart';
@@ -20,10 +21,12 @@ import '../widgets/error_state.dart';
 import '../widgets/feed_composer.dart';
 import '../widgets/hover_carousel.dart';
 import '../widgets/pin_bar.dart';
+import '../widgets/pin_restore_row.dart';
 import '../widgets/shell_actions.dart';
 import '../widgets/universal_card.dart';
 import '../utils/announcement_rules.dart';
 import '../widgets/announcement_view.dart';
+import '../widgets/app_toast.dart';
 import '../widgets/post_card.dart';
 import '../widgets/profile_avatar_action.dart';
 import '../widgets/post_card_skeleton.dart';
@@ -252,6 +255,15 @@ class _HomeScreenState extends State<HomeScreen> with RefreshOnContentChange {
   @override
   void onContentChanged() => _fetchFeedData();
 
+  /// Brings back every pin this device has closed, so a reader (or an
+  /// admin who closed one and then needed to unpin it) has a way back.
+  Future<void> _restorePins() async {
+    // The message is read before the await; showToast needs no context.
+    final done = context.l10nRead.pinClosedBack;
+    await PinnedPosts.restore();
+    showToast(done);
+  }
+
   /// The editor is a route (/create/post); publishing lands on the new
   /// post and the feed refreshes through [onContentChanged].
   void _openComposer() {
@@ -264,24 +276,29 @@ class _HomeScreenState extends State<HomeScreen> with RefreshOnContentChange {
   Widget build(BuildContext context) {
     return ValueListenableBuilder(
       valueListenable: PinnedPosts.pins,
-      builder: (context, pins, _) => FeedView(
-        posts: _posts,
-        pins: pins,
-        onDismissPin: PinnedPosts.dismiss,
-        injectables: _injectables,
-        events: _featuredEvents,
-        listings: _freshMarketItems,
-        isLoading: _isLoading,
-        hasError: _hasError,
-        hasMore: _hasMore,
-        loadingMore: _loadingMore,
-        loadMoreError: _loadMoreError,
-        onRefresh: _fetchFeedData,
-        onLoadMore: _loadMore,
-        onCompose: _openComposer,
-        // Search and notifications only. Settings live in Profile; refresh
-        // is pull-to-refresh, with a button only for mouse users on desktop.
-        actions: homeAppBarActions(context, onRefresh: _fetchFeedData),
+      builder: (context, pins, _) => ValueListenableBuilder(
+        valueListenable: PinnedPosts.closedCount,
+        builder: (context, closed, _) => FeedView(
+          posts: _posts,
+          pins: pins,
+          onDismissPin: PinnedPosts.dismiss,
+          closedPins: closed,
+          onRestorePins: _restorePins,
+          injectables: _injectables,
+          events: _featuredEvents,
+          listings: _freshMarketItems,
+          isLoading: _isLoading,
+          hasError: _hasError,
+          hasMore: _hasMore,
+          loadingMore: _loadingMore,
+          loadMoreError: _loadMoreError,
+          onRefresh: _fetchFeedData,
+          onLoadMore: _loadMore,
+          onCompose: _openComposer,
+          // Search and notifications only. Settings live in Profile; refresh
+          // is pull-to-refresh, with a button only for mouse users on desktop.
+          actions: homeAppBarActions(context, onRefresh: _fetchFeedData),
+        ),
       ),
     );
   }
@@ -301,6 +318,10 @@ class FeedView extends StatelessWidget {
   /// What the pin bar shows; these posts leave the list below it.
   final List<Map<String, dynamic>> pins;
   final ValueChanged<Map<String, dynamic>>? onDismissPin;
+
+  /// Live pins closed on this device: above 0, a slim row offers them back.
+  final int closedPins;
+  final VoidCallback? onRestorePins;
   final List<Map<String, dynamic>> injectables;
   final List<Map<String, dynamic>> events;
   final List<Map<String, dynamic>> listings;
@@ -319,6 +340,8 @@ class FeedView extends StatelessWidget {
     required this.posts,
     this.pins = const [],
     this.onDismissPin,
+    this.closedPins = 0,
+    this.onRestorePins,
     this.injectables = const [],
     this.events = const [],
     this.listings = const [],
@@ -424,6 +447,16 @@ class FeedView extends StatelessWidget {
                       pins: pins,
                       onOpen: (p) => context.goPost(p),
                       onDismiss: (p) => onDismissPin?.call(p),
+                    ),
+                  ),
+                ),
+
+              if (!isLoading && closedPins > 0 && onRestorePins != null)
+                _column(
+                  SliverToBoxAdapter(
+                    child: PinRestoreRow(
+                      count: closedPins,
+                      onRestore: onRestorePins!,
                     ),
                   ),
                 ),

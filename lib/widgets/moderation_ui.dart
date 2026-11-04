@@ -45,6 +45,7 @@ abstract final class ModIcons {
   static const IconData clock = AppIcons.clock;
   static const IconData settings = AppIcons.settings;
   static const IconData history = AppIcons.history;
+  static const IconData pin = AppIcons.pin;
   // Not in AppIcons yet
   static const IconData post = LucideIcons.fileText;
   static const IconData appeal = LucideIcons.gavel;
