@@ -5,6 +5,7 @@ import '../../l10n/access_strings.dart';
 import '../../l10n/moderation_strings.dart';
 import '../../language_cubit.dart';
 import '../../services/admin_unlock.dart';
+import '../../services/feature_flags.dart';
 import '../../services/moderation_service.dart';
 import '../../services/registration_policy.dart';
 import '../../utils/moderation_logic.dart';
@@ -56,6 +57,10 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
   bool _registrationOpen = false;
   bool _registrationSaving = false;
 
+  /// Owner-only feature switches (all on unless turned off).
+  FeatureFlagsState _features = const FeatureFlagsState();
+  final Set<AppFeature> _featureSaving = {};
+
   @override
   bool get wantKeepAlive => true;
 
@@ -70,10 +75,36 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
       final policy = await ModerationService.accessPolicy();
       _verification = policy['verification_enabled'] == true;
       _registrationOpen = policy['registration_mode'] == 'open';
+      _features = FeatureFlagsState.fromPolicy(policy);
     } catch (_) {
       // Fail closed: an unread policy must not look enabled.
       _verification = false;
       _registrationOpen = false;
+      // Features fail open, like the app itself.
+      _features = FeatureFlags.current;
+    }
+  }
+
+  String _featureLabel(AppFeature f) => switch (f) {
+        AppFeature.announcements => context.l10n.featureAnnouncements,
+        AppFeature.clubs => context.l10n.featureClubs,
+        AppFeature.studentFeatures => context.l10n.featureStudent,
+      };
+
+  Future<void> _toggleFeature(AppFeature f, bool value) async {
+    final s = context.l10n;
+    setState(() => _featureSaving.add(f));
+    try {
+      // Also updates FeatureFlags, so open screens rebuild.
+      await FeatureFlags.setEnabled(f, value);
+      if (!mounted) return;
+      setState(() => _features = _features.copyWith(f, value));
+      showModSnack(context,
+          (value ? s.featureNowOn : s.featureNowOff).fill([_featureLabel(f)]));
+    } catch (e) {
+      if (mounted) showModError(context, e);
+    } finally {
+      if (mounted) setState(() => _featureSaving.remove(f));
     }
   }
 
@@ -266,6 +297,42 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                         icon: const Icon(ModIcons.settings, size: 18),
                         label: Text(_pinConfigured ? m.adminPinChange : m.adminPinSet),
                       ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // ---- app features: whole areas on or off ----
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(ModIcons.settings, size: 20),
+                          const SizedBox(width: 8),
+                          Text(context.l10n.featuresTitle,
+                              style: Theme.of(context).textTheme.titleSmall),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(context.l10n.featuresBody,
+                          style: Theme.of(context).textTheme.bodySmall),
+                      for (final f in AppFeature.values)
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: _features.isOn(f),
+                          onChanged: _featureSaving.contains(f)
+                              ? null
+                              : (v) => _toggleFeature(f, v),
+                          title: Text(_featureLabel(f)),
+                          subtitle: f == AppFeature.studentFeatures
+                              ? Text(context.l10n.featureStudentBody)
+                              : null,
+                        ),
                     ],
                   ),
                 ),

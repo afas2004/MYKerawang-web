@@ -59,6 +59,23 @@ extension AccessStrings on AppStrings {
   String get regNowStudentOnly => _t("Signup is limited to student emails",
       "Pendaftaran terhad kepada e-mel pelajar", "Signup is limited to student emails");
 
+  // ---- app features (owner switches) ----
+  String get featuresTitle => _t("App features", "Ciri aplikasi", "アプリの機能");
+  String get featuresBody => _t(
+      "Turn whole areas of the app on or off for everyone. Turning one off hides it; nothing is deleted.",
+      "Hidupkan atau matikan bahagian aplikasi untuk semua orang. Mematikan satu bahagian hanya menyembunyikannya; tiada apa yang dipadam.",
+      "アプリの各機能を全員に対して有効・無効にします。無効にすると非表示になるだけで、データは削除されません。");
+  String get featureAnnouncements =>
+      _t("Announcements", "Pengumuman", "お知らせ");
+  String get featureClubs => _t("Clubs", "Kelab", "クラブ");
+  String get featureStudent => _t("Student features", "Ciri pelajar", "学生向け機能");
+  String get featureStudentBody => _t(
+      "Student verification, student-email signup wording and matric number prefill.",
+      "Pengesahan pelajar, teks pendaftaran e-mel pelajar dan isian automatik nombor matrik.",
+      "学生確認、学生メールでの登録案内、学籍番号の自動入力。");
+  String get featureNowOn => _t("{0} turned on", "{0} dihidupkan", "{0}を有効にしました");
+  String get featureNowOff => _t("{0} turned off", "{0} dimatikan", "{0}を無効にしました");
+
   // ---- student verification ----
   String get verifySectionTitle =>
       _t("Student verification", "Pengesahan pelajar", "学生確認");
