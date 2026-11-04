@@ -12,7 +12,7 @@ import '../utils/responsive.dart';
 const kPrivacyContactEmail = '';
 
 /// Last revision of the text below; bump it when the policy changes.
-const kPrivacyPolicyUpdated = '25 Oct 2026';
+const kPrivacyPolicyUpdated = '4 Nov 2026';
 
 /// Plain-language privacy notice (PDPA 2010). Describes what the app
 /// actually stores today — keep it in step with the schema.
@@ -98,7 +98,16 @@ class PrivacyPolicyScreen extends StatelessWidget {
         ),
         (
           'Why we use it',
-          'Only to run the app: show your content, let buyers reach sellers, send you notifications, and keep the community safe. We don\'t sell your data or use it for advertising.',
+          'To run the app: show your content, let buyers reach sellers, send you notifications, and keep the community safe. We don\'t sell your data or use it for advertising.',
+        ),
+        (
+          'Website analytics',
+          'The website at kerawang.my counts visits with Google Analytics. The phone apps do not.\n'
+              '• What is recorded: the page you opened and when, your browser, device type, screen size and language, the site that linked you here, and a city-level location worked out from your IP address. Google uses the IP address to work out the city and does not store it.\n'
+              '• A random id is kept in a cookie on your device (called _ga, for about two years) so that coming back later is not counted as a new person. It is not linked to your MYKerawang account.\n'
+              '• Page addresses are shortened before they are sent: a post is reported as /post/:id, so the real post, profile, event or listing id never leaves your browser. Nothing you type is sent, and nothing is read from your account.\n'
+              '• This tells us how many people use the site and on what devices, not what any one person did. It is not sold and not used for advertising.\n'
+              '• You can block it with your browser tracking protection or an ad blocker. The app still works normally.',
         ),
         (
           'How long we keep it',
@@ -144,7 +153,16 @@ class PrivacyPolicyScreen extends StatelessWidget {
         ),
         (
           'Kenapa kami menggunakannya',
-          'Hanya untuk menjalankan aplikasi: memaparkan kandungan anda, membolehkan pembeli menghubungi penjual, menghantar notifikasi dan menjaga keselamatan komuniti. Kami tidak menjual data anda atau menggunakannya untuk iklan.',
+          'Untuk menjalankan aplikasi: memaparkan kandungan anda, membolehkan pembeli menghubungi penjual, menghantar notifikasi dan menjaga keselamatan komuniti. Kami tidak menjual data anda atau menggunakannya untuk iklan.',
+        ),
+        (
+          'Analitik laman web',
+          'Laman web di kerawang.my mengira kunjungan menggunakan Google Analytics. Aplikasi telefon tidak menggunakannya.\n'
+              '• Apa yang direkodkan: halaman yang anda buka dan bila, pelayar, jenis peranti, saiz skrin dan bahasa anda, laman yang membawa anda ke sini, dan lokasi peringkat bandar yang dikira daripada alamat IP anda. Google menggunakan alamat IP itu untuk mengetahui bandar dan tidak menyimpannya.\n'
+              '• Satu id rawak disimpan dalam kuki pada peranti anda (bernama _ga, kira-kira dua tahun) supaya kunjungan semula tidak dikira sebagai orang baharu. Ia tidak dikaitkan dengan akaun MYKerawang anda.\n'
+              '• Alamat halaman dipendekkan sebelum dihantar: satu post dilaporkan sebagai /post/:id, jadi id post, profil, acara atau iklan yang sebenar tidak pernah keluar daripada pelayar anda. Apa yang anda taip tidak dihantar, dan tiada apa dibaca daripada akaun anda.\n'
+              '• Ini memberitahu kami berapa ramai yang menggunakan laman web dan pada peranti apa, bukan apa yang dilakukan oleh seseorang. Ia tidak dijual dan tidak digunakan untuk iklan.\n'
+              '• Anda boleh menghalangnya dengan perlindungan penjejakan pelayar atau penyekat iklan. Aplikasi tetap berfungsi seperti biasa.',
         ),
         (
           'Berapa lama kami menyimpannya',
