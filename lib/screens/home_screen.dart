@@ -63,8 +63,11 @@ List<Map<String, dynamic>> buildFeedItems(
 ///
 /// [unreadBadge] false draws a plain bell (tests: the live count needs
 /// Supabase).
-List<Widget> homeAppBarActions(BuildContext context,
-    {required VoidCallback onRefresh, bool unreadBadge = true}) {
+List<Widget> homeAppBarActions(
+  BuildContext context, {
+  required VoidCallback onRefresh,
+  bool unreadBadge = true,
+}) {
   final s = context.l10n;
   final signedIn = ShellAuth.of(context);
   return [
@@ -97,8 +100,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 /// Loads the feed; [FeedView] lays it out.
-class _HomeScreenState extends State<HomeScreen>
-    with RefreshOnContentChange {
+class _HomeScreenState extends State<HomeScreen> with RefreshOnContentChange {
   final _supabase = Supabase.instance.client;
 
   bool _isLoading = true;
@@ -156,14 +158,16 @@ class _HomeScreenState extends State<HomeScreen>
 
       // All three run in parallel — one round trip on mobile, not three.
       final results = await Future.wait<List<Map<String, dynamic>>>([
-        _supabase.from('events')
+        _supabase
+            .from('events')
             .select()
             .eq('is_hidden', false)
             .isFilter('cancelled_at', null)
             .gt('end_datetime', now)
             .order('start_datetime', ascending: true)
             .limit(20),
-        _supabase.from('listings')
+        _supabase
+            .from('listings')
             .select()
             .or(kAvailableListingsFilter)
             .order('created_at', ascending: false)
@@ -261,27 +265,26 @@ class _HomeScreenState extends State<HomeScreen>
     return ValueListenableBuilder(
       valueListenable: PinnedPosts.pins,
       builder: (context, pins, _) => FeedView(
-      posts: _posts,
-      pins: pins,
-      onDismissPin: PinnedPosts.dismiss,
-      injectables: _injectables,
-      events: _featuredEvents,
-      listings: _freshMarketItems,
-      isLoading: _isLoading,
-      hasError: _hasError,
-      hasMore: _hasMore,
-      loadingMore: _loadingMore,
-      loadMoreError: _loadMoreError,
-      onRefresh: _fetchFeedData,
-      onLoadMore: _loadMore,
-      onCompose: _openComposer,
-      // Search and notifications only. Settings live in Profile; refresh
-      // is pull-to-refresh, with a button only for mouse users on desktop.
-      actions: homeAppBarActions(context, onRefresh: _fetchFeedData),
+        posts: _posts,
+        pins: pins,
+        onDismissPin: PinnedPosts.dismiss,
+        injectables: _injectables,
+        events: _featuredEvents,
+        listings: _freshMarketItems,
+        isLoading: _isLoading,
+        hasError: _hasError,
+        hasMore: _hasMore,
+        loadingMore: _loadingMore,
+        loadMoreError: _loadMoreError,
+        onRefresh: _fetchFeedData,
+        onLoadMore: _loadMore,
+        onCompose: _openComposer,
+        // Search and notifications only. Settings live in Profile; refresh
+        // is pull-to-refresh, with a button only for mouse users on desktop.
+        actions: homeAppBarActions(context, onRefresh: _fetchFeedData),
       ),
     );
   }
-
 }
 
 /// The home feed layout, fed with data — no Supabase, so it can be
@@ -346,15 +349,17 @@ class FeedView extends StatelessWidget {
       index < 3 ? KEntrance(index: index, child: build()) : build();
 
   static Widget _column(Widget sliver) => SliverLayoutBuilder(
-        builder: (context, c) {
-          final side = ((c.crossAxisExtent - Responsive.feedMaxWidth) / 2)
-              .clamp(0.0, double.infinity);
-          return SliverPadding(
-            padding: EdgeInsets.symmetric(horizontal: side),
-            sliver: sliver,
-          );
-        },
+    builder: (context, c) {
+      final side = ((c.crossAxisExtent - Responsive.feedMaxWidth) / 2).clamp(
+        0.0,
+        double.infinity,
       );
+      return SliverPadding(
+        padding: EdgeInsets.symmetric(horizontal: side),
+        sliver: sliver,
+      );
+    },
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -364,10 +369,14 @@ class FeedView extends StatelessWidget {
     final size = Responsive.sizeFor(width);
     final railVisible = size.isLarge; // MainScaffold shows the rail here
     final showPins = !isLoading && pins.isNotEmpty;
-    final items = buildFeedItems(posts, injectables,
-        inject: !railVisible,
-        hidden: {if (showPins) ...pins.map((p) => p['id'])});
-    final topPadding = MediaQuery.paddingOf(context).top + KBand.heightOf(context);
+    final items = buildFeedItems(
+      posts,
+      injectables,
+      inject: !railVisible,
+      hidden: {if (showPins) ...pins.map((p) => p['id'])},
+    );
+    final topPadding =
+        MediaQuery.paddingOf(context).top + KBand.heightOf(context);
 
     return Scaffold(
       body: LinearRefresher(
@@ -390,26 +399,38 @@ class FeedView extends StatelessWidget {
                 rounded: !showPins,
                 // Desktop: the sidebar carries the wordmark, so the page
                 // header just names the page.
-                title: size.isExpanded ? Text(s.navHome) : Text(
-                  AppStrings.appName,
-                  // 20 px so the wordmark fits beside four actions on a
-                  // 360 px phone.
-                  style: theme.textTheme.titleLarge?.copyWith(
-                      fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.3, color: KBand.onBand),
-                ),
+                title: size.isExpanded
+                    ? Text(s.navHome)
+                    : Text(
+                        AppStrings.appName,
+                        // 20 px so the wordmark fits beside four actions on a
+                        // 360 px phone.
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.3,
+                          color: KBand.onBand,
+                        ),
+                      ),
                 actions: actions,
               ),
 
               if (showPins)
                 PinnedHeaderSliver(
-                  child: PinBar(
-                    pins: pins,
-                    onOpen: (p) => context.goPost(p),
-                    onDismiss: (p) => onDismissPin?.call(p),
+                  // The bar stays put while the feed scrolls under it: keep it
+                  // on its own layer so scrolling doesn't repaint it.
+                  child: RepaintBoundary(
+                    child: PinBar(
+                      pins: pins,
+                      onOpen: (p) => context.goPost(p),
+                      onDismiss: (p) => onDismissPin?.call(p),
+                    ),
                   ),
                 ),
 
-              _column(SliverToBoxAdapter(child: FeedComposer(onTap: onCompose))),
+              _column(
+                SliverToBoxAdapter(child: FeedComposer(onTap: onCompose)),
+              ),
 
               if (!isLoading && hasError && posts.isEmpty)
                 SliverFillRemaining(
@@ -418,60 +439,71 @@ class FeedView extends StatelessWidget {
                 )
               else ...[
                 if (!railVisible && !isLoading && events.isNotEmpty)
-                  _column(SliverToBoxAdapter(
-                    child: _FeedSection(
-                      title: s.happeningSoon,
-                      onSeeAll: () => context.go('/events'),
-                      items: events,
-                      onTap: (e) => context.goEvent(e),
-                      cardWidth: 220,
+                  _column(
+                    SliverToBoxAdapter(
+                      child: _FeedSection(
+                        title: s.happeningSoon,
+                        onSeeAll: () => context.go('/events'),
+                        items: events,
+                        onTap: (e) => context.goEvent(e),
+                        cardWidth: 220,
+                      ),
                     ),
-                  )),
+                  ),
                 if (!railVisible && !isLoading && listings.isNotEmpty)
-                  _column(SliverToBoxAdapter(
-                    child: _FeedSection(
-                      title: s.freshFinds,
-                      onSeeAll: () => context.go('/market'),
-                      items: listings,
-                      onTap: (l) => context.goItem(l),
-                      cardWidth: 160,
+                  _column(
+                    SliverToBoxAdapter(
+                      child: _FeedSection(
+                        title: s.freshFinds,
+                        onSeeAll: () => context.go('/market'),
+                        items: listings,
+                        onTap: (l) => context.goItem(l),
+                        cardWidth: 160,
+                      ),
                     ),
-                  )),
+                  ),
                 if (isLoading)
-                  _column(SliverToBoxAdapter(child: PostCardSkeleton.list(context)))
+                  _column(
+                    SliverToBoxAdapter(child: PostCardSkeleton.list(context)),
+                  )
                 else
-                  _column(SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) => _enter(index, () {
-                        final item = items[index];
-                        if (item['type'] == 'event' || item['type'] == 'listing') {
-                          final isEvent = item['type'] == 'event';
-                          return EmbedCard(
-                            data: item,
-                            isEvent: isEvent,
-                            onTap: () => isEvent
-                                ? context.goEvent(item)
-                                : context.goItem(item),
-                          );
-                        }
-                        if (item['is_announcement'] == true) {
-                          return AnnouncementCard(
+                  _column(
+                    SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) => _enter(index, () {
+                          final item = items[index];
+                          if (item['type'] == 'event' ||
+                              item['type'] == 'listing') {
+                            final isEvent = item['type'] == 'event';
+                            return EmbedCard(
+                              data: item,
+                              isEvent: isEvent,
+                              onTap: () => isEvent
+                                  ? context.goEvent(item)
+                                  : context.goItem(item),
+                            );
+                          }
+                          if (item['is_announcement'] == true) {
+                            return AnnouncementCard(
+                              key: ValueKey(item['id']),
+                              post: item,
+                              onTap: () => context.goPost(item),
+                            );
+                          }
+                          return PostCard(
                             key: ValueKey(item['id']),
                             post: item,
                             onTap: () => context.goPost(item),
                           );
-                        }
-                        return PostCard(
-                          key: ValueKey(item['id']),
-                          post: item,
-                          onTap: () => context.goPost(item),
-                        );
-                      }),
-                      childCount: items.length,
+                        }),
+                        childCount: items.length,
+                      ),
                     ),
-                  )),
+                  ),
                 if (!isLoading && !hasError && posts.isEmpty)
-                  _column(SliverToBoxAdapter(child: _EmptyFeed(onCompose: onCompose))),
+                  _column(
+                    SliverToBoxAdapter(child: _EmptyFeed(onCompose: onCompose)),
+                  ),
                 if (!isLoading && posts.isNotEmpty)
                   _column(SliverToBoxAdapter(child: _pagingFooter(context))),
               ],
@@ -511,9 +543,12 @@ class FeedView extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.xl, KSpace.l, 96),
       child: Center(
-        child: Text(context.feedL10n.feedEnd,
-            style: theme.textTheme.labelLarge
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        child: Text(
+          context.feedL10n.feedEnd,
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
       ),
     );
   }
@@ -545,7 +580,12 @@ class _FeedSection extends StatelessWidget {
           SectionHeader(
             title: title,
             onSeeAll: onSeeAll,
-            padding: const EdgeInsets.fromLTRB(KSpace.l, 0, KSpace.s, KSpace.xs),
+            padding: const EdgeInsets.fromLTRB(
+              KSpace.l,
+              0,
+              KSpace.s,
+              KSpace.xs,
+            ),
           ),
           // Compact strip: photo + two text lines.
           HoverCarousel(
@@ -554,7 +594,10 @@ class _FeedSection extends StatelessWidget {
             itemBuilder: (context, i) => Container(
               width: cardWidth,
               margin: const EdgeInsets.only(right: KSpace.m, bottom: KSpace.s),
-              child: UniversalCard(data: items[i], onTap: () => onTap(items[i])),
+              child: UniversalCard(
+                data: items[i],
+                onTap: () => onTap(items[i]),
+              ),
             ),
           ),
         ],

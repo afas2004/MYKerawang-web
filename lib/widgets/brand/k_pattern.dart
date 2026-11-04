@@ -48,15 +48,20 @@ class KPattern extends StatelessWidget {
   Widget build(BuildContext context) {
     return ExcludeSemantics(
       excluding: child == null,
-      child: CustomPaint(
-        painter: KPatternPainter(
-          kind: kind,
-          color: color,
-          background: background,
-          cell: cell,
-          angle: angle,
+      // Its own layer: the pattern is cached instead of redrawn whenever
+      // something nearby repaints (a pinned header over a scrolling list).
+      child: RepaintBoundary(
+        child: CustomPaint(
+          isComplex: true,
+          painter: KPatternPainter(
+            kind: kind,
+            color: color,
+            background: background,
+            cell: cell,
+            angle: angle,
+          ),
+          child: child ?? const SizedBox.expand(),
         ),
-        child: child ?? const SizedBox.expand(),
       ),
     );
   }
@@ -83,7 +88,9 @@ class KPatternPainter extends CustomPainter {
     final bounds = Offset.zero & size;
     canvas.save();
     canvas.clipRect(bounds);
-    if (background != null) canvas.drawRect(bounds, Paint()..color = background!);
+    if (background != null) {
+      canvas.drawRect(bounds, Paint()..color = background!);
+    }
 
     final stroke = Paint()
       ..color = color
@@ -92,15 +99,21 @@ class KPatternPainter extends CustomPainter {
       ..isAntiAlias = true;
     final fill = Paint()..color = color;
 
-    // Rotate about the centre and cover the whole diagonal, so rotated
-    // patterns still reach every corner.
+    // Tiles sit on a grid centred on the box. Unrotated, only the tiles that
+    // touch the box are drawn; rotated, the box's corners can reach as far as
+    // half its diagonal from the centre, so that circle is covered. (This used
+    // to cover twice the longest side both ways: about 2,000 draw calls for a
+    // 360 px strip, repeated every frame it was repainted.)
     final c = size.center(Offset.zero);
     canvas.translate(c.dx, c.dy);
     canvas.rotate(angle * math.pi / 180);
-    final reach = size.longestSide;
-    final n = (reach / cell).ceil() + 1;
-    for (var i = -n; i <= n; i++) {
-      for (var j = -n; j <= n; j++) {
+    final rotated = angle % 360 != 0;
+    final reachX = rotated
+        ? size.bottomRight(Offset.zero).distance / 2
+        : size.width / 2;
+    final reachY = rotated ? reachX : size.height / 2;
+    for (var i = (-reachX / cell).floor() - 1; i * cell <= reachX; i++) {
+      for (var j = (-reachY / cell).floor() - 1; j * cell <= reachY; j++) {
         _tile(canvas, Offset(i * cell, j * cell), stroke, fill);
       }
     }
@@ -114,7 +127,10 @@ class KPatternPainter extends CustomPainter {
         final mid = o + Offset(s / 2, s / 2);
         final a = s * 0.18;
         final b = a * math.sqrt2;
-        canvas.drawRect(Rect.fromCenter(center: mid, width: a * 2, height: a * 2), stroke);
+        canvas.drawRect(
+          Rect.fromCenter(center: mid, width: a * 2, height: a * 2),
+          stroke,
+        );
         canvas.drawPath(
           Path()
             ..moveTo(mid.dx, mid.dy - b)
@@ -133,16 +149,21 @@ class KPatternPainter extends CustomPainter {
           ..close();
         canvas.drawPath(tri(0, 1, 0.12), stroke);
         canvas.drawPath(tri(0.25, 0.75, 0.5), stroke);
-        canvas.drawLine(o + Offset(s / 2, s * 0.12), o + Offset(s / 2, s * 0.5), stroke);
+        canvas.drawLine(
+          o + Offset(s / 2, s * 0.12),
+          o + Offset(s / 2, s * 0.5),
+          stroke,
+        );
       case KPatternKind.tabur:
         void diamond(Offset p, double r) => canvas.drawPath(
-            Path()
-              ..moveTo(p.dx, p.dy - r)
-              ..lineTo(p.dx + r, p.dy)
-              ..lineTo(p.dx, p.dy + r)
-              ..lineTo(p.dx - r, p.dy)
-              ..close(),
-            fill);
+          Path()
+            ..moveTo(p.dx, p.dy - r)
+            ..lineTo(p.dx + r, p.dy)
+            ..lineTo(p.dx, p.dy + r)
+            ..lineTo(p.dx - r, p.dy)
+            ..close(),
+          fill,
+        );
         diamond(o + Offset(s / 2, s / 2), s * 0.12);
         diamond(o, s * 0.06);
     }
