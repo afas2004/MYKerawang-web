@@ -14,6 +14,7 @@ import 'screens/create_post_screen.dart';
 import 'screens/edit_profile_screen.dart';
 import 'screens/event_detail_screen.dart';
 import 'screens/follow_list_screen.dart';
+import 'screens/licenses_screen.dart';
 import 'screens/privacy_policy_screen.dart';
 import 'screens/tag_feed_screen.dart';
 import 'screens/events/checkin_screens.dart';
@@ -89,6 +90,9 @@ final List<RegExp> _guestPaths = [
   // A shared form shows who made it and a sign-in bar; answering needs an account.
   RegExp(r'^/f/[^/]+/?$'),
   RegExp(r'^/settings/privacy/?$'),
+  // Attribution has to be reachable without an account (the artwork is
+  // CC BY 4.0), even though the Settings entry that links it is not.
+  RegExp(r'^/settings/licenses/?$'),
 ];
 
 /// True when [path] is open to guests.
@@ -531,6 +535,13 @@ GoRouter buildRouter() {
         onExit: historyAwareExit,
         builder: (context, state) =>
             const DesktopChrome(child: PrivacyPolicyScreen()),
+      ),
+      GoRoute(
+        path: '/settings/licenses',
+        parentNavigatorKey: _rootKey,
+        onExit: historyAwareExit,
+        builder: (context, state) =>
+            const DesktopChrome(child: LicensesScreen()),
       ),
       GoRoute(
         path: '/notifications',

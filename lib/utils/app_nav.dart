@@ -62,6 +62,8 @@ extension AppNav on BuildContext {
 
   void goPrivacyPolicy() => push('/settings/privacy');
 
+  void goLicenses() => push('/settings/licenses');
+
   // ---- create / edit (forms are full-screen on phones, a dialog on wide) --
 
   /// New post. [sharedEvent] / [sharedListing] attach a repost.
