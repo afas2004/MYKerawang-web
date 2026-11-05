@@ -3,16 +3,24 @@ import 'package:go_router/go_router.dart';
 
 import '../l10n/shell_strings.dart';
 import '../language_cubit.dart';
+import '../services/feature_flags.dart';
 import 'app_sidebar.dart';
 import 'brand/brand.dart';
 
 /// Sidebar link to the club directory (/clubs). Shown to everyone: the
 /// directory and club pages are public, unlike the signed-in account rows.
+/// Hidden while the owner has clubs switched off.
 class ClubsNavEntry extends StatelessWidget {
   const ClubsNavEntry({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ValueListenableBuilder<FeatureFlagsState>(
+        valueListenable: FeatureFlags.listenable,
+        builder: (context, flags, _) =>
+            flags.clubsOn ? _entry(context) : const SizedBox.shrink(),
+      );
+
+  Widget _entry(BuildContext context) {
     final path = GoRouter.maybeOf(context)
             ?.routeInformationProvider
             .value

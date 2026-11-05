@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../screens/clubs/club_widgets.dart' show ClubLogo, clubColor;
 import '../services/club_service.dart';
+import '../services/feature_flags.dart';
 import 'brand/brand.dart';
 
 /// Active clubs by lowercase handle, loaded once on the first mention shown,
@@ -35,6 +36,9 @@ abstract final class ClubMentionDirectory {
 /// A club mention in a live page: a soft pill in the club's colour with its
 /// logo and name; tapping opens the club. An unknown handle (no such club,
 /// or the list still loading) shows as `@handle`.
+///
+/// While the owner has clubs switched off it is plain text (the club's
+/// name, or `@handle`) with no link, so the sentence still reads.
 class ClubMentionChip extends StatelessWidget {
   final String handle;
   final TextStyle? style;
@@ -49,6 +53,9 @@ class ClubMentionChip extends StatelessWidget {
       valueListenable: ClubMentionDirectory.clubs,
       builder: (context, clubs, _) {
         final club = clubs[handle.toLowerCase()];
+        if (!FeatureFlags.clubsOn) {
+          return Text(club?.name ?? '@$handle', style: style);
+        }
         final tint = club == null ? scheme.primary : clubColor(club);
         // Club colours are deep; on a dark ground they need more light.
         final dark = Theme.of(context).brightness == Brightness.dark;

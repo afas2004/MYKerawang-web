@@ -4,6 +4,7 @@ import '../l10n/create_strings.dart';
 import '../language_cubit.dart';
 import '../screens/clubs/club_widgets.dart';
 import '../services/club_service.dart';
+import '../services/feature_flags.dart';
 import 'brand/brand.dart';
 
 /// "Post as" picker for the create screens (post, event, listing).
@@ -17,7 +18,8 @@ import 'brand/brand.dart';
 ///     final row = (_postAs ?? const PostAsOption.self('')).applyTo({...});
 ///
 /// Renders nothing until it knows you're an officer of at least one
-/// active club, so ordinary students never see it. [options] skips the
+/// active club, so ordinary students never see it; nothing at all while
+/// the owner has clubs switched off. [options] skips the
 /// lookup (tests, or a screen that already loaded them).
 class PostAsSelector extends StatefulWidget {
   final String selfLabel;
@@ -58,7 +60,7 @@ class _PostAsSelectorState extends State<PostAsSelector> {
       future: _options,
       builder: (context, snap) {
         final opts = snap.data ?? const [];
-        if (opts.length < 2) return const SizedBox.shrink();
+        if (opts.length < 2 || !FeatureFlags.clubsOn) return const SizedBox.shrink();
         final selected = opts.firstWhere(
           (o) => o.clubId == widget.value?.clubId,
           orElse: () => opts.first,

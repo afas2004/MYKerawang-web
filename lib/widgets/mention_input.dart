@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 
+import '../services/feature_flags.dart';
 import '../utils/club_mentions.dart';
 import '../utils/filter_rules.dart';
 import 'mention_text.dart';
@@ -61,6 +62,9 @@ class MentionInput extends StatelessWidget {
   /// (or the wrong person). A picked club inserts a club mention,
   /// `@[handle]`, which the page shows as a chip (see club_mentions.dart).
   final bool suggestClubs;
+
+  /// [suggestClubs], unless the owner has clubs switched off.
+  bool get _clubs => suggestClubs && FeatureFlags.clubsOn;
 
   /// Suggest `@people`. Off where a mention would notify nobody and only
   /// clubs make sense (the announcement body).
@@ -157,7 +161,7 @@ class MentionInput extends StatelessWidget {
         // Bare words find clubs only in a one-line field (the co-organiser,
         // where the whole entry is a name); in a body that would pop up on
         // every word, so there it takes an "@".
-        if (!isMention && (!suggestClubs || isMultiLine)) return null;
+        if (!isMention && (!_clubs || isMultiLine)) return null;
         if (!isMention && currentWord.length < 2) return null;
 
         final query = isMention ? currentWord.substring(1) : currentWord;
@@ -184,7 +188,7 @@ class MentionInput extends StatelessWidget {
         // 4b. Clubs, by name or handle, typed bare or after "@". These
         //      insert as a club mention, `@[handle]`, never `@handle`:
         //      a club has no profile to notify.
-        if (suggestClubs) {
+        if (_clubs) {
           try {
             final res = await Supabase.instance.client
                 .from('clubs')

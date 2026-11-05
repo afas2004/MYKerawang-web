@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../l10n/moderation_strings.dart';
 import '../../language_cubit.dart';
+import '../../services/feature_flags.dart';
 import '../../utils/moderation_logic.dart';
 import '../../widgets/brand/brand.dart';
 import '../../widgets/moderation_ui.dart';
@@ -35,6 +36,9 @@ class AdminOverview extends StatelessWidget {
             lessThanMinute: m.ageNow,
           );
 
+    // Clubs switched off: no club card, and the two club tabs are gone,
+    // so Appeals moves from tab 3 to tab 1.
+    final clubsOn = FeatureFlags.clubsOn;
     final cards = [
       _Stat(
         icon: ModIcons.inbox,
@@ -55,17 +59,18 @@ class AdminOverview extends StatelessWidget {
         onTap: () => onOpenTab?.call(0),
         emphasis: n('hidden_cases') > 0,
       ),
-      _Stat(
-        icon: ModIcons.verified,
-        label: u.statClubs,
-        value: s == null ? null : '${n('club_requests')}',
-        onTap: () => onOpenTab?.call(1),
-      ),
+      if (clubsOn)
+        _Stat(
+          icon: ModIcons.verified,
+          label: u.statClubs,
+          value: s == null ? null : '${n('club_requests')}',
+          onTap: () => onOpenTab?.call(1),
+        ),
       _Stat(
         icon: ModIcons.appeal,
         label: u.statAppeals,
         value: s == null ? null : '${n('pending_appeals')}',
-        onTap: () => onOpenTab?.call(3),
+        onTap: () => onOpenTab?.call(clubsOn ? 3 : 1),
       ),
     ];
 

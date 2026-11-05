@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/event_live.dart';
 
 import '../utils/filter_rules.dart';
+import 'feature_flags.dart';
 
 /// Clubs: pages run by student officers (supabase/migrations/20261022002*).
 /// The database decides who may do what (can_act_as_club, RPC checks);
@@ -337,7 +338,9 @@ class ClubService {
   }
 
   /// Search source for [SearchScreen.clubSource] (wired in main.dart).
+  /// Nothing while the owner has clubs switched off.
   static Future<List<Map<String, dynamic>>> searchRows(String term, int limit) async {
+    if (!FeatureFlags.clubsOn) return const [];
     final clubs = await directory(search: term, limit: limit);
     return [for (final c in clubs) clubSearchRow(c)];
   }
@@ -389,7 +392,9 @@ class ClubService {
 
   /// "Post as" choices: yourself, then every ACTIVE club you're an
   /// officer of. Pass [selfLabel] (e.g. your display name).
+  /// Only yourself while the owner has clubs switched off.
   static Future<List<PostAsOption>> postAsOptions(String selfLabel, {String? selfAvatar}) async {
+    if (!FeatureFlags.clubsOn) return [PostAsOption.self(selfLabel, avatarUrl: selfAvatar)];
     if (debugPostAsOptions != null) return debugPostAsOptions!();
     final clubs = await myClubs();
     return [
