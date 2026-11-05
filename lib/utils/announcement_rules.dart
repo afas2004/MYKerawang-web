@@ -5,7 +5,12 @@
 /// v1.4 columns: cover_url, action_links (≤2 {label, url}),
 /// linked_event_id, publish_at, feature_until, comments_enabled,
 /// show_in_feed, announcement_category, club_id.
+///
+/// The one non-pure rule is [announcementHidden], which reads the owner's
+/// Announcements switch ([FeatureFlags]).
 library;
+
+import '../services/feature_flags.dart';
 
 // ---------------------------------------------------------------- categories
 
@@ -167,11 +172,23 @@ List<AnnouncementIssue> validateAnnouncement({
 /// Whether a posts row belongs in the Home feed now: announcements can
 /// opt out (show_in_feed = false) and scheduled ones wait for publish_at.
 bool showInHomeFeed(Map<String, dynamic> post, {DateTime? now}) {
+  if (announcementHidden(post)) return false;
   if (post['show_in_feed'] == false) return false;
   final at = DateTime.tryParse('${post['publish_at'] ?? ''}');
   if (at != null && at.isAfter(now ?? DateTime.now())) return false;
   return true;
 }
+
+/// True for an announcement while the owner has switched Announcements
+/// off (admin Settings). Such rows stay in the database; the app just
+/// doesn't show them. [on] overrides the switch (tests).
+bool announcementHidden(Map<String, dynamic> post, {bool? on}) =>
+    post['is_announcement'] == true && !(on ?? FeatureFlags.announcementsOn);
+
+/// Route guard for the announcement pages (hub, composer, edit): back to
+/// Home while the switch is off, deep links included. [on] is for tests.
+String? announcementsOffRedirect({bool? on}) =>
+    (on ?? FeatureFlags.announcementsOn) ? null : '/home';
 
 /// Comments default to on; announcements may turn them off.
 bool commentsEnabled(Map<String, dynamic> post) => post['comments_enabled'] != false;

@@ -4,6 +4,7 @@ import '../l10n/app_strings.dart';
 import 'package:mykerawang/utils/app_nav.dart';
 import '../l10n/social_strings.dart';
 import '../language_cubit.dart';
+import '../services/feature_flags.dart';
 import '../utils/adaptive.dart';
 import '../utils/responsive.dart';
 
@@ -68,7 +69,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
   static List<(String, String)> _sectionsEn() => [
         (
           'Who we are',
-          'MYKerawang is a community app for the UiTM college: a feed, a Market for buying and selling, events, and profiles you can follow. This notice explains what it stores about you and who can see it.',
+          'MYKerawang is a community app for the ${FeatureFlags.studentFeaturesOn ? 'UiTM ' : ''}college: a feed, a Market for buying and selling, events, and profiles you can follow. This notice explains what it stores about you and who can see it.',
         ),
         (
           'What we store',
@@ -123,7 +124,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
   static List<(String, String)> _sectionsMs() => [
         (
           'Siapa kami',
-          'MYKerawang ialah aplikasi komuniti untuk kolej UiTM: suapan, Pasar untuk jual beli, acara dan profil yang boleh diikuti. Notis ini menerangkan apa yang disimpan tentang anda dan siapa boleh melihatnya.',
+          'MYKerawang ialah aplikasi komuniti untuk kolej${FeatureFlags.studentFeaturesOn ? ' UiTM' : ''}: suapan, Pasar untuk jual beli, acara dan profil yang boleh diikuti. Notis ini menerangkan apa yang disimpan tentang anda dan siapa boleh melihatnya.',
         ),
         (
           'Apa yang kami simpan',

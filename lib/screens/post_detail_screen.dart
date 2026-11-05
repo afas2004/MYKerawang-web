@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mykerawang/utils/app_nav.dart';
 import 'package:mykerawang/widgets/mention_input.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -476,6 +477,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Owner switched Announcements off: the post exists but isn't shown.
+    if (announcementHidden(_postData)) return const AnnouncementOffPage();
     final s = context.l10n;
     final fs = context.feedL10n;
     final count =
@@ -776,6 +779,28 @@ class CommentComposer extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// An announcement's page while the owner has Announcements switched off
+/// (shared links, saved posts, notifications): "not available" + Home.
+class AnnouncementOffPage extends StatelessWidget {
+  const AnnouncementOffPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    return Scaffold(
+      appBar: AppBar(),
+      body: Center(
+        child: BrandEmptyState(
+          icon: AppIcons.announcement,
+          title: s.contentUnavailable,
+          actionLabel: s.goHome,
+          onAction: () => context.go('/home'),
         ),
       ),
     );

@@ -5,6 +5,7 @@ import '../l10n/app_strings.dart';
 import '../l10n/feed_strings.dart';
 import '../l10n/post_strings.dart';
 import '../language_cubit.dart';
+import '../utils/announcement_rules.dart' show announcementHidden;
 import '../utils/app_nav.dart';
 import '../widgets/brand/brand.dart';
 import '../utils/tags.dart';
@@ -95,7 +96,7 @@ class _TagFeedScreenState extends State<TagFeedScreen> {
     return TagFeedView(
       tag: _tag,
       count: _count,
-      posts: _posts,
+      posts: [for (final p in _posts) if (!announcementHidden(p)) p],
       loading: _loading,
       error: _error,
       hasMore: _hasMore,
