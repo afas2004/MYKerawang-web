@@ -148,7 +148,9 @@ if (-not $Yes) {
 
 Write-Host ''
 Write-Host '== Applying ==' -ForegroundColor Cyan
-$push = Invoke-Supabase @('db', 'push', '--include-all')
+# --yes: CLI v3 asks its own confirmation, which it cannot show while this
+# script captures its output. The script already asked above.
+$push = Invoke-Supabase @('db', 'push', '--include-all', '--yes')
 Write-Host $push
 
 if ($push -match 'Finished|Applying migration|completed') {
