@@ -6,7 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'language_cubit.dart';
 import 'l10n/brand_strings.dart';
-import 'screens/announcements/announcements_screen.dart';
+import 'screens/announcements/announcements_tab.dart';
 import 'screens/create_event_screen.dart';
 import 'screens/create_listing_screen.dart';
 import 'screens/create_announcement_screen.dart';
@@ -196,8 +196,8 @@ GoRouter buildRouter() {
           StatefulShellBranch(observers: [OverlayTracker()], routes: [
             GoRoute(
               path: '/announcements',
-              redirect: (_, __) => announcementsOffRedirect(),
-              builder: (context, state) => const AnnouncementsScreen(),
+              // Switched off: the tab stays and shows "Coming soon".
+              builder: (context, state) => const AnnouncementsTab(),
             ),
           ]),
           StatefulShellBranch(observers: [OverlayTracker()], routes: [
