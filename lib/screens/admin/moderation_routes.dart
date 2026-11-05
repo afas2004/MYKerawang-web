@@ -5,6 +5,7 @@ import '../../widgets/app_sidebar.dart';
 import '../standing_screen.dart';
 import 'admin_screen.dart';
 import 'club_registry_screen.dart';
+import '../clubs/club_routes.dart' show clubsOffRedirect;
 
 export '../clubs/club_routes.dart' show clubRoutes;
 
@@ -23,6 +24,7 @@ List<RouteBase> moderationRoutes(GlobalKey<NavigatorState> rootKey) => [
       GoRoute(
         path: '/admin/clubs/registry',
         parentNavigatorKey: rootKey,
+        redirect: clubsOffRedirect,
         builder: (context, state) =>
             const DesktopChrome(maxWidth: 900, child: ClubRegistryScreen()),
       ),

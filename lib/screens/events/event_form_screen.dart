@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../l10n/form_strings.dart';
 import '../../language_cubit.dart';
+import '../../services/feature_flags.dart';
 import '../../services/form_service.dart';
 import '../../services/my_forms_service.dart';
 import '../../theme/app_icons.dart';
@@ -135,7 +136,10 @@ class _EventFormScreenState extends State<EventFormScreen> {
       return Map<String, dynamic>.from(mine);
     }
     final out = <String, dynamic>{};
-    final matric = (email != null && email.toLowerCase().endsWith('@student.uitm.edu.my'))
+    // No matric guess from the address while student features are off.
+    final matric = FeatureFlags.studentFeaturesOn &&
+            email != null &&
+            email.toLowerCase().endsWith('@student.uitm.edu.my')
         ? email.split('@').first
         : null;
     for (final f in view.doc.fields) {

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/create_strings.dart';
 import '../services/club_service.dart';
+import '../services/feature_flags.dart';
 import '../l10n/shell_strings.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
@@ -112,7 +113,7 @@ class CreateOptionsList extends StatelessWidget {
           future: ability,
           builder: (context, snap) => AnimatedSize(
             duration: KMotion.of(context).fast,
-            child: snap.data?.allowed == true
+            child: snap.data?.allowed == true && FeatureFlags.announcementsOn
                 ? _CreateOption(
                     icon: AppIcons.announcement,
                     title: s.create.announcement,
@@ -215,10 +216,16 @@ class ShellClubsButton extends StatelessWidget {
   Widget build(BuildContext context) {
     if (isWide(context)) return const SizedBox.shrink();
     final s = context.l10n;
-    return IconButton(
-      tooltip: s.shell.clubs,
-      icon: const Icon(AppIcons.people),
-      onPressed: () => context.push('/clubs'),
+    // Gone while the owner has clubs switched off.
+    return ValueListenableBuilder<FeatureFlagsState>(
+      valueListenable: FeatureFlags.listenable,
+      builder: (context, flags, _) => !flags.clubsOn
+          ? const SizedBox.shrink()
+          : IconButton(
+              tooltip: s.shell.clubs,
+              icon: const Icon(AppIcons.people),
+              onPressed: () => context.push('/clubs'),
+            ),
     );
   }
 }

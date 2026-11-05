@@ -6,6 +6,7 @@ import '../../l10n/access_strings.dart';
 import '../../l10n/moderation_strings.dart';
 import '../../language_cubit.dart';
 import '../../services/admin_unlock.dart';
+import '../../services/feature_flags.dart';
 import '../../services/moderation_service.dart';
 import '../../services/student_verification.dart';
 import '../../widgets/moderation_ui.dart';
@@ -91,7 +92,7 @@ class _AdminScreenState extends State<AdminScreen> {
         }
 
         return ListenableBuilder(
-          listenable: AdminUnlock.instance,
+          listenable: Listenable.merge([AdminUnlock.instance, FeatureFlags.listenable]),
           builder: (context, _) {
             if (AdminUnlock.instance.configured && !AdminUnlock.instance.unlocked) {
               return Scaffold(
@@ -115,14 +116,16 @@ class _AdminScreenState extends State<AdminScreen> {
     final scheme = Theme.of(context).colorScheme;
     final tabs = <(String, IconData, Widget)>[
       (m.tabCases, ModIcons.inbox, const CasesTab()),
-      (m.tabClubs, ModIcons.verified, const ClubApprovalsTab()),
-      (m.tabJoinRequests, ModIcons.person, const JoinRequestsTab()),
+      if (FeatureFlags.clubsOn) ...[
+        (m.tabClubs, ModIcons.verified, const ClubApprovalsTab()),
+        (m.tabJoinRequests, ModIcons.person, const JoinRequestsTab()),
+      ],
       (m.tabAppeals, ModIcons.appeal, const AppealsTab()),
       (m.tabRestrictions, ModIcons.ban, const RestrictionsTab()),
       (m.tabLog, ModIcons.log, const LogTab()),
       (context.l10n.catTitle, ModIcons.category, const CategoriesTab()),
       (context.l10n.pinsTabTitle, ModIcons.pin, const PinsTab()),
-      if (verifyEnabled)
+      if (verifyEnabled && FeatureFlags.studentFeaturesOn)
         (context.l10n.verifyQueueTitle, ModIcons.verified, const VerificationsTab()),
       if (owner) (m.tabSettings, ModIcons.settings, const SettingsTab()),
     ];

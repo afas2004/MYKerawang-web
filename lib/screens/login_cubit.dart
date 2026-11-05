@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show ValueNotifier, debugPrint, kIsWeb;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/guest_access.dart';
+import '../services/feature_flags.dart';
 import '../services/registration_policy.dart';
 import '../utils/browser_history_stub.dart'
     if (dart.library.js_interop) '../utils/browser_history_web.dart';
@@ -44,6 +45,9 @@ final ValueNotifier<String?> pendingLoginEmail = ValueNotifier(null);
 /// where that migration isn't applied yet.
 Future<void> enforceStudentEmailForNewAccount(User user) async {
   if (isStudentEmail(user.email)) return;
+  // Student features off: no student-email rule in the app. The database
+  // trigger still applies whatever registration_mode says.
+  if (!FeatureFlags.studentFeaturesOn) return;
   final created = DateTime.tryParse(user.createdAt);
   final lastSignIn = DateTime.tryParse(user.lastSignInAt ?? '');
   // Brand-new account: first sign-in happens at creation time.
@@ -112,7 +116,7 @@ class LoginCubit extends Cubit<LoginState> {
     // signup to any address (access_settings.registration_mode), and the
     // auth.users trigger enforces the same rule server-side.
     if (!state.isLoginMode &&
-        !RegistrationPolicy.isOpen &&
+        RegistrationPolicy.studentEmailRequired &&
         !isStudentEmail(email)) {
       emit(state.copyWith(errorMessage: LoginError.studentEmailOnly));
       return;

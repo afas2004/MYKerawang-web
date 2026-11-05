@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'feature_flags.dart';
+
 /// Whether the owner has opened signup to any email address.
 ///
 /// Read through `access_policy()`, which is granted to `anon` because the
@@ -13,6 +15,14 @@ class RegistrationPolicy {
   /// means a network blip keeps the student-email message instead of
   /// wrongly promising that any address works.
   static bool get isOpen => _open ?? false;
+
+  /// Whether the app should ask new accounts for a student address
+  /// (wording and the client-side check). False while the owner has
+  /// student features off, even if the database still says
+  /// `student_only` — the auth.users trigger keeps enforcing that, and
+  /// admin Settings tells the owner to open signup.
+  static bool get studentEmailRequired =>
+      FeatureFlags.studentFeaturesOn && !isOpen;
 
   static Future<bool> refresh() async {
     try {

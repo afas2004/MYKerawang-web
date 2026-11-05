@@ -8,6 +8,7 @@ import '../l10n/social_strings.dart';
 import '../widgets/brand/brand.dart';
 import '../widgets/shell_actions.dart';
 import '../language_cubit.dart';
+import '../services/feature_flags.dart';
 import '../widgets/app_toast.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -248,19 +249,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             ),
                           ),
                           
-                          const SizedBox(height: KSpace.xxl),
-                          const Divider(),
-                          const SizedBox(height: KSpace.l),
-
-                          // Clubs: a separate flow after sign-up.
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton.icon(
-                              onPressed: () => context.push('/clubs/register'),
-                              icon: const Icon(AppIcons.people, size: 18),
-                              label: Text(s.shell.registerClubLater),
+                          // Clubs: a separate flow after sign-up (hidden
+                          // while the owner has clubs switched off).
+                          if (FeatureFlags.clubsOn) ...[
+                            const SizedBox(height: KSpace.xxl),
+                            const Divider(),
+                            const SizedBox(height: KSpace.l),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: () => context.push('/clubs/register'),
+                                icon: const Icon(AppIcons.people, size: 18),
+                                label: Text(s.shell.registerClubLater),
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),

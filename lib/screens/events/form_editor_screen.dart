@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../l10n/app_strings.dart';
 import '../../l10n/form_strings.dart';
 import '../../language_cubit.dart';
+import '../../services/feature_flags.dart';
 import '../../services/form_service.dart';
 import '../../services/my_forms_service.dart';
 import '../../services/share_service.dart';
@@ -1034,7 +1035,15 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
                 context,
                 width: 126,
                 value: f.kind,
-                options: [for (final k in kFormKinds) (k, s.formKindLabel(k))],
+                options: [
+                  for (final k in kFormKinds)
+                    // No new matric questions while student features are
+                    // off; an existing one keeps its kind.
+                    if (k != 'student_id' ||
+                        FeatureFlags.studentFeaturesOn ||
+                        f.kind == k)
+                      (k, s.formKindLabel(k)),
+                ],
                 onChanged: _readOnly ? null : (k) => _setKind(index, k),
               ),
               if (f.isRating) ...[

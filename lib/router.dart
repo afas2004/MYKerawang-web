@@ -37,6 +37,8 @@ import 'screens/post_detail_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
+import 'services/feature_flags.dart';
+import 'utils/announcement_rules.dart' show announcementsOffRedirect;
 import 'utils/app_nav.dart';
 import 'utils/guest_access.dart';
 import 'theme/transitions.dart';
@@ -148,7 +150,7 @@ GoRouter buildRouter() {
     navigatorKey: _rootKey,
     initialLocation: '/home',
     observers: [OverlayTracker()],
-    refreshListenable: authNotifier,
+    refreshListenable: Listenable.merge([authNotifier, FeatureFlags.listenable]),
 
     // Auth gate with guest mode — see [authRedirect].
     redirect: (context, state) => authRedirect(
@@ -194,6 +196,7 @@ GoRouter buildRouter() {
           StatefulShellBranch(observers: [OverlayTracker()], routes: [
             GoRoute(
               path: '/announcements',
+              redirect: (_, __) => announcementsOffRedirect(),
               builder: (context, state) => const AnnouncementsScreen(),
             ),
           ]),
@@ -458,6 +461,7 @@ GoRouter buildRouter() {
       // screen checks can_post_announcement and the DB enforces it).
       GoRoute(
         path: '/create/announcement',
+        redirect: (_, __) => announcementsOffRedirect(),
         parentNavigatorKey: _rootKey,
         onExit: leaveFormRoute,
         pageBuilder: (context, state) =>
@@ -465,6 +469,7 @@ GoRouter buildRouter() {
       ),
       GoRoute(
         path: '/post/:id/edit-announcement',
+        redirect: (_, __) => announcementsOffRedirect(),
         parentNavigatorKey: _rootKey,
         onExit: leaveFormRoute,
         pageBuilder: (context, state) => formPage(
