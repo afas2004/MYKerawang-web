@@ -51,6 +51,10 @@ class FeatureFlags {
 
   static bool isOn(AppFeature f) => _state.value.isOn(f);
 
+  /// Tests: set the switches without a database.
+  @visibleForTesting
+  static void debugSet(FeatureFlagsState s) => _state.value = s;
+
   /// Reads the switches again. Never throws; on error the last known
   /// (or all-on) state stays.
   static Future<FeatureFlagsState> refresh() =>

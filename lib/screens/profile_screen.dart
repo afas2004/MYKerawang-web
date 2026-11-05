@@ -10,6 +10,7 @@ import 'package:mykerawang/utils/report_helper.dart';
 import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import '../utils/announcement_rules.dart' show announcementHidden;
 import '../utils/roles.dart';
 import '../l10n/access_strings.dart';
 import '../l10n/account_strings.dart';
@@ -124,7 +125,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       if (mounted) {
         setState(() {
           _profile = profileData;
-          _userPosts = posts.map((p) => {...p, 'type': 'post'}).toList();
+          _userPosts = posts.where((p) => !announcementHidden(p)).map((p) => {...p, 'type': 'post'}).toList();
           _userEvents = events.map((e) => {...e, 'type': 'event'}).toList();
           _userListings = listings.map((l) => {...l, 'type': 'listing'}).toList(); // <--- NEW
           _isLoading = false;

@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../utils/tags.dart';
 import '../utils/filter_rules.dart';
+import '../utils/announcement_rules.dart' show announcementHidden;
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -214,6 +215,7 @@ class _SearchScreenState extends State<SearchScreen> {
             .limit(limitPerCategory);
 
         for (var p in posts) {
+          if (announcementHidden(p)) continue;
           // Titles are optional: fall back to the shared item, then the
           // first line of the body, then the generic "Post".
           final rawTitle = '${p['title'] ?? ''}'.trim();
