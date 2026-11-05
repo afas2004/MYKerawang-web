@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../l10n/shell_strings.dart';
 import '../language_cubit.dart';
-import '../services/feature_flags.dart';
 import '../services/unread_notifications.dart';
 import '../utils/app_nav.dart';
 import '../utils/browser_history_stub.dart'
@@ -37,9 +36,7 @@ abstract final class ShellBranch {
 
   /// Tabs in the order the bottom bar and the rail show them (Create sits
   /// between Announcements and Market on the bar). Search has no slot.
-  /// Announcements drops out while the owner has it switched off.
-  static List<int> get navOrder =>
-      [home, if (FeatureFlags.announcementsOn) announcements, market, events];
+  static const navOrder = [home, announcements, market, events];
 }
 
 /// Shell around the five main tabs. The tab bodies and their state are
@@ -151,9 +148,7 @@ class ShellFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Rebuild when the owner flips a feature switch (nav slots come and go).
-    return ValueListenableBuilder(valueListenable: FeatureFlags.listenable, builder: (context, _, __) =>
-        LayoutBuilder(builder: (context, constraints) {
+    return LayoutBuilder(builder: (context, constraints) {
       final size = Responsive.sizeFor(constraints.maxWidth);
       return switch (size) {
         WindowSize.compact => _compact(context),
@@ -161,7 +156,7 @@ class ShellFrame extends StatelessWidget {
         WindowSize.expanded || WindowSize.large =>
           _expanded(context, showRail: size.isLarge),
       };
-    }));
+    });
   }
 
   // ---------- COMPACT: bottom bar with a centre Create ----------
@@ -179,7 +174,7 @@ class ShellFrame extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     // Rail shows the same four tabs as the bottom bar; Search is in the
     // leading area (and the tab app bars), so it maps to no destination.
-    final branches = ShellBranch.navOrder;
+    const branches = ShellBranch.navOrder;
     final railIndex = branches.indexOf(currentIndex);
     final items = AppSidebar.navItems(context, short: true);
     final loggedIn = ShellAuth.of(context);
@@ -359,7 +354,7 @@ class CompactNavBar extends StatelessWidget {
             child: Row(
               children: [
                 tab(ShellBranch.home),
-                if (FeatureFlags.announcementsOn) tab(ShellBranch.announcements),
+                tab(ShellBranch.announcements),
                 Expanded(
                   child: _BarItem(
                     icon: AppIcons.create,

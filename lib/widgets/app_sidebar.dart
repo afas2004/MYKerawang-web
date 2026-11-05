@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import '../l10n/shell_strings.dart';
 import '../language_cubit.dart';
 import '../screens/announcements/hub_strings.dart';
-import '../services/feature_flags.dart';
 import '../services/unread_notifications.dart';
 import '../utils/app_nav.dart';
 import 'admin_nav_entry.dart';
@@ -126,7 +125,6 @@ class AppSidebar extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.s, KSpace.m, KSpace.s),
                 children: [
                   for (int i = 0; i < items.length; i++)
-                    if (routes[i] != '/announcements' || FeatureFlags.announcementsOn)
                     SideNavTile(
                       icon: selectedIndex == i ? items[i].$2 : items[i].$1,
                       label: items[i].$3,

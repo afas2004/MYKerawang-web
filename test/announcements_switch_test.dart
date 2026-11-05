@@ -1,9 +1,11 @@
 // The owner's Announcements switch (admin Settings → App features).
-// Off: no nav slot, the announcement pages send you Home, and
+// Off: the News tab shows "Coming soon", the composer pages send you Home, and
 // announcement posts drop out of the feed, pins and search.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mykerawang/screens/announcements/announcements_screen.dart';
+import 'package:mykerawang/screens/announcements/announcements_tab.dart';
 import 'package:mykerawang/screens/home_screen.dart';
 import 'package:mykerawang/screens/main_scaffold.dart';
 import 'package:mykerawang/services/feature_flags.dart';
@@ -25,7 +27,9 @@ void main() {
   );
 
   group('nav when off', () {
-    testWidgets('bottom bar drops News; other slots keep their branches', (
+    // The News slot stays so the bar keeps its five-slot shape; the tab
+    // itself shows "Coming soon" (see AnnouncementsTab below).
+    testWidgets('bottom bar keeps News and it still selects its branch', (
       tester,
     ) async {
       FeatureFlags.debugSet(_off);
@@ -34,67 +38,48 @@ void main() {
       final picked = <int>[];
       await pumpScreen(tester, frame(onSelect: picked.add));
 
-      expect(find.text('News'), findsNothing);
-      expect(find.text('Create'), findsOneWidget);
+      expect(find.text('News'), findsOneWidget);
+      await tester.tap(find.text('News'));
       await tester.tap(find.text('Market'));
-      await tester.tap(find.text('Events'));
-      await tester.tap(find.text('Home'));
-      expect(picked, [
-        ShellBranch.market,
-        ShellBranch.events,
-        ShellBranch.home,
-      ]);
-    });
-
-    testWidgets('rail drops News; rail index maps to the right branch', (
-      tester,
-    ) async {
-      FeatureFlags.debugSet(_off);
-      await initTestSupabase(tester);
-      await setWidth(tester, 768);
-      final picked = <int>[];
-      await pumpScreen(tester, frame(onSelect: picked.add));
-
-      expect(find.text('News'), findsNothing);
+      expect(picked, [ShellBranch.announcements, ShellBranch.market]);
       expect(ShellBranch.navOrder, [
         ShellBranch.home,
+        ShellBranch.announcements,
         ShellBranch.market,
         ShellBranch.events,
       ]);
-      await tester.tap(find.text('Market'));
-      await tester.tap(find.text('Events'));
-      expect(picked, [ShellBranch.market, ShellBranch.events]);
     });
 
-    testWidgets('sidebar drops Announcements; Market still opens Market', (
-      tester,
-    ) async {
+    testWidgets('sidebar keeps Announcements', (tester) async {
       FeatureFlags.debugSet(_off);
       await initTestSupabase(tester);
       await setWidth(tester, 1280);
       final picked = <int>[];
       await pumpScreen(tester, frame(onSelect: picked.add));
 
-      expect(find.text('Announcements'), findsNothing);
+      expect(find.text('Announcements'), findsOneWidget);
       await tester.tap(find.text('Market'));
       expect(picked, [ShellBranch.market]);
     });
+  });
 
-    testWidgets('flipping the switch updates the bar without a reload', (
+  group('News tab', () {
+    testWidgets('off: shows Coming soon; flipping on swaps it live', (
       tester,
     ) async {
+      FeatureFlags.debugSet(_off);
       await initTestSupabase(tester);
       await setWidth(tester, 375);
-      await pumpScreen(tester, frame());
-      expect(find.text('News'), findsOneWidget);
+      await pumpScreen(tester, const AnnouncementsTab());
 
-      FeatureFlags.debugSet(_off);
-      await tester.pump();
-      expect(find.text('News'), findsNothing);
+      expect(find.byType(AnnouncementsComingSoon), findsOneWidget);
+      expect(find.text('Coming soon'), findsOneWidget);
+      expect(find.byType(AnnouncementsScreen), findsNothing);
 
       FeatureFlags.debugSet(const FeatureFlagsState());
       await tester.pump();
-      expect(find.text('News'), findsOneWidget);
+      expect(find.byType(AnnouncementsComingSoon), findsNothing);
+      expect(find.byType(AnnouncementsScreen), findsOneWidget);
     });
   });
 
@@ -108,7 +93,6 @@ void main() {
 
     // Same wiring as router.dart: a route-level redirect on each page.
     for (final path in [
-      '/announcements',
       '/create/announcement',
       '/post/abc/edit-announcement',
     ]) {
@@ -123,7 +107,6 @@ void main() {
           initialLocation: path,
           routes: [
             GoRoute(path: '/home', builder: (_, __) => const Text('home')),
-            page('/announcements'),
             page('/create/announcement'),
             page('/post/:id/edit-announcement'),
           ],

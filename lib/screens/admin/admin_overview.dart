@@ -83,9 +83,14 @@ class AdminOverview extends StatelessWidget {
             : c.maxWidth >= 600
             ? 3
             : 2;
+        // Spread the cards evenly over the rows the grid needs, so a
+        // switched-off card (e.g. Clubs) doesn't leave one card alone on a
+        // full-width row: 4 cards on 3 columns lay out 2 + 2, not 3 + 1.
+        final rowCount = (cards.length / cols).ceil();
+        final perRow = rowCount == 0 ? cols : (cards.length / rowCount).ceil();
         final rows = <List<Widget>>[
-          for (var i = 0; i < cards.length; i += cols)
-            cards.sublist(i, (i + cols).clamp(0, cards.length)),
+          for (var i = 0; i < cards.length; i += perRow)
+            cards.sublist(i, (i + perRow).clamp(0, cards.length)),
         ];
         return Padding(
           padding: const EdgeInsets.fromLTRB(
