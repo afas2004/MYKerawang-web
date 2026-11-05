@@ -11,6 +11,7 @@ import 'package:mykerawang/widgets/linear_refresher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../utils/roles.dart';
+import '../services/feature_flags.dart';
 import '../l10n/access_strings.dart';
 import '../l10n/account_strings.dart';
 import '../l10n/feed_strings.dart';
@@ -134,7 +135,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       }
 
       // Only the owner can read this row; a failure just hides the banner.
-      if (_isMe && isStudentEmail(_supabase.auth.currentUser?.email)) {
+      if (_isMe &&
+          FeatureFlags.studentFeaturesOn &&
+          isStudentEmail(_supabase.auth.currentUser?.email)) {
         var needs = true;
         try {
           final c = await _supabase

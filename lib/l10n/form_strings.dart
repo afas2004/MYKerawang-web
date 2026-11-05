@@ -1,3 +1,4 @@
+import '../services/feature_flags.dart';
 import 'app_strings.dart';
 
 /// Copy for event forms (the KI report survey, its editor and its answers).
@@ -157,6 +158,12 @@ extension FormStrings on AppStrings {
       _t("Ready to publish", "Sedia diterbitkan", "Ready to publish");
 
   // ---- kinds ----
+  /// The `student_id` kind reads as a plain ID number while the owner has
+  /// student features off.
+  String get _studentIdLabel => FeatureFlags.studentFeaturesOn
+      ? _t("Matric number", "Nombor matrik", "Matric number")
+      : _t("ID number", "Nombor ID", "ID number");
+
   String formKindLabel(String kind) => switch (kind) {
         'short_text' => _t("Short text", "Teks pendek", "Short text"),
         'long_text' => _t("Long text", "Teks panjang", "Long text"),
@@ -167,7 +174,7 @@ extension FormStrings on AppStrings {
         'date' => _t("Date", "Tarikh", "Date"),
         'email' => _t("Email", "Emel", "Email"),
         'phone' => _t("Phone", "Telefon", "Phone"),
-        'student_id' => _t("Matric number", "Nombor matrik", "Matric number"),
+        'student_id' => _studentIdLabel,
         'consent' => _t("Agreement", "Persetujuan", "Agreement"),
         'heading' => _t("Section heading", "Tajuk bahagian", "Section heading"),
         _ => kind,
@@ -466,7 +473,7 @@ extension FormStrings on AppStrings {
         'date' => _t("Date", "Tarikh", "Date"),
         'email' => _t("Email", "E-mel", "Email"),
         'phone' => _t("Phone", "Telefon", "Phone"),
-        'student_id' => _t("Matric number", "Nombor matrik", "Matric number"),
+        'student_id' => _studentIdLabel,
         'consent' => _t("Agreement", "Persetujuan", "Agreement"),
         _ => _t("Section", "Bahagian", "Section"),
       };

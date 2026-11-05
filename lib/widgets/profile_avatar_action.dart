@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../language_cubit.dart';
 import '../screens/announcements/hub_strings.dart';
 import '../screens/profile_cubit.dart';
+import '../services/registration_policy.dart';
 import '../utils/guest_access.dart';
 import 'brand/brand.dart';
 
@@ -165,7 +166,10 @@ class _GuestPanel extends StatelessWidget {
         const SizedBox(height: KSpace.s),
         OutlinedButton(
           onPressed: () => goToLogin(context),
-          child: Text(s.hub.joinWithStudentEmail,
+          child: Text(
+              RegistrationPolicy.studentEmailRequired
+                  ? s.hub.joinWithStudentEmail
+                  : s.signUp,
               maxLines: 1, overflow: TextOverflow.ellipsis),
         ),
       ],

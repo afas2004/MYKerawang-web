@@ -17,6 +17,7 @@ import '../l10n/social_strings.dart';
 import '../l10n/brand_strings.dart';
 import '../l10n/moderation_strings.dart';
 import '../services/account_data.dart';
+import '../services/feature_flags.dart';
 import '../services/moderation_service.dart';
 import '../services/student_verification.dart';
 import '../utils/app_nav.dart';
@@ -266,6 +267,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // The student address stops working after graduation; without a
     // backup the account is unrecoverable. Only nag about a real gap.
     final needsBackup = _backupLoaded &&
+        FeatureFlags.studentFeaturesOn &&
         isStudentEmail(email) &&
         (_backupEmail == null || _backupEmail!.isEmpty);
 
@@ -428,7 +430,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         if (mounted) _loadBackupEmail();
                       },
                     ),
-                  if (_verifyEnabled)
+                  if (_verifyEnabled && FeatureFlags.studentFeaturesOn)
                     ListTile(
                       leading: Icon(
                         AppIcons.verified,

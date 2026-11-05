@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_strings.dart';
 import '../../l10n/access_strings.dart';
 import '../../l10n/moderation_strings.dart';
+import '../../l10n/student_feature_strings.dart';
 import '../../language_cubit.dart';
 import '../../services/admin_unlock.dart';
 import '../../services/feature_flags.dart';
@@ -333,6 +334,13 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                               ? Text(context.l10n.featureStudentBody)
                               : null,
                         ),
+                      // The database still enforces signup and verification.
+                      if (!_features.studentFeaturesOn &&
+                          (!_registrationOpen || _verification))
+                        Text(context.l10n.featureStudentOffHint,
+                            key: const ValueKey('student-off-hint'),
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).colorScheme.error)),
                     ],
                   ),
                 ),

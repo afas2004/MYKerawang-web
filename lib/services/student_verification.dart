@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'feature_flags.dart';
+
 /// One account's student verification, as stored.
 ///
 /// A mailbox is all this proves: the address, whether it was accepted, and
@@ -43,7 +45,11 @@ class StudentVerificationService {
 
   /// The owner's switch, readable by every signed-in account so the app
   /// can hide the entry points while the feature is off.
+  ///
+  /// Also off while the owner has student features switched off: the app
+  /// then reads as a general college app with no verify entry points.
   static Future<bool> isEnabled() async {
+    if (!FeatureFlags.studentFeaturesOn) return false;
     try {
       final p = await _db.rpc('access_policy') as Map;
       return p['verification_enabled'] == true;

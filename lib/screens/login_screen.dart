@@ -8,6 +8,7 @@ import '../language_cubit.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/brand/brand.dart';
 import '../utils/guest_access.dart';
+import '../services/feature_flags.dart';
 import '../services/registration_policy.dart';
 import '../widgets/app_toast.dart';
 import 'login_cubit.dart'; // This looks in the SAME folder
@@ -35,10 +36,20 @@ class _LoginScreenState extends State<LoginScreen> {
   /// Owner-controlled: when open, any email may sign up.
   bool _openRegistration = RegistrationPolicy.isOpen;
 
+  /// New accounts need a student address: signup isn't open and the
+  /// owner hasn't switched student features off.
+  bool get _studentOnly =>
+      FeatureFlags.studentFeaturesOn && !_openRegistration;
+
+  void _onFlags() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
     pendingLoginError.addListener(_showPendingError);
+    FeatureFlags.listenable.addListener(_onFlags);
     RegistrationPolicy.refresh().then((open) {
       if (mounted && open != _openRegistration) {
         setState(() => _openRegistration = open);
@@ -73,6 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void dispose() {
     pendingLoginError.removeListener(_showPendingError);
+    FeatureFlags.listenable.removeListener(_onFlags);
     _emailCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
@@ -207,9 +219,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 labelText: s.email,
                 prefixIcon: const Icon(AppIcons.email),
                 // Student addresses are the fast path; when the owner has
-                // opened signup, any address works.
+                // opened signup (or turned student features off), any
+                // address works.
                 helperText: signUp
-                    ? (_openRegistration ? s.anyEmailHint : s.studentEmailHint)
+                    ? (_studentOnly ? s.studentEmailHint : s.anyEmailHint)
                     : null,
                 helperMaxLines: 2,
               ),
@@ -217,7 +230,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 final email = (v ?? '').trim();
                 if (email.isEmpty) return s.fillAllFields;
                 if (!_emailPattern.hasMatch(email)) return s.emailInvalid;
-                if (signUp && !_openRegistration && !isStudentEmail(email)) {
+                if (signUp && _studentOnly && !isStudentEmail(email)) {
                   return s.studentEmailOnly;
                 }
                 return null;
@@ -309,7 +322,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             if (!signUp)
               Text(
-                s.studentEmailHint,
+                _studentOnly ? s.studentEmailHint : s.anyEmailHint,
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
               ),
