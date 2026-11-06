@@ -12,7 +12,10 @@ import 'save_button.dart';
 /// The own-profile "Saved" tab: bookmarks grouped by type (posts, Market,
 /// events), newest first within each group.
 class SavedItemsView extends StatefulWidget {
-  const SavedItemsView({super.key});
+  /// Fires when the page around this tab is refreshed (pull-to-refresh).
+  final Listenable? reloadSignal;
+
+  const SavedItemsView({super.key, this.reloadSignal});
 
   @override
   State<SavedItemsView> createState() => _SavedItemsViewState();
@@ -25,6 +28,39 @@ class _SavedItemsViewState extends State<SavedItemsView> {
       setState(() => _future = SavedItems.instance.fetchAll());
 
   @override
+  void initState() {
+    super.initState();
+    widget.reloadSignal?.addListener(_reload);
+  }
+
+  @override
+  void didUpdateWidget(SavedItemsView old) {
+    super.didUpdateWidget(old);
+    if (old.reloadSignal != widget.reloadSignal) {
+      old.reloadSignal?.removeListener(_reload);
+      widget.reloadSignal?.addListener(_reload);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.reloadSignal?.removeListener(_reload);
+    super.dispose();
+  }
+
+  /// Fills the tab and can be dragged, so pull-to-refresh works even when
+  /// there is no list (loading, error, nothing saved).
+  Widget _pullable(Widget child) => LayoutBuilder(
+        builder: (context, c) => SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: c.maxHeight),
+            child: Center(child: child),
+          ),
+        ),
+      );
+
+  @override
   Widget build(BuildContext context) {
     final s = context.l10n;
     final scheme = Theme.of(context).colorScheme;
@@ -32,12 +68,13 @@ class _SavedItemsViewState extends State<SavedItemsView> {
     return FutureBuilder<List<SavedEntry>>(
       future: _future,
       builder: (context, snap) {
-        if (snap.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
+        // On a reload keep the old list up; the spinner is first load only.
+        if (snap.connectionState != ConnectionState.done && !snap.hasData) {
+          return _pullable(const CircularProgressIndicator());
         }
         if (snap.hasError) {
-          return Center(
-            child: Column(
+          return _pullable(
+            Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(s.errorWithDetail.fill([snap.error])),
@@ -61,8 +98,8 @@ class _SavedItemsViewState extends State<SavedItemsView> {
                 .where((e) => keys.contains(SavedItems.keyOf(e.type, e.id)))
                 .toList();
             if (entries.isEmpty) {
-              return Center(
-                child: Padding(
+              return _pullable(
+                Padding(
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,

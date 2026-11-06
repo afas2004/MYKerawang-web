@@ -23,6 +23,8 @@ import '../utils/event_live.dart';
 import '../widgets/status_badge.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../utils/formatters.dart';
+import '../utils/url_rules.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../utils/guest_access.dart';
 import '../widgets/admin_icon_button.dart';
 import '../widgets/brand/brand.dart';
@@ -39,7 +41,8 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
+class _ProfileScreenState extends State<ProfileScreen>
+    with SingleTickerProviderStateMixin, RefreshOnContentChange {
   final _supabase = Supabase.instance.client;
   late TabController _tabController; // Controls the 3 tabs
   
@@ -47,6 +50,15 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   bool _loadError = false;
   bool _isMe = false;
   bool _isFollowing = false;
+  bool _followBusy = false;
+
+  /// Bumped on pull-to-refresh / menu refresh so the Saved tab reloads too.
+  final _savedReload = ValueNotifier<int>(0);
+
+  Future<void> _refreshAll() {
+    _savedReload.value++;
+    return _fetchProfileData();
+  }
 
   /// Own profile only: signed in with a student address and no backup —
   /// the account dies with the mailbox. Dismissable for this visit.
@@ -70,6 +82,19 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     _fetchProfileData();
   }
 
+  /// Back from Edit profile (or any post/event/listing change): reload, so
+  /// the new name, photo, link and backup state show without a manual
+  /// refresh.
+  @override
+  void onContentChanged() => _fetchProfileData();
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _savedReload.dispose();
+    super.dispose();
+  }
+
   Future<void> _fetchProfileData() async {
     final currentUid = _supabase.auth.currentUser?.id;
     final targetUid = widget.userId ?? currentUid;
@@ -86,9 +111,20 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       final profileData = await _supabase
           .from('profiles')
           // Explicit: never pull private columns for someone else's page.
-          .select('id, username, display_name, full_name, avatar_url, bio, is_verified, role')
+          .select('id, username, display_name, full_name, avatar_url, bio, website, is_verified, role')
           .eq('id', targetUid)
-          .single();
+          .maybeSingle();
+
+      // No such user: show "not found", not a connection error with a retry.
+      if (profileData == null) {
+        if (mounted) {
+          setState(() {
+            _profile = null;
+            _isLoading = false;
+          });
+        }
+        return;
+      }
       
       // 2. Fetch Content (Posts, Events, AND Listings)
       // posts_public nulls user_id on anonymous rows, so anonymous posts no
@@ -175,6 +211,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       requireLogin(context);
       return;
     }
+    // A second tap while the first is still saving would send the opposite
+    // request out of order (or a duplicate insert).
+    if (_followBusy) return;
+    _followBusy = true;
 
     // Optimistic UI Update
     setState(() {
@@ -187,20 +227,24 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         // 1. Insert Follow Record
         await _supabase.from('followers').insert({'follower_id': currentUid, 'following_id': targetUid});
         
-        // 2. SEND NOTIFICATION (New!)
-        // Fetch my name first so the notification looks nice ("Fahmi followed you")
-        final myProfile = await _supabase.from('profiles').select('display_name').eq('id', currentUid).single();
+        // 2. Tell them. The follow is already saved, so a failed
+        // notification must not undo it on screen.
+        try {
+          final myProfile = await _supabase.from('profiles').select('display_name, full_name').eq('id', currentUid).single();
 
-        // Read by the recipient, so written in the canonical language.
-        const n = AppStrings.en;
-        await _supabase.from('notifications').insert({
-          'user_id': targetUid,      // Send TO target
-          'actor_id': currentUid,    // From ME
-          'type': 'follow',
-          'title': n.notifFollowTitle,
-          'body': n.notifFollowBody.fill([myProfile['display_name']]),
-          'data': {}, // No extra data needed for follow
-        });
+          // Read by the recipient, so written in the canonical language.
+          const n = AppStrings.en;
+          await _supabase.from('notifications').insert({
+            'user_id': targetUid,      // Send TO target
+            'actor_id': currentUid,    // From ME
+            'type': 'follow',
+            'title': n.notifFollowTitle,
+            'body': n.notifFollowBody.fill([displayNameFor(n, myProfile)]),
+            'data': {}, // No extra data needed for follow
+          });
+        } catch (e) {
+          debugPrint('Follow notification failed: $e');
+        }
 
       } else {
         // Unfollow
@@ -215,6 +259,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         });
         showToast(context.l10nRead.errorWithDetail.fill([e]));
       }
+    } finally {
+      _followBusy = false;
     }
   }
 
@@ -222,6 +268,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     final theme = Theme.of(context);
     final qrColor = theme.colorScheme.onSurface;
     final s = context.l10nRead;
+    // The scanner reports the same code many times a second; only the first
+    // may close the dialog, or the extra pops close this page too.
+    var handled = false;
 
     showDialog(
       context: context,
@@ -301,11 +350,13 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                             );
                           },
                           onDetect: (capture) {
+                            if (handled) return;
                             final List<Barcode> barcodes = capture.barcodes;
                             for (final barcode in barcodes) {
                               if (barcode.rawValue != null) {
                                 final userId = userIdFromProfileCode(barcode.rawValue!);
                                 if (userId != null) {
+                                  handled = true;
                                   Navigator.pop(ctx);
                                   context.goUser(userId);
                                   break;
@@ -385,8 +436,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         ],
       ),
       body: LinearRefresher(
-        onRefresh: _fetchProfileData,
+        onRefresh: _refreshAll,
         offset: 0.0,
+        notificationPredicate: LinearRefresher.nestedScrollPredicate,
         child: NestedScrollView(
           physics: const BouncingScrollPhysics(
               parent: AlwaysScrollableScrollPhysics()),
@@ -427,7 +479,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               _userListings.isEmpty
                   ? _TabEmpty(icon: AppIcons.market, text: s.nothingForSale)
                   : _tileGrid(_userListings, isEvent: false),
-              if (_isMe) const SavedItemsView(),
+              if (_isMe) SavedItemsView(reloadSignal: _savedReload),
             ],
           ),
         ),
@@ -497,7 +549,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           case 'qr':
             _showQRCode();
           case 'refresh':
-            _fetchProfileData();
+            _refreshAll();
           case 'report':
             if (requireLogin(context)) {
               showReportDialog(context, widget.userId!, 'user');
@@ -658,6 +710,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             const SizedBox(height: KSpace.m),
             Text(p['bio'], style: theme.textTheme.bodyMedium),
           ],
+          if (_websiteUri(p['website']) case final uri?) ...[
+            const SizedBox(height: KSpace.xs),
+            _WebsiteLink(uri: uri, label: (p['website'] as String).trim()),
+          ],
           const SizedBox(height: KSpace.s),
           Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,
@@ -686,6 +742,18 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         ],
       ),
     );
+  }
+
+  /// The link from Edit profile. People type "instagram.com/me", so a
+  /// missing scheme means https; anything that isn't a web link is not shown.
+  static Uri? _websiteUri(dynamic raw) {
+    final text = raw is String ? raw.trim() : '';
+    if (text.isEmpty) return null;
+    final hasScheme = Uri.tryParse(text)?.hasScheme ?? false;
+    final uri = launchableUri(hasScheme ? text : 'https://$text');
+    return (uri != null && (uri.scheme == 'http' || uri.scheme == 'https'))
+        ? uri
+        : null;
   }
 
   void _openFollows(String type) {
@@ -850,6 +918,53 @@ class _ProfileTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The profile's website as a tappable link, opened outside the app.
+class _WebsiteLink extends StatelessWidget {
+  final Uri uri;
+  final String label;
+  const _WebsiteLink({required this.uri, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final shown =
+        label.replaceFirst(RegExp(r'^https?://', caseSensitive: false), '');
+    return Semantics(
+      link: true,
+      child: InkWell(
+        borderRadius: KRadius.small,
+        onTap: () async {
+          var ok = false;
+          try {
+            ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+          } catch (_) {}
+          if (!ok && context.mounted) {
+            showToast(context.l10nRead.linkUnsupported);
+          }
+        },
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 40),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(AppIcons.website, size: 16, color: scheme.primary),
+              const SizedBox(width: KSpace.xs),
+              Flexible(
+                child: Text(shown,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                        color: scheme.primary, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

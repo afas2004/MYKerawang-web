@@ -28,13 +28,25 @@ class LinearRefresher extends StatelessWidget {
   /// Pull distance (px) before a release triggers a refresh.
   final double triggerDistance;
 
+  /// Which scroll notifications drive the pull. The default takes only the
+  /// scroll view directly inside; a NestedScrollView needs its inner lists
+  /// (see [nestedScrollPredicate]).
+  final ScrollNotificationPredicate notificationPredicate;
+
   const LinearRefresher({
     super.key,
     required this.onRefresh,
     required this.child,
     this.offset = 0.0,
     this.triggerDistance = 120.0,
+    this.notificationPredicate = defaultScrollNotificationPredicate,
   });
+
+  /// For a NestedScrollView whose body is a TabBarView: pulling down past
+  /// the top is handed to the tab's own list, which sits two scroll views
+  /// deep (outer view → tab pager → list), so depth 0 never sees it.
+  static bool nestedScrollPredicate(ScrollNotification n) =>
+      n.depth == 2 && n.metrics.axis == Axis.vertical;
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +54,7 @@ class LinearRefresher extends StatelessWidget {
     return CustomRefreshIndicator(
       onRefresh: onRefresh,
       offsetToArmed: triggerDistance,
+      notificationPredicate: notificationPredicate,
       builder: (context, child, controller) {
         return Stack(
           children: [
