@@ -268,6 +268,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (mounted) {
         // Composer avatar / name elsewhere read from the cubit.
         context.read<ProfileCubit>().loadProfile();
+        notifyContentChanged(); // the profile page reloads
         Navigator.pop(context, true); 
         showToast(s.profileUpdated);
       }
@@ -300,6 +301,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   // images are committed by the bottom button (see [_save]).
   final Map<String, Timer?> _debounce = {};
   final Map<String, String> _fieldState = {}; // 'saving' | 'saved'
+
+  /// Something auto-saved: the profile page (and anything else showing
+  /// this person) reloads once when this page closes, not per keystroke.
+  bool _autoSaved = false;
+
+  @override
+  void dispose() {
+    if (_autoSaved) Future.microtask(notifyContentChanged);
+    super.dispose();
+  }
 
   /// Private columns, stored in profile_contacts rather than profiles.
   static const _contactColumns = {'phone_number', 'payment_qr_url', 'backup_email'};
@@ -336,8 +347,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
         _loaded[column] = value.trim();
         if (mounted) {
+          _autoSaved = true;
           setState(() => _fieldState[column] = 'saved');
           context.read<ProfileCubit>().loadProfile();
+        } else {
+          // Typed just before leaving: the page is gone, tell others now.
+          notifyContentChanged();
         }
       } catch (_) {
         if (mounted) setState(() => _fieldState.remove(column));
