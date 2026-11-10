@@ -1,0 +1,16 @@
+{
+  "name": "mykerawang-functions",
+  "private": true,
+  "description": "Per-page link previews for kerawang.my (see docs/link-previews.md)",
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.0.0"
+  }
+}

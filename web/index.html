@@ -21,10 +21,12 @@
   <meta name="theme-color" content="#F6F5F8">
   <meta name="description" content="MYKerawang — community marketplace and events platform.">
 
-  <!-- Link previews (WhatsApp, Telegram, X…). Crawlers don't run Flutter,
-       so every shared URL gets this same generic card; per-item previews
-       would need server-side rendering (e.g. a Cloud Function on /event/**).
-       og:image must be an absolute URL. -->
+  <!-- Link previews (WhatsApp, Telegram, X…). Crawlers don't run Flutter.
+       These are the generic tags. For /item/:id, /event/:id and /post/:id
+       the linkPreview function (functions/) serves this same file with
+       these tags swapped for the page's own; see docs/link-previews.md.
+       Keep every preview tag on one line: the function removes them by
+       pattern. og:image must be an absolute URL. -->
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="MYKerawang">
   <meta property="og:title" content="MYKerawang">
