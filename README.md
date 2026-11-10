@@ -65,6 +65,8 @@ Migrations live in `supabase/migrations/`, one timestamped SQL file per change. 
 
 Always deploy with `deploy_web.bat`. Never deploy a plain `flutter build web`. The script stamps a build id, turns off the PWA service worker, swaps in a self-removing worker for old caches, and then runs `firebase deploy --only hosting`.
 
+Shared links to listings, events and posts get their own WhatsApp/Telegram preview from the `linkPreview` Firebase Function in `functions/`. The script does not deploy it: run `firebase deploy --only functions` once before the first hosting deploy that includes it, and again whenever `functions/` changes. See [docs/link-previews.md](docs/link-previews.md).
+
 ## Project structure
 
 ```
