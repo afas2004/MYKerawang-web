@@ -29,6 +29,8 @@ import 'verification/verify_sheet.dart';
 import '../services/update_service.dart';
 import '../l10n/welcome_tour_strings.dart';
 import '../widgets/welcome_tour.dart';
+import '../widgets/page_tips.dart';
+import '../l10n/page_tips_strings.dart';
 import '../widgets/app_toast.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -455,6 +457,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     trailing: const Icon(AppIcons.chevronRight),
                     onTap: () => WelcomeTour.show(context,
                         name: context.read<ProfileCubit>().state.profile?['display_name'] as String?),
+                  ),
+                  ListTile(
+                    leading: const Icon(AppIcons.info),
+                    title: Text(s.tipsReset),
+                    subtitle: Text(s.tipsResetSub),
+                    onTap: () async {
+                      final done = s.tipsResetDone;
+                      await PageTips.resetAll();
+                      showToast(done);
+                    },
                   ),
                   ListTile(
                     leading: const Icon(AppIcons.info),

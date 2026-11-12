@@ -25,6 +25,8 @@ import 'clubs/post_as_selector.dart';
 import 'profile_cubit.dart';
 import '../services/club_service.dart';
 import '../widgets/app_toast.dart';
+import '../widgets/page_tips.dart';
+import '../l10n/page_tips_strings.dart';
 
 /// Width at or above which the editor opens as a dialog over the feed;
 /// below it is a full-screen page.
@@ -172,6 +174,18 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       () => _dirty && !_isLoading,
       confirm: (_) => _confirmDiscard(),
     );
+    // First new post: tags, anonymous, and the rules.
+    if (!_isEdit) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final s = context.l10nRead;
+        PageTips.maybeShow(context, 'create-post', () => [
+              TipStep('post-tags', s.tipPostTags),
+              TipStep('post-anon', s.tipPostAnon),
+              TipStep('post-submit', s.tipPostRules),
+            ]);
+      });
+    }
   }
 
   @override
@@ -412,7 +426,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
     final submit = Padding(
       padding: const EdgeInsets.only(right: KSpace.m),
-      child: FilledButton(
+      child: TipAnchor(
+        id: 'post-submit',
+        child: FilledButton(
         onPressed: _isLoading ? null : _submit,
         child: _isLoading
             ? SizedBox(
@@ -424,6 +440,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 ),
               )
             : Text(_isEdit ? s.saveChanges : fs.postAction),
+      ),
       ),
     );
 
@@ -544,28 +561,36 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         ],
         const SizedBox(height: KSpace.xl),
 
-        sectionLabel(s.addTags),
-        _TagField(
-          tags: _tags,
-          controller: _tagCtrl,
-          focusNode: _tagFocus,
-          onChanged: _onTagChanged,
-          onSubmitted: (_) => _commitTag(),
-          onKey: _onTagKey,
-          onRemove: (t) => setState(() => _tags.remove(t)),
-        ),
-        const SizedBox(height: KSpace.s),
-        Wrap(
-          spacing: KSpace.s,
-          runSpacing: KSpace.xs,
-          children: [
-            for (final tag in _suggested)
-              FilterChip(
-                label: Text(displayTag(tag)),
-                selected: _tags.contains(tag),
-                onSelected: (_) => _toggleSuggested(tag),
+        TipAnchor(
+          id: 'post-tags',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              sectionLabel(s.addTags),
+              _TagField(
+                tags: _tags,
+                controller: _tagCtrl,
+                focusNode: _tagFocus,
+                onChanged: _onTagChanged,
+                onSubmitted: (_) => _commitTag(),
+                onKey: _onTagKey,
+                onRemove: (t) => setState(() => _tags.remove(t)),
               ),
-          ],
+              const SizedBox(height: KSpace.s),
+              Wrap(
+                spacing: KSpace.s,
+                runSpacing: KSpace.xs,
+                children: [
+                  for (final tag in _suggested)
+                    FilterChip(
+                      label: Text(displayTag(tag)),
+                      selected: _tags.contains(tag),
+                      onSelected: (_) => _toggleSuggested(tag),
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
         // Anonymity isn't offered when posting as a club.
         if (!_asClub) ...[
@@ -575,7 +600,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           // Anonymity: one line here, the full explanation behind (i).
           // Fixed once posted: flipping it later would expose (or
           // re-attribute) what was already said under it.
-          ListTile(
+          TipAnchor(
+            id: 'post-anon',
+            child: ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Icon(
               AppIcons.anonymous,
@@ -607,6 +634,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   : (val) => setState(() => _isAnon = val),
             ),
             onTap: _isEdit ? null : () => setState(() => _isAnon = !_isAnon),
+          ),
           ),
         ],
       ],

@@ -40,6 +40,8 @@ import '../widgets/restriction_gate.dart';
 import '../widgets/save_button.dart';
 import '../utils/url_rules.dart';
 import '../widgets/app_toast.dart';
+import '../widgets/page_tips.dart';
+import '../l10n/page_tips_strings.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final Map<String, dynamic> event;
@@ -216,10 +218,26 @@ class _EventDetailScreenState extends State<EventDetailScreen>
       if (userId != null) _fetchFollowingGoing(userId);
       _loadSeries();
       _watchParticipants();
+      _askTips();
     } catch (e) {
       debugPrint("Error fetching details: $e");
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  /// First visit to an event page: Join, Save, Share. Only for someone who
+  /// can join this one, so the Join tip is true.
+  void _askTips() {
+    if (!mounted || _isOwner || _isJoined || _isClosed || _registrationClosed || _isFullAtCapacity) return;
+    final s = context.l10nRead;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      PageTips.maybeShow(context, 'event', () => [
+            TipStep('event-join', s.tipEventJoin),
+            TipStep('event-save', s.tipEventSave),
+            TipStep('event-share', s.tipEventShare),
+          ]);
+    });
   }
 
   /// Keeps "N attending" honest while people join, leave or check in.
@@ -713,7 +731,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                   _organiserRow(context),
                 ],
                 const SizedBox(height: KSpace.l),
-                KStampSwitcher(child: _primaryAction(context)),
+                TipAnchor(id: 'event-join', child: KStampSwitcher(child: _primaryAction(context))),
                 const SizedBox(height: KSpace.m),
                 _secondaryActions(context),
               ],
@@ -808,7 +826,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         border: Border(top: BorderSide(color: scheme.outlineVariant)),
       ),
       padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.m, KSpace.l, KSpace.m),
-      child: SafeArea(top: false, child: KStampSwitcher(child: _primaryAction(context))),
+      child: SafeArea(top: false, child: TipAnchor(id: 'event-join', child: KStampSwitcher(child: _primaryAction(context)))),
     );
   }
 
@@ -822,8 +840,14 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     final s = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     return [
-      SaveButton(type: SavedType.event, id: _event['id'], color: scheme.onSurfaceVariant),
-      IconButton(tooltip: s.share, icon: const Icon(AppIcons.share), onPressed: _share),
+      TipAnchor(
+        id: 'event-save',
+        child: SaveButton(type: SavedType.event, id: _event['id'], color: scheme.onSurfaceVariant),
+      ),
+      TipAnchor(
+        id: 'event-share',
+        child: IconButton(tooltip: s.share, icon: const Icon(AppIcons.share), onPressed: _share),
+      ),
       if (_isOwner)
         _ownerMenu(context)
       else
