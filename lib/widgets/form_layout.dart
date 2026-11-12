@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'brand/brand.dart';
+import 'info_tip.dart';
 
 /// Layout for the create / edit forms (event, listing): titled sections,
 /// a centred card on wide screens, and a publish bar that stays put.
@@ -50,11 +51,15 @@ class FormSection extends StatelessWidget {
   final IconData icon;
   final List<Widget> children;
 
+  /// Optional (i) text after the title.
+  final String? info;
+
   const FormSection({
     super.key,
     required this.title,
     required this.icon,
     required this.children,
+    this.info,
   });
 
   @override
@@ -79,6 +84,7 @@ class FormSection extends StatelessWidget {
                       style: theme.textTheme.titleMedium,
                       overflow: TextOverflow.ellipsis),
                 ),
+                if (info != null) InfoTip(info!),
                 const SizedBox(width: 12),
                 Expanded(child: Divider(color: scheme.outlineVariant)),
               ],

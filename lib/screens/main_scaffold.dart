@@ -16,6 +16,7 @@ import '../widgets/app_sidebar.dart';
 import '../widgets/profile_avatar_action.dart';
 import '../widgets/right_rail.dart';
 import '../widgets/shell_actions.dart';
+import '../widgets/page_tips.dart';
 
 // Layout per Responsive size class (WindowSize):
 //  * compact  < 600   bottom bar (Home, Announcements, Create, Market,
@@ -199,7 +200,9 @@ class ShellFrame extends StatelessWidget {
                   child: const AppLogo(size: 36),
                 ),
                 const SizedBox(height: KSpace.l),
-                FloatingActionButton(
+                TipAnchor(
+                  id: 'shell-create',
+                  child: FloatingActionButton(
                   heroTag: 'shell-create',
                   tooltip: s.shell.create,
                   elevation: 0,
@@ -207,6 +210,7 @@ class ShellFrame extends StatelessWidget {
                   foregroundColor: scheme.onPrimary,
                   onPressed: () => showCreateSheet(context),
                   child: const Icon(AppIcons.create),
+                ),
                 ),
                 const SizedBox(height: KSpace.m),
                 IconButton(
@@ -356,13 +360,16 @@ class CompactNavBar extends StatelessWidget {
                 tab(ShellBranch.home),
                 tab(ShellBranch.announcements),
                 Expanded(
-                  child: _BarItem(
+                  child: TipAnchor(
+                    id: 'shell-create',
+                    child: _BarItem(
                     icon: AppIcons.create,
                     selectedIcon: AppIcons.create,
                     label: s.shell.create,
                     selected: false,
                     accent: true,
                     onTap: () => showCreateSheet(context),
+                  ),
                   ),
                 ),
                 tab(ShellBranch.market),

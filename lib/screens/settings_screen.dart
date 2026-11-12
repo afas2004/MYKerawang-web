@@ -29,6 +29,8 @@ import 'verification/verify_sheet.dart';
 import '../services/update_service.dart';
 import '../l10n/welcome_tour_strings.dart';
 import '../widgets/welcome_tour.dart';
+import '../widgets/page_tips.dart';
+import '../l10n/page_tips_strings.dart';
 import '../l10n/whats_new_strings.dart';
 import '../widgets/app_toast.dart';
 
@@ -463,6 +465,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: Text(s.whatsNewSub),
                     trailing: const Icon(AppIcons.chevronRight),
                     onTap: context.goWhatsNew,
+                  ),
+                  ListTile(
+                    leading: const Icon(AppIcons.info),
+                    title: Text(s.tipsReset),
+                    subtitle: Text(s.tipsResetSub),
+                    onTap: () async {
+                      final done = s.tipsResetDone;
+                      await PageTips.resetAll();
+                      showToast(done);
+                    },
                   ),
                   ListTile(
                     leading: const Icon(AppIcons.info),

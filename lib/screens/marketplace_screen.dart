@@ -20,6 +20,8 @@ import 'marketplace_cubit.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
 import '../widgets/error_state.dart';
+import '../widgets/page_tips.dart';
+import '../l10n/page_tips_strings.dart';
 
 /// Filters become a side panel once the market is given this much width.
 const double _kSidePanelFrom = 900;
@@ -49,6 +51,23 @@ class MarketplaceView extends StatefulWidget {
 class _MarketplaceViewState extends State<MarketplaceView>
     with RefreshOnContentChange {
   final TextEditingController _searchCtrl = TextEditingController();
+
+  /// Page tips are asked for once, when the first items are on screen.
+  bool _tipsAsked = false;
+
+  void _askTips() {
+    if (_tipsAsked) return;
+    _tipsAsked = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final s = context.l10nRead;
+      PageTips.maybeShow(context, 'market', () => [
+            TipStep('market-search', s.tipMarketSearch),
+            TipStep('market-item', s.tipMarketItem),
+            TipStep('shell-create', s.tipMarketSell),
+          ]);
+    });
+  }
 
   @override
   void dispose() {
@@ -141,7 +160,9 @@ class _MarketplaceViewState extends State<MarketplaceView>
                         Padding(
                           padding: const EdgeInsets.fromLTRB(
                               KSpace.l, KSpace.s, KSpace.l, KSpace.s),
-                          child: Row(
+                          child: TipAnchor(
+                            id: 'market-search',
+                            child: Row(
                             children: [
                               Expanded(child: _searchField(context)),
                               if (!sidePanel) ...[
@@ -158,6 +179,7 @@ class _MarketplaceViewState extends State<MarketplaceView>
                                 ),
                               ],
                             ],
+                          ),
                           ),
                         ),
                         // Quick category chips; wide layouts have them in
@@ -234,6 +256,7 @@ class _MarketplaceViewState extends State<MarketplaceView>
         );
       }
 
+      _askTips();
       return CustomScrollView(
         slivers: [
           SliverPadding(
@@ -249,7 +272,8 @@ class _MarketplaceViewState extends State<MarketplaceView>
               itemBuilder: (context, index) {
                 final item = state.items[index];
                 final card = MarketCard(item: item, onTap: () => context.goItem(item));
-                return index < 3 ? KEntrance(index: index, child: card) : card;
+                final shown = index < 3 ? KEntrance(index: index, child: card) : card;
+                return index == 0 ? TipAnchor(id: 'market-item', child: shown) : shown;
               },
             ),
           ),

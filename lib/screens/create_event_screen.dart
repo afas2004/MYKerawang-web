@@ -29,6 +29,9 @@ import '../l10n/event_timing_strings.dart';
 import '../utils/event_series.dart';
 import '../services/feature_flags.dart';
 import '../widgets/form_folds.dart';
+import '../widgets/page_tips.dart';
+import '../widgets/info_tip.dart';
+import '../l10n/page_tips_strings.dart';
 
 class CreateEventScreen extends StatefulWidget {
   final Map<String, dynamic>? eventToEdit;
@@ -177,6 +180,52 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       if (event == null) _restoreDraft();
     }
     _loadIsAdmin();
+    if (event == null && !widget.preview) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _askTips());
+    }
+  }
+
+  /// First new event: a walk through the form, for whichever layout is on.
+  Future<void> _askTips() async {
+    if (!mounted) return;
+    final s = context.l10nRead;
+    final steps = _layout == EventFormLayout.steps;
+    Future<void> Function() goStep(int i) => () async {
+          if (mounted && _step != i) setState(() => _step = i);
+        };
+    final shown = await PageTips.maybeShow(
+      context,
+      'create-event',
+      () => steps
+          ? [
+              TipStep('ce-steps-bar', s.tipCeStepsBar),
+              TipStep('ce-steps-next', s.tipCeStepsNext),
+              TipStep('ce-when-mode', s.tipCeStepsWhen, before: goStep(1)),
+              TipStep('ce-steps-reg', s.tipCeStepsReg, before: goStep(2)),
+              TipStep('ce-steps-buttons', s.tipCeButtons, before: goStep(3)),
+              TipStep('ce-steps-people', s.tipCePeople),
+              TipStep('ce-publish', s.tipCePublish),
+            ]
+          : [
+              TipStep('ce-basics', s.tipCeBasics),
+              TipStep('ce-when-mode', s.tipCeWhen),
+              TipStep('ce-repeats', s.tipCeRepeats),
+              TipStep('ce-where', s.tipCeWhere),
+              TipStep('ce-folds', s.tipCeFolds),
+              TipStep('ce-fold-desc', s.tipCeDesc),
+              TipStep('ce-fold-reg', s.tipCeReg),
+              TipStep('ce-fold-buttons', s.tipCeButtons),
+              TipStep('ce-fold-people', s.tipCePeople),
+              TipStep('ce-publish', s.tipCePublish),
+            ],
+    );
+    // The tips moved through the form; start the person at the top.
+    if (!shown || !mounted) return;
+    if (steps) {
+      if (_step != 0) setState(() => _step = 0);
+    } else {
+      await TipAnchor.reveal('ce-basics');
+    }
   }
 
   Future<void> _loadIsAdmin() async {
@@ -702,7 +751,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         ],
         const SizedBox(height: KSpace.l),
       ],
-      _label(s.eventTitle, topPad: 0),
+      _label(s.eventTitle, topPad: 0, info: s.infoTitle),
       _input(_titleController, s.eventTitleHint, validator: _required(s.title)),
     ];
   }
@@ -710,7 +759,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   List<Widget> _categoryPart() {
     final s = context.l10n;
     return [
-      _label(s.category),
+      _label(s.category, info: s.infoCategory),
       CategoryField(
         kind: 'event',
         value: _categories,
@@ -726,7 +775,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     final s = context.l10n;
     final theme = Theme.of(context);
     return [
-      if (label) _label(s.description),
+      if (label) _label(s.description, info: s.infoDescription),
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
@@ -766,10 +815,20 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     ];
   }
 
-  List<Widget> _wherePart() {
+  List<Widget> _wherePart() => [
+        TipAnchor(
+          id: 'ce-where',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: _whereFields(),
+          ),
+        ),
+      ];
+
+  List<Widget> _whereFields() {
     final s = context.l10n;
     return [
-      _label(s.lmWhere),
+      _label(s.lmWhere, info: s.infoWhere),
       SegmentedButton<LocationMode>(
         key: const ValueKey('location-mode'),
         showSelectedIcon: false,
@@ -782,7 +841,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         onSelectionChanged: (v) => setState(() => _where = v.first),
       ),
       if (_where.hasPlace) ...[
-        _label(s.location),
+        _label(s.location, info: s.infoLocation),
         _input(_locationController, s.locationHint, validator: _required(s.location)),
       ],
       if (_where.hasLink) ...[
@@ -826,7 +885,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           ],
         );
       }),
-      _label(s.evAudience),
+      _label(s.evAudience, info: s.infoAudience),
       DropdownButtonFormField<String>(
         initialValue: _audience,
         decoration: _emptyDeco(),
@@ -866,7 +925,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     final hasOldLink = widget.eventToEdit != null &&
         '${widget.eventToEdit!['registration_link'] ?? ''}'.trim().isNotEmpty;
     return [
-      _hint(s.eventButtonsHint),
+      Row(
+        children: [
+          Expanded(child: _hint(s.eventButtonsHint)),
+          InfoTip(s.infoButtons),
+        ],
+      ),
       for (var i = 0; i < _links.length; i++) _linkEditor(i),
       if (_links.length < kActionLinksMax)
         Wrap(
@@ -907,9 +971,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     final s = context.l10n;
     final theme = Theme.of(context);
     return [
-      _label(s.eventPic, topPad: 0),
+      _label(s.eventPic, topPad: 0, info: s.infoPic),
       _input(_picCtrl, s.eventPicHint),
-      _label(s.evCoOrganiser),
+      _label(s.evCoOrganiser, info: s.infoCoOrganiser),
       // "Dengan kerjasama": usually a club, sometimes a person. Typing
       // suggests both — clubs insert "@[handle]" (a chip on the event page),
       // people "@username".
@@ -925,7 +989,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           suggestClubs: true,
         ),
       ),
-      _label(s.evContacts),
+      _label(s.evContacts, info: s.infoContacts),
       _hint(s.evContactHint),
       const SizedBox(height: KSpace.s),
       _channelField(_contactCtrls['whatsapp']!, 'WhatsApp', AppIcons.phone, TextInputType.phone),
@@ -1004,22 +1068,31 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          FormSection(
-            title: s.stepBasics,
-            icon: AppIcons.edit,
-            children: [
-              ..._photosPart(),
-              const SizedBox(height: KSpace.l),
-              ..._hostAndTitlePart(),
-              ..._categoryPart(),
-            ],
+          TipAnchor(
+            id: 'ce-basics',
+            child: FormSection(
+              title: s.stepBasics,
+              icon: AppIcons.edit,
+              info: s.infoPhotos,
+              children: [
+                ..._photosPart(),
+                const SizedBox(height: KSpace.l),
+                ..._hostAndTitlePart(),
+                ..._categoryPart(),
+              ],
+            ),
           ),
           FormSection(
             title: s.sectionWhenWhere,
             icon: AppIcons.calendar,
             children: [..._whenPart(), ..._wherePart()],
           ),
-          FoldSection(
+          TipAnchor(
+            id: 'ce-folds',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+          TipAnchor(id: 'ce-fold-desc', child: FoldSection(
             key: const ValueKey('fold-description'),
             title: s.description,
             icon: AppIcons.edit,
@@ -1027,8 +1100,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             listenTo: _summaryInputs,
             openSignal: _openFolds,
             children: _descriptionPart(label: false),
-          ),
-          FoldSection(
+          )),
+          TipAnchor(id: 'ce-fold-reg', child: FoldSection(
             key: const ValueKey('fold-registration'),
             title: s.evRegistration,
             icon: AppIcons.ticket,
@@ -1036,7 +1109,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             listenTo: _summaryInputs,
             openSignal: _openFolds,
             children: _registrationPart(),
-          ),
+          )),
           if (_canOfferMerit)
             FoldSection(
               key: const ValueKey('fold-merit'),
@@ -1047,7 +1120,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               openSignal: _openFolds,
               children: _meritPart(),
             ),
-          FoldSection(
+          TipAnchor(id: 'ce-fold-buttons', child: FoldSection(
             key: const ValueKey('fold-buttons'),
             title: s.foldButtonsTitle,
             icon: AppIcons.link,
@@ -1055,8 +1128,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             listenTo: _summaryInputs,
             openSignal: _openFolds,
             children: _buttonsPart(),
-          ),
-          FoldSection(
+          )),
+          TipAnchor(id: 'ce-fold-people', child: FoldSection(
             key: const ValueKey('fold-people'),
             title: s.foldPeopleTitle,
             icon: AppIcons.email,
@@ -1064,6 +1137,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             listenTo: _summaryInputs,
             openSignal: _openFolds,
             children: _peoplePart(),
+          )),
+              ],
+            ),
           ),
         ],
       ),
@@ -1085,20 +1161,37 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       ],
       [..._whenPart(), ..._wherePart()],
       [
-        ..._registrationPart(),
+        TipAnchor(
+          id: 'ce-steps-reg',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: _registrationPart(),
+          ),
+        ),
         if (_canOfferMerit) ...[const SizedBox(height: KSpace.m), ..._meritPart()],
       ],
       [
-        _label(s.foldButtonsTitle, topPad: 0),
-        ..._buttonsPart(),
+        TipAnchor(
+          id: 'ce-steps-buttons',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [_label(s.foldButtonsTitle, topPad: 0), ..._buttonsPart()],
+          ),
+        ),
         const SizedBox(height: KSpace.l),
-        ..._peoplePart(),
+        TipAnchor(
+          id: 'ce-steps-people',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: _peoplePart(),
+          ),
+        ),
       ],
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        StepProgress(
+        TipAnchor(id: 'ce-steps-bar', child: StepProgress(
           steps: _stepNames(s),
           current: _step,
           // Going back is always fine; going forward checks the steps between.
@@ -1109,7 +1202,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             }
             setState(() => _step = i);
           },
-        ),
+        )),
         const SizedBox(height: KSpace.l),
         for (var i = 0; i < steps.length; i++)
           // Every step stays mounted, so nothing typed is lost moving around
@@ -1135,13 +1228,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     final s = context.l10n;
     final last = _step == _stepKeys.length - 1;
     if (last) {
-      return PublishBar(
+      return TipAnchor(id: 'ce-publish', child: PublishBar(
         busy: _isLoading,
         editing: widget.eventToEdit != null,
         label: widget.eventToEdit != null ? s.saveChanges : s.publish,
         busyLabel: s.saving,
         onPressed: _submit,
-      );
+      ));
     }
     final scheme = Theme.of(context).colorScheme;
     return Container(
@@ -1170,14 +1263,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   const SizedBox(width: KSpace.m),
                 ],
                 Expanded(
-                  child: FilledButton(
+                  child: TipAnchor(id: 'ce-steps-next', child: FilledButton(
                     key: const ValueKey('step-next'),
                     onPressed: () {
                       if (_stepReady(_step)) setState(() => _step++);
                     },
                     style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
                     child: Text(s.stepNext),
-                  ),
+                  )),
                 ),
               ],
             ),
@@ -1209,20 +1302,29 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       body: FormPageBody(child: steps ? _stepsLayout() : _foldedLayout()),
       bottomNavigationBar: steps
           ? _stepsBar()
-          : PublishBar(
-              busy: _isLoading,
-              editing: isEditing,
-              label: isEditing ? s.saveChanges : s.publish,
-              busyLabel: s.saving,
-              onPressed: _submit,
+          : TipAnchor(
+              id: 'ce-publish',
+              child: PublishBar(
+                busy: _isLoading,
+                editing: isEditing,
+                label: isEditing ? s.saveChanges : s.publish,
+                busyLabel: s.saving,
+                onPressed: _submit,
+              ),
             ),
     );
   }
 
   // --- FORM HELPERS (Input) ---
-  Widget _label(String text, {double topPad = 16}) => Padding(
-    padding: EdgeInsets.only(bottom: 8, top: topPad),
-    child: Text(text, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600))
+  Widget _label(String text, {double topPad = 16, String? info}) => Padding(
+    // With an (i) the row is taller; trim the padding so labels line up.
+    padding: EdgeInsets.only(bottom: info == null ? 8 : 0, top: info == null ? topPad : (topPad - 8).clamp(0, 16)),
+    child: Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: LabelWithInfo(text,
+          info: info,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+    ),
   );
 
   /// One contact channel: its icon, then the field. The channel is the label,

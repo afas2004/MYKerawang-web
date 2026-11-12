@@ -7,6 +7,9 @@ import '../language_cubit.dart';
 import '../utils/event_series.dart';
 import '../utils/formatters.dart';
 import 'brand/brand.dart';
+import 'info_tip.dart';
+import 'page_tips.dart';
+import '../l10n/page_tips_strings.dart';
 
 /// Everything the Create event form knows about *when*: the timing mode,
 /// the dates it makes, and when registration closes. The form reads
@@ -228,22 +231,32 @@ class EventTimingEditor extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (!c.locked) ...[
-              SegmentedButton<TimingMode>(
-                key: const ValueKey('timing-mode'),
-                showSelectedIcon: false,
-                segments: [
-                  ButtonSegment(value: TimingMode.once, label: Text(s.tmOnce)),
-                  ButtonSegment(value: TimingMode.repeats, label: Text(s.tmRepeats)),
-                  ButtonSegment(value: TimingMode.dates, label: Text(s.tmDates)),
-                ],
-                selected: {c.mode},
-                onSelectionChanged: (v) => c.mode = v.first,
+              TipAnchor(
+                id: 'ce-when-mode',
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: SegmentedButton<TimingMode>(
+                        key: const ValueKey('timing-mode'),
+                        showSelectedIcon: false,
+                        segments: [
+                          ButtonSegment(value: TimingMode.once, label: Text(s.tmOnce)),
+                          ButtonSegment(value: TimingMode.repeats, label: Text(s.tmRepeats)),
+                          ButtonSegment(value: TimingMode.dates, label: Text(s.tmDates)),
+                        ],
+                        selected: {c.mode},
+                        onSelectionChanged: (v) => c.mode = v.first,
+                      ),
+                    ),
+                    InfoTip(s.infoWhen),
+                  ],
+                ),
               ),
               const SizedBox(height: KSpace.m),
             ],
             switch (c.mode) {
               TimingMode.once => _Once(c),
-              TimingMode.repeats => _Repeats(c),
+              TimingMode.repeats => TipAnchor(id: 'ce-repeats', child: _Repeats(c)),
               TimingMode.dates => _PickDates(c),
             },
             if (c.isSeries) ...[
@@ -792,7 +805,9 @@ class RegistrationCloseField extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _label(context, s.rcLabel),
+            LabelWithInfo(s.rcLabel,
+                info: s.infoRegCloses,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
             SegmentedButton<CloseRule>(
               key: const ValueKey('close-rule'),
               showSelectedIcon: false,

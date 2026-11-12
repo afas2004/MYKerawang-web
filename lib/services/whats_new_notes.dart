@@ -36,6 +36,14 @@ class ReleaseNote {
 
 /// Newest first.
 final kReleaseNotes = <ReleaseNote>[
+  ReleaseNote('1.16.0', DateTime(2026, 11, 13), const [
+    NoteLine('Short tips show the first time you open Market, an event, or the Create pages. Bring them back in Settings.',
+        'Tip ringkas muncul kali pertama awak buka Pasar, aktiviti, atau halaman Cipta. Boleh tunjuk semula di Tetapan.',
+        'マーケット、イベント、作成ページを初めて開いたときに短いヒントが出ます。設定からもう一度表示できます。'),
+    NoteLine('Create event has (i) icons that explain each field and its limits.',
+        'Cipta aktiviti ada ikon (i) yang terangkan setiap ruangan dan hadnya.',
+        'イベント作成の各項目に、使い方と制限を説明する (i) アイコンが付きました。'),
+  ]),
   ReleaseNote('1.15.0', DateTime(2026, 11, 13), const [
     NoteLine('Events can repeat weekly or run on dates you pick, and you join each date on its own.',
         'Aktiviti boleh berulang setiap minggu atau ikut tarikh yang dipilih, dan awak sertai setiap tarikh secara berasingan.',

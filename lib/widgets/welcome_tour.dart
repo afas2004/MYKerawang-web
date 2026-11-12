@@ -25,6 +25,13 @@ abstract final class WelcomeTour {
 
   static bool _open = false;
 
+  /// Whether the tour is on screen now (page tips wait for it).
+  static bool get isOpen => _open;
+
+  /// Set once the tour has opened in this app session: page tips don't
+  /// pile on straight after it, they start on the next visit.
+  static bool shownThisSession = false;
+
   /// Queues the tour for [userId]; [name] is the display name it greets.
   static Future<void> markPending(String userId, String name) async {
     final prefs = await SharedPreferences.getInstance();
@@ -63,6 +70,7 @@ abstract final class WelcomeTour {
   static Future<void> show(BuildContext context, {String? name}) async {
     if (_open) return;
     _open = true;
+    shownThisSession = true;
     try {
       await showDialog<void>(
         context: context,
@@ -76,7 +84,10 @@ abstract final class WelcomeTour {
   }
 
   @visibleForTesting
-  static void debugReset() => _open = false;
+  static void debugReset() {
+    _open = false;
+    shownThisSession = false;
+  }
 }
 
 /// One card of the tour.

@@ -11,6 +11,7 @@ import '../theme/transitions.dart';
 import 'brand/brand.dart';
 import 'profile_avatar_action.dart';
 import 'shell_actions.dart';
+import 'page_tips.dart';
 
 /// Desktop sidebar (≥ 900), shared by the tab shell and by pushed pages
 /// (detail/profile/settings) so the chrome never disappears mid-session
@@ -111,12 +112,15 @@ class AppSidebar extends StatelessWidget {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(KSpace.m, KSpace.l, KSpace.m, KSpace.s),
-              child: FilledButton.icon(
-                onPressed: () => showCreateSheet(context),
-                icon: const Icon(AppIcons.create),
-                label: Text(s.shell.create),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
+              child: TipAnchor(
+                id: 'shell-create',
+                child: FilledButton.icon(
+                  onPressed: () => showCreateSheet(context),
+                  icon: const Icon(AppIcons.create),
+                  label: Text(s.shell.create),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                  ),
                 ),
               ),
             ),

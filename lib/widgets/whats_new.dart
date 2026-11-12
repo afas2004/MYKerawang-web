@@ -8,6 +8,7 @@ import '../services/update_service.dart';
 import '../services/whats_new_notes.dart';
 import '../utils/app_nav.dart';
 import 'brand/brand.dart';
+import 'page_tips.dart';
 
 /// "What's new in 1.x": a small centred card someone sees once, the first
 /// time they open a version that has release notes.
@@ -29,6 +30,9 @@ abstract final class WhatsNew {
 
   static bool _open = false;
 
+  /// Whether the card is on screen now (page tips wait for it).
+  static bool get isOpen => _open;
+
   /// Records [version] (default: the running one) as already seen.
   static Future<void> markSeen([String? version]) async {
     final prefs = await SharedPreferences.getInstance();
@@ -46,7 +50,8 @@ abstract final class WhatsNew {
     String? version,
     List<ReleaseNote>? notes,
   }) async {
-    if (_open) return false;
+    // Page tips already on screen: the notes wait for the next start.
+    if (_open || PageTips.isOpen) return false;
     final current = version ?? UpdateService.appVersion;
     final prefs = await SharedPreferences.getInstance();
     final seen = prefs.getString(_key);
