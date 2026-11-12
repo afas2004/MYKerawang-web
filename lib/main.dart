@@ -34,6 +34,7 @@ import 'screens/login_cubit.dart';
 import 'utils/realtime_gate.dart';
 import 'widgets/app_toast.dart';
 import 'widgets/welcome_tour.dart';
+import 'widgets/whats_new.dart';
 
 /// Lets mouse users drag-scroll lists (like touch), on top of the wheel.
 class AppScrollBehavior extends MaterialScrollBehavior {
@@ -222,7 +223,9 @@ class _SessionWatcherState extends State<SessionWatcher> {
       } else if (!needsOnboarding) {
         // Set up, but the welcome tour never opened (the app was reloaded
         // right after setup): open it now. A no-op for everyone else.
-        unawaited(WelcomeTour.showPending(userId: userId));
+        // Otherwise, notes for a version this device hasn't shown yet.
+        unawaited(WelcomeTour.showPending(userId: userId).then((toured) =>
+            toured ? WhatsNew.markSeen() : WhatsNew.maybeShow()));
       }
       return needsOnboarding;
     } catch (e) {

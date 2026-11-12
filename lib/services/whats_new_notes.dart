@@ -1,0 +1,147 @@
+import '../l10n/app_strings.dart';
+import 'feature_flags.dart';
+
+/// The release notes behind "What's new" (the pop-up after an update,
+/// Settings › What's new, and the owner's Updates tab).
+///
+/// HOW TO ADD A RELEASE: when you bump `UpdateService.appVersion` and
+/// pubspec.yaml for a deploy, add a [ReleaseNote] for that version at the
+/// TOP of [kReleaseNotes]. One plain line per highlight, in English,
+/// Malay and Japanese. A release with no entry shows no pop-up, so small
+/// fixes can simply be left out.
+///
+/// A line for an area the owner can switch off names it in `needs:` and
+/// is hidden while that switch is off.
+class NoteLine {
+  final String en, ms, ja;
+  final AppFeature? needs;
+  const NoteLine(this.en, this.ms, this.ja, {this.needs});
+
+  String of(AppStrings s) =>
+      identical(s, AppStrings.ms) ? ms : identical(s, AppStrings.ja) ? ja : en;
+
+  bool get visible => needs == null || FeatureFlags.isOn(needs!);
+}
+
+class ReleaseNote {
+  /// `major.minor.patch`, as in pubspec.yaml (no build number).
+  final String version;
+  final DateTime date;
+  final List<NoteLine> lines;
+  const ReleaseNote(this.version, this.date, this.lines);
+
+  /// The lines people can see right now (switched-off areas left out).
+  List<NoteLine> get visibleLines => [for (final l in lines) if (l.visible) l];
+}
+
+/// Newest first.
+final kReleaseNotes = <ReleaseNote>[
+  ReleaseNote('1.14.6', DateTime(2026, 11, 12), const [
+    NoteLine('Forms get short links that are easy to share.',
+        'Borang kini ada link pendek yang senang dikongsi.',
+        'フォームに共有しやすい短いリンクが付きました。'),
+    NoteLine('Shared form links show a preview card in WhatsApp.',
+        'Link borang yang dikongsi kini tunjuk kad pratonton dalam WhatsApp.',
+        '共有したフォームのリンクがWhatsAppでプレビュー表示されます。'),
+  ]),
+  ReleaseNote('1.14.5', DateTime(2026, 11, 12), const [
+    NoteLine('Forms can be public, so anyone can answer without an account.',
+        'Borang boleh dibuka kepada umum, jadi sesiapa boleh jawab tanpa akaun.',
+        'フォームを公開でき、アカウントなしでも回答できます。'),
+  ]),
+  ReleaseNote('1.14.4', DateTime(2026, 11, 12), const [
+    NoteLine('New accounts get a short welcome tour. Replay it any time in Settings.',
+        'Akaun baharu dapat lawatan ringkas. Boleh ulang bila-bila masa di Tetapan.',
+        '新しいアカウントには短い紹介ツアーがあります。設定からいつでも見直せます。'),
+  ]),
+  ReleaseNote('1.14.3', DateTime(2026, 11, 11), const [
+    NoteLine('Shared listings, events and posts show a preview card with a picture.',
+        'Barang, aktiviti dan hantaran yang dikongsi kini tunjuk kad pratonton bergambar.',
+        '共有した出品・イベント・投稿が画像付きのプレビューで表示されます。'),
+  ]),
+  ReleaseNote('1.13.0', DateTime(2026, 11, 5), const [
+    NoteLine('Pins you closed can come back if you change your mind.',
+        'Pin yang awak tutup boleh dibuka semula kalau ubah fikiran.',
+        '閉じたピンを後から元に戻せます。'),
+  ]),
+  ReleaseNote('1.11.0', DateTime(2026, 10, 31), const [
+    NoteLine('Important posts stay pinned in a bar at the top of Home.',
+        'Hantaran penting kekal dipin di bar atas Laman Utama.',
+        '大事な投稿はホーム上部のバーに固定されます。'),
+  ]),
+  ReleaseNote('1.10.5', DateTime(2026, 10, 29), const [
+    NoteLine('Anyone can make a form, starting from 16 ready-made templates.',
+        'Sesiapa boleh buat borang, bermula dengan 16 templat sedia ada.',
+        'だれでもフォームを作れます。16種類のテンプレートから始められます。'),
+  ]),
+  ReleaseNote('1.10.0', DateTime(2026, 10, 29), const [
+    NoteLine('A new look in Kerawang plum and marigold.',
+        'Rupa baharu dalam warna ungu manggis dan kuning Kerawang.',
+        'ケラワンらしいプラムとマリーゴールドの新デザイン。'),
+  ]),
+  ReleaseNote('1.6.0', DateTime(2026, 10, 24), const [
+    NoteLine('Register for events and check in with a QR code.',
+        'Daftar aktiviti dan daftar masuk dengan kod QR.',
+        'イベントに登録して、QRコードでチェックインできます。'),
+  ]),
+  ReleaseNote('1.5.0', DateTime(2026, 10, 24), const [
+    NoteLine("Ask to join a club and see who's in it.",
+        'Mohon sertai kelab dan tengok siapa ahlinya.',
+        'クラブへの参加を申し込み、メンバーを確認できます。',
+        needs: AppFeature.clubs),
+    NoteLine('UiTM students can ask to be verified.',
+        'Pelajar UiTM boleh mohon pengesahan.',
+        'UiTMの学生は認証を申請できます。',
+        needs: AppFeature.studentFeatures),
+  ]),
+  ReleaseNote('1.4.0', DateTime(2026, 10, 22), const [
+    NoteLine('Official announcements from clubs and the college, in their own tab.',
+        'Pengumuman rasmi dari kelab dan kolej, dalam tab sendiri.',
+        'クラブやカレッジからの公式なお知らせを専用タブで。',
+        needs: AppFeature.announcements),
+  ]),
+  ReleaseNote('1.3.0', DateTime(2026, 10, 22), const [
+    NoteLine('Look around without an account: guests can browse and read posts.',
+        'Tengok-tengok tanpa akaun: tetamu boleh layari dan baca hantaran.',
+        'アカウントなしでも投稿を閲覧できます。'),
+  ]),
+  ReleaseNote('1.2.0', DateTime(2026, 10, 21), const [
+    NoteLine('A cleaner design and simpler navigation, with one Create button.',
+        'Reka bentuk lebih kemas dan navigasi lebih mudah, dengan satu butang Cipta.',
+        'すっきりしたデザインと、作成ボタンひとつのシンプルな操作。'),
+  ]),
+  ReleaseNote('1.0.2', DateTime(2026, 10, 18), const [
+    NoteLine('MYKerawang on the web: Market, events, posts, follows, search and notifications.',
+        'MYKerawang di web: Pasar, aktiviti, hantaran, ikut, carian dan notifikasi.',
+        'Web版MYKerawang:マーケット、イベント、投稿、フォロー、検索、通知。'),
+  ]),
+];
+
+/// -1, 0 or 1, comparing `x.y.z` strings number by number.
+int compareVersions(String a, String b) {
+  List<int> parts(String v) =>
+      v.split('+').first.split('.').map((p) => int.tryParse(p) ?? 0).toList();
+  final x = parts(a), y = parts(b);
+  for (var i = 0; i < 3; i++) {
+    final d = (i < x.length ? x[i] : 0).compareTo(i < y.length ? y[i] : 0);
+    if (d != 0) return d.sign;
+  }
+  return 0;
+}
+
+/// Releases to show someone who last saw [seen] and now runs [current]:
+/// those after [seen] up to [current], newest first, with something
+/// visible. With no [seen] (first run on this device), only [current]'s.
+List<ReleaseNote> releasesSince(String? seen, String current,
+    {List<ReleaseNote>? notes}) {
+  final all = notes ?? kReleaseNotes;
+  return [
+    for (final r in all)
+      if (compareVersions(r.version, current) <= 0 &&
+          (seen == null
+              ? compareVersions(r.version, current) == 0
+              : compareVersions(r.version, seen) > 0) &&
+          r.visibleLines.isNotEmpty)
+        r,
+  ];
+}

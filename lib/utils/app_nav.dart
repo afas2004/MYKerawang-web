@@ -64,6 +64,8 @@ extension AppNav on BuildContext {
 
   void goLicenses() => push('/settings/licenses');
 
+  void goWhatsNew() => push('/settings/whats-new');
+
   // ---- create / edit (forms are full-screen on phones, a dialog on wide) --
 
   /// New post. [sharedEvent] / [sharedListing] attach a repost.
