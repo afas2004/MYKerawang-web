@@ -16,6 +16,8 @@ import '../widgets/shell_actions.dart';
 import '../services/category_service.dart';
 import '../utils/categories.dart';
 import '../utils/event_live.dart';
+import '../utils/event_series.dart';
+import '../l10n/event_timing_strings.dart';
 import '../utils/formatters.dart';
 import '../utils/roles.dart';
 import '../widgets/error_state.dart';
@@ -367,8 +369,13 @@ class EventCard extends StatelessWidget {
                   const SizedBox(height: KSpace.xs),
                   _iconLine(AppIcons.clock, timeText, meta, scheme),
                   const SizedBox(height: 2),
-                  _iconLine(AppIcons.location,
-                      (event['location'] ?? s.locationTba).toString(), meta, scheme),
+                  _iconLine(
+                      LocationMode.of(event['location_mode']) == LocationMode.online
+                          ? AppIcons.online
+                          : AppIcons.location,
+                      s.placeOf(event),
+                      meta,
+                      scheme),
                   const SizedBox(height: KSpace.s),
                   Wrap(
                     spacing: KSpace.s,
@@ -383,6 +390,9 @@ class EventCard extends StatelessWidget {
                       // event you are standing next to.
                       if (!closed && checkinOpen(event))
                         _Pill(s.evCheckinOpen),
+                      // Other dates of the same series still to come.
+                      if ((event[kSeriesMoreKey] as int? ?? 0) > 0)
+                        _Pill(s.seriesMore(event[kSeriesMoreKey] as int)),
                       if (goingCount != null && goingCount! > 0)
                         _iconLine(AppIcons.people, s.goingCount.fill([goingCount]), meta, scheme,
                             shrink: true),

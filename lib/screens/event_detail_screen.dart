@@ -10,6 +10,8 @@ import 'package:mykerawang/services/share_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../l10n/access_strings.dart';
+import '../l10n/event_timing_strings.dart';
+import '../utils/event_series.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/form_strings.dart';
 import '../language_cubit.dart';
@@ -61,6 +63,12 @@ class _EventDetailScreenState extends State<EventDetailScreen>
   bool _postingComment = false;
   bool _savingCalendar = false;
 
+  /// Every date of this event's series (soonest first) and how they repeat;
+  /// empty for a one-off event.
+  List<Map<String, dynamic>> _seriesSessions = const [];
+  Object? _seriesRule;
+  bool _showAllDates = false;
+
   /// People I follow who joined: total, plus up to 3 for avatars.
   int _followingGoing = 0;
   List<Map<String, dynamic>> _followingGoingFaces = const [];
@@ -94,6 +102,34 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     _loadOpenForm();
     _checkClubOfficer();
     _loadContacts();
+  }
+
+  /// The other dates of a series. Each is read as its own row, so its
+  /// cancelled / ended state is exactly what its own page shows.
+  Future<void> _loadSeries() async {
+    final sid = _event['series_id'];
+    if (sid is! String) {
+      if (_seriesSessions.isNotEmpty && mounted) setState(() => _seriesSessions = const []);
+      return;
+    }
+    try {
+      final supabase = Supabase.instance.client;
+      final results = await Future.wait<Object?>([
+        supabase
+            .from('events')
+            .select('id, start_datetime, end_datetime, cancelled_at, join_deadline')
+            .eq('series_id', sid)
+            .order('start_datetime'),
+        supabase.from('event_series').select('repeat_rule').eq('id', sid).maybeSingle(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _seriesSessions = List<Map<String, dynamic>>.from(results[0] as List);
+        _seriesRule = (results[1] as Map<String, dynamic>?)?['repeat_rule'];
+      });
+    } catch (e) {
+      debugPrint('No series dates: $e');
+    }
   }
 
   /// The event's published form, if any, for the "answer" entry point.
@@ -178,6 +214,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         });
       }
       if (userId != null) _fetchFollowingGoing(userId);
+      _loadSeries();
       _watchParticipants();
     } catch (e) {
       debugPrint("Error fetching details: $e");
@@ -392,13 +429,68 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         ],
       ),
     );
-    if (confirm == true) {
-      await _setCancelled(DateTime.now().toUtc().toIso8601String(), s.eventCancelled);
+    if (confirm != true || !mounted) return;
+    final stamp = DateTime.now().toUtc().toIso8601String();
+    // A series: this date only, or this and every later date still on.
+    final later = _laterOpenDates;
+    if (later.isNotEmpty) {
+      final all = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(s.cancelWhich),
+          actions: [
+            TextButton(
+              key: const ValueKey('cancel-this-only'),
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(s.onlyThisDate),
+            ),
+            FilledButton(
+              key: const ValueKey('cancel-later'),
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error,
+                foregroundColor: Theme.of(ctx).colorScheme.onError,
+              ),
+              child: Text('${s.thisAndLater} (${later.length + 1})'),
+            ),
+          ],
+        ),
+      );
+      if (all == null || !mounted) return;
+      if (all) {
+        try {
+          await Supabase.instance.client
+              .from('events')
+              .update({'cancelled_at': stamp})
+              .inFilter('id', [for (final e in later) e['id']])
+              .isFilter('cancelled_at', null);
+        } catch (e) {
+          if (mounted) showErrorWithRetry(context, e, onRetry: _cancelEvent);
+          return;
+        }
+      }
     }
+    await _setCancelled(stamp, s.eventCancelled);
+    _loadSeries();
   }
 
-  Future<void> _restoreEvent() =>
-      _setCancelled(null, context.l10nRead.eventRestored);
+  /// Later dates of this series that are still on (not cancelled, not over).
+  List<Map<String, dynamic>> get _laterOpenDates {
+    final myStart = DateTime.tryParse('${_event['start_datetime'] ?? ''}');
+    if (myStart == null) return const [];
+    return [
+      for (final e in _seriesSessions)
+        if (e['id'] != _event['id'] &&
+            (DateTime.tryParse('${e['start_datetime']}')?.isAfter(myStart) ?? false) &&
+            sessionStateOf(e) == SessionState.upcoming)
+          e,
+    ];
+  }
+
+  Future<void> _restoreEvent() async {
+    await _setCancelled(null, context.l10nRead.eventRestored);
+    _loadSeries();
+  }
 
   Future<void> _setCancelled(String? cancelledAt, String doneMessage) async {
     try {
@@ -748,7 +840,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
       context,
       _event['title'],
       [
-        if (_event['location'] != null) "📍 ${_event['location']}",
+        "📍 ${context.l10nRead.placeOf(_event)}",
         "🗓 ${formatEventRange(_start, _end)}",
         if (_event['description'] != null) "\n${_event['description']}",
       ].join('\n'),
@@ -938,7 +1030,8 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     final s = context.l10n;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final location = (_event['location'] ?? '').toString().trim();
+    final mode = LocationMode.of(_event['location_mode']);
+    final onlineUrl = onlineLinkFor(_event);
     final countdown = _isClosed ? null : eventCountdown(s, _event);
 
     return KCard(
@@ -968,11 +1061,11 @@ class _EventDetailScreenState extends State<EventDetailScreen>
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(AppIcons.location, size: 20, color: scheme.onSurfaceVariant),
+              Icon(mode == LocationMode.online ? AppIcons.online : AppIcons.location,
+                  size: 20, color: scheme.onSurfaceVariant),
               const SizedBox(width: KSpace.m),
               Expanded(
-                child: Text(location.isEmpty ? s.locationTba : location,
-                    style: theme.textTheme.bodyLarge),
+                child: Text(s.placeOf(_event), style: theme.textTheme.bodyLarge),
               ),
             ],
           ),
@@ -990,14 +1083,16 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                       : const Icon(AppIcons.calendarAdd, size: 18),
                   label: Text(s.addToCalendar),
                 ),
-              if (location.isNotEmpty)
+              // Only while this date is still on: a cancelled or finished
+              // date has no meeting to join.
+              if (onlineUrl != null)
                 OutlinedButton.icon(
-                  onPressed: () => launchUrl(
-                    Uri.https('www.google.com', '/maps/search/', {'api': '1', 'query': location}),
-                    mode: LaunchMode.externalApplication,
-                  ),
-                  icon: const Icon(AppIcons.location, size: 18),
-                  label: Text(s.openInMaps),
+                  key: const ValueKey('join-online'),
+                  onPressed: () {
+                    if (requireLogin(context)) _launchSafeUrl(onlineUrl);
+                  },
+                  icon: const Icon(AppIcons.online, size: 18),
+                  label: Text(s.joinOnline),
                 ),
               if (_event['registration_link'] != null)
                 OutlinedButton.icon(
@@ -1008,7 +1103,101 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                 ),
             ],
           ),
+          if (_seriesSessions.length > 1) ...[
+            const SizedBox(height: KSpace.l),
+            _seriesDates(context),
+          ],
         ],
+      ),
+    );
+  }
+
+  /// Every date of the series, this one marked. Each row carries its own
+  /// state (cancelled / ended), read from its own row: the same rule its
+  /// own page and the lists use.
+  Widget _seriesDates(BuildContext context) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    const preview = 5;
+    final all = _seriesSessions;
+    // Start the short list at this date, so the next dates are visible.
+    final here = all.indexWhere((e) => e['id'] == _event['id']);
+    final maxFrom = all.length > preview ? all.length - preview : 0;
+    final from = here < 0 ? 0 : (here > maxFrom ? maxFrom : here);
+    final shown = _showAllDates ? all : all.skip(from).take(preview).toList();
+
+    return Column(
+      key: const ValueKey('series-dates'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(children: [
+          Icon(AppIcons.repeat, size: 18, color: scheme.primary),
+          const SizedBox(width: KSpace.s),
+          Expanded(
+            child: Text('${s.seriesDates} · ${s.seriesSummary(_seriesRule)}',
+                style: theme.textTheme.titleSmall),
+          ),
+        ]),
+        const SizedBox(height: KSpace.s),
+        for (final e in shown) _seriesRow(context, e),
+        if (all.length > preview)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: () => setState(() => _showAllDates = !_showAllDates),
+              child: Text(_showAllDates ? s.seriesShowFewer : s.seriesShowAll),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _seriesRow(BuildContext context, Map<String, dynamic> e) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final start = parseLocal(e['start_datetime']);
+    final end = parseLocal(e['end_datetime']);
+    final here = e['id'] == _event['id'];
+    final state = sessionStateOf(e);
+    final tag = here
+        ? s.thisDate
+        : switch (state) {
+            SessionState.cancelled => s.cancelled,
+            SessionState.ended => s.ended,
+            SessionState.upcoming => null,
+          };
+    final muted = state != SessionState.upcoming;
+    return InkWell(
+      key: ValueKey('series-row-${e['id']}'),
+      borderRadius: KRadius.small,
+      onTap: here ? null : () => context.pushReplacement('/event/${e['id']}'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        child: Row(children: [
+          Expanded(
+            child: Text(
+              start == null ? '' : formatEventRange(start, end),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: here ? FontWeight.w600 : null,
+                color: muted ? scheme.onSurfaceVariant : null,
+                decoration: state == SessionState.cancelled ? TextDecoration.lineThrough : null,
+              ),
+            ),
+          ),
+          if (tag != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: here ? scheme.primaryContainer : scheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(99),
+              ),
+              child: Text(tag,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                      color: here ? scheme.onPrimaryContainer : scheme.onSurfaceVariant)),
+            ),
+        ]),
       ),
     );
   }
@@ -1043,7 +1232,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     }
     final deadline = DateTime.tryParse('${e['join_deadline'] ?? ''}');
     if (deadline != null) {
-      rows.add((AppIcons.calendar, s.evRegistration, formatDate(deadline)));
+      rows.add((AppIcons.calendar, s.evRegistration, formatEventDate(deadline.toLocal())));
     }
     final cap = e['capacity'];
     if (cap is num) {
