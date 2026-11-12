@@ -11,6 +11,8 @@ import '../../services/moderation_service.dart';
 import '../../services/registration_policy.dart';
 import '../../utils/moderation_logic.dart';
 import '../../widgets/moderation_ui.dart';
+import '../../l10n/event_timing_strings.dart';
+import 'event_layout_card.dart';
 
 /// Owner-only editor for moderation_settings (RLS lets only the owner
 /// update; every change is logged with before/after values).
@@ -61,6 +63,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
   /// Owner-only feature switches (all on unless turned off).
   FeatureFlagsState _features = const FeatureFlagsState();
   final Set<AppFeature> _featureSaving = {};
+  bool _layoutSaving = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -106,6 +109,21 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
       if (mounted) showModError(context, e);
     } finally {
       if (mounted) setState(() => _featureSaving.remove(f));
+    }
+  }
+
+  /// The owner already confirmed in the card's dialog.
+  Future<void> _setLayout(EventFormLayout layout) async {
+    setState(() => _layoutSaving = true);
+    try {
+      await FeatureFlags.setEventLayout(layout);
+      if (!mounted) return;
+      setState(() => _features = _features.withLayout(layout));
+      showModSnack(context, context.l10nRead.layoutNow(EventLayoutCard.nameOf(context, layout)));
+    } catch (e) {
+      if (mounted) showModError(context, e);
+    } finally {
+      if (mounted) setState(() => _layoutSaving = false);
     }
   }
 
@@ -344,6 +362,13 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                     ],
                   ),
                 ),
+              ),
+              const SizedBox(height: 16),
+              // ---- how the Create event page is laid out ----
+              EventLayoutCard(
+                current: _features.eventLayout,
+                saving: _layoutSaving,
+                onChoose: _setLayout,
               ),
               const SizedBox(height: 16),
               // ---- registration: student addresses only, or anyone ----

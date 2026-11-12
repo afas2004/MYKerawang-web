@@ -1,4 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import '../utils/event_series.dart';
+import '../l10n/event_timing_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -71,7 +73,7 @@ class _RightRailState extends State<RightRail> {
           .order('created_at', ascending: false)
           .limit(4),
     ]);
-    var events = results[0];
+    var events = collapseSeries(results[0]);
     var past = false;
     // No upcoming events: show the most recent ones rather than nothing.
     if (events.isEmpty) {
@@ -82,6 +84,7 @@ class _RightRailState extends State<RightRail> {
           .isFilter('cancelled_at', null)
           .order('start_datetime', ascending: false)
           .limit(3);
+      events = collapseSeries(events);
       past = events.isNotEmpty;
     }
     return RightRailData(events, results[1], pastEvents: past);
@@ -233,8 +236,9 @@ class _EventRow extends StatelessWidget {
               Text(
                 [
                   if (start != null) formatEventDate(start),
-                  if ((event['location'] ?? '').toString().isNotEmpty)
-                    event['location'],
+                  if ((event['location'] ?? '').toString().isNotEmpty ||
+                      event['location_mode'] == 'online')
+                    context.l10n.placeOf(event),
                 ].join(' · '),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
