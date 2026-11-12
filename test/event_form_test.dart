@@ -63,6 +63,12 @@ class FakeAnswerService implements FormService {
   Future<void> setPublic(String formId, bool on) async {}
 
   @override
+  Future<String?> setSlug(String formId, String? slug) async => slug;
+
+  @override
+  Future<String?> idForKey(String key) async => key;
+
+  @override
   Future<void> submitGuest(String formId,
       {required String name, String? email, required Map<String, dynamic> answers}) async {}
 

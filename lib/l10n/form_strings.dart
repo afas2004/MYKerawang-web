@@ -79,7 +79,8 @@ extension FormStrings on AppStrings {
   String get formMoveUp => _t("Move up", "Naik", "Move up");
   String get formMoveDown => _t("Move down", "Turun", "Move down");
   String get formTitleLabel => _t("Form title", "Tajuk borang", "Form title");
-  String get formIntroLabel => _t("Introduction (optional)", "Pengenalan (pilihan)", "Introduction (optional)");
+  String get formIntroLabel =>
+      _t("Description (optional)", "Penerangan (pilihan)", "説明（任意）");
   String get formRequireRsvp => _t(
       "Only people who joined the event may answer",
       "Hanya peserta yang mendaftar boleh menjawab",
@@ -581,6 +582,9 @@ extension FormStrings on AppStrings {
             "Sahkan status pelajar anda untuk berbuat demikian.",
             "Verify your student status to do this."),
         'guest_name' => formGuestNameMissing,
+        'slug_bad' => formSlugBad,
+        'slug_blocked' => formSlugBlocked,
+        'slug_taken' => formSlugTaken,
         'guest_email' => formGuestEmailBad,
         'login_required' => formGuestSignInView,
         _ => null,
@@ -653,4 +657,29 @@ extension FormStrings on AppStrings {
       "Borang ini menerima banyak jawapan tetamu sekarang. Cuba lagi sebentar lagi, atau log masuk.",
       "現在このフォームにはゲストの回答が集中しています。しばらくしてから再度お試しいただくか、ログインしてください。");
   String get formGuestTag => _t("Guest", "Tetamu", "ゲスト");
+
+  // ---- short links ----
+  String get formSlugTitle => _t("Short link", "Pautan pendek", "短縮リンク");
+  String get formSlugHelp => _t(
+      "Optional. 3–40 letters, numbers or dashes. The long link keeps working.",
+      "Pilihan. 3–40 huruf, nombor atau sengkang. Pautan panjang masih berfungsi.",
+      "任意。英小文字・数字・ハイフンで3〜40文字。長いリンクも引き続き使えます。");
+  String get formSlugHint => _t("e.g. sus-survey", "cth. tinjauan-sus", "例: sus-survey");
+  String get formSlugSave => _t("Set link", "Tetapkan", "設定");
+  String get formSlugRemove => _t("Remove", "Buang", "削除");
+  String get formSlugSaved => _t("Short link saved", "Pautan pendek disimpan", "短縮リンクを保存しました");
+  String get formSlugRemoved =>
+      _t("Short link removed", "Pautan pendek dibuang", "短縮リンクを削除しました");
+  String get formSlugBad => _t(
+      "Use 3–40 lowercase letters, numbers or single dashes, not starting or ending with a dash.",
+      "Gunakan 3–40 huruf kecil, nombor atau sengkang tunggal, bukan di awal atau akhir.",
+      "英小文字・数字・ハイフン（連続不可、先頭と末尾は不可）で3〜40文字にしてください。");
+  String get formSlugBlocked => _t(
+      "That name could make the form look official or like a login page. Pick another.",
+      "Nama itu boleh menjadikan borang kelihatan rasmi atau seperti halaman log masuk. Pilih yang lain.",
+      "その名前は公式やログインページのように見える可能性があります。別の名前にしてください。");
+  String get formSlugTaken => _t(
+      "Another form already uses that name.",
+      "Borang lain sudah menggunakan nama itu.",
+      "その名前は別のフォームで使われています。");
 }

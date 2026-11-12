@@ -5,7 +5,7 @@
 //
 // Flutter web is one index.html for every URL, so WhatsApp, Telegram and
 // friends (which never run JavaScript) used to see the same generic
-// "MYKerawang" card for every shared listing, event and post. The function
+// "MYKerawang" card for every shared listing, event, post and form. The function
 // in index.js fetches the live index.html, swaps the preview tags for ones
 // describing the page, and serves it. People get the normal app; crawlers
 // get a real card.
@@ -19,21 +19,27 @@ const DESCRIPTION_MAX = 200;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// The three route shapes the function serves. Must match the rewrite regex
-// in firebase.json and the routes in lib/router.dart.
-const KINDS = { item: 'listing', event: 'event', post: 'post' };
+// A form's short name (`/f/sus-survey`). Same shape as the database's
+// event_forms_slug_shape check and lib/utils/form_rules.dart.
+const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/;
+
+// The route shapes the function serves. Must match the rewrite regex in
+// firebase.json and the routes in lib/router.dart.
+const KINDS = { item: 'listing', event: 'event', post: 'post', f: 'form' };
 
 /**
- * `/item/<uuid>` → `{ kind: 'listing', id }`. Anything else (wrong shape,
- * a non-uuid id, a deeper path such as `/item/<id>/edit`) → null, and the
- * caller serves the generic page.
+ * `/item/<uuid>` → `{ kind: 'listing', id }`. A form also takes its short
+ * name: `/f/<uuid or short name>`. Anything else (wrong shape, a bad id, a
+ * deeper path such as `/item/<id>/edit`) → null, and the caller serves the
+ * generic page.
  */
 function parsePath(pathname) {
-  const m = /^\/(item|event|post)\/([^/]+)\/?$/.exec(pathname || '');
+  const m = /^\/(item|event|post|f)\/([^/]+)\/?$/.exec(pathname || '');
   if (!m) return null;
-  const id = m[2];
-  if (!UUID_RE.test(id)) return null;
-  return { kind: KINDS[m[1]], id, path: `/${m[1]}/${id.toLowerCase()}` };
+  const id = m[2].toLowerCase();
+  const isKey = UUID_RE.test(id) || (m[1] === 'f' && SLUG_RE.test(id) && !id.includes('--'));
+  if (!isKey) return null;
+  return { kind: KINDS[m[1]], id, path: `/${m[1]}/${id}` };
 }
 
 /** One line, trimmed, cut at `max` characters with an ellipsis. */
@@ -132,7 +138,20 @@ function postMeta(row) {
   };
 }
 
-const BUILDERS = { listing: listingMeta, event: eventMeta, post: postMeta };
+/**
+ * Preview fields for a form, from the `form_preview` RPC: the form's own
+ * title, and its description only if the form is public (the RPC returns
+ * null otherwise). No description → left blank, nothing made up.
+ */
+function formMeta(row) {
+  return {
+    title: clip(row.title, TITLE_MAX) || 'A form',
+    description: clip(row.description, DESCRIPTION_MAX),
+    image: null,
+  };
+}
+
+const BUILDERS = { listing: listingMeta, event: eventMeta, post: postMeta, form: formMeta };
 
 function buildMeta(kind, row, path) {
   const meta = BUILDERS[kind](row);
@@ -197,6 +216,7 @@ module.exports = {
   listingMeta,
   eventMeta,
   postMeta,
+  formMeta,
   buildMeta,
   renderTags,
   injectMeta,

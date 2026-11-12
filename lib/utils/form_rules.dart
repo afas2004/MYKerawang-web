@@ -502,6 +502,29 @@ List<int> sensitiveFieldIndexes(List<FormFieldSpec> fields) => [
 
 /// The `FORM:<code>` (or `MOD:rate_limited:form`) a server error carries, or
 /// null when it carries none. `FORM:required:<id>` reads as `required`.
+/// A form id as it appears in `/f/<id>` — anything else there is a short name.
+final RegExp kFormUuid =
+    RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', caseSensitive: false);
+
+/// Short-name rules, the same as the server's `form_slug_problem()`:
+/// `slug_bad` (shape), `slug_blocked` (looks official or asks for a login,
+/// or a reserved word), or null when fine. Expects the tidied (lower-case,
+/// trimmed) name.
+String? formSlugProblem(String slug) {
+  if (!RegExp(r'^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$').hasMatch(slug) || slug.contains('--')) {
+    return 'slug_bad';
+  }
+  const reserved = {'new', 'create', 'edit', 'responses', 'gallery', 'templates', 'forms'};
+  if (reserved.contains(slug)) return 'slug_blocked';
+  if (RegExp(r'(uitm|official|rasmi|login|signin|logmasuk|password|katalaluan|bank|mykerawang|admin|verify|sahkan|support)')
+      .hasMatch(slug)) {
+    return 'slug_blocked';
+  }
+  const words = {'otp', 'pin', 'tac', 'hep', 'cvv'};
+  if (slug.split('-').any(words.contains)) return 'slug_blocked';
+  return null;
+}
+
 /// A guest's optional email, checked the way `submit_guest_form_response`
 /// checks it: something@something.something, no spaces, at most 200 chars.
 bool isPlausibleGuestEmail(String email) =>

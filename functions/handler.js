@@ -39,6 +39,9 @@ const QUERIES = {
     from: 'posts_public',
     select: 'id,title,body,image_url,cover_url,is_anonymous,profiles,club',
   },
+  // Forms are RPC-only (no table access for anon); form_preview takes a
+  // uuid or a short name and returns null for missing or removed forms.
+  form: { rpc: 'form_preview' },
 };
 
 // Browsers revalidate every time (like index.html itself); the Hosting CDN
@@ -66,6 +69,17 @@ function requestHost(req) {
 
 async function fetchRow(fetchImpl, kind, id) {
   const q = QUERIES[kind];
+  if (q.rpc) {
+    const res = await fetchImpl(`${SUPABASE_URL}/rest/v1/rpc/${q.rpc}`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_key: id }),
+      signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
+    });
+    if (!res.ok) throw new Error(`lookup ${kind} ${res.status}`);
+    const row = await res.json();
+    return row && typeof row === 'object' && !Array.isArray(row) ? row : null;
+  }
   const url =
     `${SUPABASE_URL}/rest/v1/${q.from}` +
     `?id=eq.${encodeURIComponent(id)}&select=${q.select}&limit=1`;

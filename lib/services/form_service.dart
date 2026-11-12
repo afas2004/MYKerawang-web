@@ -76,6 +76,10 @@ class FormDoc {
   /// [header].
   final bool isPublic;
 
+  /// The optional short name (`/f/sus-survey`), standalone forms only. Saved
+  /// on its own (`set_form_slug`), not in [header].
+  final String? slug;
+
   const FormDoc({
     required this.id,
     required this.title,
@@ -95,11 +99,13 @@ class FormDoc {
     this.closesAt,
     this.maxResponses,
     this.isPublic = false,
+    this.slug,
   });
 
   /// Where the editor, the answer page and the responses page live.
-  String get answerPath =>
-      standalone || eventId == null ? '/f/$id' : '/event/$eventId/form?f=$id';
+  String get answerPath => standalone || eventId == null
+      ? '/f/${slug ?? id}'
+      : '/event/$eventId/form?f=$id';
   String get editPath =>
       standalone || eventId == null ? '/f/$id/edit' : '/event/$eventId/form/edit?f=$id';
   String get responsesPath => standalone || eventId == null
@@ -132,6 +138,7 @@ class FormDoc {
     DateTime? Function()? closesAt,
     int? Function()? maxResponses,
     bool? isPublic,
+    String? Function()? slug,
   }) =>
       FormDoc(
         id: id,
@@ -152,6 +159,7 @@ class FormDoc {
         closesAt: closesAt == null ? this.closesAt : closesAt(),
         maxResponses: maxResponses == null ? this.maxResponses : maxResponses(),
         isPublic: isPublic ?? this.isPublic,
+        slug: slug == null ? this.slug : slug(),
       );
 }
 
@@ -321,6 +329,13 @@ abstract class FormService {
   /// The "public" switch: on lets people without an account answer.
   Future<void> setPublic(String formId, bool on);
 
+  /// Sets (or, with null/empty, clears) the form's short name. Returns what
+  /// was stored, tidied (lower case), or null when cleared.
+  Future<String?> setSlug(String formId, String? slug);
+
+  /// `/f/<key>`: the form id for a short name (or a uuid), null if none.
+  Future<String?> idForKey(String key);
+
   /// A guest's answer to a public form. [name] is required, [email] optional.
   Future<void> submitGuest(
     String formId, {
@@ -418,6 +433,7 @@ class SupabaseFormService implements FormService {
         closesAt: DateTime.tryParse('${form['closes_at'] ?? ''}')?.toLocal(),
         maxResponses: (form['max_responses'] as num?)?.toInt(),
         isPublic: form['is_public'] == true,
+        slug: form['slug'] as String?,
       ),
       canAnswer: all['can_answer'] == true,
       reason: all['reason'] as String?,
@@ -443,6 +459,19 @@ class SupabaseFormService implements FormService {
   Future<void> setAfterCheckin(String formId, bool on) =>
       _db.rpc('set_form_after_checkin',
           params: {'p_form_id': formId, 'p_on': on});
+
+  @override
+  Future<String?> setSlug(String formId, String? slug) async {
+    final raw = await _db.rpc('set_form_slug',
+        params: {'p_form_id': formId, 'p_slug': (slug ?? '').trim().isEmpty ? null : slug});
+    return raw == null ? null : '$raw';
+  }
+
+  @override
+  Future<String?> idForKey(String key) async {
+    final raw = await _db.rpc('form_id_for_key', params: {'p_key': key});
+    return raw == null ? null : '$raw';
+  }
 
   @override
   Future<void> setPublic(String formId, bool on) =>
