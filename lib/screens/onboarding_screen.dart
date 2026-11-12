@@ -11,6 +11,7 @@ import '../language_cubit.dart';
 import '../services/feature_flags.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/welcome_tour.dart';
+import '../widgets/whats_new.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -138,6 +139,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       // A brand-new account: queue the welcome tour, then open it over
       // Home once the router has swapped this page out.
       await WelcomeTour.markPending(user.id, _nameCtrl.text);
+      await WhatsNew.markSeen(); // the tour, not release notes
       if (mounted) {
         // Go to Home (router replaces the stack)
         context.go('/home');
