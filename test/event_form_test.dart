@@ -60,6 +60,13 @@ class FakeAnswerService implements FormService {
   Future<void> setAfterCheckin(String formId, bool on) async {}
 
   @override
+  Future<void> setPublic(String formId, bool on) async {}
+
+  @override
+  Future<void> submitGuest(String formId,
+      {required String name, String? email, required Map<String, dynamic> answers}) async {}
+
+  @override
   Future<void> submit(String formId,
       {required Map<String, dynamic> answers, String? role}) async {
     submitted = answers;
@@ -224,7 +231,7 @@ void main() {
     await pumpAt(tester, kCompact, const EventFormScreen(eventId: 'e1'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Sign in to answer'), findsOneWidget);
+    expect(find.text('Sign in to view this form'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Submit'), findsNothing);
   });
 

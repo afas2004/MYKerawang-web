@@ -30,6 +30,8 @@ class FakeForms implements FormService {
   FormView view;
   final List<FormDoc> saved = [];
   Map<String, dynamic>? submitted;
+  final List<bool> publicCalls = [];
+  Map<String, dynamic>? guestSubmitted;
 
   @override
   Future<List<FormTemplate>> templates() async => const [];
@@ -55,6 +57,13 @@ class FakeForms implements FormService {
   Future<List<FormResponse>> responses(String formId) async => const [];
   @override
   Future<void> setAfterCheckin(String formId, bool on) async {}
+  @override
+  Future<void> setPublic(String formId, bool on) async => publicCalls.add(on);
+  @override
+  Future<void> submitGuest(String formId,
+      {required String name, String? email, required Map<String, dynamic> answers}) async {
+    guestSubmitted = {'name': name, 'email': email, 'answers': answers};
+  }
   @override
   Future<void> submit(String formId, {required Map<String, dynamic> answers, String? role}) async {
     submitted = answers;
@@ -735,6 +744,154 @@ void main() {
       ),
     );
     expect(find.text('Fill in form'), findsNothing);
+  });
+
+  // ------------------------------------------------------------ public forms
+  group('public forms', () {
+    FormDoc publicDoc({bool canEdit = false, String status = 'open'}) => FormDoc(
+          id: 'f1',
+          title: 'Lost & found survey',
+          status: status,
+          canEdit: canEdit,
+          fields: _fields,
+          standalone: true,
+          isPublic: true,
+          ownerUsername: 'alice',
+        );
+
+    test('a guest email is checked like the server checks it', () {
+      expect(isPlausibleGuestEmail('siti@example.com'), isTrue);
+      expect(isPlausibleGuestEmail('siti@example'), isFalse);
+      expect(isPlausibleGuestEmail('si ti@example.com'), isFalse);
+      expect(isPlausibleGuestEmail('a@b.c${'x' * 200}'), isFalse);
+    });
+
+    test('the switch copy exists in all three languages', () {
+      for (final s in [AppStrings.en, AppStrings.ms, AppStrings.ja]) {
+        expect(s.formPublicTitle, isNotEmpty);
+        expect(s.formServerError('guest_name'), isNotNull);
+      }
+      expect(AppStrings.ms.formPublicTitle, 'Borang awam');
+      expect(AppStrings.ja.formGuestTag, 'ゲスト');
+    });
+
+    for (final width in [375.0, 1280.0]) {
+      for (final dark in [false, true]) {
+        final mode = dark ? 'dark' : 'light';
+        testWidgets('guest at $width ($mode) answers a public form and is invited to join',
+            (tester) async {
+          final fake = FakeForms(FormView(doc: publicDoc(), canAnswer: true, guest: true));
+          FormService.instance = fake;
+          await pump(tester, width, const EventFormScreen(formId: 'f1'), dark: dark);
+
+          expect(find.text('About you'), findsOneWidget);
+          expect(find.byIcon(Icons.more_vert), findsNothing, reason: 'guests cannot report');
+
+          await tester.enterText(find.byKey(const ValueKey('guest-name')), '  Siti  ');
+          await tester.enterText(find.byKey(const ValueKey('guest-email')), 'siti@example.com');
+          await tester.enterText(find.byKey(const ValueKey('input-q1')), 'Wallet');
+          await tester.tap(find.widgetWithText(FilledButton, 'Submit'));
+          await tester.pumpAndSettle();
+
+          expect(fake.guestSubmitted?['name'], 'Siti');
+          expect(fake.guestSubmitted?['email'], 'siti@example.com');
+          expect((fake.guestSubmitted?['answers'] as Map)['q1'], 'Wallet');
+          expect(fake.submitted, isNull, reason: 'not the signed-in path');
+          expect(find.byKey(const ValueKey('guest-sent')), findsOneWidget);
+          expect(find.text('Join MYKerawang'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+
+    testWidgets('a guest must give a name, and a bad email is caught', (tester) async {
+      final fake = FakeForms(FormView(doc: publicDoc(), canAnswer: true, guest: true));
+      FormService.instance = fake;
+      await pump(tester, 375, const EventFormScreen(formId: 'f1'));
+
+      await tester.enterText(find.byKey(const ValueKey('input-q1')), 'Wallet');
+      await tester.tap(find.widgetWithText(FilledButton, 'Submit'));
+      await tester.pumpAndSettle();
+      expect(fake.guestSubmitted, isNull);
+      expect(find.text('Please enter your name.'), findsWidgets);
+
+      await tester.enterText(find.byKey(const ValueKey('guest-name')), 'Siti');
+      await tester.enterText(find.byKey(const ValueKey('guest-email')), 'siti@nowhere');
+      await tester.tap(find.widgetWithText(FilledButton, 'Submit'));
+      await tester.pumpAndSettle();
+      expect(fake.guestSubmitted, isNull);
+      expect(find.text("That email doesn't look right."), findsWidgets);
+    });
+
+    testWidgets('send another answer starts a fresh form', (tester) async {
+      final fake = FakeForms(FormView(doc: publicDoc(), canAnswer: true, guest: true));
+      FormService.instance = fake;
+      await pump(tester, 375, const EventFormScreen(formId: 'f1'));
+      await tester.enterText(find.byKey(const ValueKey('guest-name')), 'Siti');
+      await tester.enterText(find.byKey(const ValueKey('input-q1')), 'Wallet');
+      await tester.tap(find.widgetWithText(FilledButton, 'Submit'));
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(find.text('Send another answer'), 200,
+          scrollable: find.byType(Scrollable).first);
+      await tester.tap(find.text('Send another answer'));
+      await tester.pumpAndSettle();
+      expect(find.text('About you'), findsOneWidget);
+      final name = tester.widget<TextField>(find.byKey(const ValueKey('guest-name')));
+      expect(name.controller!.text, isEmpty);
+    });
+
+    testWidgets('a signed-in user on a public form answers with their account', (tester) async {
+      final fake = FakeForms(FormView(doc: publicDoc(), canAnswer: true));
+      FormService.instance = fake;
+      await pump(tester, 375, const EventFormScreen(formId: 'f1'));
+      expect(find.text('About you'), findsNothing);
+      await tester.enterText(find.byKey(const ValueKey('input-q1')), 'Wallet');
+      await tester.tap(find.widgetWithText(FilledButton, 'Submit'));
+      await tester.pumpAndSettle();
+      expect(fake.submitted?['q1'], 'Wallet');
+      expect(fake.guestSubmitted, isNull);
+    });
+
+    testWidgets('a guest on a private form is asked to sign in to view it', (tester) async {
+      FormService.instance = FakeForms(FormView(
+          doc: standalone(fields: const []), reason: 'signed_out', guest: true));
+      await pump(tester, 375, const EventFormScreen(formId: 'f1'));
+      expect(find.byKey(const ValueKey('guest-sign-in')), findsOneWidget);
+      expect(find.text('Sign in to view this form'), findsOneWidget);
+      expect(find.text('About you'), findsNothing);
+    });
+
+    for (final width in [375.0, 1280.0]) {
+      testWidgets('editor at $width: the public switch saves at once', (tester) async {
+        final fake = FakeForms(
+            FormView(doc: standalone(status: 'draft', canEdit: true, fields: _fields)));
+        FormService.instance = fake;
+        await pump(tester, width, const FormEditorScreen(formId: 'f1'));
+
+        final tile = find.byKey(const ValueKey('public-switch'));
+        expect(tile, findsOneWidget);
+        expect(tester.widget<SwitchListTile>(tile).value, isFalse, reason: 'off by default');
+        expect(find.text('Only signed-in members can see and answer it.'), findsOneWidget);
+
+        await tester.tap(tile);
+        await tester.pumpAndSettle();
+        expect(fake.publicCalls, [true]);
+        expect(tester.widget<SwitchListTile>(tile).value, isTrue);
+        expect(find.text('Anyone with the link can answer, even without an account.'),
+            findsOneWidget);
+        expect(fake.saved, isEmpty, reason: 'no full save needed');
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('editor: a closed form cannot change the switch', (tester) async {
+      FormService.instance = FakeForms(
+          FormView(doc: standalone(status: 'closed', canEdit: true, fields: _fields)));
+      await pump(tester, 375, const FormEditorScreen(formId: 'f1'));
+      final tile = tester.widget<SwitchListTile>(find.byKey(const ValueKey('public-switch')));
+      expect(tile.onChanged, isNull);
+    });
   });
 }
 

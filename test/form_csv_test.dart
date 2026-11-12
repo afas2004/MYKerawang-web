@@ -100,6 +100,25 @@ void main() {
     expect(lines[2], startsWith('B,,'));
   });
 
+  test('members only: no guest columns', () {
+    final csv = responsesCsv(fields, [person()]);
+    expect(csv.split('\n').first, isNot(contains('guest')));
+  });
+
+  test('guest answers add guest and guest_email at the end', () {
+    final csv = responsesCsv(fields, [
+      person(name: 'A'),
+      const FormResponse(
+          userId: '', displayName: 'Siti', isGuest: true, guestEmail: 'siti@example.com'),
+    ]);
+    final lines = csv.trimRight().split('\n');
+    expect(lines.first, startsWith('display_name,student_id,role,submitted_at'));
+    expect(lines.first, endsWith(',guest,guest_email'));
+    expect(lines[1], endsWith(',no,'));
+    expect(lines[2], startsWith('Siti,'));
+    expect(lines[2], endsWith(',yes,siti@example.com'));
+  });
+
   test('an answer that looks like a formula cannot run in a spreadsheet', () {
     final csv = responsesCsv(fields, [
       person(answers: const {

@@ -67,6 +67,11 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
   bool _requireRsvp = false;
   bool _afterCheckin = false;
 
+  /// Guests may answer. Saved the moment it is flipped (`set_form_public`),
+  /// not with the Save button: it is a sharing choice, not an edit.
+  bool _isPublic = false;
+  bool _savingPublic = false;
+
   /// General-form settings, saved with the form (see [FormDoc.header]).
   DateTime? _closesAt;
   final _limitCtrl = TextEditingController();
@@ -150,6 +155,7 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
     _rows = [for (final f in doc.fields) _Row(f)];
     _requireRsvp = doc.requireRsvp;
     _afterCheckin = doc.afterCheckin;
+    _isPublic = doc.isPublic;
     _closesAt = doc.closesAt;
     _limitCtrl.text = doc.maxResponses?.toString() ?? '';
     _titleCtrl.text = doc.title;
@@ -659,6 +665,9 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
               ),
               const SizedBox(height: KSpace.m),
               _SummaryChips(specs: _specs, ki: _kiMode),
+              const SizedBox(height: KSpace.m),
+              Divider(height: 1, color: scheme.outlineVariant),
+              _publicSwitch(context),
               // RSVP and check-in belong to an event; a standalone form has none.
               if (!doc.standalone) ...[
               const SizedBox(height: KSpace.m),
@@ -700,6 +709,54 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
         const SizedBox(height: KSpace.m),
       ],
     );
+  }
+
+  /// "Public form": on, anyone with the link answers without an account.
+  Widget _publicSwitch(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final subtitle = _isPublic ? s.formPublicOn : s.formPublicOff;
+    return SwitchListTile(
+      key: const ValueKey('public-switch'),
+      contentPadding: EdgeInsets.zero,
+      secondary: Icon(_isPublic ? AppIcons.website : AppIcons.lock,
+          color: scheme.onSurfaceVariant),
+      title: Text(s.formPublicTitle,
+          style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Text(_isPublic && _requireRsvp
+          ? '$subtitle ${s.formPublicRsvpNote}'
+          : subtitle),
+      value: _isPublic,
+      onChanged: _readOnly || _savingPublic ? null : _setPublic,
+    );
+  }
+
+  Future<void> _setPublic(bool on) async {
+    final doc = _doc;
+    if (doc == null) return;
+    final s = context.l10nRead;
+    setState(() {
+      _isPublic = on;
+      _savingPublic = true;
+    });
+    try {
+      await FormService.instance.setPublic(doc.id, on);
+      if (!mounted) return;
+      setState(() {
+        _savingPublic = false;
+        _doc = doc.copyWith(isPublic: on);
+      });
+      notifyContentChanged();
+      _toast(on ? s.formPublicNowOn : s.formPublicNowOff);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isPublic = !on;
+        _savingPublic = false;
+      });
+      showErrorWithRetry(context, e,
+          onRetry: () => _setPublic(on), message: s.formServerError(formErrorCode(e)));
+    }
   }
 
   void _editSetting(VoidCallback change) {

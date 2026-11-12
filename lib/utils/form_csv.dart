@@ -46,12 +46,26 @@ List<List<String>> responseRows(
 
 /// The CSV the organiser downloads. One row per person, same identity columns
 /// as the attendance export so the two join in a spreadsheet.
+///
+/// A public form can have guest answers (no account). Only then are two
+/// columns added at the end — `guest` (yes/no) and `guest_email` — so the
+/// identity columns stay first and a members-only export is unchanged.
 String responsesCsv(List<FormFieldSpec> fields, List<FormResponse> responses) {
-  final columns = responseColumns(fields);
+  final withGuests = responses.any((r) => r.isGuest);
+  final columns = [
+    ...responseColumns(fields),
+    if (withGuests) ...['guest', 'guest_email'],
+  ];
   final rows = responseRows(fields, responses);
   return toCsv(columns, [
-    for (final r in rows)
-      {for (var i = 0; i < columns.length; i++) columns[i]: r[i]},
+    for (var n = 0; n < rows.length; n++)
+      {
+        for (var i = 0; i < rows[n].length; i++) columns[i]: rows[n][i],
+        if (withGuests) ...{
+          'guest': responses[n].isGuest ? 'yes' : 'no',
+          'guest_email': responses[n].guestEmail ?? '',
+        },
+      },
   ]);
 }
 

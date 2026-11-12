@@ -530,6 +530,8 @@ class _RespondentRow extends StatelessWidget {
           ),
           Text(
             [
+              if (response.isGuest) context.l10n.formGuestTag,
+              if ((response.guestEmail ?? '').isNotEmpty) response.guestEmail!,
               if ((response.studentId ?? '').isNotEmpty) response.studentId!,
               response.role,
             ].join(' · '),
