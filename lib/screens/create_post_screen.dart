@@ -81,6 +81,11 @@ class CreatePostScreen extends StatefulWidget {
   /// When set, the form edits this post instead of creating one.
   final Map<String, dynamic>? editPost;
 
+  /// A new post that starts filled in (the owner's Updates tab).
+  final String? initialTitle;
+  final String? initialBody;
+  final List<String>? initialTags;
+
   /// Tests: the "Post as" choices without a club lookup.
   @visibleForTesting
   final List<PostAsOption>? postAsOptions;
@@ -91,6 +96,9 @@ class CreatePostScreen extends StatefulWidget {
     this.sharedListing,
     this.editPost,
     this.postAsOptions,
+    this.initialTitle,
+    this.initialBody,
+    this.initialTags,
   });
 
   @override
@@ -161,6 +169,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       );
       _isAnon = post['is_anonymous'] ?? false;
       _photos.addAll(PostService.photoUrlsOf(post));
+    } else {
+      _titleCtrl.text = widget.initialTitle ?? '';
+      _bodyCtrl.text = widget.initialBody ?? '';
+      _tags.addAll(widget.initialTags ?? const []);
     }
     _initialTitle = _titleCtrl.text;
     _initialBody = _bodyCtrl.text;

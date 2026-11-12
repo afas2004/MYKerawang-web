@@ -4,6 +4,7 @@ import 'package:mykerawang/utils/app_nav.dart';
 
 import '../../l10n/access_strings.dart';
 import '../../l10n/moderation_strings.dart';
+import '../../l10n/whats_new_strings.dart';
 import '../../language_cubit.dart';
 import '../../services/admin_unlock.dart';
 import '../../services/feature_flags.dart';
@@ -22,6 +23,7 @@ import 'pins_tab.dart';
 import 'restrictions_tab.dart';
 import 'settings_tab.dart';
 import 'verifications_tab.dart';
+import 'whats_new_tab.dart';
 
 /// /admin — moderation console. The route is reachable by URL, so the
 /// page checks the role itself; the database checks it again on every
@@ -128,6 +130,7 @@ class _AdminScreenState extends State<AdminScreen> {
       if (verifyEnabled && FeatureFlags.studentFeaturesOn)
         (context.l10n.verifyQueueTitle, ModIcons.verified, const VerificationsTab()),
       if (owner) (m.tabSettings, ModIcons.settings, const SettingsTab()),
+      if (owner) (context.l10n.whatsNewAdminTab, ModIcons.history, const WhatsNewAdminTab()),
     ];
 
     return DefaultTabController(

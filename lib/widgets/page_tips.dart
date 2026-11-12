@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../l10n/page_tips_strings.dart';
 import '../language_cubit.dart';
 import 'welcome_tour.dart';
+import 'whats_new.dart';
 
 /// Page tips: the first time a signed-in person opens a main page, the page
 /// dims and one control stays lit, with a short card beside it ("1 of 3").
@@ -40,6 +41,7 @@ abstract final class PageTips {
     if (uid == null ||
         _open ||
         WelcomeTour.isOpen ||
+        WhatsNew.isOpen ||
         WelcomeTour.shownThisSession) {
       return false;
     }
@@ -48,7 +50,7 @@ abstract final class PageTips {
     if (await WelcomeTour.isPending(uid)) return false;
     // Let the page finish its first layout (and its entrance animation).
     await Future<void>.delayed(const Duration(milliseconds: 450));
-    if (!context.mounted || _open || WelcomeTour.isOpen) return false;
+    if (!context.mounted || _open || WelcomeTour.isOpen || WhatsNew.isOpen) return false;
     final list = steps()
         .where((s) => s.before != null || TipAnchor.find(s.anchor) != null)
         .toList();

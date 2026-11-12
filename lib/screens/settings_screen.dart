@@ -31,6 +31,7 @@ import '../l10n/welcome_tour_strings.dart';
 import '../widgets/welcome_tour.dart';
 import '../widgets/page_tips.dart';
 import '../l10n/page_tips_strings.dart';
+import '../l10n/whats_new_strings.dart';
 import '../widgets/app_toast.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -457,6 +458,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     trailing: const Icon(AppIcons.chevronRight),
                     onTap: () => WelcomeTour.show(context,
                         name: context.read<ProfileCubit>().state.profile?['display_name'] as String?),
+                  ),
+                  ListTile(
+                    leading: const Icon(AppIcons.sparkle),
+                    title: Text(s.whatsNewTitle),
+                    subtitle: Text(s.whatsNewSub),
+                    trailing: const Icon(AppIcons.chevronRight),
+                    onTap: context.goWhatsNew,
                   ),
                   ListTile(
                     leading: const Icon(AppIcons.info),

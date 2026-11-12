@@ -15,6 +15,7 @@ import 'screens/edit_profile_screen.dart';
 import 'screens/event_detail_screen.dart';
 import 'screens/follow_list_screen.dart';
 import 'screens/licenses_screen.dart';
+import 'screens/whats_new_screen.dart';
 import 'screens/privacy_policy_screen.dart';
 import 'screens/tag_feed_screen.dart';
 import 'screens/events/checkin_screens.dart';
@@ -95,6 +96,8 @@ final List<RegExp> _guestPaths = [
   // Attribution has to be reachable without an account (the artwork is
   // CC BY 4.0), even though the Settings entry that links it is not.
   RegExp(r'^/settings/licenses/?$'),
+  // Release notes: a post can link here for everyone.
+  RegExp(r'^/settings/whats-new/?$'),
 ];
 
 /// True when [path] is open to guests.
@@ -424,6 +427,9 @@ GoRouter buildRouter() {
             CreatePostScreen(
               sharedEvent: extra['sharedEvent'] as Map<String, dynamic>?,
               sharedListing: extra['sharedListing'] as Map<String, dynamic>?,
+              initialTitle: extra['title'] as String?,
+              initialBody: extra['body'] as String?,
+              initialTags: (extra['tags'] as List?)?.cast<String>(),
             ),
           );
         },
@@ -547,6 +553,13 @@ GoRouter buildRouter() {
         onExit: historyAwareExit,
         builder: (context, state) =>
             const DesktopChrome(child: LicensesScreen()),
+      ),
+      GoRoute(
+        path: '/settings/whats-new',
+        parentNavigatorKey: _rootKey,
+        onExit: historyAwareExit,
+        builder: (context, state) =>
+            const DesktopChrome(child: WhatsNewScreen()),
       ),
       GoRoute(
         path: '/notifications',
