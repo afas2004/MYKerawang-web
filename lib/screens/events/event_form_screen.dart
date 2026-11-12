@@ -105,6 +105,10 @@ class _EventFormScreenState extends State<EventFormScreen> {
     });
     try {
       var id = widget.formId;
+      // `/f/sus-survey`: a short name, looked up once.
+      if (id != null && !kFormUuid.hasMatch(id)) {
+        id = await FormService.instance.idForKey(id);
+      }
       if (id == null && widget.eventId != null) {
         id = await FormService.instance.openFormId(widget.eventId!);
       }

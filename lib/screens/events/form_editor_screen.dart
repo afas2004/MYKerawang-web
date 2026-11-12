@@ -72,6 +72,11 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
   bool _isPublic = false;
   bool _savingPublic = false;
 
+  /// The short name (`/f/<name>`), also saved on its own (`set_form_slug`).
+  final _slugCtrl = TextEditingController();
+  String? _slugError;
+  bool _savingSlug = false;
+
   /// General-form settings, saved with the form (see [FormDoc.header]).
   DateTime? _closesAt;
   final _limitCtrl = TextEditingController();
@@ -107,6 +112,7 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
     }
     _titleCtrl.dispose();
     _introCtrl.dispose();
+    _slugCtrl.dispose();
     _limitCtrl.dispose();
     super.dispose();
   }
@@ -156,6 +162,8 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
     _requireRsvp = doc.requireRsvp;
     _afterCheckin = doc.afterCheckin;
     _isPublic = doc.isPublic;
+    _slugCtrl.text = doc.slug ?? '';
+    _slugError = null;
     _closesAt = doc.closesAt;
     _limitCtrl.text = doc.maxResponses?.toString() ?? '';
     _titleCtrl.text = doc.title;
@@ -843,6 +851,10 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (doc.standalone) ...[
+          _slugSetting(context, doc),
+          const SizedBox(height: KSpace.m),
+        ],
         Text(s.panelClosesAt, style: Theme.of(context).textTheme.labelMedium),
         const SizedBox(height: KSpace.xs),
         Row(
@@ -893,6 +905,95 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
         ],
       ],
     );
+  }
+
+  /// "Short link": `kerawang.my/f/<name>`, set with its own button.
+  Widget _slugSetting(BuildContext context, FormDoc doc) {
+    final s = context.l10n;
+    final busy = _readOnly || _savingSlug;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(s.formSlugTitle, style: Theme.of(context).textTheme.labelMedium),
+        const SizedBox(height: KSpace.xs),
+        TextField(
+          key: const ValueKey('slug-field'),
+          controller: _slugCtrl,
+          enabled: !busy,
+          maxLength: 40,
+          autocorrect: false,
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9-]')),
+            TextInputFormatter.withFunction(
+                (_, v) => v.copyWith(text: v.text.toLowerCase())),
+          ],
+          // Rebuild so "Set link" lights up once the name differs.
+          onChanged: (_) => setState(() => _slugError = null),
+          onSubmitted: busy ? null : (_) => _saveSlug(),
+          decoration: InputDecoration(
+            isDense: true,
+            prefixText: 'kerawang.my/f/',
+            hintText: s.formSlugHint,
+            helperText: s.formSlugHelp,
+            helperMaxLines: 3,
+            errorText: _slugError,
+            errorMaxLines: 3,
+            counterText: '',
+          ),
+        ),
+        const SizedBox(height: KSpace.xs),
+        Wrap(
+          spacing: KSpace.s,
+          children: [
+            FilledButton.tonal(
+              key: const ValueKey('slug-save'),
+              onPressed: busy || _slugCtrl.text.trim() == (doc.slug ?? '') ? null : _saveSlug,
+              child: Text(s.formSlugSave),
+            ),
+            if (doc.slug != null)
+              TextButton(
+                key: const ValueKey('slug-remove'),
+                onPressed: busy ? null : () => _saveSlug(clear: true),
+                child: Text(s.formSlugRemove),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _saveSlug({bool clear = false}) async {
+    final doc = _doc;
+    if (doc == null) return;
+    final s = context.l10nRead;
+    final wanted = clear ? '' : _slugCtrl.text.trim().toLowerCase();
+    // The same rules as the server, so most mistakes never make the trip.
+    final problem = wanted.isEmpty ? null : formSlugProblem(wanted);
+    if (problem != null) {
+      setState(() => _slugError = s.formServerError(problem));
+      return;
+    }
+    setState(() => _savingSlug = true);
+    try {
+      final stored = await FormService.instance.setSlug(doc.id, wanted.isEmpty ? null : wanted);
+      if (!mounted) return;
+      setState(() {
+        _savingSlug = false;
+        _slugError = null;
+        _slugCtrl.text = stored ?? '';
+        _doc = _doc!.copyWith(slug: () => stored);
+      });
+      notifyContentChanged();
+      _toast(stored == null ? s.formSlugRemoved : s.formSlugSaved);
+    } catch (e) {
+      if (!mounted) return;
+      final message = s.formServerError(formErrorCode(e));
+      setState(() {
+        _savingSlug = false;
+        _slugError = message;
+      });
+      if (message == null) showErrorWithRetry(context, e, onRetry: _saveSlug);
+    }
   }
 
   Future<void> _pickCloseDate() async {

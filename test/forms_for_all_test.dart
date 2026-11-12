@@ -31,6 +31,8 @@ class FakeForms implements FormService {
   final List<FormDoc> saved = [];
   Map<String, dynamic>? submitted;
   final List<bool> publicCalls = [];
+  final List<String?> slugCalls = [];
+  final Map<String, String?> keys = {};
   Map<String, dynamic>? guestSubmitted;
 
   @override
@@ -59,6 +61,14 @@ class FakeForms implements FormService {
   Future<void> setAfterCheckin(String formId, bool on) async {}
   @override
   Future<void> setPublic(String formId, bool on) async => publicCalls.add(on);
+  @override
+  Future<String?> setSlug(String formId, String? slug) async {
+    slugCalls.add(slug);
+    if (slug == 'taken-name') throw Exception('FORM:slug_taken');
+    return slug;
+  }
+  @override
+  Future<String?> idForKey(String key) async => keys.containsKey(key) ? keys[key] : key;
   @override
   Future<void> submitGuest(String formId,
       {required String name, String? email, required Map<String, dynamic> answers}) async {
@@ -891,6 +901,114 @@ void main() {
       await pump(tester, 375, const FormEditorScreen(formId: 'f1'));
       final tile = tester.widget<SwitchListTile>(find.byKey(const ValueKey('public-switch')));
       expect(tile.onChanged, isNull);
+    });
+  });
+
+  // ------------------------------------------------------------ short links
+  group('short links', () {
+    test('rules match the server', () {
+      expect(formSlugProblem('sus-survey'), isNull);
+      expect(formSlugProblem('pinjam-buku'), isNull);
+      expect(formSlugProblem('ab'), 'slug_bad');
+      expect(formSlugProblem('two--dashes'), 'slug_bad');
+      expect(formSlugProblem('-x-'), 'slug_bad');
+      expect(formSlugProblem('uitm-survey'), 'slug_blocked');
+      expect(formSlugProblem('get-otp'), 'slug_blocked');
+      expect(formSlugProblem('edit'), 'slug_blocked');
+      for (final s in [AppStrings.en, AppStrings.ms, AppStrings.ja]) {
+        expect(s.formServerError('slug_taken'), isNotNull);
+        expect(s.formSlugTitle, isNotEmpty);
+      }
+      expect(AppStrings.en.formIntroLabel, 'Description (optional)');
+    });
+
+    test('the share link uses the short name when there is one', () {
+      expect(standalone().answerPath, '/f/f1');
+      expect(standalone().copyWith(slug: () => 'sus-survey').answerPath, '/f/sus-survey');
+    });
+
+    for (final width in [375.0, 1280.0]) {
+      testWidgets('editor at $width sets a short link and the share box shows it', (tester) async {
+        final fake = FakeForms(
+            FormView(doc: standalone(status: 'open', canEdit: true, fields: _fields)));
+        FormService.instance = fake;
+        await pump(tester, width, const FormEditorScreen(formId: 'f1'));
+        if (width < 1000) {
+          await tester.tap(find.text(AppStrings.en.panelSettingsAndShare));
+          await tester.pumpAndSettle();
+        }
+
+        final field = find.byKey(const ValueKey('slug-field'));
+        await tester.ensureVisible(field);
+        await tester.enterText(field, 'SUS-Survey');
+        await tester.pump();
+        expect(tester.widget<TextField>(field).controller!.text, 'sus-survey', reason: 'lower-cased as typed');
+        await tester.ensureVisible(find.byKey(const ValueKey('slug-save')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('slug-save')));
+        await tester.pumpAndSettle();
+
+        expect(fake.slugCalls, ['sus-survey']);
+        expect(find.textContaining('kerawang.my/f/sus-survey'), findsWidgets);
+        expect(find.byKey(const ValueKey('slug-remove')), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('a misleading name is refused before it is sent', (tester) async {
+      final fake = FakeForms(
+          FormView(doc: standalone(status: 'open', canEdit: true, fields: _fields)));
+      FormService.instance = fake;
+      await pump(tester, 1280, const FormEditorScreen(formId: 'f1'));
+      final field = find.byKey(const ValueKey('slug-field'));
+      await tester.ensureVisible(field);
+      await tester.enterText(field, 'uitm-login');
+      await tester.pump();
+      await tester.ensureVisible(find.byKey(const ValueKey('slug-save')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('slug-save')));
+      await tester.pumpAndSettle();
+      expect(fake.slugCalls, isEmpty);
+      expect(find.text(AppStrings.en.formSlugBlocked), findsOneWidget);
+    });
+
+    testWidgets('a name someone else has is explained', (tester) async {
+      final fake = FakeForms(
+          FormView(doc: standalone(status: 'open', canEdit: true, fields: _fields)));
+      FormService.instance = fake;
+      await pump(tester, 1280, const FormEditorScreen(formId: 'f1'));
+      final field = find.byKey(const ValueKey('slug-field'));
+      await tester.ensureVisible(field);
+      await tester.enterText(field, 'taken-name');
+      await tester.pump();
+      await tester.ensureVisible(find.byKey(const ValueKey('slug-save')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('slug-save')));
+      await tester.pumpAndSettle();
+      expect(find.text(AppStrings.en.formSlugTaken), findsOneWidget);
+    });
+
+    testWidgets('event forms have no short link setting', (tester) async {
+      FormService.instance = FakeForms(FormView(
+          doc: FormDoc(
+              id: 'f1', title: 'KI', status: 'open', canEdit: true, eventId: 'e1', fields: _fields)));
+      await pump(tester, 1280, const FormEditorScreen(formId: 'f1'));
+      expect(find.byKey(const ValueKey('slug-field')), findsNothing);
+    });
+
+    testWidgets('/f/<short name> opens the form', (tester) async {
+      final fake = FakeForms(FormView(doc: standalone(), canAnswer: true))
+        ..keys['sus-survey'] = 'f1';
+      FormService.instance = fake;
+      await pump(tester, 375, const EventFormScreen(formId: 'sus-survey'));
+      expect(find.text('Lost & found survey'), findsWidgets);
+    });
+
+    testWidgets('an unknown short name says the form is not available', (tester) async {
+      FormService.instance = FakeForms(FormView(doc: standalone(), canAnswer: true))
+        ..keys['no-such-form'] = null;
+      await pump(tester, 375, const EventFormScreen(formId: 'no-such-form'));
+      expect(find.text(AppStrings.en.formNotAvailable), findsOneWidget);
     });
   });
 }

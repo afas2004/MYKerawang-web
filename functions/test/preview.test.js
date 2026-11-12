@@ -13,6 +13,7 @@ const {
   listingMeta,
   eventMeta,
   postMeta,
+  formMeta,
   buildMeta,
   injectMeta,
 } = require('../preview');
@@ -249,4 +250,61 @@ test('requestHost only trusts known hosts', () => {
   assert.equal(requestHost({ headers: { 'x-forwarded-host': 'KERAWANG.MY:443' } }), 'kerawang.my');
   assert.equal(requestHost({ headers: { 'x-forwarded-host': 'evil.example' } }), 'kerawang.my');
   assert.equal(requestHost({ headers: {}, hostname: '' }), 'kerawang.my');
+});
+
+// ----------------------------------------------------------------- forms
+
+test('parsePath: a form by id or by short name', () => {
+  assert.deepEqual(parsePath(`/f/${ID}`), { kind: 'form', id: ID, path: `/f/${ID}` });
+  assert.deepEqual(parsePath('/f/SUS-Survey/'), { kind: 'form', id: 'sus-survey', path: '/f/sus-survey' });
+  assert.equal(parsePath(`/f/${ID}/edit`), null);
+  assert.equal(parsePath('/f/ab'), null, 'too short');
+  assert.equal(parsePath('/f/two--dashes'), null);
+  assert.equal(parsePath('/f/-x-'), null);
+  assert.equal(parsePath('/f/a%27b'), null);
+  assert.equal(parsePath('/item/sus-survey'), null, 'short names are for forms only');
+});
+
+test('form: the title, and the description only as given', () => {
+  assert.deepEqual(formMeta({ title: 'SUS survey', description: 'Tell us' }),
+    { title: 'SUS survey', description: 'Tell us', image: null });
+  assert.equal(formMeta({ title: 'SUS survey', description: null }).description, '',
+    'no description stays blank');
+  assert.equal(formMeta({ title: '' }).title, 'A form');
+});
+
+function rpcFetch({ row = null, calls = [] } = {}) {
+  return async (url, opts) => {
+    calls.push({ url, opts });
+    if (url.endsWith('/index.html')) return { ok: true, status: 200, text: async () => INDEX };
+    return { ok: true, status: 200, json: async () => row };
+  };
+}
+
+test('handler: a form card comes from the form_preview RPC, as anon', async () => {
+  const calls = [];
+  const h = makeHandler({
+    fetchImpl: rpcFetch({ row: { id: ID, slug: 'sus-survey', title: 'SUS survey', description: null }, calls }),
+    log: quiet,
+  });
+  const res = fakeRes();
+  await h(req('/f/sus-survey'), res);
+  assert.equal(res.statusCode, 200);
+  assert.match(res.body, /og:title" content="SUS survey"/);
+  assert.match(res.body, /og:description" content=""/);
+  assert.match(res.body, /og:url" content="https:\/\/kerawang\.my\/f\/sus-survey"/);
+  assert.doesNotMatch(res.body, /community marketplace/, 'the generic description is gone');
+
+  const lookup = calls.find((c) => c.url.includes('/rest/v1/'));
+  assert.match(lookup.url, /\/rest\/v1\/rpc\/form_preview$/);
+  assert.equal(lookup.opts.method, 'POST');
+  assert.deepEqual(JSON.parse(lookup.opts.body), { p_key: 'sus-survey' });
+  assert.equal(lookup.opts.headers.Authorization, undefined);
+});
+
+test('handler: a missing or removed form → the generic page', async () => {
+  const h = makeHandler({ fetchImpl: rpcFetch({ row: null }), log: quiet });
+  const res = fakeRes();
+  await h(req(`/f/${ID}`), res);
+  assert.equal(res.body, INDEX);
 });
