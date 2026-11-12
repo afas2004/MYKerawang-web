@@ -27,11 +27,20 @@ import '../widgets/app_toast.dart';
 import '../widgets/event_timing_editor.dart';
 import '../l10n/event_timing_strings.dart';
 import '../utils/event_series.dart';
+import '../services/feature_flags.dart';
+import '../widgets/form_folds.dart';
 
 class CreateEventScreen extends StatefulWidget {
-  final Map<String, dynamic>? eventToEdit; 
+  final Map<String, dynamic>? eventToEdit;
 
-  const CreateEventScreen({super.key, this.eventToEdit});
+  /// Overrides the owner's layout choice (Admin's preview, tests).
+  final EventFormLayout? layout;
+
+  /// Admin's preview: the real form, but nothing is saved or published and
+  /// no draft or unsaved-changes guard is touched.
+  final bool preview;
+
+  const CreateEventScreen({super.key, this.eventToEdit, this.layout, this.preview = false});
 
   @override
   State<CreateEventScreen> createState() => _CreateEventScreenState();
@@ -163,8 +172,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
     // Leaving with unsaved input asks first (router onExit).
     _initialSnapshot = _snapshot();
-    FormGuard.register(() => !_isLoading && _snapshot() != _initialSnapshot);
-    if (event == null) _restoreDraft();
+    if (!widget.preview) {
+      FormGuard.register(() => !_isLoading && _snapshot() != _initialSnapshot);
+      if (event == null) _restoreDraft();
+    }
     _loadIsAdmin();
   }
 
@@ -296,26 +307,34 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     for (final l in _links) {
       l.dispose();
     }
-    FormGuard.clear();
+    _openFolds.dispose();
+    if (!widget.preview) FormGuard.clear();
     // Leaving on purpose (publish / discard / close) drops the draft; a
     // page reload never gets here, so the draft survives that.
-    _draft.clear();
+    if (!widget.preview) _draft.clear();
     super.dispose();
   }
 
   // --- SUBMIT LOGIC (SMART SORTING) ---
   Future<void> _submit() async {
     setState(() => _showTimingErrors = true);
-    if (!_formKey.currentState!.validate()) return;
+    if (!_validateAll()) return;
     final s = context.l10nRead;
+    if (widget.preview) {
+      showToast(s.previewNote);
+      return;
+    }
     // The same checks the editor shows inline, so nothing half-valid is
     // published.
     final issue = _timing.issue;
     if (issue != SessionsIssue.none) {
+      if (_layout == EventFormLayout.steps) setState(() => _step = 1);
       showToast(issueText(s, issue));
       return;
     }
     if (_timing.closeAfterStart) {
+      if (_layout == EventFormLayout.steps) setState(() => _step = 2);
+      _openFolds.value++;
       showToast(s.rcAfterStart);
       return;
     }
@@ -323,6 +342,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     // every list renders it. (It used to be required, which made a seeded or
     // quickly-created event impossible to open and re-save.)
     if (_categories.isEmpty) {
+      if (_layout == EventFormLayout.steps) setState(() => _step = 0);
       showToast(s.categoryRequired);
       return;
     }
@@ -571,318 +591,631 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (widget.eventToEdit == null) _draft.save(_draftData());
+  // ---------------------------------------------------------------------
+  // Layout. The fields below are built once and arranged two ways (owner's
+  // choice in Admin → Settings): one page with the optional parts folded,
+  // or four steps. Same fields, same checks, same save.
+  // ---------------------------------------------------------------------
+
+  EventFormLayout get _layout => widget.layout ?? _layoutAtOpen;
+
+  /// Read once when the page opens: a switch in Admin applies from the next
+  /// visit, never mid-form.
+  final EventFormLayout _layoutAtOpen = FeatureFlags.eventLayout;
+
+  /// Steps layout: the step shown, and one form per step so Next can check
+  /// just that step.
+  int _step = 0;
+  final List<GlobalKey<FormState>> _stepKeys = List.generate(4, (_) => GlobalKey<FormState>());
+
+  /// Folded layout: opens every fold when publishing finds a problem.
+  final ValueNotifier<int> _openFolds = ValueNotifier(0);
+
+  /// Everything a fold summary reads, so summaries refresh while typing.
+  late final Listenable _summaryInputs = Listenable.merge([
+    _descController,
+    _capacityCtrl,
+    _feeCtrl,
+    _picCtrl,
+    _coOrganiserCtrl,
+    _meritNoteCtrl,
+    _timing,
+    ..._contactCtrls.values,
+  ]);
+
+  /// Checks every field. On failure the steps layout jumps to the first
+  /// step with a problem, and the folded layout opens its folds.
+  bool _validateAll() {
+    if (_layout == EventFormLayout.folded) {
+      final ok = _formKey.currentState!.validate();
+      if (!ok) _openFolds.value++;
+      return ok;
+    }
+    for (var i = 0; i < _stepKeys.length; i++) {
+      if (!(_stepKeys[i].currentState?.validate() ?? true)) {
+        setState(() => _step = i);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Steps layout: what must be right before leaving step [i].
+  bool _stepReady(int i) {
+    final s = context.l10nRead;
+    if (!(_stepKeys[i].currentState?.validate() ?? true)) return false;
+    if (i == 0 && _categories.isEmpty) {
+      showToast(s.categoryRequired);
+      return false;
+    }
+    if (i == 1 && _timing.issue != SessionsIssue.none) {
+      setState(() => _showTimingErrors = true);
+      showToast(issueText(s, _timing.issue));
+      return false;
+    }
+    if (i == 2 && _timing.closeAfterStart) {
+      showToast(s.rcAfterStart);
+      return false;
+    }
+    return true;
+  }
+
+  // ---- the parts --------------------------------------------------------
+
+  Widget _hint(String text) => Text(text,
+      style: Theme.of(context)
+          .textTheme
+          .bodySmall
+          ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant));
+
+  List<Widget> _photosPart() => [
+        // Shared with the listing form. The picker returns after an await
+        // (camera / file dialog); the form may be gone by then.
+        MediaPickerGrid(
+            items: _mediaItems,
+            onChanged: () {
+              if (mounted) setState(() {});
+            }),
+      ];
+
+  List<Widget> _hostAndTitlePart() {
+    final s = context.l10n;
     final theme = Theme.of(context);
     final isEditing = widget.eventToEdit != null;
-    final s = context.l10n;
-
-    return Scaffold(
-      appBar: appBarConstrained(context,
-          leading: const AppCloseButton(),
-          title: Text(isEditing ? s.editEvent : s.createEvent)),
-      body: FormPageBody(
-        child: Form(
-          key: _formKey,
-          // Errors show as soon as a field is touched, not only on submit.
-          autovalidateMode: AutovalidateMode.onUserInteraction,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    return [
+      if (!isEditing) ...[
+        PostAsSelector(
+          selfLabel: s.create.yourself,
+          label: s.create.hostedBy,
+          value: _hostAs,
+          onChanged: (o) => setState(() => _hostAs = o),
+        ),
+        if (_hostAs?.isClub ?? false) ...[
+          const SizedBox(height: KSpace.s),
+          Row(
             children: [
-              FormSection(
-                title: s.sectionPhotos,
-                icon: AppIcons.photo,
-                children: [
-                  // Shared with the listing form
-                  // The picker returns after an await (camera / file dialog);
-                  // the form may be gone by then.
-                  MediaPickerGrid(
-                      items: _mediaItems,
-                      onChanged: () {
-                        if (mounted) setState(() {});
-                      }),
-                ],
-              ),
-              FormSection(
-                title: s.sectionDetails,
-                icon: AppIcons.edit,
-                children: [
-                  if (!isEditing) ...[
-                    PostAsSelector(
-                      selfLabel: s.create.yourself,
-                      label: s.create.hostedBy,
-                      value: _hostAs,
-                      onChanged: (o) => setState(() => _hostAs = o),
-                    ),
-                    if (_hostAs?.isClub ?? false) ...[
-                      const SizedBox(height: KSpace.s),
-                      Row(
-                        children: [
-                          Icon(AppIcons.official, size: 16, color: theme.colorScheme.tertiary),
-                          const SizedBox(width: KSpace.xs),
-                          Expanded(
-                            child: Text(s.create.clubEventNote,
-                                style: theme.textTheme.bodySmall
-                                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                          ),
-                        ],
-                      ),
-                    ],
-                    const SizedBox(height: KSpace.l),
-                  ],
-                  _label(s.eventTitle, topPad: 0),
-                  _input(_titleController, s.eventTitleHint, validator: _required(s.title)),
-                  _label(s.description),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainer,
-                      borderRadius: KRadius.input,
-                    ),
-                    child: MentionInput(
-                      controller: _descController,
-                      hintText: s.eventDescHint,
-                      isMultiLine: true,
-                      suggestClubs: true,
-                    ),
-                  ),
-                  // Same light markup the announcement composer documents:
-                  // the event page renders the description with it.
-                  const SizedBox(height: KSpace.xs),
-                  Text(
-                    context.announceL10n.formattingHelp,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  ),
-                  _label(s.eventPic),
-                  _input(_picCtrl, s.eventPicHint),
-                ],
-              ),
-              FormSection(
-                title: s.category,
-                icon: AppIcons.filter,
-                children: [
-                  CategoryField(
-                    kind: 'event',
-                    value: _categories,
-                    onChanged: (v) => setState(() => _categories = v),
-                    hintText: s.eventCategoryHint,
-                  ),
-                  const SizedBox(height: KSpace.xs),
-                  Text(
-                    s.categoryPickHint.fill(['$kMaxCategoriesPerItem']),
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  ),
-                ],
-              ),
-              FormSection(
-                title: s.eventButtons,
-                icon: AppIcons.link,
-                children: [
-                  Text(
-                    s.eventButtonsHint,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  ),
-                  for (var i = 0; i < _links.length; i++) _linkEditor(i),
-                  if (_links.length < kActionLinksMax)
-                    Wrap(
-                      spacing: KSpace.s,
-                      children: [
-                        TextButton.icon(
-                          onPressed: () => setState(() => _links.add(_LinkRow())),
-                          icon: const Icon(AppIcons.create, size: 18),
-                          label: Text(s.eventAddButton),
-                        ),
-                        // A form becomes an ordinary button: "Fill in form" → /f/:id.
-                        AttachFormButton(
-                          onPicked: (f) => setState(() =>
-                              _links.add(_LinkRow()..set(s.formLinkLabel, f.path))),
-                        ),
-                      ],
-                    ),
-                ],
-              ),
-              FormSection(
-                title: s.sectionWhenWhere,
-                icon: AppIcons.calendar,
-                children: [
-                  if (_timing.locked && _seriesCount != null) ...[
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(AppIcons.repeat, size: 16, color: theme.colorScheme.primary),
-                        const SizedBox(width: KSpace.xs),
-                        Expanded(
-                          child: Text(s.seriesEditBanner(_seriesCount!),
-                              style: theme.textTheme.bodySmall
-                                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: KSpace.m),
-                  ],
-                  EventTimingEditor(controller: _timing, showErrors: _showTimingErrors),
-                  _label(s.lmWhere),
-                  SegmentedButton<LocationMode>(
-                    key: const ValueKey('location-mode'),
-                    showSelectedIcon: false,
-                    segments: [
-                      ButtonSegment(value: LocationMode.inPerson, label: Text(s.lmInPerson)),
-                      ButtonSegment(value: LocationMode.online, label: Text(s.lmOnline)),
-                      ButtonSegment(value: LocationMode.hybrid, label: Text(s.lmHybrid)),
-                    ],
-                    selected: {_where},
-                    onSelectionChanged: (v) => setState(() => _where = v.first),
-                  ),
-                  if (_where.hasPlace) ...[
-                    _label(s.location),
-                    _input(_locationController, s.locationHint, validator: _required(s.location)),
-                  ],
-                  if (_where.hasLink) ...[
-                    _label(s.meetingLink),
-                    _input(
-                      _onlineCtrl,
-                      'https://meet.google.com/…',
-                      icon: AppIcons.online,
-                      keyboard: TextInputType.url,
-                      validator: (v) {
-                        final text = (v ?? '').trim();
-                        if (text.isEmpty) return s.meetingLinkRequired;
-                        return validateHttpsUrl(text) == null
-                            ? null
-                            : context.announceL10nRead.errActionNotHttps;
-                      },
-                    ),
-                  ],
-                  _label(s.registrationLinkOptional),
-                  // The registration link is launched from the event page, so
-                  // it has to be an https URL — not `javascript:`.
-                  _input(
-                    _linkController,
-                    "https://forms.gle/...",
-                    icon: AppIcons.link,
-                    validator: (v) {
-                      final text = (v ?? '').trim();
-                      if (text.isEmpty) return null;
-                      return validateHttpsUrl(text) == null
-                          ? null
-                          : context.announceL10nRead.errActionNotHttps;
-                    },
-                  ),
-                ],
-              ),
-              FormSection(
-                title: s.evRegistration,
-                icon: AppIcons.ticket,
-                children: [
-                  RegistrationCloseField(controller: _timing),
-                  const SizedBox(height: KSpace.m),
-                  LayoutBuilder(builder: (context, c) {
-                    final capacity = _input(_capacityCtrl, s.evCapacity,
-                        icon: AppIcons.person,
-                        helper: s.evCapacityHint,
-                        keyboard: TextInputType.number);
-                    final fee = _input(_feeCtrl, s.evFee,
-                        icon: AppIcons.market,
-                        helper: s.evFeeHint,
-                        keyboard: TextInputType.number);
-                    if (c.maxWidth < 420) {
-                      return Column(children: [
-                        capacity,
-                        const SizedBox(height: 12),
-                        fee,
-                      ]);
-                    }
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: capacity),
-                        const SizedBox(width: 12),
-                        Expanded(child: fee),
-                      ],
-                    );
-                  }),
-                  _label(s.evAudience),
-                  DropdownButtonFormField<String>(
-                    initialValue: _audience,
-                    decoration: _emptyDeco(),
-                    items: [
-                      for (final a in const ['uitm', 'kolej', 'klab', 'awam'])
-                        DropdownMenuItem(
-                            value: a, child: Text(s.evAudienceLabel(a))),
-                    ],
-                    onChanged: (v) => setState(() => _audience = v),
-                  ),
-                  if (_hostAs?.isClub == true || _isAdminUser) ...[
-                    const SizedBox(height: KSpace.s),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      value: _meritOffered,
-                      onChanged: (v) => setState(() => _meritOffered = v),
-                      title: Text(s.evMerit),
-                      subtitle: Text(s.evMeritHint,
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                    ),
-                    if (_meritOffered) ...[
-                      _input(_meritNoteCtrl, s.evMeritNote,
-                          icon: AppIcons.verified),
-                      const SizedBox(height: 12),
-                      _input(_activityRefCtrl, s.evActivityRef,
-                          icon: AppIcons.link),
-                    ],
-                  ],
-                  const SizedBox(height: 12),
-                  // "Dengan kerjasama": usually a club, sometimes a person.
-                  // Typing suggests both — clubs insert a club mention,
-                  // "@[handle]" (a chip on the event page), people "@username".
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainer,
-                      borderRadius: KRadius.input,
-                    ),
-                    child: MentionInput(
-                      controller: _coOrganiserCtrl,
-                      hintText: s.evCoOrganiserHint,
-                      suggestClubs: true,
-                    ),
-                  ),
-                ],
-              ),
-              FormSection(
-                title: s.evContacts,
-                icon: AppIcons.email,
-                children: [
-                  Text(s.evContactHint,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                  const SizedBox(height: KSpace.s),
-                  _channelField(_contactCtrls['whatsapp']!, 'WhatsApp',
-                      AppIcons.phone, TextInputType.phone),
-                  _channelField(_contactCtrls['telegram']!, 'Telegram',
-                      AppIcons.send),
-                  _channelField(_contactCtrls['instagram']!, 'Instagram',
-                      AppIcons.camera),
-                  _channelField(_contactCtrls['email']!, 'Email',
-                      AppIcons.email, TextInputType.emailAddress),
-                  _channelField(_contactCtrls['link']!, 'Link', AppIcons.link),
-                ],
-              ),
+              Icon(AppIcons.official, size: 16, color: theme.colorScheme.tertiary),
+              const SizedBox(width: KSpace.xs),
+              Expanded(child: _hint(s.create.clubEventNote)),
             ],
+          ),
+        ],
+        const SizedBox(height: KSpace.l),
+      ],
+      _label(s.eventTitle, topPad: 0),
+      _input(_titleController, s.eventTitleHint, validator: _required(s.title)),
+    ];
+  }
+
+  List<Widget> _categoryPart() {
+    final s = context.l10n;
+    return [
+      _label(s.category),
+      CategoryField(
+        kind: 'event',
+        value: _categories,
+        onChanged: (v) => setState(() => _categories = v),
+        hintText: s.eventCategoryHint,
+      ),
+      const SizedBox(height: KSpace.xs),
+      _hint(s.categoryPickHint.fill(['$kMaxCategoriesPerItem'])),
+    ];
+  }
+
+  List<Widget> _descriptionPart({bool label = true}) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    return [
+      if (label) _label(s.description),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainer,
+          borderRadius: KRadius.input,
+        ),
+        child: MentionInput(
+          controller: _descController,
+          hintText: s.eventDescHint,
+          isMultiLine: true,
+          suggestClubs: true,
+        ),
+      ),
+      // Same light markup the announcement composer documents: the event
+      // page renders the description with it.
+      const SizedBox(height: KSpace.xs),
+      _hint(context.announceL10n.formattingHelp),
+    ];
+  }
+
+  List<Widget> _whenPart() {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    return [
+      if (_timing.locked && _seriesCount != null) ...[
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(AppIcons.repeat, size: 16, color: theme.colorScheme.primary),
+            const SizedBox(width: KSpace.xs),
+            Expanded(child: _hint(s.seriesEditBanner(_seriesCount!))),
+          ],
+        ),
+        const SizedBox(height: KSpace.m),
+      ],
+      EventTimingEditor(controller: _timing, showErrors: _showTimingErrors),
+    ];
+  }
+
+  List<Widget> _wherePart() {
+    final s = context.l10n;
+    return [
+      _label(s.lmWhere),
+      SegmentedButton<LocationMode>(
+        key: const ValueKey('location-mode'),
+        showSelectedIcon: false,
+        segments: [
+          ButtonSegment(value: LocationMode.inPerson, label: Text(s.lmInPerson)),
+          ButtonSegment(value: LocationMode.online, label: Text(s.lmOnline)),
+          ButtonSegment(value: LocationMode.hybrid, label: Text(s.lmHybrid)),
+        ],
+        selected: {_where},
+        onSelectionChanged: (v) => setState(() => _where = v.first),
+      ),
+      if (_where.hasPlace) ...[
+        _label(s.location),
+        _input(_locationController, s.locationHint, validator: _required(s.location)),
+      ],
+      if (_where.hasLink) ...[
+        _label(s.meetingLink),
+        _input(
+          _onlineCtrl,
+          'https://meet.google.com/…',
+          icon: AppIcons.online,
+          keyboard: TextInputType.url,
+          validator: (v) {
+            final text = (v ?? '').trim();
+            if (text.isEmpty) return s.meetingLinkRequired;
+            return validateHttpsUrl(text) == null
+                ? null
+                : context.announceL10nRead.errActionNotHttps;
+          },
+        ),
+      ],
+    ];
+  }
+
+  List<Widget> _registrationPart() {
+    final s = context.l10n;
+    return [
+      RegistrationCloseField(controller: _timing),
+      const SizedBox(height: KSpace.m),
+      LayoutBuilder(builder: (context, c) {
+        final capacity = _input(_capacityCtrl, s.evCapacity,
+            icon: AppIcons.person, helper: s.evCapacityHint, keyboard: TextInputType.number);
+        final fee = _input(_feeCtrl, s.evFee,
+            icon: AppIcons.market, helper: s.evFeeHint, keyboard: TextInputType.number);
+        if (c.maxWidth < 420) {
+          return Column(children: [capacity, const SizedBox(height: 12), fee]);
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: capacity),
+            const SizedBox(width: 12),
+            Expanded(child: fee),
+          ],
+        );
+      }),
+      _label(s.evAudience),
+      DropdownButtonFormField<String>(
+        initialValue: _audience,
+        decoration: _emptyDeco(),
+        items: [
+          for (final a in const ['uitm', 'kolej', 'klab', 'awam'])
+            DropdownMenuItem(value: a, child: Text(s.evAudienceLabel(a))),
+        ],
+        onChanged: (v) => setState(() => _audience = v),
+      ),
+    ];
+  }
+
+  bool get _canOfferMerit => _hostAs?.isClub == true || _isAdminUser;
+
+  List<Widget> _meritPart() {
+    final s = context.l10n;
+    return [
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        value: _meritOffered,
+        onChanged: (v) => setState(() => _meritOffered = v),
+        title: Text(s.evMerit),
+        subtitle: _hint(s.evMeritHint),
+      ),
+      if (_meritOffered) ...[
+        _input(_meritNoteCtrl, s.evMeritNote, icon: AppIcons.verified),
+        const SizedBox(height: 12),
+        _input(_activityRefCtrl, s.evActivityRef, icon: AppIcons.link),
+      ],
+    ];
+  }
+
+  List<Widget> _buttonsPart() {
+    final s = context.l10n;
+    // The old single "Registration link" field: Buttons do the same job, so
+    // only an event that already has one still shows it.
+    final hasOldLink = widget.eventToEdit != null &&
+        '${widget.eventToEdit!['registration_link'] ?? ''}'.trim().isNotEmpty;
+    return [
+      _hint(s.eventButtonsHint),
+      for (var i = 0; i < _links.length; i++) _linkEditor(i),
+      if (_links.length < kActionLinksMax)
+        Wrap(
+          spacing: KSpace.s,
+          children: [
+            TextButton.icon(
+              onPressed: () => setState(() => _links.add(_LinkRow())),
+              icon: const Icon(AppIcons.create, size: 18),
+              label: Text(s.eventAddButton),
+            ),
+            // A form becomes an ordinary button: "Fill in form" → /f/:id.
+            AttachFormButton(
+              onPicked: (f) =>
+                  setState(() => _links.add(_LinkRow()..set(s.formLinkLabel, f.path))),
+            ),
+          ],
+        ),
+      if (hasOldLink) ...[
+        _label(s.registrationLinkOptional),
+        // Launched from the event page, so https only — not `javascript:`.
+        _input(
+          _linkController,
+          "https://forms.gle/...",
+          icon: AppIcons.link,
+          validator: (v) {
+            final text = (v ?? '').trim();
+            if (text.isEmpty) return null;
+            return validateHttpsUrl(text) == null
+                ? null
+                : context.announceL10nRead.errActionNotHttps;
+          },
+        ),
+      ],
+    ];
+  }
+
+  List<Widget> _peoplePart() {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    return [
+      _label(s.eventPic, topPad: 0),
+      _input(_picCtrl, s.eventPicHint),
+      _label(s.evCoOrganiser),
+      // "Dengan kerjasama": usually a club, sometimes a person. Typing
+      // suggests both — clubs insert "@[handle]" (a chip on the event page),
+      // people "@username".
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainer,
+          borderRadius: KRadius.input,
+        ),
+        child: MentionInput(
+          controller: _coOrganiserCtrl,
+          hintText: s.evCoOrganiserHint,
+          suggestClubs: true,
+        ),
+      ),
+      _label(s.evContacts),
+      _hint(s.evContactHint),
+      const SizedBox(height: KSpace.s),
+      _channelField(_contactCtrls['whatsapp']!, 'WhatsApp', AppIcons.phone, TextInputType.phone),
+      _channelField(_contactCtrls['telegram']!, 'Telegram', AppIcons.send),
+      _channelField(_contactCtrls['instagram']!, 'Instagram', AppIcons.camera),
+      _channelField(_contactCtrls['email']!, 'Email', AppIcons.email, TextInputType.emailAddress),
+      _channelField(_contactCtrls['link']!, 'Link', AppIcons.link),
+    ];
+  }
+
+  // ---- fold summaries ---------------------------------------------------
+
+  String _descriptionSummary() {
+    final s = context.l10nRead;
+    final d = _descController.text.trim().replaceAll(RegExp(r'\s+'), ' ');
+    return d.isEmpty ? s.foldEmpty : d;
+  }
+
+  String _registrationSummary() {
+    final s = context.l10nRead;
+    final close = switch (_timing.close) {
+      CloseRule.atStart => s.rcAtStart,
+      CloseRule.setTime => s.rcSetTime,
+      CloseRule.never => s.rcNever,
+    };
+    final cap = int.tryParse(_capacityCtrl.text.trim());
+    final fee = double.tryParse(_feeCtrl.text.trim());
+    return [
+      '${s.rcLabel}: $close',
+      cap == null ? s.foldNoLimit : s.foldPlaces(cap),
+      fee == null || fee <= 0 ? s.evFeeFree : 'RM ${_feeCtrl.text.trim()}',
+      s.evAudienceLabel(_audience ?? 'uitm'),
+    ].join(' · ');
+  }
+
+  String _buttonsSummary() {
+    final s = context.l10nRead;
+    final n = _links.where((l) => l.label.text.trim().isNotEmpty).length;
+    return n == 0 ? s.foldNone : s.foldButtons(n);
+  }
+
+  String _peopleSummary() {
+    final s = context.l10nRead;
+    final set = [
+      if (_picCtrl.text.trim().isNotEmpty) s.eventPic,
+      if (_coOrganiserCtrl.text.trim().isNotEmpty) s.evCoOrganiser,
+      for (final e in _contactCtrls.entries)
+        if (e.value.text.trim().isNotEmpty) _channelName(e.key),
+    ];
+    return set.isEmpty ? s.foldNone : set.join(', ');
+  }
+
+  static String _channelName(String key) => switch (key) {
+        'whatsapp' => 'WhatsApp',
+        'telegram' => 'Telegram',
+        'instagram' => 'Instagram',
+        'email' => 'Email',
+        _ => 'Link',
+      };
+
+  String _meritSummary() {
+    final s = context.l10nRead;
+    if (!_meritOffered) return s.foldOff;
+    final note = _meritNoteCtrl.text.trim();
+    return note.isEmpty ? s.foldOn : note;
+  }
+
+  // ---- the two arrangements ---------------------------------------------
+
+  Widget _foldedLayout() {
+    final s = context.l10n;
+    return Form(
+      key: _formKey,
+      // Errors show as soon as a field is touched, not only on submit.
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FormSection(
+            title: s.stepBasics,
+            icon: AppIcons.edit,
+            children: [
+              ..._photosPart(),
+              const SizedBox(height: KSpace.l),
+              ..._hostAndTitlePart(),
+              ..._categoryPart(),
+            ],
+          ),
+          FormSection(
+            title: s.sectionWhenWhere,
+            icon: AppIcons.calendar,
+            children: [..._whenPart(), ..._wherePart()],
+          ),
+          FoldSection(
+            key: const ValueKey('fold-description'),
+            title: s.description,
+            icon: AppIcons.edit,
+            summary: _descriptionSummary,
+            listenTo: _summaryInputs,
+            openSignal: _openFolds,
+            children: _descriptionPart(label: false),
+          ),
+          FoldSection(
+            key: const ValueKey('fold-registration'),
+            title: s.evRegistration,
+            icon: AppIcons.ticket,
+            summary: _registrationSummary,
+            listenTo: _summaryInputs,
+            openSignal: _openFolds,
+            children: _registrationPart(),
+          ),
+          if (_canOfferMerit)
+            FoldSection(
+              key: const ValueKey('fold-merit'),
+              title: s.evMerit,
+              icon: AppIcons.verified,
+              summary: _meritSummary,
+              listenTo: _summaryInputs,
+              openSignal: _openFolds,
+              children: _meritPart(),
+            ),
+          FoldSection(
+            key: const ValueKey('fold-buttons'),
+            title: s.foldButtonsTitle,
+            icon: AppIcons.link,
+            summary: _buttonsSummary,
+            listenTo: _summaryInputs,
+            openSignal: _openFolds,
+            children: _buttonsPart(),
+          ),
+          FoldSection(
+            key: const ValueKey('fold-people'),
+            title: s.foldPeopleTitle,
+            icon: AppIcons.email,
+            summary: _peopleSummary,
+            listenTo: _summaryInputs,
+            openSignal: _openFolds,
+            children: _peoplePart(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<String> _stepNames(AppStrings s) =>
+      [s.stepBasics, s.sectionWhenWhere, s.evRegistration, s.stepExtras];
+
+  Widget _stepsLayout() {
+    final s = context.l10n;
+    final steps = <List<Widget>>[
+      [
+        ..._photosPart(),
+        const SizedBox(height: KSpace.l),
+        ..._hostAndTitlePart(),
+        ..._categoryPart(),
+        ..._descriptionPart(),
+      ],
+      [..._whenPart(), ..._wherePart()],
+      [
+        ..._registrationPart(),
+        if (_canOfferMerit) ...[const SizedBox(height: KSpace.m), ..._meritPart()],
+      ],
+      [
+        _label(s.foldButtonsTitle, topPad: 0),
+        ..._buttonsPart(),
+        const SizedBox(height: KSpace.l),
+        ..._peoplePart(),
+      ],
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        StepProgress(
+          steps: _stepNames(s),
+          current: _step,
+          // Going back is always fine; going forward checks the steps between.
+          onTap: (i) {
+            if (i <= _step) return setState(() => _step = i);
+            for (var k = _step; k < i; k++) {
+              if (!_stepReady(k)) return setState(() => _step = k);
+            }
+            setState(() => _step = i);
+          },
+        ),
+        const SizedBox(height: KSpace.l),
+        for (var i = 0; i < steps.length; i++)
+          // Every step stays mounted, so nothing typed is lost moving around
+          // and publishing can check them all.
+          Visibility(
+            key: ValueKey('step-$i'),
+            visible: i == _step,
+            maintainState: true,
+            child: Form(
+              key: _stepKeys[i],
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: steps[i],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _stepsBar() {
+    final s = context.l10n;
+    final last = _step == _stepKeys.length - 1;
+    if (last) {
+      return PublishBar(
+        busy: _isLoading,
+        editing: widget.eventToEdit != null,
+        label: widget.eventToEdit != null ? s.saveChanges : s.publish,
+        busyLabel: s.saving,
+        onPressed: _submit,
+      );
+    }
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        border: Border(top: BorderSide(color: scheme.outlineVariant)),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: SafeArea(
+        top: false,
+        child: Center(
+          heightFactor: 1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: Row(
+              children: [
+                if (_step > 0) ...[
+                  Expanded(
+                    child: OutlinedButton(
+                      key: const ValueKey('step-back'),
+                      onPressed: () => setState(() => _step--),
+                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                      child: Text(s.stepBack),
+                    ),
+                  ),
+                  const SizedBox(width: KSpace.m),
+                ],
+                Expanded(
+                  child: FilledButton(
+                    key: const ValueKey('step-next'),
+                    onPressed: () {
+                      if (_stepReady(_step)) setState(() => _step++);
+                    },
+                    style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                    child: Text(s.stepNext),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
-      bottomNavigationBar: PublishBar(
-        busy: _isLoading,
-        editing: isEditing,
-        label: isEditing ? s.saveChanges : s.publish,
-        busyLabel: s.saving,
-        onPressed: _submit,
-      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.eventToEdit == null && !widget.preview) _draft.save(_draftData());
+    final isEditing = widget.eventToEdit != null;
+    final s = context.l10n;
+    final steps = _layout == EventFormLayout.steps;
+
+    return Scaffold(
+      appBar: appBarConstrained(context,
+          leading: widget.preview
+              ? IconButton(
+                  tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                  icon: const Icon(AppIcons.close),
+                  onPressed: () => Navigator.of(context).maybePop(),
+                )
+              : const AppCloseButton(),
+          title: Text(widget.preview
+              ? '${s.previewTitle} · ${isEditing ? s.editEvent : s.createEvent}'
+              : (isEditing ? s.editEvent : s.createEvent))),
+      body: FormPageBody(child: steps ? _stepsLayout() : _foldedLayout()),
+      bottomNavigationBar: steps
+          ? _stepsBar()
+          : PublishBar(
+              busy: _isLoading,
+              editing: isEditing,
+              label: isEditing ? s.saveChanges : s.publish,
+              busyLabel: s.saving,
+              onPressed: _submit,
+            ),
     );
   }
 

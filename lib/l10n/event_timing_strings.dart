@@ -164,6 +164,48 @@ extension EventTimingStrings on AppStrings {
       "Later dates keep their own date and time.",
       "Tarikh seterusnya kekal dengan tarikh dan masa sendiri.",
       "以降の日程の日時は変わりません。");
+  // ---- form layout (one page / steps)
+  String get stepBasics => _t("Basics", "Asas", "基本");
+  String get stepExtras => _t("Extras", "Tambahan", "その他");
+  String get stepNext => _t("Next", "Seterusnya", "次へ");
+  String get stepBack => _t("Back", "Kembali", "戻る");
+  String get foldEmpty => _t("Empty", "Kosong", "未入力");
+  String get foldNone => _t("None", "Tiada", "なし");
+  String get foldOn => _t("On", "Ya", "あり");
+  String get foldOff => _t("Off", "Tidak", "なし");
+  String get foldNoLimit => _t("No limit", "Tiada had", "定員なし");
+  String foldPlaces(int n) => _t("$n places", "$n tempat", "定員$n人");
+  String foldButtons(int n) => _t(n == 1 ? "1 button" : "$n buttons", "$n butang", "ボタン$n個");
+  String get foldButtonsTitle => _t("Buttons & form", "Butang & borang", "ボタン・フォーム");
+  String get foldPeopleTitle => _t("Contacts & people", "Hubungan & orang", "連絡先・担当者");
+  String get previewTitle => _t("Preview", "Pratonton", "プレビュー");
+  String get previewNote => _t("Preview only: nothing is published.",
+      "Pratonton sahaja: tiada apa diterbitkan.", "プレビューのため公開されません。");
+
+  // ---- admin: choosing the layout
+  String get layoutTitle => _t("Create event layout", "Susun atur Cipta acara", "イベント作成のレイアウト");
+  String get layoutBody => _t(
+      "How organisers see the Create event page. Both save exactly the same details.",
+      "Cara penganjur melihat halaman Cipta acara. Kedua-duanya menyimpan butiran yang sama.",
+      "主催者に表示されるイベント作成ページの形式です。どちらも保存される内容は同じです。");
+  String get layoutFolded => _t("One page", "Satu halaman", "1ページ");
+  String get layoutFoldedBody => _t("Essentials open, extras folded with a summary.",
+      "Perkara utama dibuka, tambahan dilipat dengan ringkasan.", "必須項目を表示し、その他は要約付きで折りたたみます。");
+  String get layoutSteps => _t("Steps", "Langkah", "ステップ");
+  String get layoutStepsBody => _t("Four short screens with a progress bar.",
+      "Empat skrin pendek dengan bar kemajuan.", "進行バー付きの4つの短い画面。");
+  String get layoutInUse => _t("In use", "Sedang digunakan", "使用中");
+  String get layoutUse => _t("Use this", "Guna ini", "これを使う");
+  String layoutConfirmTitle(String name) =>
+      _t("Switch to “$name”?", "Tukar kepada “$name”?", "「$name」に切り替えますか？");
+  String get layoutConfirmBody => _t(
+      "Organisers will see this layout the next time they open Create event. Anything they're filling in right now isn't affected.",
+      "Penganjur akan melihat susun atur ini apabila membuka Cipta acara seterusnya. Apa yang sedang diisi sekarang tidak terjejas.",
+      "主催者が次にイベント作成を開いたときからこの形式になります。入力中の内容には影響しません。");
+  String get layoutSwitch => _t("Switch", "Tukar", "切り替える");
+  String layoutNow(String name) => _t("Create event now uses “$name”.",
+      "Cipta acara kini menggunakan “$name”.", "イベント作成は「$name」になりました。");
+
   String get errSeriesFull => _t("This series already has the most dates allowed.",
       "Siri ini sudah mencapai had tarikh.", "このシリーズは日程の上限に達しています。");
 }

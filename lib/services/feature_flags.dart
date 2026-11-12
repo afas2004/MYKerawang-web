@@ -15,6 +15,22 @@ enum AppFeature {
   String get policyKey => '${key}_enabled';
 }
 
+/// How the Create event page is laid out (owner's choice, see
+/// 20261113000100_create_event_layout.sql). Both write the same rows.
+enum EventFormLayout {
+  /// One page; optional sections folded with a summary.
+  folded('folded'),
+
+  /// Four steps with a progress bar.
+  steps('steps');
+
+  const EventFormLayout(this.db);
+  final String db;
+
+  static EventFormLayout of(Object? v) =>
+      values.firstWhere((l) => l.db == v, orElse: () => EventFormLayout.folded);
+}
+
 /// Owner on/off switches for whole areas of the app (announcements,
 /// clubs, student-specific features).
 ///
@@ -51,6 +67,8 @@ class FeatureFlags {
 
   static bool isOn(AppFeature f) => _state.value.isOn(f);
 
+  static EventFormLayout get eventLayout => _state.value.eventLayout;
+
   /// Tests: set the switches without a database.
   @visibleForTesting
   static void debugSet(FeatureFlagsState s) => _state.value = s;
@@ -75,6 +93,14 @@ class FeatureFlags {
     _state.value = _state.value.copyWith(f, enabled);
   }
 
+  /// Owner only (MOD:not_owner otherwise). Organisers get the new layout
+  /// the next time they open Create event.
+  static Future<void> setEventLayout(EventFormLayout layout) async {
+    await Supabase.instance.client
+        .rpc('set_create_event_layout', params: {'p_layout': layout.db});
+    _state.value = _state.value.withLayout(layout);
+  }
+
   static Future<FeatureFlagsState> _read() async {
     try {
       final p = await Supabase.instance.client.rpc('access_policy') as Map;
@@ -94,10 +120,14 @@ class FeatureFlagsState {
   final bool clubsOn;
   final bool studentFeaturesOn;
 
+  /// Not an on/off switch; travels with them because it's read the same way.
+  final EventFormLayout eventLayout;
+
   const FeatureFlagsState({
     this.announcementsOn = true,
     this.clubsOn = true,
     this.studentFeaturesOn = true,
+    this.eventLayout = EventFormLayout.folded,
   });
 
   factory FeatureFlagsState.fromPolicy(Map policy) {
@@ -106,6 +136,7 @@ class FeatureFlagsState {
       announcementsOn: on(AppFeature.announcements),
       clubsOn: on(AppFeature.clubs),
       studentFeaturesOn: on(AppFeature.studentFeatures),
+      eventLayout: EventFormLayout.of(policy['create_event_layout']),
     );
   }
 
@@ -120,6 +151,14 @@ class FeatureFlagsState {
         clubsOn: f == AppFeature.clubs ? on : clubsOn,
         studentFeaturesOn:
             f == AppFeature.studentFeatures ? on : studentFeaturesOn,
+        eventLayout: eventLayout,
+      );
+
+  FeatureFlagsState withLayout(EventFormLayout layout) => FeatureFlagsState(
+        announcementsOn: announcementsOn,
+        clubsOn: clubsOn,
+        studentFeaturesOn: studentFeaturesOn,
+        eventLayout: layout,
       );
 
   @override
@@ -127,8 +166,9 @@ class FeatureFlagsState {
       other is FeatureFlagsState &&
       other.announcementsOn == announcementsOn &&
       other.clubsOn == clubsOn &&
-      other.studentFeaturesOn == studentFeaturesOn;
+      other.studentFeaturesOn == studentFeaturesOn &&
+      other.eventLayout == eventLayout;
 
   @override
-  int get hashCode => Object.hash(announcementsOn, clubsOn, studentFeaturesOn);
+  int get hashCode => Object.hash(announcementsOn, clubsOn, studentFeaturesOn, eventLayout);
 }
