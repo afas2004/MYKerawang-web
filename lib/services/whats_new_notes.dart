@@ -36,6 +36,17 @@ class ReleaseNote {
 
 /// Newest first.
 final kReleaseNotes = <ReleaseNote>[
+  ReleaseNote('1.15.0', DateTime(2026, 11, 13), const [
+    NoteLine('Events can repeat weekly or run on dates you pick, and you join each date on its own.',
+        'Aktiviti boleh berulang setiap minggu atau ikut tarikh yang dipilih, dan awak sertai setiap tarikh secara berasingan.',
+        'イベントを毎週くり返したり、日付を選んで開いたりできます。参加は日付ごとに申し込みます。'),
+    NoteLine('Organisers can set when registration closes.',
+        'Penganjur boleh tetapkan bila pendaftaran ditutup.',
+        '主催者は登録の締め切り時間を設定できます。'),
+    NoteLine('Online and hybrid events show a Join online link.',
+        'Aktiviti dalam talian dan hibrid ada link Sertai dalam talian.',
+        'オンラインやハイブリッドのイベントには「オンラインで参加」リンクがあります。'),
+  ]),
   ReleaseNote('1.14.6', DateTime(2026, 11, 12), const [
     NoteLine('Forms get short links that are easy to share.',
         'Borang kini ada link pendek yang senang dikongsi.',
