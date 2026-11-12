@@ -1,4 +1,4 @@
-// Event series + online / hybrid events (20261112001100_event_series.sql).
+// Event series + online / hybrid events (20261112003100_event_series.sql).
 // Applies every migration twice against the moderation stub, like the others.
 //
 //   node supabase/tests/events/event_series_test.mjs .

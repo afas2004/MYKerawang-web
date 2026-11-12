@@ -4,7 +4,7 @@
 ///
 /// A series is not a special kind of event: each date is an ordinary
 /// `events` row with its own check-in, joiners, cancel and registration
-/// deadline, and `series_id` groups them (20261112001100_event_series.sql).
+/// deadline, and `series_id` groups them (20261112003100_event_series.sql).
 /// So "is this date cancelled / over / still open to join" is always the
 /// same per-row rule from event_live.dart, never something worked out from
 /// a repeat pattern.
