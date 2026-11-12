@@ -13,6 +13,7 @@ import '../l10n/social_strings.dart';
 import '../services/pinned_posts.dart';
 import '../services/unread_notifications.dart';
 import '../utils/app_nav.dart';
+import '../utils/event_series.dart';
 import '../utils/guest_access.dart';
 import '../utils/listing_status.dart';
 import '../widgets/brand/brand.dart';
@@ -177,7 +178,8 @@ class _HomeScreenState extends State<HomeScreen> with RefreshOnContentChange {
             .limit(20),
         _postsPage(0),
       ]);
-      final events = results[0];
+      // One card per series (its next date), like the Events tab.
+      final events = collapseSeries(results[0]);
       final listings = results[1];
       final posts = results[2];
 

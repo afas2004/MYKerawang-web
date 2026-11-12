@@ -8,7 +8,6 @@ import '../l10n/access_strings.dart';
 import '../l10n/app_strings.dart';
 import '../language_cubit.dart';
 import '../utils/adaptive.dart';
-import '../utils/formatters.dart';
 import '../utils/app_nav.dart';
 import '../utils/form_draft.dart';
 import '../utils/announcement_rules.dart';
@@ -25,6 +24,9 @@ import '../services/moderation_service.dart';
 import '../utils/categories.dart';
 import '../widgets/post_as_selector.dart';
 import '../widgets/app_toast.dart';
+import '../widgets/event_timing_editor.dart';
+import '../l10n/event_timing_strings.dart';
+import '../utils/event_series.dart';
 
 class CreateEventScreen extends StatefulWidget {
   final Map<String, dynamic>? eventToEdit; 
@@ -42,9 +44,18 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   late TextEditingController _locationController;
   late TextEditingController _descController;
   late TextEditingController _linkController;
-  
-  DateTime? _startDate;
-  DateTime? _endDate;
+
+  /// When: once / repeats / pick dates, and when registration closes.
+  late final EventTimingController _timing;
+  bool _showTimingErrors = false;
+
+  /// Where: in person / online / hybrid, and the meeting link.
+  LocationMode _where = LocationMode.inPerson;
+  final _onlineCtrl = TextEditingController();
+
+  /// Editing one date of a series: how many dates it has (for the note).
+  int? _seriesCount;
+
   bool _isLoading = false;
 
   /// Yourself (null) or one of your clubs: club events are official.
@@ -58,7 +69,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   List<String> _categories = [];
 
   // Registration + merit + contacts.
-  bool _closeAtStart = true;
   bool _meritOffered = false;
   bool _isAdminUser = false;
   String? _audience = 'uitm';
@@ -105,12 +115,23 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     _linkController = TextEditingController(text: event?['registration_link'] ?? '');
     
     if (event != null) {
-      _startDate = DateTime.parse(event['start_datetime']).toLocal();
-      _endDate = event['end_datetime'] != null 
-          ? DateTime.parse(event['end_datetime']).toLocal() 
-          : _startDate!.add(const Duration(hours: 2));
+      final start = DateTime.parse(event['start_datetime']).toLocal();
+      final end = event['end_datetime'] != null
+          ? DateTime.parse(event['end_datetime']).toLocal()
+          : start.add(const Duration(hours: 2));
+      final seriesId = event['series_id'] as String?;
+      // The form shows the rule the viewer's page reads back from the row.
+      _timing = EventTimingController(
+        start: start,
+        end: end,
+        locked: seriesId != null,
+        close: closeRuleOf(event),
+        closeAt: DateTime.tryParse('${event['join_deadline'] ?? ''}')?.toLocal(),
+      );
+      if (seriesId != null) _loadSeriesCount(seriesId);
+      _where = LocationMode.of(event['location_mode']);
+      _onlineCtrl.text = event['online_url'] ?? '';
       _categories = _categoriesFrom(event);
-      _closeAtStart = event['join_deadline'] != null;
       _capacityCtrl.text = event['capacity']?.toString() ?? '';
       _feeCtrl.text = event['fee']?.toString() ?? '';
       _audience = (event['audience'] as String?) ?? 'uitm';
@@ -134,8 +155,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         _mediaItems.addAll(List<String>.from(event['gallery_urls']));
       }
     } else {
-      _startDate = DateTime.now();
-      _endDate = DateTime.now().add(const Duration(hours: 2));
+      final now = DateTime.now();
+      // On the hour, so the weekly times start tidy.
+      final start = DateTime(now.year, now.month, now.day, now.hour + 1);
+      _timing = EventTimingController(start: start, end: start.add(const Duration(hours: 2)));
     }
 
     // Leaving with unsaved input asks first (router onExit).
@@ -151,6 +174,18 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       if (mounted && admin) setState(() => _isAdminUser = true);
     } catch (_) {
       // Merit simply stays hidden if the check fails.
+    }
+  }
+
+  Future<void> _loadSeriesCount(String seriesId) async {
+    try {
+      final rows = await Supabase.instance.client
+          .from('events')
+          .select('id')
+          .eq('series_id', seriesId);
+      if (mounted) setState(() => _seriesCount = rows.length);
+    } catch (_) {
+      // Only the note's number; editing works without it.
     }
   }
 
@@ -173,16 +208,17 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     }
   }
 
-  Future<void> _saveContacts(String eventId) async {
+  /// The same contacts on every listed event (each date of a series is its
+  /// own event, so each gets its own contacts row).
+  Future<void> _saveContacts(List<String> eventIds) async {
     final values = {
       for (final e in _contactCtrls.entries) e.key: _nullIfEmpty(e.value.text),
     };
-    if (values.values.every((v) => v == null)) return;
-    await Supabase.instance.client.from('event_contacts').upsert({
-      'event_id': eventId,
-      ...values,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }, onConflict: 'event_id');
+    if (eventIds.isEmpty || values.values.every((v) => v == null)) return;
+    final now = DateTime.now().toUtc().toIso8601String();
+    await Supabase.instance.client.from('event_contacts').upsert([
+      for (final id in eventIds) {'event_id': id, ...values, 'updated_at': now},
+    ], onConflict: 'event_id');
   }
 
   /// New events autosave their text (see FormDraft): a reload while the
@@ -240,8 +276,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         _locationController.text,
         _descController.text,
         _linkController.text,
-        _startDate?.toIso8601String(),
-        _endDate?.toIso8601String(),
+        _timing.snapshot(),
+        _where.db,
+        _onlineCtrl.text,
         _categories.join(','),
         _mediaItems.length,
         _mediaItems.map((m) => m is String ? m : identityHashCode(m)).join(','),
@@ -254,6 +291,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     _descController.dispose();
     _linkController.dispose();
     _picCtrl.dispose();
+    _onlineCtrl.dispose();
+    _timing.dispose();
     for (final l in _links) {
       l.dispose();
     }
@@ -266,8 +305,20 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
   // --- SUBMIT LOGIC (SMART SORTING) ---
   Future<void> _submit() async {
+    setState(() => _showTimingErrors = true);
     if (!_formKey.currentState!.validate()) return;
     final s = context.l10nRead;
+    // The same checks the editor shows inline, so nothing half-valid is
+    // published.
+    final issue = _timing.issue;
+    if (issue != SessionsIssue.none) {
+      showToast(issueText(s, issue));
+      return;
+    }
+    if (_timing.closeAfterStart) {
+      showToast(s.rcAfterStart);
+      return;
+    }
     // A photo is optional: an event without a cover still has a date block and
     // every list renders it. (It used to be required, which made a seeded or
     // quickly-created event impossible to open and re-save.)
@@ -313,13 +364,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         }
       }
 
+      // Everything except the dates, shared by every date of a series.
       final data = {
         'title': _titleController.text,
-        'location': _locationController.text,
+        // An online event has no venue; '' rather than null, as before.
+        'location': _where.hasPlace ? _locationController.text : '',
+        'location_mode': _where.db,
+        'online_url': _where.hasLink ? _nullIfEmpty(_onlineCtrl.text) : null,
         'description': _descController.text,
         'registration_link': _linkController.text.isEmpty ? null : _linkController.text,
-        'start_datetime': _startDate!.toUtc().toIso8601String(),
-        'end_datetime': _endDate!.toUtc().toIso8601String(),
         'image_url': finalCoverUrl,      // Index 0
         'gallery_urls': finalGalleryUrls, // Index 1+
         // The Public switch was removed: new events are public, and an
@@ -327,11 +380,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         if (widget.eventToEdit == null) 'is_public': true,
         'categories': _categories,
         'organizer_id': user!.id,
-        // A registration deadline is either "when it starts" or nothing:
-        // one toggle, no extra date to get wrong.
-        'join_deadline': _closeAtStart
-            ? _startDate!.toUtc().toIso8601String()
-            : null,
         'capacity': int.tryParse(_capacityCtrl.text.trim()),
         'fee': double.tryParse(_feeCtrl.text.trim()),
         'audience': _audience,
@@ -350,17 +398,98 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         ],
       };
 
+      // One date's row: the shared fields plus its own times and deadline.
+      Map<String, dynamic> rowFor(SessionSlot slot) => {
+            ...data,
+            'start_datetime': slot.start.toUtc().toIso8601String(),
+            'end_datetime': slot.end.toUtc().toIso8601String(),
+            'join_deadline': _timing.deadlineAt(slot.start)?.toUtc().toIso8601String(),
+          };
+      final slots = _timing.sessions;
+
       if (widget.eventToEdit != null) {
-        await supabase.from('events').update(data).eq('id', widget.eventToEdit!['id']);
-        await _saveContacts(widget.eventToEdit!['id'] as String);
+        final edited = widget.eventToEdit!;
+        final id = edited['id'] as String;
+        final seriesId = edited['series_id'] as String?;
+        // Later dates of the same series, if any, can take the same changes.
+        final later = seriesId == null
+            ? const <Map<String, dynamic>>[]
+            : List<Map<String, dynamic>>.from(await supabase
+                .from('events')
+                .select('id, start_datetime')
+                .eq('series_id', seriesId)
+                .gt('start_datetime', edited['start_datetime'])
+                .order('start_datetime'));
+        var applyLater = false;
+        if (later.isNotEmpty) {
+          if (!mounted) return;
+          final choice = await _askApplyLater(later.length);
+          if (choice == null) return; // dismissed: nothing saved
+          applyLater = choice;
+        }
+
+        final slot = slots.single;
+        await supabase.from('events').update(rowFor(slot)).eq('id', id);
+        if (applyLater) {
+          final deadline = _timing.deadlineAt(slot.start);
+          for (final other in later) {
+            final otherStart = DateTime.parse(other['start_datetime']).toLocal();
+            await supabase.from('events').update({
+              ...data,
+              'join_deadline': shiftedDeadline(
+                editedStart: slot.start,
+                editedDeadline: deadline,
+                otherStart: otherStart,
+              )?.toUtc().toIso8601String(),
+            }).eq('id', other['id']);
+          }
+        }
+        await _saveContacts([id, if (applyLater) for (final o in later) o['id'] as String]);
         // Back to the event page, which refreshes.
         if (mounted) completeEdit(context, message: s.eventUpdated);
       } else {
-        final insert = (_hostAs ?? const PostAsOption.self('')).applyTo(data, hasAnonymous: false);
-        final newEvent = await supabase.from('events').insert(insert).select().single();
-        await _saveContacts(newEvent['id'] as String);
+        final host = _hostAs ?? const PostAsOption.self('');
+        Map<String, dynamic> newEvent;
+        if (!_timing.isSeries) {
+          final insert = host.applyTo(rowFor(slots.single), hasAnonymous: false);
+          newEvent = await supabase.from('events').insert(insert).select().single();
+          await _saveContacts([newEvent['id'] as String]);
+        } else {
+          // The series first, then every date in one insert: either all
+          // dates are published or none are.
+          final series = await supabase
+              .from('event_series')
+              .insert({
+                'organizer_id': user.id,
+                'repeat_rule': repeatRule(_timing.mode,
+                    weekdays: _timing.weekdays, everyWeeks: _timing.everyWeeks),
+              })
+              .select('id')
+              .single();
+          final seriesId = series['id'] as String;
+          List<Map<String, dynamic>> created;
+          try {
+            created = List<Map<String, dynamic>>.from(await supabase
+                .from('events')
+                .insert([
+                  for (final slot in slots)
+                    host.applyTo({...rowFor(slot), 'series_id': seriesId}, hasAnonymous: false),
+                ])
+                .select());
+          } catch (_) {
+            // Don't leave an empty series behind.
+            try {
+              await supabase.from('event_series').delete().eq('id', seriesId);
+            } catch (_) {}
+            rethrow;
+          }
+          created.sort((a, b) => '${a['start_datetime']}'.compareTo('${b['start_datetime']}'));
+          newEvent = created.first;
+          await _saveContacts([for (final e in created) e['id'] as String]);
+        }
         // People mentioned in the description *or* in the cooperation line are
-        // told about the event; club names there are plain text on purpose.
+        // told about the event (once, pointing at the first date); club names
+        // there are plain text on purpose.
         await _processMentions(
           '${_descController.text} ${_coOrganiserCtrl.text}',
           newEvent['id'],
@@ -374,10 +503,40 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       }
 
     } catch (e) {
-      if (mounted) showToast(describeWriteError(context, e));
+      if (mounted) {
+        showToast('$e'.contains('EVENT:series_full')
+            ? context.l10nRead.errSeriesFull
+            : describeWriteError(context, e));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  /// Editing one date of a series that has later dates: apply the changes
+  /// to this date only (false) or to this and later dates (true). Null
+  /// when dismissed.
+  Future<bool?> _askApplyLater(int laterCount) {
+    final s = context.l10nRead;
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(s.applyTo),
+        content: Text(s.applyLaterNote),
+        actions: [
+          TextButton(
+            key: const ValueKey('apply-this-only'),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(s.onlyThisDate),
+          ),
+          FilledButton(
+            key: const ValueKey('apply-later'),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('${s.thisAndLater} (${laterCount + 1})'),
+          ),
+        ],
+      ),
+    );
   }
 
   // 1. HELPER FUNCTION
@@ -550,18 +709,54 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 title: s.sectionWhenWhere,
                 icon: AppIcons.calendar,
                 children: [
-                  // Start and end side by side at every width: two date
-                  // fields fit even on a small phone.
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: _dateSelector(true)),
-                      const SizedBox(width: 12),
-                      Expanded(child: _dateSelector(false)),
+                  if (_timing.locked && _seriesCount != null) ...[
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(AppIcons.repeat, size: 16, color: theme.colorScheme.primary),
+                        const SizedBox(width: KSpace.xs),
+                        Expanded(
+                          child: Text(s.seriesEditBanner(_seriesCount!),
+                              style: theme.textTheme.bodySmall
+                                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: KSpace.m),
+                  ],
+                  EventTimingEditor(controller: _timing, showErrors: _showTimingErrors),
+                  _label(s.lmWhere),
+                  SegmentedButton<LocationMode>(
+                    key: const ValueKey('location-mode'),
+                    showSelectedIcon: false,
+                    segments: [
+                      ButtonSegment(value: LocationMode.inPerson, label: Text(s.lmInPerson)),
+                      ButtonSegment(value: LocationMode.online, label: Text(s.lmOnline)),
+                      ButtonSegment(value: LocationMode.hybrid, label: Text(s.lmHybrid)),
                     ],
+                    selected: {_where},
+                    onSelectionChanged: (v) => setState(() => _where = v.first),
                   ),
-                  _label(s.location),
-                  _input(_locationController, s.locationHint, validator: _required(s.location)),
+                  if (_where.hasPlace) ...[
+                    _label(s.location),
+                    _input(_locationController, s.locationHint, validator: _required(s.location)),
+                  ],
+                  if (_where.hasLink) ...[
+                    _label(s.meetingLink),
+                    _input(
+                      _onlineCtrl,
+                      'https://meet.google.com/…',
+                      icon: AppIcons.online,
+                      keyboard: TextInputType.url,
+                      validator: (v) {
+                        final text = (v ?? '').trim();
+                        if (text.isEmpty) return s.meetingLinkRequired;
+                        return validateHttpsUrl(text) == null
+                            ? null
+                            : context.announceL10nRead.errActionNotHttps;
+                      },
+                    ),
+                  ],
                   _label(s.registrationLinkOptional),
                   // The registration link is launched from the event page, so
                   // it has to be an https URL — not `javascript:`.
@@ -583,15 +778,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 title: s.evRegistration,
                 icon: AppIcons.ticket,
                 children: [
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: _closeAtStart,
-                    onChanged: (v) => setState(() => _closeAtStart = v),
-                    title: Text(s.evCloseAtStart),
-                    subtitle: Text(s.evCloseAtStartHint,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                  ),
+                  RegistrationCloseField(controller: _timing),
+                  const SizedBox(height: KSpace.m),
                   LayoutBuilder(builder: (context, c) {
                     final capacity = _input(_capacityCtrl, s.evCapacity,
                         icon: AppIcons.person,
@@ -698,62 +886,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     );
   }
 
-  // --- FORM HELPERS (Date, Input) ---
-  Widget _dateSelector(bool isStart) {
-    final s = context.l10n;
-    final date = isStart ? _startDate : _endDate;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _label(isStart ? s.starts : s.ends, topPad: 0),
-        InkWell(
-          onTap: () => _pickDateTime(isStart),
-          borderRadius: KRadius.input,
-          child: AbsorbPointer(
-            child: _input(
-              TextEditingController(text: date == null ? '' : formatEventDate(date)), s.select,
-              icon: AppIcons.calendar,
-              readOnly: true,
-              validator: isStart
-                  ? (_) => _startDate == null ? s.fieldRequired.fill([s.starts]) : null
-                  : (_) => (_startDate != null && _endDate != null && !_endDate!.isAfter(_startDate!))
-                      ? s.mustBeAfterStart
-                      : null,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _pickDateTime(bool isStart) async {
-    final now = DateTime.now();
-    final initial = isStart ? (_startDate ?? now) : (_endDate ?? now);
-    
-    final d = await showDatePicker(
-      context: context, 
-      firstDate: now.subtract(const Duration(days: 365)), 
-      lastDate: now.add(const Duration(days: 365)), 
-      initialDate: initial
-    );
-    if (d == null) return;
-    
-    if (mounted) {
-      final t = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(initial));
-      if (t == null) return;
-      
-      setState(() {
-        final res = DateTime(d.year, d.month, d.day, t.hour, t.minute);
-        if (isStart) {
-          _startDate = res;
-          if (_endDate == null || _endDate!.isBefore(res)) _endDate = res.add(const Duration(hours: 2));
-        } else {
-          _endDate = res;
-        }
-      });
-    }
-  }
-
+  // --- FORM HELPERS (Input) ---
   Widget _label(String text, {double topPad = 16}) => Padding(
     padding: EdgeInsets.only(bottom: 8, top: topPad),
     child: Text(text, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600))

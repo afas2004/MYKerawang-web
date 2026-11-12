@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database_helper.dart';
 import '../utils/event_live.dart';
+import '../utils/event_series.dart';
 import '../utils/guest_access.dart';
 import '../widgets/profile_avatar_action.dart' show ShellAuth;
 
@@ -224,9 +225,10 @@ class EventsCubit extends Cubit<EventsState> {
       return matchesSearch && matchesTag;
     }).toList();
 
-    filtered.sort(compareForBrowse);
+    // One card per series: its next date still on, with "+N more dates".
+    final collapsed = collapseSeries(filtered)..sort(compareForBrowse);
 
-    return filtered;
+    return collapsed;
   }
 
   @override

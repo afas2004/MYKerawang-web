@@ -103,6 +103,10 @@ abstract final class AppIcons {
   static const IconData email = LucideIcons.mail;
   static const IconData website = LucideIcons.globe;
 
+  // --- Event timing / place ---
+  static const IconData online = LucideIcons.video;
+  static const IconData repeat = LucideIcons.repeat;
+
   // --- Media ---
   static const IconData camera = LucideIcons.camera;
   static const IconData photo = LucideIcons.image;
