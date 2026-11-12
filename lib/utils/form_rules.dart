@@ -502,6 +502,11 @@ List<int> sensitiveFieldIndexes(List<FormFieldSpec> fields) => [
 
 /// The `FORM:<code>` (or `MOD:rate_limited:form`) a server error carries, or
 /// null when it carries none. `FORM:required:<id>` reads as `required`.
+/// A guest's optional email, checked the way `submit_guest_form_response`
+/// checks it: something@something.something, no spaces, at most 200 chars.
+bool isPlausibleGuestEmail(String email) =>
+    email.length <= 200 && RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
+
 String? formErrorCode(Object error) {
   final m = RegExp(r'(FORM|MOD|VERIFY):([a-z_]+)').firstMatch('$error');
   if (m == null) return null;

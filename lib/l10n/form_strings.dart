@@ -580,6 +580,77 @@ extension FormStrings on AppStrings {
             "Verify your student status to do this.",
             "Sahkan status pelajar anda untuk berbuat demikian.",
             "Verify your student status to do this."),
+        'guest_name' => formGuestNameMissing,
+        'guest_email' => formGuestEmailBad,
+        'login_required' => formGuestSignInView,
         _ => null,
       };
+
+  // ---- public forms (guests answer without an account) ----
+  String get formPublicTitle =>
+      _t("Public form", "Borang awam", "公開フォーム");
+  String get formPublicOn => _t(
+      "Anyone with the link can answer, even without an account.",
+      "Sesiapa yang ada pautan boleh menjawab, walaupun tanpa akaun.",
+      "リンクを知っている人は、アカウントがなくても回答できます。");
+  String get formPublicOff => _t(
+      "Only signed-in members can see and answer it.",
+      "Hanya ahli yang log masuk boleh melihat dan menjawabnya.",
+      "ログインしたメンバーだけが表示・回答できます。");
+  String get formPublicRsvpNote => _t(
+      "Guests can't answer while only people who joined the event may answer.",
+      "Tetamu tidak boleh menjawab selagi hanya peserta acara dibenarkan menjawab.",
+      "イベント参加者のみ回答可能な設定の間は、ゲストは回答できません。");
+  String get formPublicNowOn =>
+      _t("Guests can now answer this form", "Tetamu kini boleh menjawab borang ini", "ゲストもこのフォームに回答できるようになりました");
+  String get formPublicNowOff =>
+      _t("Only members can answer now", "Kini hanya ahli boleh menjawab", "メンバーのみ回答できるようになりました");
+  String get formGuestSignInView => _t(
+      "Sign in to view this form",
+      "Log masuk untuk melihat borang ini",
+      "このフォームを見るにはログインしてください");
+  String get formGuestSignInViewBody => _t(
+      "This form is for MYKerawang members. Signing in takes a few seconds with your Google account.",
+      "Borang ini untuk ahli MYKerawang. Log masuk hanya beberapa saat dengan akaun Google anda.",
+      "このフォームは MYKerawang メンバー向けです。Google アカウントで数秒でログインできます。");
+  String get formGuestAboutYou =>
+      _t("About you", "Tentang anda", "あなたについて");
+  String get formGuestAboutYouHelp => _t(
+      "You're answering as a guest. The organiser sees the name you give here.",
+      "Anda menjawab sebagai tetamu. Penganjur akan melihat nama yang anda berikan di sini.",
+      "ゲストとして回答しています。主催者にはここに入力した名前が表示されます。");
+  String get formGuestName => _t("Your name", "Nama anda", "お名前");
+  String get formGuestEmail =>
+      _t("Email (optional)", "E-mel (pilihan)", "メールアドレス（任意）");
+  String get formGuestEmailHelp => _t(
+      "Only if you want the organiser to be able to reply.",
+      "Hanya jika anda mahu penganjur boleh membalas.",
+      "主催者からの返信を希望する場合のみ。");
+  String get formGuestNameMissing =>
+      _t("Please enter your name.", "Sila masukkan nama anda.", "お名前を入力してください。");
+  String get formGuestEmailBad => _t(
+      "That email doesn't look right.",
+      "E-mel itu kelihatan tidak betul.",
+      "メールアドレスが正しくないようです。");
+  String get formGuestOrSignIn => _t(
+      "Have an account? Sign in to answer with it.",
+      "Ada akaun? Log masuk untuk menjawab dengannya.",
+      "アカウントをお持ちですか？ログインして回答できます。");
+  String get formGuestSentBody => _t(
+      "Thanks! The organiser can see your answers now. Guest answers can't be changed later.",
+      "Terima kasih! Penganjur boleh lihat jawapan anda sekarang. Jawapan tetamu tidak boleh diubah kemudian.",
+      "ありがとうございます！主催者はすでに回答を見ることができます。ゲストの回答は後から変更できません。");
+  String get formGuestJoinPitch => _t(
+      "Join MYKerawang to see events, clubs and posts from your college — and edit your answers next time.",
+      "Sertai MYKerawang untuk melihat acara, kelab dan hantaran dari kolej anda — dan ubah jawapan anda lain kali.",
+      "MYKerawang に参加すると、カレッジのイベント・クラブ・投稿が見られ、次回は回答を編集できます。");
+  String get formGuestJoin =>
+      _t("Join MYKerawang", "Sertai MYKerawang", "MYKerawang に参加");
+  String get formGuestAnswerAnother =>
+      _t("Send another answer", "Hantar jawapan lain", "別の回答を送信");
+  String get formGuestBusy => _t(
+      "This form is getting a lot of guest answers right now. Try again in a while, or sign in.",
+      "Borang ini menerima banyak jawapan tetamu sekarang. Cuba lagi sebentar lagi, atau log masuk.",
+      "現在このフォームにはゲストの回答が集中しています。しばらくしてから再度お試しいただくか、ログインしてください。");
+  String get formGuestTag => _t("Guest", "Tetamu", "ゲスト");
 }

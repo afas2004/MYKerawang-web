@@ -22,8 +22,10 @@ import '../../widgets/app_toast.dart';
 
 /// Filling in an event's form — the KI report survey, in practice.
 ///
-/// The page is open to guests (they see the questions and a sign-in bar); the
-/// server decides whether an answer is accepted. `form_public()` already
+/// Guests (not signed in) see a private form's title and a sign-in button. On a
+/// public form they see the questions and answer with a name (and optionally
+/// an email); the thank-you card then invites them to join. The server decides
+/// whether an answer is accepted. `form_public()` already
 /// carries the caller's own answer, so re-opening shows what they said.
 ///
 /// Layout: the form's own sections are the cards, tinted the same way the
@@ -61,6 +63,13 @@ class _EventFormScreenState extends State<EventFormScreen> {
   final Set<String> _touched = {};
   final Map<String, String> _errors = {};
 
+  /// A guest's name and email, on a public form only.
+  final _guestName = TextEditingController();
+  final _guestEmail = TextEditingController();
+  String? _guestNameError;
+  String? _guestEmailError;
+  final _guestKey = GlobalKey();
+
   FormView? _view;
   bool _loading = true;
   bool _sending = false;
@@ -76,6 +85,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
 
   @override
   void dispose() {
+    _guestName.dispose();
+    _guestEmail.dispose();
     for (final c in _texts.values) {
       c.dispose();
     }
@@ -201,10 +212,35 @@ class _EventFormScreenState extends State<EventFormScreen> {
       !_errors.containsKey(f.id) &&
       !answerIsEmpty(_answers[f.id]);
 
+  /// The guest's name and email, checked the way the server checks them.
+  /// Returns true when both are fine.
+  bool _checkGuest() {
+    final s = context.l10nRead;
+    final name = _guestName.text.trim();
+    final email = _guestEmail.text.trim();
+    setState(() {
+      _guestNameError = name.isEmpty ? s.formGuestNameMissing : null;
+      _guestEmailError =
+          email.isNotEmpty && !isPlausibleGuestEmail(email) ? s.formGuestEmailBad : null;
+    });
+    return _guestNameError == null && _guestEmailError == null;
+  }
+
   Future<void> _submit() async {
     final doc = _doc;
     final view = _view;
     if (doc == null || view == null || _sending) return;
+
+    if (view.guest && !_checkGuest()) {
+      final ctx = _guestKey.currentContext;
+      if (ctx != null) {
+        await Scrollable.ensureVisible(ctx,
+            duration: const Duration(milliseconds: 300), alignment: 0.1);
+      }
+      if (!mounted) return;
+      _toast(_guestNameError ?? _guestEmailError!);
+      return;
+    }
 
     final invalid = invalidAnswers(doc.fields, _answers);
     if (invalid.isNotEmpty) {
@@ -231,13 +267,29 @@ class _EventFormScreenState extends State<EventFormScreen> {
     }
 
     setState(() => _sending = true);
+    final answers = {
+      for (final f in doc.fields)
+        if (f.id != null && _answers[f.id] != null) f.id!: _answers[f.id],
+    };
     try {
+      if (view.guest) {
+        // A guest has no account to come back to: no reload, just thanks.
+        await FormService.instance.submitGuest(
+          doc.id,
+          name: _guestName.text.trim(),
+          email: _guestEmail.text.trim(),
+          answers: answers,
+        );
+        if (!mounted) return;
+        setState(() {
+          _sending = false;
+          _justSent = true;
+        });
+        return;
+      }
       await FormService.instance.submit(
         doc.id,
-        answers: {
-          for (final f in doc.fields)
-            if (f.id != null && _answers[f.id] != null) f.id!: _answers[f.id],
-        },
+        answers: answers,
         role: roleForAnswers(doc.fields, _answers),
       );
       final fresh = await FormService.instance.load(doc.id);
@@ -251,9 +303,28 @@ class _EventFormScreenState extends State<EventFormScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _sending = false);
+      final code = formErrorCode(e);
+      final s = context.l10nRead;
       showErrorWithRetry(context, e,
-          onRetry: _submit, message: context.l10nRead.formServerError(formErrorCode(e)));
+          onRetry: _submit,
+          message: view.guest && code == 'rate_limited'
+              ? s.formGuestBusy
+              : s.formServerError(code));
     }
+  }
+
+  /// "Send another answer": a guest starts again with an empty form.
+  void _guestAgain() {
+    for (final c in _texts.values) {
+      c.dispose();
+    }
+    _texts.clear();
+    _touched.clear();
+    _errors.clear();
+    _answers.clear();
+    _guestName.clear();
+    _guestEmail.clear();
+    setState(() => _justSent = false);
   }
 
   Future<void> _withdraw() async {
@@ -327,6 +398,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
           if (view != null &&
               view.doc.standalone &&
               !view.doc.canEdit &&
+              !view.guest &&
               view.reason != 'signed_out')
             ReportMenuButton(targetId: view.doc.id, type: 'form'),
         ],
@@ -389,10 +461,14 @@ class _EventFormScreenState extends State<EventFormScreen> {
                     MadeByNotice(doc: doc),
                     const SizedBox(height: KSpace.l),
                   ],
-                  if (_justSent)
+                  if (_justSent && view.guest)
+                    _GuestSuccessCard(onAgain: _guestAgain)
+                  else if (_justSent)
                     _SuccessCard(onEdit: () => setState(() => _justSent = false))
-                  else
+                  else ...[
+                    if (view.guest) _guestCard(context),
                     for (final section in _sections(doc.fields)) _sectionCard(context, section),
+                  ],
                   if (doc.standalone && view.answered && !_sending)
                     Center(
                       child: TextButton(
@@ -404,6 +480,85 @@ class _EventFormScreenState extends State<EventFormScreen> {
               ),
             ),
             if (!_justSent) _bottomBar(context, doc, done, total),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// "About you": the guest's name (required) and email (optional), above the
+  /// form's own questions, with a way to sign in instead.
+  Widget _guestCard(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      key: _guestKey,
+      padding: const EdgeInsets.only(bottom: KSpace.l),
+      child: Container(
+        padding: const EdgeInsets.all(KSpace.l),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLowest,
+          borderRadius: KRadius.card,
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(s.formGuestAboutYou,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 2),
+            Text(s.formGuestAboutYouHelp,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: scheme.onSurfaceVariant)),
+            const SizedBox(height: KSpace.m),
+            TextField(
+              key: const ValueKey('guest-name'),
+              controller: _guestName,
+              enabled: !_sending,
+              maxLength: 80,
+              textCapitalization: TextCapitalization.words,
+              autofillHints: const [AutofillHints.name],
+              onChanged: (_) {
+                if (_guestNameError != null) _checkGuest();
+              },
+              decoration: InputDecoration(
+                labelText: '${s.formGuestName} *',
+                errorText: _guestNameError,
+                counterText: '',
+              ),
+            ),
+            const SizedBox(height: KSpace.s),
+            TextField(
+              key: const ValueKey('guest-email'),
+              controller: _guestEmail,
+              enabled: !_sending,
+              maxLength: 200,
+              keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
+              onChanged: (_) {
+                if (_guestEmailError != null) _checkGuest();
+              },
+              decoration: InputDecoration(
+                labelText: s.formGuestEmail,
+                helperText: s.formGuestEmailHelp,
+                errorText: _guestEmailError,
+                counterText: '',
+              ),
+            ),
+            const SizedBox(height: KSpace.s),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton.icon(
+                onPressed: () => goToLogin(context),
+                icon: const Icon(Icons.login, size: 16),
+                label: Text(s.formGuestOrSignIn),
+              ),
+            ),
           ],
         ),
       ),
@@ -1117,6 +1272,74 @@ class _SuccessCard extends StatelessWidget {
   }
 }
 
+/// A guest's end state: thanks, a nudge to join, and a way to answer again
+/// (one phone passed around at a booth).
+class _GuestSuccessCard extends StatelessWidget {
+  final VoidCallback onAgain;
+  const _GuestSuccessCard({required this.onAgain});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Container(
+        key: const ValueKey('guest-sent'),
+        constraints: const BoxConstraints(maxWidth: 440),
+        margin: const EdgeInsets.symmetric(vertical: KSpace.xl),
+        padding: const EdgeInsets.all(KSpace.xl),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLowest,
+          borderRadius: KRadius.card,
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(color: scheme.primaryContainer, shape: BoxShape.circle),
+                child: Icon(AppIcons.check, size: 26, color: scheme.onPrimaryContainer),
+              ),
+            ),
+            const SizedBox(height: KSpace.m),
+            Text(
+              s.formAnswerSentTitle,
+              textAlign: TextAlign.center,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: KSpace.xs),
+            Text(
+              s.formGuestSentBody,
+              textAlign: TextAlign.center,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: KSpace.l),
+            Text(
+              s.formGuestJoinPitch,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: KSpace.m),
+            GuestActionBar(label: s.formGuestJoin),
+            const SizedBox(height: KSpace.s),
+            TextButton(onPressed: onAgain, child: Text(s.formGuestAnswerAnother)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _Banner extends StatelessWidget {
   final String text;
   final IconData icon;
@@ -1158,7 +1381,18 @@ class _Blocked extends StatelessWidget {
         return Center(
           child: Padding(
             padding: const EdgeInsets.all(KSpace.xl),
-            child: GuestActionBar(label: s.formAnswerSignIn),
+            child: Column(
+              key: const ValueKey('guest-sign-in'),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(AppIcons.lock, size: 30,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant),
+                const SizedBox(height: KSpace.m),
+                Text(s.formGuestSignInViewBody, textAlign: TextAlign.center),
+                const SizedBox(height: KSpace.l),
+                GuestActionBar(label: s.formGuestSignInView),
+              ],
+            ),
           ),
         );
       case 'not_joined':

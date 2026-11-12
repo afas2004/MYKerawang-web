@@ -71,6 +71,13 @@ class FakeResponsesService implements FormService {
 
   @override
   Future<void> setAfterCheckin(String formId, bool on) async {}
+
+  @override
+  Future<void> setPublic(String formId, bool on) async {}
+
+  @override
+  Future<void> submitGuest(String formId,
+      {required String name, String? email, required Map<String, dynamic> answers}) async {}
 }
 
 void main() {

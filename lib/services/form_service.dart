@@ -71,6 +71,11 @@ class FormDoc {
   /// Answers stop after this many people (null: no limit).
   final int? maxResponses;
 
+  /// People without an account may see and answer it. Off: a guest gets the
+  /// title and a sign-in button. Saved on its own (`set_form_public`), not in
+  /// [header].
+  final bool isPublic;
+
   const FormDoc({
     required this.id,
     required this.title,
@@ -89,6 +94,7 @@ class FormDoc {
     this.eventId,
     this.closesAt,
     this.maxResponses,
+    this.isPublic = false,
   });
 
   /// Where the editor, the answer page and the responses page live.
@@ -125,6 +131,7 @@ class FormDoc {
     List<FormFieldSpec>? fields,
     DateTime? Function()? closesAt,
     int? Function()? maxResponses,
+    bool? isPublic,
   }) =>
       FormDoc(
         id: id,
@@ -144,6 +151,7 @@ class FormDoc {
         eventId: eventId,
         closesAt: closesAt == null ? this.closesAt : closesAt(),
         maxResponses: maxResponses == null ? this.maxResponses : maxResponses(),
+        isPublic: isPublic ?? this.isPublic,
       );
 }
 
@@ -165,6 +173,9 @@ class FormView {
   final Map<String, dynamic>? mine;
   final String? myRole;
 
+  /// The caller is not signed in. With [canAnswer] they answer as a guest.
+  final bool guest;
+
   const FormView({
     required this.doc,
     this.canAnswer = false,
@@ -172,6 +183,7 @@ class FormView {
     this.canRead = false,
     this.mine,
     this.myRole,
+    this.guest = false,
   });
 
   bool get answered => mine != null;
@@ -240,12 +252,18 @@ class FormAnalysis {
 
 /// One person's answers.
 class FormResponse {
+  /// The account that answered; empty for a guest.
   final String userId;
   final String displayName;
   final String? studentId;
   final String role;
   final DateTime? submittedAt;
   final Map<String, dynamic> answers;
+
+  /// Answered without an account on a public form; [displayName] is the name
+  /// they typed, [guestEmail] the address they gave (if any).
+  final bool isGuest;
+  final String? guestEmail;
 
   const FormResponse({
     required this.userId,
@@ -254,6 +272,8 @@ class FormResponse {
     this.role = 'peserta',
     this.submittedAt,
     this.answers = const {},
+    this.isGuest = false,
+    this.guestEmail,
   });
 }
 
@@ -297,6 +317,17 @@ abstract class FormService {
 
   /// The organiser's "ask this form after check-in" switch.
   Future<void> setAfterCheckin(String formId, bool on);
+
+  /// The "public" switch: on lets people without an account answer.
+  Future<void> setPublic(String formId, bool on);
+
+  /// A guest's answer to a public form. [name] is required, [email] optional.
+  Future<void> submitGuest(
+    String formId, {
+    required String name,
+    String? email,
+    required Map<String, dynamic> answers,
+  });
 
   static FormService instance = const SupabaseFormService();
 
@@ -386,12 +417,14 @@ class SupabaseFormService implements FormService {
         eventId: event['id'] as String?,
         closesAt: DateTime.tryParse('${form['closes_at'] ?? ''}')?.toLocal(),
         maxResponses: (form['max_responses'] as num?)?.toInt(),
+        isPublic: form['is_public'] == true,
       ),
       canAnswer: all['can_answer'] == true,
       reason: all['reason'] as String?,
       canRead: all['can_read'] == true,
       mine: mine is Map ? Map<String, dynamic>.from(mine) : null,
       myRole: mine is Map ? mine['role'] as String? : null,
+      guest: all['guest'] == true,
     );
   }
 
@@ -410,6 +443,24 @@ class SupabaseFormService implements FormService {
   Future<void> setAfterCheckin(String formId, bool on) =>
       _db.rpc('set_form_after_checkin',
           params: {'p_form_id': formId, 'p_on': on});
+
+  @override
+  Future<void> setPublic(String formId, bool on) =>
+      _db.rpc('set_form_public', params: {'p_form_id': formId, 'p_on': on});
+
+  @override
+  Future<void> submitGuest(
+    String formId, {
+    required String name,
+    String? email,
+    required Map<String, dynamic> answers,
+  }) =>
+      _db.rpc('submit_guest_form_response', params: {
+        'p_form_id': formId,
+        'p_name': name,
+        'p_email': (email ?? '').trim().isEmpty ? null : email!.trim(),
+        'p_answers': answers,
+      });
 
   @override
   Future<void> submit(
@@ -472,8 +523,10 @@ class SupabaseFormService implements FormService {
       for (final e in rows)
         if (e is Map)
           FormResponse(
-            userId: '${e['user_id']}',
+            userId: '${e['user_id'] ?? ''}',
             displayName: '${e['display_name'] ?? e['username'] ?? ''}',
+            isGuest: e['is_guest'] == true,
+            guestEmail: e['guest_email'] as String?,
             studentId: e['student_id'] as String?,
             role: '${e['role'] ?? 'peserta'}',
             submittedAt: DateTime.tryParse('${e['submitted_at'] ?? ''}'),
