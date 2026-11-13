@@ -15,7 +15,10 @@ class MentionText extends StatelessWidget {
   final String text;
   final TextStyle? style;
 
-  const MentionText(this.text, {super.key, this.style});
+  /// Cap on lines (feed cards); null = unlimited.
+  final int? maxLines;
+
+  const MentionText(this.text, {super.key, this.style, this.maxLines});
 
   static final mentionPattern = RegExp(r"\@(\w+)");
 
@@ -41,6 +44,8 @@ class MentionText extends StatelessWidget {
     return ParsedText(
       text: text,
       style: base,
+      maxLines: maxLines,
+      overflow: maxLines == null ? TextOverflow.clip : TextOverflow.ellipsis,
       parse: [
         MatchText(
           pattern: clubMentionPattern.pattern,

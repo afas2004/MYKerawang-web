@@ -42,7 +42,7 @@ void main() {
     }
   }
 
-  testWidgets('photo tiles: one per photo up to 4, then +N', (tester) async {
+  testWidgets('feed photo tiles: one per photo up to 3, then +N', (tester) async {
     Future<void> pumpPhotos(int n) => pumpAt(
           tester,
           kCompact,
@@ -53,14 +53,14 @@ void main() {
           ),
         );
 
-    for (final n in [1, 2, 3, 4]) {
+    for (final n in [1, 2, 3]) {
       await pumpPhotos(n);
       expect(find.bySemanticsLabel(RegExp('Post photo \\d of $n')),
           findsNWidgets(n), reason: '$n photos');
     }
     await pumpPhotos(6);
-    expect(find.bySemanticsLabel(RegExp('Post photo \\d of 6')), findsNWidgets(4));
-    expect(find.text('+2'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('Post photo \\d of 6')), findsNWidgets(3));
+    expect(find.text('+3'), findsOneWidget);
   });
 
   testWidgets('a pinned post looks like any other card: the pin bar marks it', (tester) async {

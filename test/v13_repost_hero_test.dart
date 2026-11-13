@@ -45,9 +45,15 @@ void main() {
     expect(find.textContaining('RM 15'), findsOneWidget);
   });
 
-  testWidgets('plain post keeps the full photo layout', (tester) async {
+  testWidgets('plain post: compact photos in the feed, full layout on its page',
+      (tester) async {
     await pumpAt(tester, kCompact,
         Scaffold(body: SingleChildScrollView(child: PostCard(post: samplePost(photos: 2)))));
+    expect(find.byType(PostPhotoPreview), findsOneWidget);
+    expect(find.byType(SharedItemHero), findsNothing);
+    await pumpAt(tester, kCompact,
+        Scaffold(body: SingleChildScrollView(
+            child: PostCard(post: samplePost(photos: 2), expanded: true))));
     expect(find.byType(PostPhotoLayout), findsOneWidget);
     expect(find.byType(SharedItemHero), findsNothing);
   });

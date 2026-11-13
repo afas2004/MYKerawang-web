@@ -20,6 +20,7 @@ class FeedStrings {
   final String official;
   final String morePhotos; // "+{0}"
   final String photoOf; // "Photo {0} of {1}"
+  final String readMore; // under a feed post cut at 5 lines
 
   // Composer + create
   final String composerHintCompact;
@@ -67,6 +68,7 @@ class FeedStrings {
     required this.official,
     required this.morePhotos,
     required this.photoOf,
+    required this.readMore,
     required this.composerHintCompact,
     required this.addPhotoAction,
     required this.postingAs,
@@ -107,6 +109,7 @@ class FeedStrings {
     official: "Official",
     morePhotos: "+{0}",
     photoOf: "Photo {0} of {1}",
+    readMore: "Read more",
     composerHintCompact: "Share something with kolej…",
     addPhotoAction: "Add photos",
     postingAs: "Posting as {0}",
@@ -148,6 +151,7 @@ class FeedStrings {
     official: "Rasmi",
     morePhotos: "+{0}",
     photoOf: "Gambar {0} daripada {1}",
+    readMore: "Baca lagi",
     composerHintCompact: "Kongsi sesuatu dengan kolej…",
     addPhotoAction: "Tambah gambar",
     postingAs: "Post sebagai {0}",
