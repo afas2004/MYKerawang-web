@@ -22,6 +22,7 @@ import 'whats_new.dart';
 abstract final class PageTips {
   static const _prefix = 'page_tips_seen:';
   static String _key(String userId, String page) => '$_prefix$userId:$page';
+  static String _offKey(String userId) => 'page_tips_off:$userId';
 
   static bool _open = false;
 
@@ -46,6 +47,7 @@ abstract final class PageTips {
       return false;
     }
     final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_offKey(uid)) == true) return false;
     if (prefs.getBool(_key(uid, page)) == true) return false;
     if (await WelcomeTour.isPending(uid)) return false;
     // Let the page finish its first layout (and its entrance animation).
@@ -83,7 +85,29 @@ abstract final class PageTips {
     }
   }
 
-  /// Settings › Show page tips again: forgets which pages were seen.
+  /// Settings › Page tips switch. On by default.
+  static Future<bool> isEnabled({String? userId}) async {
+    final uid = userId ?? _signedInUser();
+    if (uid == null) return true;
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_offKey(uid)) != true;
+  }
+
+  /// Turning tips back on also forgets which pages were seen, so each page
+  /// shows its tips again on the next visit.
+  static Future<void> setEnabled(bool on, {String? userId}) async {
+    final uid = userId ?? _signedInUser();
+    if (uid == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    if (on) {
+      await prefs.remove(_offKey(uid));
+      await resetAll(userId: uid);
+    } else {
+      await prefs.setBool(_offKey(uid), true);
+    }
+  }
+
+  /// Settings › See them again: forgets which pages were seen.
   static Future<void> resetAll({String? userId}) async {
     final uid = userId ?? _signedInUser();
     if (uid == null) return;
