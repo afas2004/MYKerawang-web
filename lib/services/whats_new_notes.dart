@@ -36,6 +36,14 @@ class ReleaseNote {
 
 /// Newest first.
 final kReleaseNotes = <ReleaseNote>[
+  ReleaseNote('1.17.1', DateTime(2026, 11, 13), const [
+    NoteLine("Taking attendance can also show your form's own QR, so guests without an account can answer it.",
+        'Semasa mengambil kehadiran, QR borang anda juga boleh dipaparkan supaya tetamu tanpa akaun boleh menjawabnya.',
+        '出欠を取るとき、フォームのQRも表示できます。アカウントのないゲストも回答できます。'),
+    NoteLine('Shared posts, events and items now put the kerawang.my link right under the title, so chat apps show the MYKerawang preview.',
+        'Post, acara dan barang yang dikongsi kini letak pautan kerawang.my terus di bawah tajuk, jadi aplikasi chat tunjuk pratonton MYKerawang.',
+        '共有した投稿・イベント・商品は、タイトルのすぐ下にkerawang.myのリンクが入り、チャットアプリでMYKerawangのプレビューが表示されます。'),
+  ]),
   ReleaseNote('1.17.0', DateTime(2026, 11, 13), const [
     NoteLine('Phone notifications: get event reminders, comments and form answers even when MYKerawang is closed. Turn them on in Settings › Notifications.',
         'Pemberitahuan telefon: terima peringatan acara, ulasan dan jawapan borang walaupun MYKerawang ditutup. Hidupkan di Tetapan › Pemberitahuan.',
