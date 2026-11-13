@@ -130,6 +130,24 @@ void main() {
     expect(await (await open(tester, 'market')), isFalse);
   });
 
+  testWidgets('the Settings switch turns tips off; turning it on brings them back', (tester) async {
+    await initTestSupabase(tester);
+    await setWidth(tester, 375, height: 812);
+    await pumpScreen(tester, const _Page());
+
+    await PageTips.setEnabled(false, userId: 'u1');
+    expect(await PageTips.isEnabled(userId: 'u1'), isFalse);
+    expect(await (await open(tester, 'market')), isFalse);
+    expect(find.text('Tip about A'), findsNothing);
+
+    await PageTips.setEnabled(true, userId: 'u1');
+    final again = await open(tester, 'market');
+    expect(find.text('Tip about A'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('tips-skip')));
+    await tester.pumpAndSettle();
+    expect(await again, isTrue);
+  });
+
   testWidgets('(i) shows its text when tapped', (tester) async {
     await initTestSupabase(tester);
     await pumpScreen(
