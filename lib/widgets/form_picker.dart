@@ -3,18 +3,22 @@ import 'package:go_router/go_router.dart';
 
 import '../l10n/access_strings.dart';
 import '../l10n/form_strings.dart';
+import '../l10n/gform_import_strings.dart';
 import '../language_cubit.dart';
 import '../services/my_forms_service.dart';
 import '../theme/app_icons.dart';
 import '../theme/tokens.dart';
 import '../utils/adaptive.dart';
+import 'app_toast.dart';
+import 'google_form_import.dart';
 
 /// Lets a composer (post, event, announcement) link one of the user's forms.
 /// The result is an ordinary action link — `{label: "Fill in form",
 /// url: "/f/:id"}` — so nothing downstream needs to know about forms.
 ///
 /// [openOnly] hides drafts too: for a form people must be able to answer now
-/// (the one asked after check-in).
+/// (the one asked after check-in). It also hides "Import from Google Form",
+/// whose result is a draft.
 Future<MyForm?> showFormPicker(BuildContext context, {bool openOnly = false}) {
   Widget body(BuildContext ctx) => _FormPickerBody(openOnly: openOnly);
   if (isWide(context)) {
@@ -61,6 +65,13 @@ class _FormPickerBodyState extends State<_FormPickerBody> {
             for (final f in all)
               if (widget.openOnly ? f.isOpen : (!f.isHidden && f.status != 'closed')) f
           ]);
+
+  Future<void> _importGoogle() async {
+    final form = await importGoogleFormAsStandalone(context);
+    if (form == null || !mounted) return;
+    showToast(context.l10nRead.gfCreatedDraft);
+    Navigator.pop(context, form);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -124,17 +135,27 @@ class _FormPickerBodyState extends State<_FormPickerBody> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(KSpace.s, KSpace.s, KSpace.s, KSpace.s),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: () {
-                    final router = GoRouter.of(context);
-                    Navigator.pop(context);
-                    router.push('/forms');
-                  },
-                  icon: const Icon(AppIcons.create, size: 18),
-                  label: Text(s.formAttachManage),
-                ),
+              child: Wrap(
+                spacing: KSpace.s,
+                children: [
+                  TextButton.icon(
+                    onPressed: () {
+                      final router = GoRouter.of(context);
+                      Navigator.pop(context);
+                      router.push('/forms');
+                    },
+                    icon: const Icon(AppIcons.create, size: 18),
+                    label: Text(s.formAttachManage),
+                  ),
+                  // Makes a draft from a Google Form and attaches it at once.
+                  if (!widget.openOnly)
+                    TextButton.icon(
+                      key: const ValueKey('picker-gform'),
+                      onPressed: _importGoogle,
+                      icon: const Icon(AppIcons.link, size: 18),
+                      label: Text(s.gfImport),
+                    ),
+                ],
               ),
             ),
           ],
