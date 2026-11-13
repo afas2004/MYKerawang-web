@@ -56,6 +56,9 @@ class _AttendanceLiveScreenState extends State<AttendanceLiveScreen> {
   bool _ending = false;
   int _formResponses = 0;
 
+  /// The organiser chose to show the form's own QR beside the check-in one.
+  bool _showFormQr = false;
+
   @override
   void initState() {
     super.initState();
@@ -237,7 +240,9 @@ class _AttendanceLiveScreenState extends State<AttendanceLiveScreen> {
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
+          // Two codes side by side on a wide screen.
+          constraints: BoxConstraints(
+              maxWidth: !_closed && _showFormQr && widget.form != null ? 880 : 480),
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 400),
             switchInCurve: Curves.easeOutCubic,
@@ -281,22 +286,20 @@ class _AttendanceLiveScreenState extends State<AttendanceLiveScreen> {
         ),
         const SizedBox(height: KSpace.l),
         if (url != null)
-          Center(
-            child: KCard(
-              padding: const EdgeInsets.all(KSpace.m),
-              child: QrImageView(
-                data: url,
-                size: 260,
-                backgroundColor: Colors.white,
-                eyeStyle: const QrEyeStyle(
-                    eyeShape: QrEyeShape.square, color: Colors.black),
-                dataModuleStyle: const QrDataModuleStyle(
-                    dataModuleShape: QrDataModuleShape.square, color: Colors.black),
-              ),
-            ),
+          DoorCodes(
+            checkinUrl: url,
+            form: _showFormQr ? widget.form : null,
           )
         else if (_error != null)
           Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: scheme.error)),
+        if (widget.form != null) ...[
+          const SizedBox(height: KSpace.m),
+          FormQrSwitch(
+            form: widget.form!,
+            value: _showFormQr,
+            onChanged: (v) => setState(() => _showFormQr = v),
+          ),
+        ],
 
         const SizedBox(height: KSpace.l),
         // The number is the whole point of standing at the door with this open,
@@ -512,6 +515,130 @@ class _Stat extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: scheme.onSurfaceVariant)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Where the form's QR points. Always `/f/…`: guests may open it, while an
+/// event form's own `/event/:id/form` page is behind sign-in.
+String doorFormPath(FormDoc f) => '/f/${f.slug ?? f.id}';
+
+/// The code(s) at the door. Alone: the check-in code, as before. With [form]:
+/// the form's own QR too, its title beneath — the organiser tells guests
+/// which one to scan. Side by side when there is room, else stacked.
+class DoorCodes extends StatelessWidget {
+  final String checkinUrl;
+  final FormDoc? form;
+
+  const DoorCodes({super.key, required this.checkinUrl, this.form});
+
+  static Widget _qr(String data, double size, Key key) => KCard(
+        key: key,
+        padding: const EdgeInsets.all(KSpace.m),
+        child: QrImageView(
+          data: data,
+          size: size,
+          backgroundColor: Colors.white,
+          eyeStyle:
+              const QrEyeStyle(eyeShape: QrEyeShape.square, color: Colors.black),
+          dataModuleStyle: const QrDataModuleStyle(
+              dataModuleShape: QrDataModuleShape.square, color: Colors.black),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final f = form;
+    if (f == null) {
+      return Center(child: _qr(checkinUrl, 260, const ValueKey('qr-checkin')));
+    }
+    final s = context.l10n;
+    final labelStyle = Theme.of(context)
+        .textTheme
+        .titleSmall
+        ?.copyWith(fontWeight: FontWeight.w600);
+
+    Widget code(String data, String label, Key qrKey, Key labelKey, double size) =>
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _qr(data, size, qrKey),
+            const SizedBox(height: KSpace.s),
+            Text(label,
+                key: labelKey,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: labelStyle),
+          ],
+        );
+
+    final formUrl = ShareService.absoluteUrl(doorFormPath(f));
+    return LayoutBuilder(builder: (context, c) {
+      final wide = c.maxWidth >= 600;
+      final size = wide ? 260.0 : 220.0;
+      final checkin = code(checkinUrl, s.evCheckIn, const ValueKey('qr-checkin'),
+          const ValueKey('qr-checkin-label'), size);
+      final answer = code(formUrl, f.title, const ValueKey('qr-form'),
+          const ValueKey('qr-form-title'), size);
+      if (wide) {
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: checkin),
+            const SizedBox(width: KSpace.l),
+            Expanded(child: answer),
+          ],
+        );
+      }
+      return Column(children: [
+        checkin,
+        const SizedBox(height: KSpace.l),
+        answer,
+      ]);
+    });
+  }
+}
+
+/// The organiser's choice to show the form's QR at the door, with a warning
+/// when guests would only meet a sign-in screen.
+class FormQrSwitch extends StatelessWidget {
+  final FormDoc form;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const FormQrSwitch(
+      {super.key, required this.form, required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final small = TextStyle(fontSize: 12, color: scheme.onSurfaceVariant);
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: SwitchListTile(
+        key: const ValueKey('form-qr-switch'),
+        value: value,
+        onChanged: onChanged,
+        contentPadding: const EdgeInsets.symmetric(horizontal: KSpace.m),
+        title: Text(s.afShowFormQr, style: const TextStyle(fontSize: 14)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(s.afShowFormQrHint, style: small),
+            if (value && (!form.isPublic || form.requireRsvp)) ...[
+              const SizedBox(height: KSpace.xs),
+              Text(s.afFormNotPublic,
+                  key: const ValueKey('form-qr-not-public'),
+                  style: small.copyWith(color: scheme.error)),
+            ],
           ],
         ),
       ),
