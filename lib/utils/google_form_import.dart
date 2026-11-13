@@ -89,6 +89,8 @@ abstract final class GoogleFormNoteCode {
   static const trimmed = 'trimmed';
   static const oneChoice = 'one_choice';
   static const noChoices = 'no_choices';
+  static const pictureChoices = 'picture_choices';
+  static const branching = 'branching';
 
   static const skipped = {grid, file, image, video, blocked, unknown, tooMany};
 }
@@ -171,6 +173,10 @@ String _cut(String s, int max) => s.length <= max ? s : '${s.substring(0, max - 
 
 Object? _at(Object? list, int i) => list is List && i >= 0 && i < list.length ? list[i] : null;
 
+/// [v] when it is a list, else empty: Google's arrays change shape between
+/// item types and over time, and a surprise must never crash an import.
+List<Object?> _list(Object? v) => v is List ? v : const [];
+
 /// Turns `FB_PUBLIC_LOAD_DATA_` (already JSON-decoded) into a draft form.
 ///
 /// [studentIds]: a "No. matrik" question becomes the student-ID kind (only
@@ -191,77 +197,83 @@ GoogleFormDraft parseGoogleForm(
   final notes = <GoogleFormNote>[];
   final fields = <FormFieldSpec>[];
 
-  for (final q in (items as List?) ?? const []) {
+  for (final q in _list(items)) {
     if (q is! List) continue;
     final title = _clean(_at(q, 1));
     final desc = _clean(_at(q, 2));
-    final type = _at(q, 3);
-    final entry = _at(_at(q, 4), 0);
-    final required = _at(entry, 2) == 1 || _at(entry, 2) == true;
     final shown = title.isNotEmpty ? title : desc.split('\n').first.trim();
+    // One odd item is listed as "not supported", never the end of the import.
+    try {
+      final rawType = _at(q, 3);
+      final type = rawType is num ? rawType.toInt() : -1;
+      final entry = _at(_at(q, 4), 0);
+      final required = _at(entry, 2) == 1 || _at(entry, 2) == true;
 
-    FormFieldSpec? field;
-    switch (type) {
-      case 0: // short answer
-        var kind = 'short_text';
-        if (studentIds && _matricLabel.hasMatch(title)) {
-          kind = 'student_id';
-        } else if (_emailLabel.hasMatch(title)) {
-          kind = 'email';
-        } else if (_phoneLabel.hasMatch(title)) {
-          kind = 'phone';
-        }
-        field = FormFieldSpec(kind: kind, label: title, required: required);
-      case 1: // paragraph
-        field = FormFieldSpec(kind: 'long_text', label: title, required: required);
-      case 2 || 3 || 4: // multiple choice, dropdown, checkboxes
-        field = _choiceField(title, type == 4, entry, required, notes);
-      case 5 || 18: // linear scale, rating
-        field = _scaleField(title, desc, type == 18, entry, required, notes);
-      case 9:
-        field = FormFieldSpec(kind: 'date', label: title, required: required);
-      case 10:
-        notes.add(GoogleFormNote(GoogleFormNoteCode.time, title));
-        field = FormFieldSpec(kind: 'short_text', label: title, required: required);
-      case 6 || 8: // text block, section break
-        if (shown.isEmpty) continue;
-        field = FormFieldSpec(kind: 'heading', label: shown);
-      case 7:
-        notes.add(GoogleFormNote(GoogleFormNoteCode.grid, shown));
-        continue;
-      case 11:
-        notes.add(GoogleFormNote(GoogleFormNoteCode.image, shown));
-        continue;
-      case 12:
-        notes.add(GoogleFormNote(GoogleFormNoteCode.video, shown));
-        continue;
-      case 13:
-        notes.add(GoogleFormNote(GoogleFormNoteCode.file, shown));
-        continue;
-      default:
-        notes.add(GoogleFormNote(GoogleFormNoteCode.unknown, shown));
-        continue;
-    }
+      FormFieldSpec? field;
+      switch (type) {
+        case 0: // short answer
+          var kind = 'short_text';
+          if (studentIds && _matricLabel.hasMatch(title)) {
+            kind = 'student_id';
+          } else if (_emailLabel.hasMatch(title)) {
+            kind = 'email';
+          } else if (_phoneLabel.hasMatch(title)) {
+            kind = 'phone';
+          }
+          field = FormFieldSpec(kind: kind, label: title, required: required);
+        case 1: // paragraph
+          field = FormFieldSpec(kind: 'long_text', label: title, required: required);
+        case 2 || 3 || 4: // multiple choice, dropdown, checkboxes
+          field = _choiceField(title, type == 4, entry, required, notes);
+        case 5 || 18: // linear scale, rating
+          field = _scaleField(title, desc, type == 18, entry, required, notes);
+        case 9:
+          field = FormFieldSpec(kind: 'date', label: title, required: required);
+        case 10:
+          notes.add(GoogleFormNote(GoogleFormNoteCode.time, title));
+          field = FormFieldSpec(kind: 'short_text', label: title, required: required);
+        case 6 || 8: // text block, section break
+          if (shown.isEmpty) continue;
+          field = FormFieldSpec(kind: 'heading', label: shown);
+        case 7:
+          notes.add(GoogleFormNote(GoogleFormNoteCode.grid, shown));
+          continue;
+        case 11:
+          notes.add(GoogleFormNote(GoogleFormNoteCode.image, shown));
+          continue;
+        case 12:
+          notes.add(GoogleFormNote(GoogleFormNoteCode.video, shown));
+          continue;
+        case 13:
+          notes.add(GoogleFormNote(GoogleFormNoteCode.file, shown));
+          continue;
+        default:
+          notes.add(GoogleFormNote(GoogleFormNoteCode.unknown, shown));
+          continue;
+      }
 
-    // A question with no title: borrow the first line of its description.
-    var label = field.label.isEmpty ? shown : field.label;
-    if (label.isEmpty) {
-      notes.add(const GoogleFormNote(GoogleFormNoteCode.unknown, ''));
-      continue;
-    }
-    if (label.length > kLabelMax) {
-      notes.add(GoogleFormNote(GoogleFormNoteCode.trimmed, label));
-      label = _cut(label, kLabelMax);
-    }
-    // The description becomes help text, unless it is already the label.
-    final help = field.help ?? (desc.isEmpty || desc == label ? null : desc);
-    field = field.copyWith(label: label, help: help);
+      // A question with no title: borrow the first line of its description.
+      var label = field.label.isEmpty ? shown : field.label;
+      if (label.isEmpty) {
+        notes.add(const GoogleFormNote(GoogleFormNoteCode.unknown, ''));
+        continue;
+      }
+      if (label.length > kLabelMax) {
+        notes.add(GoogleFormNote(GoogleFormNoteCode.trimmed, label));
+        label = _cut(label, kLabelMax);
+      }
+      // The description becomes help text, unless it is already the label.
+      final help = field.help ?? (desc.isEmpty || desc == label ? null : desc);
+      field = field.copyWith(label: label, help: help);
 
-    if (standalone && (formLabelBlocked(field.label) || formLabelBlocked(field.help))) {
-      notes.add(GoogleFormNote(GoogleFormNoteCode.blocked, label));
-      continue;
+      if (standalone && (formLabelBlocked(field.label) || formLabelBlocked(field.help))) {
+        notes.add(GoogleFormNote(GoogleFormNoteCode.blocked, label));
+        continue;
+      }
+      fields.add(field);
+    } catch (_) {
+      notes.add(GoogleFormNote(GoogleFormNoteCode.unknown, shown));
     }
-    fields.add(field);
   }
 
   if (fields.length > kMaxFormFields) {
@@ -295,13 +307,21 @@ FormFieldSpec _choiceField(
   final choices = <String>[];
   var hasOther = false;
   var trimmed = false;
-  for (final o in (_at(entry, 1) as List?) ?? const []) {
+  var pictures = false;
+  var branching = false;
+  for (final o in _list(_at(entry, 1))) {
+    // o[2]: "go to section …" after this answer.
+    if (_at(o, 2) != null) branching = true;
     if (_at(o, 4) == 1 || _at(o, 4) == true) {
       hasOther = true;
       continue;
     }
     var c = _clean(_at(o, 0));
-    if (c.isEmpty) continue;
+    if (c.isEmpty) {
+      // An option with no words is a picture: it can't come across.
+      if (_at(o, 5) != null) pictures = true;
+      continue;
+    }
     if (c.length > _choiceMax) {
       c = _cut(c, _choiceMax);
       trimmed = true;
@@ -317,6 +337,8 @@ FormFieldSpec _choiceField(
     trimmed = true;
   }
   if (trimmed) notes.add(GoogleFormNote(GoogleFormNoteCode.trimmed, title));
+  if (pictures) notes.add(GoogleFormNote(GoogleFormNoteCode.pictureChoices, title));
+  if (branching) notes.add(GoogleFormNote(GoogleFormNoteCode.branching, title));
 
   if (choices.isEmpty) {
     notes.add(GoogleFormNote(GoogleFormNoteCode.noChoices, title));
@@ -347,7 +369,7 @@ FormFieldSpec _scaleField(
 ) {
   // The options are the numbers ("1" … "5"); some forms keep only the bounds.
   final numbers = <int>[
-    for (final o in (_at(entry, 1) as List?) ?? const [])
+    for (final o in _list(_at(entry, 1)))
       if (int.tryParse(_clean(_at(o, 0))) case final n?) n,
   ];
   final extra = _at(entry, 3);

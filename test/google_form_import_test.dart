@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mykerawang/utils/form_rules.dart';
@@ -282,6 +283,105 @@ void main() {
       final d = parseGoogleForm(form(const []));
       expect(d.fields, isEmpty);
       expect(d.questionCount, 0);
+    });
+  });
+
+  group('sections, pictures and odd items never break an import', () {
+    List<Object?> form(List<Object?> items) => [
+          null,
+          [null, items, null, null, null, null, null, null, 'T'],
+          '/forms',
+          'T'
+        ];
+    List<Object?> opt(String label, {Object? goTo, Object? image}) =>
+        [label, null, goTo, null, 0, image];
+
+    test('a three-section form with images keeps every question in order', () {
+      final d = parseGoogleForm(form([
+        [1, 'Name', null, 0, [[1, null, 1]]],
+        [2, 'Section 2: Food', 'Tell us what you eat', 8, null],
+        [3, null, null, 11, [null, [null, 'img-id']]], // an untitled image
+        [4, 'Favourite food', null, 2, [
+          [4, [opt('Nasi lemak', goTo: 5), opt('Roti canai', goTo: -3), opt('', image: ['pic'])], 1]
+        ]],
+        [5, 'Section 3: Done', null, 8, null],
+        [6, 'Promo video', null, 12, [null, null, ['yt']]],
+        [7, 'Anything else?', null, 1, [[7, null, 0]]],
+      ]));
+      expect(d.fields.map((f) => '${f.kind}:${f.label}').toList(), [
+        'short_text:Name',
+        'heading:Section 2: Food',
+        'single_choice:Favourite food',
+        'heading:Section 3: Done',
+        'long_text:Anything else?',
+      ]);
+      expect(d.fields[1].help, 'Tell us what you eat');
+      expect(d.fields[2].choices, ['Nasi lemak', 'Roti canai']);
+      expect(d.skipped.map((n) => n.code), ['image', 'video']);
+      expect(d.changed.map((n) => n.code), containsAll(['picture_choices', 'branching']));
+      expect(checkFields(d.fields), isEmpty);
+    });
+
+    test('items with unexpected shapes are listed, not fatal', () {
+      final d = parseGoogleForm(form([
+        [1, 'Fine', null, 0, [[1, null, 1]]],
+        [2, 'Options not a list', null, 2, [[2, 'oops', 1]]],
+        [3, 'Entry not a list', null, 4, 'oops'],
+        [4, 'Type as text', null, '2', null],
+        [5, 'Type as decimal', null, 1.0, [[5, null, 0]]],
+        [6, 42, 17, 0, null],
+        'not an item',
+        null,
+        [7, 'Scale with junk', null, 5, [[7, [['a'], 3, null], 0, 'x']]],
+      ]));
+      expect(d.fields.first.label, 'Fine');
+      expect(d.fields.where((f) => f.label == 'Options not a list').single.kind, 'short_text');
+      expect(d.fields.where((f) => f.label == 'Type as decimal').single.kind, 'long_text');
+      expect(d.skipped.map((n) => n.label), contains('Type as text'));
+      expect(checkFields(d.fields), isEmpty);
+    });
+
+    test('fuzz: 2000 random forms never crash and always save cleanly', () {
+      final rnd = Random(7);
+      Object? junk(int depth) {
+        switch (rnd.nextInt(depth > 3 ? 5 : 8)) {
+          case 0:
+            return null;
+          case 1:
+            return rnd.nextInt(20) - 2;
+          case 2:
+            return ['Q', 'Nama', '', 'a' * 300, 'PIN', 'x\ny'][rnd.nextInt(6)];
+          case 3:
+            return rnd.nextBool();
+          case 4:
+            return rnd.nextDouble();
+          default:
+            return [for (var i = 0; i < rnd.nextInt(7); i++) junk(depth + 1)];
+        }
+      }
+
+      Object? item() => rnd.nextInt(4) == 0
+          ? junk(0)
+          : [
+              rnd.nextInt(999),
+              junk(3),
+              junk(3),
+              [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 18, 99][rnd.nextInt(16)],
+              rnd.nextBool() ? junk(0) : [[1, junk(1), rnd.nextInt(2), junk(2)]],
+            ];
+
+      for (var i = 0; i < 2000; i++) {
+        final items = [for (var j = 0; j < rnd.nextInt(50); j++) item()];
+        final d = parseGoogleForm(form(items));
+        expect(d.fields.length, lessThanOrEqualTo(kMaxFormFields));
+        final answerable = d.fields.where((f) => f.isAnswerable);
+        if (answerable.isNotEmpty) {
+          expect(checkFields(d.fields), isEmpty, reason: '${d.fields}');
+        }
+        for (final f in d.fields) {
+          expect(formLabelBlocked(f.label) || formLabelBlocked(f.help), isFalse);
+        }
+      }
     });
   });
 }

@@ -70,6 +70,12 @@ extension GoogleFormImportStrings on AppStrings {
         'trimmed' => _t("Shortened to fit.", "Dipendekkan supaya muat.", "長すぎるため短くしました。"),
         'one_choice' => _t("Only one option: becomes a tick-to-agree box.",
             "Hanya satu pilihan: menjadi kotak tanda setuju.", "選択肢が1つ：同意のチェックになります。"),
+        'picture_choices' => _t("Picture-only options aren't copied.",
+            "Pilihan bergambar sahaja tidak disalin.", "画像だけの選択肢はコピーされません。"),
+        'branching' => _t(
+            "\"Go to section based on answer\" isn't supported: everyone sees every question.",
+            "\"Pergi ke bahagian berdasarkan jawapan\" tidak disokong: semua orang melihat semua soalan.",
+            "回答による「セクションへ移動」は使えません。全員がすべての質問を見ます。"),
         'no_choices' => _t("No usable options: becomes short text.",
             "Tiada pilihan yang boleh digunakan: menjadi teks pendek.", "選択肢がないため短い文章になります。"),
         _ => _t("This item type isn't supported.", "Jenis item ini tidak disokong.",
