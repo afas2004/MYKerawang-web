@@ -20,4 +20,5 @@ const kFirebaseWebOptions = FirebaseOptions(
 ///
 /// While empty, the app keeps phone notifications switched off and says
 /// they are coming soon, instead of failing (docs/push-notifications.md).
-const String kWebPushVapidKey = '';
+const String kWebPushVapidKey =
+    'BBl-2Q_-qvqhaWvyoC-rs569QN_oDrOHC-N-KKI3hct1adwS-3-RYRGFE4o7vrC7Fur_7y-jTS313tO0-0qc4v4';
