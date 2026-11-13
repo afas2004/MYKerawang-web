@@ -4,15 +4,18 @@ import 'package:mykerawang/utils/app_nav.dart';
 
 import '../../l10n/access_strings.dart';
 import '../../l10n/moderation_strings.dart';
+import '../../l10n/safe_link_strings.dart';
 import '../../l10n/whats_new_strings.dart';
 import '../../language_cubit.dart';
 import '../../services/admin_unlock.dart';
 import '../../services/feature_flags.dart';
 import '../../services/moderation_service.dart';
 import '../../services/student_verification.dart';
+import '../../theme/app_icons.dart';
 import '../../widgets/moderation_ui.dart';
 import 'admin_lock_screen.dart';
 import 'admin_overview.dart';
+import 'allowed_links_tab.dart';
 import 'appeals_tab.dart';
 import 'cases_tab.dart';
 import 'categories_tab.dart';
@@ -126,6 +129,7 @@ class _AdminScreenState extends State<AdminScreen> {
       (m.tabRestrictions, ModIcons.ban, const RestrictionsTab()),
       (m.tabLog, ModIcons.log, const LogTab()),
       (context.l10n.catTitle, ModIcons.category, const CategoriesTab()),
+      (context.l10n.slTab, AppIcons.link, const AllowedLinksTab()),
       (context.l10n.pinsTabTitle, ModIcons.pin, const PinsTab()),
       if (verifyEnabled && FeatureFlags.studentFeaturesOn)
         (context.l10n.verifyQueueTitle, ModIcons.verified, const VerificationsTab()),

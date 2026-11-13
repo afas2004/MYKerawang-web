@@ -23,6 +23,7 @@ import 'services/saved_items.dart';
 import 'services/unread_notifications.dart';
 import 'services/update_service.dart';
 import 'services/art_credits.dart';
+import 'services/allowed_links.dart';
 import 'services/feature_flags.dart';
 import 'widgets/update_banner.dart';
 import 'widgets/brand/k_ground.dart';
@@ -88,6 +89,10 @@ void main() async {
   // a slow network never holds the splash. Fails open (all on).
   final flags = FeatureFlags.ensureLoaded()
       .timeout(const Duration(seconds: 3), onTimeout: () => FeatureFlags.current);
+
+  // Sites whose links are tappable. Not awaited: the built-in starter list
+  // is used until it lands.
+  AllowedLinks.ensureLoaded();
 
   // The fonts first, behind the splash, so no text is measured with a
   // stand-in font.

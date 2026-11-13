@@ -798,10 +798,11 @@ class PostBodyPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return LayoutBuilder(builder: (context, box) {
-      // Lay the plain text out once to learn whether 5 lines are enough.
-      // No text scaling: MentionText's RichText doesn't scale either.
+      // Lay the plain text out once to learn whether 5 lines are enough
+      // (as shown: long links shortened). No text scaling: MentionText's
+      // RichText doesn't scale either.
       final painter = TextPainter(
-        text: TextSpan(text: body, style: style),
+        text: TextSpan(text: MentionText.displayText(body), style: style),
         maxLines: maxLines,
         textDirection: Directionality.of(context),
         textScaler: TextScaler.noScaling,
