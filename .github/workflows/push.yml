@@ -1,0 +1,61 @@
+name: Phone notifications
+
+# Sends phone notifications (push) with worker/push.py. See
+# docs/push-notifications.md for the one-time setup.
+#
+# Started three ways:
+#   * by the database the moment something needs pushing (push_kick() with a
+#     Vault secret; optional) — the fast path, about 30 seconds;
+#   * every 5 minutes by GitHub's schedule (often a few minutes late) — the
+#     fallback, and what creates "starting soon" reminders;
+#   * by hand from the Actions tab.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Check the setup only; send nothing"
+        type: boolean
+        default: false
+
+# One sender at a time. A start while one runs waits (only the newest waiting
+# start is kept, which is fine: it sends everything that is due).
+concurrency:
+  group: push
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests google-auth
+
+      - name: Unit tests
+        run: python -m unittest worker/test_push.py
+
+      - name: Send
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] || [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "Push isn't set up yet (missing secrets) — see docs/push-notifications.md"
+            exit 0
+          fi
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            python worker/push.py --dry-run --once
+          else
+            python worker/push.py
+          fi
