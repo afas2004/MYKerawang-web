@@ -36,6 +36,11 @@ class ReleaseNote {
 
 /// Newest first.
 final kReleaseNotes = <ReleaseNote>[
+  ReleaseNote('1.16.2', DateTime(2026, 11, 13), const [
+    NoteLine('Page tips can be turned off in Settings, or turned back on to see them again.',
+        'Tip halaman boleh dimatikan di Tetapan, atau dihidupkan semula untuk lihat sekali lagi.',
+        'ページのヒントは設定でオフにできます。オンに戻すともう一度見られます。'),
+  ]),
   ReleaseNote('1.16.1', DateTime(2026, 11, 13), const [
     NoteLine('Shorter post cards: long posts show 5 lines with Read more, and photos are smaller, so more posts fit on your screen.',
         'Kad post lebih pendek: post panjang tunjuk 5 baris dengan Baca lagi, dan gambar lebih kecil, jadi lebih banyak post muat di skrin.',
