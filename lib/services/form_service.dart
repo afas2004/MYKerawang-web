@@ -117,6 +117,11 @@ class FormDoc {
   /// The caller may fill this form in.
   bool get isOpen => status == 'open';
 
+  /// Built from the KI report template: it has questions tagged for the KI
+  /// before/after analysis. Only then do KI labels and exports apply.
+  bool get isKi =>
+      fields.any((f) => f.analysis == 'ki_pre' || f.analysis == 'ki_post');
+
   /// The `p_form` half of `save_event_form`.
   Map<String, dynamic> get header => {
         'title': title,

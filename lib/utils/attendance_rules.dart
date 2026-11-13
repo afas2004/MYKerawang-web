@@ -35,13 +35,20 @@ String _titleCase(String value) => value
 ///
 /// Columns match what the eMerit application asks for and what the checklist
 /// says to keep: full name, student id, verified, when they checked in.
-String attendanceCsv(List<Map<String, dynamic>> rows) {
-  final out = StringBuffer()..writeln('name,student_id,verified,checked_in_at');
+///
+/// With the owner's student-features switch off ([studentFeatures] false) the
+/// `student_id` and `verified` columns are left out: they only mean something
+/// for verified students.
+String attendanceCsv(List<Map<String, dynamic>> rows, {bool studentFeatures = true}) {
+  final out = StringBuffer()
+    ..writeln(studentFeatures ? 'name,student_id,verified,checked_in_at' : 'name,checked_in_at');
   for (final r in rows) {
     out.writeln([
       _cell(r['display_name'] ?? r['username']),
-      _cell(r['student_id']),
-      _cell(r['verified'] == true ? 'yes' : 'no'),
+      if (studentFeatures) ...[
+        _cell(r['student_id']),
+        _cell(r['verified'] == true ? 'yes' : 'no'),
+      ],
       _cell(r['checked_in_at']),
     ].join(','));
   }
