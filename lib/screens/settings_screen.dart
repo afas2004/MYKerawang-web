@@ -55,6 +55,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   /// Student verification: shown only while the owner has the switch on.
   bool _verifyEnabled = false;
+
+  /// Settings › Page tips switch.
+  bool _tipsOn = true;
   StudentVerification? _verification;
 
   final _supabase = Supabase.instance.client;
@@ -64,6 +67,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _loadBackupEmail();
     _loadVerification();
+    PageTips.isEnabled().then((on) {
+      if (mounted) setState(() => _tipsOn = on);
+    });
   }
 
   Future<void> _loadVerification() async {
@@ -466,16 +472,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     trailing: const Icon(AppIcons.chevronRight),
                     onTap: context.goWhatsNew,
                   ),
-                  ListTile(
-                    leading: const Icon(AppIcons.info),
-                    title: Text(s.tipsReset),
-                    subtitle: Text(s.tipsResetSub),
-                    onTap: () async {
-                      final done = s.tipsResetDone;
-                      await PageTips.resetAll();
-                      showToast(done);
+                  SwitchListTile(
+                    key: const ValueKey('settings-page-tips'),
+                    secondary: const Icon(AppIcons.info),
+                    title: Text(s.tipsSetting),
+                    subtitle: Text(_tipsOn ? s.tipsSettingOn : s.tipsSettingOff),
+                    value: _tipsOn,
+                    onChanged: (on) async {
+                      setState(() => _tipsOn = on);
+                      await PageTips.setEnabled(on);
                     },
                   ),
+                  if (_tipsOn)
+                    ListTile(
+                      // Lines up under the switch's text.
+                      contentPadding: const EdgeInsetsDirectional.only(start: 56, end: 16),
+                      title: Text(s.tipsReset),
+                      subtitle: Text(s.tipsResetSub),
+                      trailing: OutlinedButton(
+                        key: const ValueKey('settings-tips-again'),
+                        onPressed: () async {
+                          final done = s.tipsResetDone;
+                          await PageTips.resetAll();
+                          showToast(done);
+                        },
+                        child: Text(s.tipsReset),
+                      ),
+                    ),
                   ListTile(
                     leading: const Icon(AppIcons.info),
                     title: Text(UpdateService.isSupported

@@ -16,20 +16,27 @@ extension PageTipsStrings on AppStrings {
   String get tipsGotIt => _t('Got it', 'Faham', 'OK');
   String get tipsSkip => _t('Skip', 'Langkau', 'スキップ');
   String get tipsClose => _t('Close tips', 'Tutup petua', 'ヒントを閉じる');
-  String get tipsReset => _t(
-    'Show page tips again',
-    'Tunjuk petua halaman semula',
-    'ページのヒントをもう一度表示',
+  String get tipsSetting => _t('Page tips', 'Petua halaman', 'ページのヒント');
+  String get tipsSettingOn => _t(
+    'On. A short tip shows the first time you open Market, an event or a Create page.',
+    'Hidup. Petua ringkas muncul kali pertama anda membuka Pasar, acara atau halaman Cipta.',
+    'オン。マーケット、イベント、作成ページを初めて開いたときに短いヒントが出ます。',
   );
+  String get tipsSettingOff => _t(
+    'Off. No tips show on any page.',
+    'Mati. Tiada petua di mana-mana halaman.',
+    'オフ。どのページにもヒントは出ません。',
+  );
+  String get tipsReset => _t('See them again', 'Lihat semula', 'もう一度見る');
   String get tipsResetSub => _t(
-    'The short tips you saw the first time you opened each page.',
-    'Petua ringkas yang anda lihat kali pertama membuka setiap halaman.',
-    '各ページを初めて開いたときに出た短いヒントです。',
+    'Pages you already opened show their tips once more.',
+    'Halaman yang sudah dibuka akan tunjuk petuanya sekali lagi.',
+    '開いたことのあるページでも、もう一度ヒントが出ます。',
   );
   String get tipsResetDone => _t(
-    'Page tips will show again.',
-    'Petua halaman akan ditunjuk semula.',
-    'ページのヒントがまた表示されます。',
+    'Tips will show the next time you open each page.',
+    'Petua akan muncul apabila anda membuka setiap halaman nanti.',
+    '次に各ページを開いたときにヒントが出ます。',
   );
   String get infoMore => _t('More info', 'Maklumat lanjut', '詳細');
 
