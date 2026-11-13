@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/focus_highlight.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mykerawang/utils/app_nav.dart';
 import 'package:mykerawang/widgets/mention_input.dart';
@@ -34,7 +35,11 @@ import '../widgets/app_toast.dart';
 class PostDetailScreen extends StatefulWidget {
   final Map<String, dynamic> post;
 
-  const PostDetailScreen({super.key, required this.post});
+  /// From a notification (`/post/:id?c=<comment>`): the comment to scroll
+  /// to and highlight.
+  final String? focusCommentId;
+
+  const PostDetailScreen({super.key, required this.post, this.focusCommentId});
 
   @override
   State<PostDetailScreen> createState() => _PostDetailScreenState();
@@ -457,8 +462,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   ),
           ),
         for (var i = 0; i < _comments.length; i++)
-          CommentTile(
+          FocusHighlight(
             key: ValueKey(_comments[i]['id']),
+            focused: _comments[i]['id'] == widget.focusCommentId,
+            child: CommentTile(
             comment: _comments[i],
             threadLine: i < _comments.length - 1,
             onEdit: _myCommentIds.contains(_comments[i]['id'])
@@ -470,7 +477,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             onTogglePin: _canPinComments
                 ? () => _togglePin(_comments[i])
                 : null,
-          ),
+          )),
       ],
     );
   }

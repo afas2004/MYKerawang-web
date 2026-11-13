@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'l10n/app_strings.dart';
+import 'services/notification_prefs.dart';
 
 class LanguageState {
   final AppLanguage language;
@@ -29,6 +30,8 @@ class LanguageCubit extends Cubit<LanguageState> {
     emit(LanguageState(lang));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('appLanguage', lang.name);
+    // Phone notifications are written in this language too.
+    await NotificationPrefs.saveLanguage(lang.name);
   }
 
   Future<void> _load() async {

@@ -118,6 +118,10 @@ $$;
 revoke execute on function public.notif_level(uuid, text) from public, anon, authenticated;
 
 -- ====================================================== notification columns
+-- mod_notify() guards against a type check constraint that a dashboard edit
+-- may have added on production; the new kinds need it gone.
+alter table public.notifications drop constraint if exists notifications_type_check;
+
 alter table public.notifications
   add column if not exists category    text,
   add column if not exists group_key   text,

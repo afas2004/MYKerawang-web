@@ -1,8 +1,6 @@
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mykerawang/theme_cubit.dart';
 import '../theme/app_themes.dart';
@@ -10,6 +8,7 @@ import '../widgets/brand/brand.dart';
 import '../utils/adaptive.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/access_strings.dart';
+import '../l10n/notification_strings.dart';
 import '../l10n/account_strings.dart';
 import '../language_cubit.dart';
 import '../l10n/shell_strings.dart';
@@ -17,6 +16,7 @@ import '../l10n/social_strings.dart';
 import '../l10n/brand_strings.dart';
 import '../l10n/moderation_strings.dart';
 import '../services/account_data.dart';
+import '../services/push_service.dart';
 import '../services/feature_flags.dart';
 import '../services/moderation_service.dart';
 import '../services/student_verification.dart';
@@ -254,6 +254,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (ok != true || !mounted) return;
 
     try {
+      // Stop this account's phone notifications reaching this device.
+      await PushService.instance.forgetThisDevice();
       await _supabase.auth.signOut();
       // Straight to Home as a guest. On the web that is a fresh page load:
       // a `go` from here would be turned into a browser back by this page's
@@ -335,20 +337,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   ListTile(
                     leading: const Icon(AppIcons.notifications),
-                    title: Text(s.notificationsTitle),
+                    title: Text(s.nsTitle),
+                    subtitle: Text('${s.nsWhatToSend} · ${s.nsQuiet}'),
                     trailing: const Icon(AppIcons.chevronRight),
-                    onTap: () => context.push('/notifications'),
+                    onTap: () => context.push('/settings/notifications'),
                   ),
-                  // App-settings shortcut only makes sense on mobile
-                  if (!kIsWeb)
-                    ListTile(
-                      leading: const Icon(AppIcons.settings),
-                      title: Text(s.fixNotifPermissions),
-                      subtitle: Text(s.openSystemSettings),
-                      trailing: const Icon(AppIcons.externalLink, size: 18),
-                      // Opens the phone's App Settings page
-                      onTap: openAppSettings,
-                    ),
                 ],
               ),
 

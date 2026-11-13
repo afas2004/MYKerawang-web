@@ -11,7 +11,10 @@ import 'theme/app_themes.dart';
 import 'language_cubit.dart';
 import 'router.dart';
 // --- IMPORT YOUR SERVICES ---
-import 'services/notification_service.dart';
+import 'services/notification_links.dart';
+import 'services/notification_prefs.dart';
+import 'services/notification_text.dart';
+import 'services/push_service.dart';
 import 'services/category_service.dart';
 import 'services/club_service.dart';
 import 'services/admin_unlock.dart';
@@ -25,6 +28,7 @@ import 'widgets/update_banner.dart';
 import 'widgets/brand/k_ground.dart';
 import 'l10n/account_strings.dart';
 import 'l10n/app_strings.dart';
+import 'l10n/notification_strings.dart';
 import 'utils/responsive.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -64,8 +68,6 @@ void main() async {
     url: 'https://zxjuqpqzyzmegdjttzyz.supabase.co',
     anonKey: 'sb_publishable_REqYNPrrJEIgmEjZjrJhtg_1JrLn_yO',
   );
-
-  await NotificationService.init();
 
   // Warm the category cache so filter chips can render labels without an
   // await. Falls back to the bundled seeds; never throws.
@@ -192,7 +194,13 @@ class _SessionWatcherState extends State<SessionWatcher> {
       _syncRealtime(event, session);
 
       if (event == AuthChangeEvent.signedIn) {
-        NotificationService.requestPermission();
+        // Never prompts: re-registers this device if it was on, and tells
+        // the push sender which language to write in.
+        PushService.instance.syncOnLaunch();
+        if (mounted) {
+          NotificationPrefs.saveLanguage(
+              context.read<LanguageCubit>().state.language.name);
+        }
         // Record every account; only warn once they are past onboarding.
         KnownAccounts.remember(session.user);
         _checkUserProfile(session.user.id).then((needsOnboarding) {
@@ -283,6 +291,40 @@ class _SessionWatcherState extends State<SessionWatcher> {
     }
   }
 
+  /// While the app is open, a new notification pops up as a toast (the
+  /// phone notification is for when it's closed). "View" opens exactly what
+  /// it is about.
+  Future<void> _toastFor(Map<String, dynamic> n) async {
+    String? actorName;
+    final actorId = n['actor_id'];
+    if (actorId is String) {
+      try {
+        final p = await Supabase.instance.client
+            .from('profiles')
+            .select('display_name, username')
+            .eq('id', actorId)
+            .maybeSingle();
+        final name = '${p?['display_name'] ?? ''}'.trim();
+        actorName = name.isNotEmpty ? name : p?['username'] as String?;
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    final s = context.l10nRead;
+    final text = notificationHeadline(s, n, actorName)?.$1 ??
+        '${n['title'] ?? n['message'] ?? n['body'] ?? s.notifications}';
+    final path = notificationPath(n);
+    showToast(
+      text,
+      actionLabel: path == null ? null : s.nView,
+      onAction: path == null
+          ? null
+          : () {
+              final ctx = rootNavigator?.context;
+              if (ctx != null && ctx.mounted) GoRouter.of(ctx).push(path);
+            },
+    );
+  }
+
   void _startNotificationStream(String userId) {
     _notificationSubscription?.cancel();
     debugPrint("🔔 Notification Listener STARTED for $userId");
@@ -307,10 +349,7 @@ class _SessionWatcherState extends State<SessionWatcher> {
 
           if (difference < 30) {
             _lastShownId = latest['id'];
-            NotificationService.showNotification(
-              latest['title'],
-              latest['message'] ?? latest['body'] ?? context.l10nRead.notifications,
-            );
+            _toastFor(latest);
           }
         }, onError: (Object e) {
           // Without this a channel error surfaces as an uncaught error. The
@@ -354,6 +393,7 @@ class _OtherAccountDialog extends StatelessWidget {
             final email = other.email;
             Navigator.pop(context);
             if (email.isNotEmpty) pendingLoginEmail.value = email;
+            await PushService.instance.forgetThisDevice();
             await Supabase.instance.client.auth.signOut();
           },
           child: Text(a.otherAccountSwitch.fill([other.label])),
