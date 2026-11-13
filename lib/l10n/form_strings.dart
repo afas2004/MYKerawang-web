@@ -440,6 +440,9 @@ extension FormStrings on AppStrings {
   String get galleryClearSearch => _t("Clear search", "Kosongkan carian", "Clear search");
   String get galleryStartTitle => _t("Start a new form", "Mula borang baharu", "Start a new form");
   String get galleryTemplates => _t("Templates", "Templat", "Templates");
+  String get galleryRecentTitle => _t("Your recent forms", "Borang terkini anda", "最近のフォーム");
+  String get gallerySeeAll => _t("See all", "Lihat semua", "すべて表示");
+  String get galleryMyForms => _t("My forms", "Borang saya", "マイフォーム");
   String get galleryCsv => _t("Import CSV", "Import CSV", "Import CSV");
   String get galleryCsvSub => _t(
       "Paste a question list or upload a .csv file.",
