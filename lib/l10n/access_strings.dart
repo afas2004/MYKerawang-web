@@ -212,17 +212,17 @@ extension AccessStrings on AppStrings {
       _t("Take attendance", "Ambil kehadiran", "Take attendance");
   String get evStartTitle => _t("Take attendance", "Ambil kehadiran", "Take attendance");
   String get evStartBody => _t(
-      "Students scan the code at the door. You can end it whenever you like.",
-      "Pelajar imbas kod di pintu. Anda boleh tamatkan bila-bila masa.",
-      "Students scan the code at the door.");
+      "People scan the code at the door. You can end it whenever you like.",
+      "Peserta imbas kod di pintu. Anda boleh tamatkan bila-bila masa.",
+      "入口でコードをスキャンしてもらいます。いつでも終了できます。");
   String get evAddKiQuestion => _t(
       "Add the KI report to this check-in?",
       "Tambah laporan KI pada daftar masuk ini?",
       "Add the KI report to this check-in?");
   String get evAddKiHint => _t(
-      "Students who check in are asked to answer the form straight afterwards.",
-      "Pelajar yang mendaftar masuk akan diminta menjawab borang selepas itu.",
-      "Students answer the form straight after checking in.");
+      "People who check in are asked to answer the form straight afterwards.",
+      "Peserta yang mendaftar masuk akan diminta menjawab borang selepas itu.",
+      "チェックインした人に、続けてフォームへの回答をお願いします。");
   String get evStart => _t("Start", "Mula", "Start");
   String get evEndAttendance =>
       _t("End attendance", "Tamatkan kehadiran", "End attendance");

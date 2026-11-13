@@ -5,8 +5,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../l10n/access_strings.dart';
 import '../../l10n/app_strings.dart';
+import '../../l10n/attendance_form_strings.dart';
 import '../../l10n/form_strings.dart';
 import '../../language_cubit.dart';
+import '../../services/checkin_form_service.dart';
 import '../../services/form_service.dart';
 import '../../services/student_verification.dart';
 import '../../theme/app_icons.dart';
@@ -149,8 +151,8 @@ class _CheckinPageState extends State<CheckinPage> {
   String? _message;
   bool _ok = false;
 
-  /// The event's open form, when the organiser asked for it after check-in.
-  String? _formId;
+  /// The form the organiser asked for after check-in, if any.
+  FormDoc? _form;
 
   @override
   void initState() {
@@ -158,22 +160,12 @@ class _CheckinPageState extends State<CheckinPage> {
     _redeem();
   }
 
-  /// The KI report is the reason the club collects attendance at all, so when
-  /// the form was published with `after_checkin`, this is the moment it is
-  /// offered — once, on the success screen, not as another button on the page.
+  /// When the organiser chose a form for this check-in, this is the moment it
+  /// is offered — once, on the success screen, not as another button on the
+  /// page.
   Future<void> _loadFormOffer() async {
-    try {
-      final id = await FormService.instance.openFormId(widget.eventId);
-      if (id == null) return;
-      final view = await FormService.instance.load(id);
-      if (!mounted) return;
-      if (view.doc.afterCheckin && view.canAnswer && !view.answered) {
-        setState(() => _formId = id);
-      }
-    } catch (e) {
-      // No forms migration, or a network hiccup: the check-in still stands.
-      debugPrint('No check-in form offer: $e');
-    }
+    final form = await loadCheckinOffer(widget.eventId);
+    if (mounted && form != null) setState(() => _form = form);
   }
 
   Future<void> _redeem() async {
@@ -234,15 +226,8 @@ class _CheckinPageState extends State<CheckinPage> {
                         textAlign: TextAlign.center,
                         style: theme.textTheme.titleMedium),
                     const SizedBox(height: KSpace.l),
-                    if (_formId != null) ...[
-                      FilledButton.icon(
-                        onPressed: () =>
-                            context.go('/event/${widget.eventId}/form'),
-                        style: FilledButton.styleFrom(
-                            minimumSize: const Size.fromHeight(48)),
-                        icon: const Icon(AppIcons.list, size: 18),
-                        label: Text(s.formAnswerKiNow),
-                      ),
+                    if (_form != null) ...[
+                      CheckinFormOffer(form: _form!),
                       const SizedBox(height: KSpace.s),
                       TextButton(
                         onPressed: () => context.go('/event/${widget.eventId}'),
@@ -267,6 +252,71 @@ class _CheckinPageState extends State<CheckinPage> {
                 ),
         ),
       ),
+    );
+  }
+}
+
+/// The form to offer someone who just checked in to [eventId], or null.
+///
+/// Asks `event_checkin_form` (any form the organiser picked). Without that
+/// migration, falls back to the old rule: the event's own open form, when its
+/// after-check-in flag is on. Never throws: the check-in already stands.
+Future<FormDoc?> loadCheckinOffer(String eventId) async {
+  try {
+    String? id;
+    var fromChoice = true;
+    try {
+      id = await CheckinFormService.instance.offered(eventId);
+    } on CheckinFormUnsupported {
+      fromChoice = false;
+      id = await FormService.instance.openFormId(eventId);
+    }
+    if (id == null) return null;
+    final view = await FormService.instance.load(id);
+    if (!fromChoice && !view.doc.afterCheckin) return null;
+    if (!view.canAnswer || view.answered) return null;
+    return view.doc;
+  } catch (e) {
+    // No forms migration, or a network hiccup: the check-in still stands.
+    debugPrint('No check-in form offer: $e');
+    return null;
+  }
+}
+
+/// "Answer the form" on the success screen, linking to [form]'s own answer
+/// page (`/f/:id` for a standalone form, the event's form page otherwise).
+class CheckinFormOffer extends StatelessWidget {
+  final FormDoc form;
+  const CheckinFormOffer({super.key, required this.form});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (form.title.trim().isNotEmpty) ...[
+          Text(
+            form.title,
+            key: const ValueKey('offer-title'),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: KSpace.s),
+        ],
+        FilledButton.icon(
+          key: const ValueKey('offer-answer'),
+          onPressed: () => context.go(form.answerPath),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+          icon: const Icon(AppIcons.list, size: 18),
+          label: Text(form.isKi ? s.formAnswerKiNow : s.afAnswerNow),
+        ),
+      ],
     );
   }
 }

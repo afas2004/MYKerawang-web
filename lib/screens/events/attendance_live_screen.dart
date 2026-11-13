@@ -5,7 +5,9 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../l10n/access_strings.dart';
+import '../../l10n/attendance_form_strings.dart';
 import '../../language_cubit.dart';
+import '../../services/feature_flags.dart';
 import '../../services/form_service.dart';
 import '../../services/share_service.dart';
 import '../../utils/attendance_rules.dart';
@@ -24,18 +26,15 @@ class AttendanceLiveScreen extends StatefulWidget {
   final String eventId;
   final String title;
 
-  /// Whether the KI form was included when attendance was started.
-  final bool withKi;
-
-  /// The open form, when there is one; the KI export needs it.
-  final String? formId;
+  /// The form asked after check-in, or null when people only check in. Any
+  /// form: KI wording and the KI export apply only when [FormDoc.isKi].
+  final FormDoc? form;
 
   const AttendanceLiveScreen({
     super.key,
     required this.eventId,
     required this.title,
-    this.withKi = false,
-    this.formId,
+    this.form,
   });
 
   @override
@@ -55,7 +54,7 @@ class _AttendanceLiveScreenState extends State<AttendanceLiveScreen> {
   String? _latestName;
   bool _closed = false;
   bool _ending = false;
-  int _kiResponses = 0;
+  int _formResponses = 0;
 
   @override
   void initState() {
@@ -167,13 +166,18 @@ class _AttendanceLiveScreenState extends State<AttendanceLiveScreen> {
       _channel = null;
     }
 
-    // The KI total is only meaningful when the form was part of this session.
-    if (widget.withKi && widget.formId != null) {
+    // The form total is only meaningful when a form was part of this session.
+    final form = widget.form;
+    if (form != null) {
       try {
-        final a = await FormService.instance.analysis(widget.formId!);
-        if (mounted) setState(() => _kiResponses = a.peserta + a.penganjur);
+        final n = form.isKi
+            ? await FormService.instance
+                .analysis(form.id)
+                .then((a) => a.peserta + a.penganjur)
+            : (await FormService.instance.responses(form.id)).length;
+        if (mounted) setState(() => _formResponses = n);
       } catch (e) {
-        debugPrint('KI count unavailable: $e');
+        debugPrint('Form count unavailable: $e');
       }
     }
 
@@ -184,27 +188,29 @@ class _AttendanceLiveScreenState extends State<AttendanceLiveScreen> {
     });
   }
 
-  Future<void> _export({required bool attendance, required bool ki}) async {
+  Future<void> _export({required bool attendance, required bool responses}) async {
     final s = context.l10nRead;
     try {
       if (attendance) {
         final rows = await _db
             .rpc('event_attendance_list', params: {'p_event_id': widget.eventId});
-        final csv = attendanceCsv(List<Map<String, dynamic>>.from(rows as List));
+        final csv = attendanceCsv(List<Map<String, dynamic>>.from(rows as List),
+            studentFeatures: FeatureFlags.studentFeaturesOn);
         await saveCsv(csv, flowFileName('attendance', widget.title));
       }
-      if (ki && widget.formId != null) {
-        final view = await FormService.instance.load(widget.formId!);
-        final responses = await FormService.instance.responses(widget.formId!);
+      final form = widget.form;
+      if (responses && form != null) {
+        final view = await FormService.instance.load(form.id);
+        final rows = await FormService.instance.responses(form.id);
         await saveCsv(
-          responsesCsv(view.doc.fields, responses),
-          flowFileName('ki', widget.title),
+          responsesCsv(view.doc.fields, rows),
+          flowFileName(form.isKi ? 'ki' : 'responses', widget.title),
         );
       }
     } catch (e) {
       if (!mounted) return;
       if (e is! StateError) {
-        showErrorWithRetry(context, e, onRetry: () => _export(attendance: attendance, ki: ki));
+        showErrorWithRetry(context, e, onRetry: () => _export(attendance: attendance, responses: responses));
         return;
       }
       showToast(s.evExportFailed);
@@ -269,7 +275,7 @@ class _AttendanceLiveScreenState extends State<AttendanceLiveScreen> {
             style: theme.textTheme.titleMedium, textAlign: TextAlign.center),
         const SizedBox(height: KSpace.xs),
         Text(
-          widget.withKi ? s.evAddKiHint : s.evAttendanceHint,
+          widget.form != null ? s.evAddKiHint : s.evAttendanceHint,
           textAlign: TextAlign.center,
           style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
         ),
@@ -360,14 +366,44 @@ class _AttendanceLiveScreenState extends State<AttendanceLiveScreen> {
 
   // ------------------------------------------------------------------ summary
 
-  Widget _summary(BuildContext context) {
+  Widget _summary(BuildContext context) => AttendanceSummary(
+        key: const ValueKey('summary'),
+        title: widget.title,
+        checkedIn: _count,
+        form: widget.form,
+        formResponses: _formResponses,
+        onExport: _export,
+        onDone: () => Navigator.of(context).pop(true),
+      );
+}
+
+/// The door, closed: totals and exports. KI wording only for a KI form.
+class AttendanceSummary extends StatelessWidget {
+  final String title;
+  final int checkedIn;
+  final FormDoc? form;
+  final int formResponses;
+  final void Function({required bool attendance, required bool responses}) onExport;
+  final VoidCallback onDone;
+
+  const AttendanceSummary({
+    super.key,
+    required this.title,
+    required this.checkedIn,
+    this.form,
+    this.formResponses = 0,
+    required this.onExport,
+    required this.onDone,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     final s = context.l10n;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final hasKi = widget.formId != null && widget.withKi;
+    final isKi = form?.isKi ?? false;
 
     return ListView(
-      key: const ValueKey('summary'),
       padding: const EdgeInsets.all(KSpace.l),
       children: [
         const SizedBox(height: KSpace.l),
@@ -383,7 +419,7 @@ class _AttendanceLiveScreenState extends State<AttendanceLiveScreen> {
         Text(s.evAttendanceClosed,
             textAlign: TextAlign.center, style: theme.textTheme.titleLarge),
         const SizedBox(height: KSpace.xs),
-        Text(widget.title,
+        Text(title,
             textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
         const SizedBox(height: KSpace.xl),
@@ -391,17 +427,18 @@ class _AttendanceLiveScreenState extends State<AttendanceLiveScreen> {
           children: [
             Expanded(
               child: _Stat(
-                value: _count,
+                value: checkedIn,
                 label: s.evTotalAttendance,
                 delay: 0,
               ),
             ),
-            if (hasKi) ...[
+            if (form != null) ...[
               const SizedBox(width: KSpace.m),
               Expanded(
                 child: _Stat(
-                  value: _kiResponses,
-                  label: s.evKiReports,
+                  key: const ValueKey('stat-responses'),
+                  value: formResponses,
+                  label: isKi ? s.evKiReports : s.afResponses,
                   delay: 120,
                 ),
               ),
@@ -410,22 +447,23 @@ class _AttendanceLiveScreenState extends State<AttendanceLiveScreen> {
         ),
         const SizedBox(height: KSpace.xl),
         OutlinedButton.icon(
-          onPressed: () => _export(attendance: true, ki: false),
+          onPressed: () => onExport(attendance: true, responses: false),
           icon: const Icon(AppIcons.download, size: 18),
           label: Text(s.evExportAttendance),
           style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
         ),
-        if (hasKi) ...[
+        if (form != null) ...[
           const SizedBox(height: KSpace.s),
           OutlinedButton.icon(
-            onPressed: () => _export(attendance: false, ki: true),
+            key: const ValueKey('export-responses'),
+            onPressed: () => onExport(attendance: false, responses: true),
             icon: const Icon(AppIcons.download, size: 18),
-            label: Text(s.evExportKi),
+            label: Text(isKi ? s.evExportKi : s.afExportResponses),
             style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
           ),
           const SizedBox(height: KSpace.s),
           FilledButton.icon(
-            onPressed: () => _export(attendance: true, ki: true),
+            onPressed: () => onExport(attendance: true, responses: true),
             icon: const Icon(AppIcons.download, size: 18),
             label: Text(s.evExportBoth),
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
@@ -433,7 +471,7 @@ class _AttendanceLiveScreenState extends State<AttendanceLiveScreen> {
         ],
         const SizedBox(height: KSpace.l),
         TextButton(
-          onPressed: () => Navigator.of(context).pop(true),
+          onPressed: onDone,
           child: Text(s.evDone),
         ),
       ],
@@ -447,7 +485,7 @@ class _Stat extends StatelessWidget {
   final String label;
   final int delay;
 
-  const _Stat({required this.value, required this.label, this.delay = 0});
+  const _Stat({super.key, required this.value, required this.label, this.delay = 0});
 
   @override
   Widget build(BuildContext context) {

@@ -12,8 +12,11 @@ import '../utils/adaptive.dart';
 /// Lets a composer (post, event, announcement) link one of the user's forms.
 /// The result is an ordinary action link — `{label: "Fill in form",
 /// url: "/f/:id"}` — so nothing downstream needs to know about forms.
-Future<MyForm?> showFormPicker(BuildContext context) {
-  Widget body(BuildContext ctx) => const _FormPickerBody();
+///
+/// [openOnly] hides drafts too: for a form people must be able to answer now
+/// (the one asked after check-in).
+Future<MyForm?> showFormPicker(BuildContext context, {bool openOnly = false}) {
+  Widget body(BuildContext ctx) => _FormPickerBody(openOnly: openOnly);
   if (isWide(context)) {
     return showAdaptiveSheet<MyForm>(context: context, builder: body);
   }
@@ -44,7 +47,8 @@ class AttachFormButton extends StatelessWidget {
 }
 
 class _FormPickerBody extends StatefulWidget {
-  const _FormPickerBody();
+  final bool openOnly;
+  const _FormPickerBody({this.openOnly = false});
 
   @override
   State<_FormPickerBody> createState() => _FormPickerBodyState();
@@ -53,7 +57,10 @@ class _FormPickerBody extends StatefulWidget {
 class _FormPickerBodyState extends State<_FormPickerBody> {
   late final Future<List<MyForm>> _forms = MyFormsService.instance
       .myForms()
-      .then((all) => [for (final f in all) if (!f.isHidden && f.status != 'closed') f]);
+      .then((all) => [
+            for (final f in all)
+              if (widget.openOnly ? f.isOpen : (!f.isHidden && f.status != 'closed')) f
+          ]);
 
   @override
   Widget build(BuildContext context) {

@@ -36,6 +36,11 @@ class ReleaseNote {
 
 /// Newest first.
 final kReleaseNotes = <ReleaseNote>[
+  ReleaseNote('1.16.4', DateTime(2026, 11, 13), const [
+    NoteLine("Taking attendance can ask any of your forms after check-in, not only the event's own form.",
+        'Ambil kehadiran boleh minta mana-mana borang awak selepas daftar masuk, bukan hanya borang acara itu sendiri.',
+        '出席を取るとき、イベント専用のフォームだけでなく、自分のどのフォームでもチェックイン後に依頼できます。'),
+  ]),
   ReleaseNote('1.16.3', DateTime(2026, 11, 13), const [
     NoteLine('The New form page shows your recent forms, with See all to open My forms.',
         'Halaman Borang baharu tunjuk borang terkini awak, dengan Lihat semua untuk buka Borang saya.',

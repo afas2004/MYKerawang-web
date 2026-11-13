@@ -35,6 +35,10 @@ import '../widgets/brand/brand.dart';
 import '../widgets/tap_card.dart';
 import 'gallery_view_screen.dart';
 import 'events/attendance_live_screen.dart';
+import 'events/attendance_start_dialog.dart';
+import '../l10n/attendance_form_strings.dart';
+import '../services/checkin_form_service.dart';
+import '../services/feature_flags.dart';
 import 'events/checkin_screens.dart';
 import '../widgets/restriction_gate.dart';
 import '../widgets/save_button.dart';
@@ -1402,6 +1406,17 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             label: Text(s.evCheckIn),
           ),
         ],
+        // A club's committee runs the door for the club's events too.
+        if (!_isOwner && _clubOfficer && FeatureFlags.clubsOn) ...[
+          const SizedBox(height: KSpace.s),
+          FilledButton.tonalIcon(
+            key: const ValueKey('officer-attendance'),
+            onPressed: _startAttendanceFlow,
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            icon: const Icon(AppIcons.qrCode, size: 18),
+            label: Text(s.evTakeAttendance),
+          ),
+        ],
         if (!_isOwner && _openFormId != null) ...[
           const SizedBox(height: KSpace.s),
           OutlinedButton.icon(
@@ -1559,46 +1574,113 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     }
   }
 
-  /// "Take attendance": ask whether the KI form comes with it, then open the
-  /// door. The choice is the only thing that needed asking; the rest is a
-  /// session the organiser ends when the queue is gone.
+  /// "Take attendance": ask which form (if any) comes after check-in, then
+  /// open the door. The choice is the only thing that needed asking; the rest
+  /// is a session the organiser ends when the queue is gone.
   Future<void> _startAttendanceFlow() async {
     final s = context.l10nRead;
+    final eventId = '${_event['id']}';
 
-    FormDoc? form;
+    // The event's own form (the KI report, for UiTM events).
+    FormDoc? own;
     try {
-      final summary = await FormService.instance.summary('${_event['id']}');
+      final summary = await FormService.instance.summary(eventId);
       if (summary != null) {
-        form = (await FormService.instance.load(summary.id)).doc;
+        own = (await FormService.instance.load(summary.id)).doc;
       }
     } catch (e) {
       debugPrint('No form for attendance: $e');
     }
+
+    // What was chosen last time; unsupported before 20261113001100.
+    var state = const CheckinFormState(supported: false);
+    try {
+      state = await CheckinFormService.instance.current(eventId);
+    } catch (e) {
+      debugPrint('Check-in form choice unavailable: $e');
+    }
+
+    FormDoc? previous;
+    final prevId = state.formId;
+    if (prevId != null && prevId != own?.id) {
+      try {
+        previous = (await FormService.instance.load(prevId)).doc;
+      } catch (e) {
+        debugPrint('Earlier check-in form unavailable: $e');
+      }
+    }
     if (!mounted) return;
 
-    final choice = await showDialog<_AttendanceChoice>(
+    final initial = prevId != null
+        ? (prevId == own?.id ? AttendanceFormKind.own : AttendanceFormKind.other)
+        : (own?.afterCheckin ?? false)
+            ? AttendanceFormKind.own
+            : AttendanceFormKind.none;
+
+    final choice = await showDialog<AttendanceFormChoice>(
       context: context,
-      builder: (ctx) => _AttendanceStartDialog(
-        hasForm: form != null,
-        initialKi: form?.afterCheckin ?? false,
+      builder: (ctx) => AttendanceStartDialog(
+        ownForm: own,
+        initialKind: initial,
+        initialOtherId: previous?.id,
+        initialOtherTitle: previous?.title,
+        canPickAny: state.supported,
       ),
     );
     if (choice == null || !mounted) return;
 
-    if (choice.withKi && form == null) {
-      // There is nothing to ask after check-in yet.
-      showToast(s.evNoOpenFormYet);
+    if (choice.makeOwn) {
       _openReportForm();
       return;
     }
 
-    // The door and the report stay in step: whatever was chosen here is what
-    // the check-in success screen reads.
-    if (form != null && form.afterCheckin != choice.withKi) {
+    // The door and the success screen stay in step: whatever was chosen here
+    // is what the check-in success screen reads. The event's own form keeps
+    // its after_checkin flag in step too, for databases (and older app
+    // versions) that only know that flag.
+    FormDoc? chosen;
+    switch (choice.kind) {
+      case AttendanceFormKind.none:
+        chosen = null;
+      case AttendanceFormKind.own:
+        chosen = own;
+      case AttendanceFormKind.other:
+        try {
+          chosen = (await FormService.instance.load(choice.otherId!)).doc;
+        } catch (e) {
+          debugPrint('Picked form unavailable: $e');
+          chosen = FormDoc(
+              id: choice.otherId!,
+              title: choice.otherTitle ?? '',
+              status: 'open',
+              standalone: true);
+        }
+    }
+
+    if (own != null) {
+      final wantFlag = choice.kind == AttendanceFormKind.own;
+      if (own.afterCheckin != wantFlag) {
+        try {
+          await FormService.instance.setAfterCheckin(own.id, wantFlag);
+        } catch (e) {
+          debugPrint('Could not set after-checkin: $e');
+        }
+      }
+    }
+    if (state.supported || choice.kind == AttendanceFormKind.other) {
       try {
-        await FormService.instance.setAfterCheckin(form.id, choice.withKi);
+        await CheckinFormService.instance.choose(eventId, chosen?.id);
+      } on CheckinFormUnsupported {
+        if (choice.kind == AttendanceFormKind.other) {
+          showToast(s.afNeedsUpdate);
+          chosen = null;
+        }
       } catch (e) {
-        debugPrint('Could not set after-checkin: $e');
+        debugPrint('Could not save the check-in form: $e');
+        if (choice.kind == AttendanceFormKind.other) {
+          showToast(s.afNotSaved);
+          chosen = null;
+        }
       }
     }
     if (!mounted) return;
@@ -1608,10 +1690,9 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         // Full window (a door screen), so the whole page takes the fade.
         builder: (_) => RouteContentFade(
           child: AttendanceLiveScreen(
-            eventId: '${_event['id']}',
+            eventId: eventId,
             title: '${_event['title'] ?? ''}',
-            withKi: choice.withKi,
-            formId: form?.id,
+            form: chosen,
           ),
         ),
       ),
@@ -2052,73 +2133,6 @@ class _TypeToConfirmDialogState extends State<_TypeToConfirmDialog> {
             foregroundColor: scheme.onError,
           ),
           child: Text(widget.confirmLabel),
-        ),
-      ],
-    );
-  }
-}
-
-/// What "Start" was tapped with.
-class _AttendanceChoice {
-  final bool withKi;
-  const _AttendanceChoice(this.withKi);
-}
-
-/// The one question before the door opens: is the KI report part of this?
-class _AttendanceStartDialog extends StatefulWidget {
-  final bool hasForm;
-  final bool initialKi;
-
-  const _AttendanceStartDialog({required this.hasForm, required this.initialKi});
-
-  @override
-  State<_AttendanceStartDialog> createState() => _AttendanceStartDialogState();
-}
-
-class _AttendanceStartDialogState extends State<_AttendanceStartDialog> {
-  late bool _withKi = widget.hasForm && widget.initialKi;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = context.l10n;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-
-    return AlertDialog(
-      icon: const Icon(AppIcons.qrCode),
-      title: Text(s.evStartTitle),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(s.evStartBody, style: theme.textTheme.bodyMedium),
-          const SizedBox(height: KSpace.l),
-          if (widget.hasForm)
-            Container(
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: SwitchListTile(
-                value: _withKi,
-                onChanged: (v) => setState(() => _withKi = v),
-                title: Text(s.evAddKiQuestion, style: const TextStyle(fontSize: 14)),
-                subtitle: Text(s.evAddKiHint,
-                    style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
-              ),
-            )
-          else
-            Text(
-              s.evNoOpenFormYet,
-              style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-            ),
-        ],
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text(s.cancel)),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, _AttendanceChoice(_withKi)),
-          child: Text(s.evStart),
         ),
       ],
     );
