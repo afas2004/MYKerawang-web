@@ -36,6 +36,14 @@ class ReleaseNote {
 
 /// Newest first.
 final kReleaseNotes = <ReleaseNote>[
+  ReleaseNote('1.18.0', DateTime(2026, 11, 14), const [
+    NoteLine('Import a Google Form: paste its link and get the same questions as a MYKerawang form you can edit.',
+        'Import Borang Google: tampal pautannya dan dapatkan soalan yang sama sebagai borang MYKerawang yang boleh disunting.',
+        'Googleフォームを取り込めます。リンクを貼るだけで、同じ質問のMYKerawangフォームができ、編集もできます。'),
+    NoteLine('Links to trusted sites like Google Forms, WhatsApp groups and Instagram can now be tapped in posts, comments and events.',
+        'Pautan ke laman dipercayai seperti Borang Google, kumpulan WhatsApp dan Instagram kini boleh diketik dalam post, ulasan dan acara.',
+        'Googleフォーム、WhatsAppグループ、Instagramなど信頼できるサイトへのリンクを、投稿・コメント・イベントでタップできるようになりました。'),
+  ]),
   ReleaseNote('1.17.1', DateTime(2026, 11, 13), const [
     NoteLine("Taking attendance can also show your form's own QR, so guests without an account can answer it.",
         'Semasa mengambil kehadiran, QR borang anda juga boleh dipaparkan supaya tetamu tanpa akaun boleh menjawabnya.',
