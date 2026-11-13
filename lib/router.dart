@@ -33,6 +33,7 @@ import 'screens/login_screen.dart';
 import 'screens/main_scaffold.dart';
 import 'screens/marketplace_screen.dart';
 import 'screens/notification_screen.dart';
+import 'screens/notification_settings_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/post_detail_screen.dart';
 import 'screens/profile_screen.dart';
@@ -265,7 +266,8 @@ GoRouter buildRouter() {
             table: 'events',
             id: state.pathParameters['id']!,
             initial: state.extra as Map<String, dynamic>?,
-            build: (data) => EventDetailScreen(event: data),
+            build: (data) => EventDetailScreen(
+                event: data, focusCommentId: state.uri.queryParameters['c']),
           ),
         ),
       ),
@@ -376,7 +378,8 @@ GoRouter buildRouter() {
             // assumes a signed-in user for commenting and reporting.
             // Same page for guests: read, share and see comments; actions
             // that need an account prompt sign-in (requireLogin).
-            build: (data) => PostDetailScreen(post: data),
+            build: (data) => PostDetailScreen(
+                post: data, focusCommentId: state.uri.queryParameters['c']),
           ),
         ),
       ),
@@ -553,6 +556,13 @@ GoRouter buildRouter() {
         onExit: historyAwareExit,
         builder: (context, state) =>
             const DesktopChrome(child: LicensesScreen()),
+      ),
+      GoRoute(
+        path: '/settings/notifications',
+        parentNavigatorKey: _rootKey,
+        onExit: historyAwareExit,
+        builder: (context, state) =>
+            const DesktopChrome(child: NotificationSettingsScreen()),
       ),
       GoRoute(
         path: '/settings/whats-new',

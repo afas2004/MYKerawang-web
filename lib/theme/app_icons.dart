@@ -24,6 +24,10 @@ abstract final class AppIcons {
   static const IconData notifications = LucideIcons.bell;
   static const IconData notificationsActive = LucideIcons.bellRing;
   static const IconData notificationsOff = LucideIcons.bellOff;
+  static const IconData formAnswers = LucideIcons.clipboardList;
+  static const IconData quietHours = LucideIcons.moon;
+  static const IconData smartphone = LucideIcons.smartphone;
+  static const IconData iosShare = LucideIcons.share;
   static const IconData settings = LucideIcons.settings;
   static const IconData menu = LucideIcons.menu;
   static const IconData back = LucideIcons.arrowLeft;

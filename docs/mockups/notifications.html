@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notifications mockup</title>
+<!--
+  MYKerawang — notifications proposal + mockup. Not app code.
+  One self-contained file: open it in any browser. Tabs along the top;
+  "Phone / Desktop" switches the frame. URL: ?tab=bell&w=desktop
+  Colours are KPalette (lib/widgets/brand/brand_cover.dart).
+-->
+<style>
+  :root {
+    --plum: #5E1A4F; --jingga: #B4501A; --hijau: #1F6E5A; --biru: #1E4E8C;
+    --merah: #A3262E; --arang: #3B3540;
+    --plum-soft: #F4E9F1; --bg: #F6F3F5; --card: #fff; --line: #E6DEE3;
+    --text: #231C22; --muted: #6B6169;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         background: #2a2228; color: var(--text); }
+  .bar { position: sticky; top: 0; z-index: 10; background: #151014; color: #fff;
+         display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 12px; }
+  .bar b { margin-right: 6px; font-size: 13px; opacity: .8; }
+  .bar button { background: #2f262d; color: #fff; border: 1px solid #4a3d47; border-radius: 999px;
+                padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+  .bar button.on { background: var(--plum); border-color: #a0538f; }
+  .bar .sp { flex: 1; }
+  .stage { display: flex; justify-content: center; padding: 20px 16px 60px; }
+  .frame { background: var(--bg); border-radius: 28px; overflow: hidden; width: 390px; max-width: 100%;
+           min-height: 760px; box-shadow: 0 20px 60px #0008; position: relative; }
+  body.desk .frame { width: 1200px; border-radius: 12px; min-height: 720px; }
+  .doc .frame, body.desk .doc .frame { width: 860px; border-radius: 12px; }
+  .page { display: none; } .page.on { display: block; }
+
+  /* app chrome */
+  .appbar { background: var(--plum); color: #fff; display: flex; align-items: center; gap: 12px;
+            padding: 14px 16px; font-weight: 600; font-size: 17px; }
+  .appbar .grow { flex: 1; }
+  .icon { width: 22px; height: 22px; display: inline-block; vertical-align: middle; }
+  .bell { position: relative; }
+  .badge { position: absolute; top: -6px; right: -8px; background: var(--merah); color: #fff;
+           font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 5px; border: 2px solid var(--plum); }
+  .tabs { display: flex; gap: 8px; padding: 10px 16px; background: #fff; border-bottom: 1px solid var(--line); overflow-x: auto; }
+  .chip { border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-size: 13px; white-space: nowrap; background: #fff; }
+  .chip.on { background: var(--plum-soft); border-color: var(--plum); color: var(--plum); font-weight: 600; }
+  .sec { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
+         padding: 14px 16px 6px; display: flex; }
+  .sec span { flex: 1; } .sec a { color: var(--plum); text-transform: none; letter-spacing: 0; font-weight: 600; }
+  .row { display: flex; gap: 12px; padding: 12px 16px; background: #fff; border-bottom: 1px solid var(--line); align-items: flex-start; }
+  .row.unread { background: #FBF6FA; }
+  .av { width: 44px; height: 44px; border-radius: 50%; flex: none; display: grid; place-items: center; color: #fff;
+        font-weight: 700; position: relative; }
+  .av .mini { position: absolute; right: -3px; bottom: -3px; width: 20px; height: 20px; border-radius: 50%;
+              border: 2px solid #fff; display: grid; place-items: center; }
+  .av .mini svg { width: 11px; height: 11px; }
+  .stack { position: relative; width: 44px; height: 44px; flex: none; }
+  .stack .av { width: 32px; height: 32px; position: absolute; font-size: 13px; border: 2px solid #fff; }
+  .stack .av:nth-child(1) { left: 0; top: 0; } .stack .av:nth-child(2) { right: 0; bottom: 0; }
+  .body { flex: 1; min-width: 0; }
+  .t { display: flex; gap: 8px; align-items: baseline; }
+  .t b { flex: 1; font-size: 14.5px; }
+  .t time { font-size: 12px; color: var(--muted); } .unread .t time { color: var(--plum); font-weight: 600; }
+  .s { color: var(--muted); font-size: 14px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--plum); margin-top: 7px; flex: none; }
+  .actions { display: flex; gap: 8px; margin-top: 8px; }
+  .btn { border: 0; border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+  .btn.pri { background: var(--plum); color: #fff; } .btn.sec2 { background: var(--plum-soft); color: var(--plum); }
+  .btn.ghost { background: transparent; color: var(--plum); }
+  .banner { margin: 12px 16px; padding: 12px 14px; border-radius: 14px; background: #fff; border: 1px solid var(--line);
+            display: flex; gap: 12px; align-items: flex-start; }
+  .banner .ic { width: 36px; height: 36px; border-radius: 10px; background: var(--plum-soft); color: var(--plum); display: grid; place-items: center; flex: none; }
+  .note { background: #FFF8E6; border: 1px dashed #d9b35a; color: #5a4413; font-size: 12.5px; padding: 8px 12px; margin: 10px 16px; border-radius: 10px; }
+  .note b { color: #3e2e08; }
+
+  /* sheet + dim */
+  .dim { position: absolute; inset: 0; background: #0007; }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; background: #fff; border-radius: 22px 22px 0 0; padding: 10px 20px 24px; }
+  .grab { width: 40px; height: 4px; border-radius: 4px; background: #ccc; margin: 0 auto 14px; }
+  .sheet h3 { margin: 8px 0 6px; font-size: 19px; }
+  .sheet .big { width: 64px; height: 64px; border-radius: 18px; background: var(--plum-soft); color: var(--plum); display: grid; place-items: center; }
+  .sheet ul { padding-left: 0; list-style: none; margin: 12px 0 16px; }
+  .sheet li { display: flex; gap: 10px; padding: 6px 0; font-size: 14px; }
+  .sheet li svg { color: var(--hijau); flex: none; }
+  .full { width: 100%; padding: 13px; font-size: 15px; }
+  .browserprompt { position: absolute; top: 12px; left: 12px; right: 12px; background: #fff; border-radius: 14px;
+                   box-shadow: 0 10px 40px #0006; padding: 14px; font-size: 14px; }
+  .browserprompt .host { font-size: 12px; color: var(--muted); }
+  .browserprompt .r { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; }
+  .browserprompt .r span { padding: 6px 12px; border-radius: 8px; font-weight: 600; color: #1a5fd0; }
+
+  /* settings */
+  .group { background: #fff; margin: 0 16px; border-radius: 14px; border: 1px solid var(--line); overflow: hidden; }
+  .set { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .set:last-child { border-bottom: 0; }
+  .set .body small { display: block; color: var(--muted); font-size: 12.5px; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; font-size: 12px; flex: none; }
+  .seg span { padding: 5px 9px; } .seg span.on { background: var(--plum); color: #fff; font-weight: 600; }
+  .sw { width: 42px; height: 24px; border-radius: 999px; background: #cfc6cc; position: relative; flex: none; cursor: pointer; }
+  .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: .15s; }
+  .sw.on { background: var(--plum); } .sw.on::after { left: 21px; }
+  .sw.lock { opacity: .55; cursor: not-allowed; }
+  .status { margin: 12px 16px; padding: 12px 14px; border-radius: 14px; display: flex; gap: 10px; align-items: center; font-size: 14px; }
+  .status.ok { background: #E5F2EE; color: var(--hijau); }
+  .status.warn { background: #FBEDE4; color: var(--jingga); }
+
+  /* lock screen */
+  .lock { min-height: 760px; color: #fff; padding: 40px 14px 20px;
+          background: radial-gradient(120% 80% at 30% 10%, #8d3b7a 0%, #5E1A4F 45%, #1b0c18 100%); }
+  .clock { text-align: center; font-size: 76px; font-weight: 300; line-height: 1; letter-spacing: -2px; }
+  .date { text-align: center; font-size: 17px; opacity: .85; margin-bottom: 36px; }
+  .pn { background: #ffffffd9; color: #111; border-radius: 18px; padding: 10px 12px; margin-bottom: 8px;
+        backdrop-filter: blur(10px); display: flex; gap: 10px; }
+  .pn .ai { width: 36px; height: 36px; border-radius: 9px; background: var(--plum); flex: none; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 13px; }
+  .pn .h { display: flex; font-size: 12.5px; color: #555; } .pn .h span { flex: 1; text-transform: uppercase; letter-spacing: .03em; }
+  .pn b { display: block; font-size: 14.5px; } .pn p { margin: 1px 0 0; font-size: 14px; }
+  .pn.behind { transform: scale(.94); margin-top: -46px; opacity: .7; height: 46px; z-index: -1; position: relative; }
+  .android { background: #1f1b1e; border-radius: 22px; padding: 12px 14px; margin-top: 26px; }
+  .android .h { color: #bbb; font-size: 12px; display: flex; gap: 6px; align-items: center; }
+  .android .h i { width: 16px; height: 16px; border-radius: 50%; background: var(--plum); display: inline-block; }
+  .android b { display: block; margin-top: 6px; } .android p { margin: 2px 0 8px; color: #ddd; font-size: 14px; }
+  .android .a { display: flex; gap: 16px; color: #e9b8de; font-weight: 600; font-size: 13.5px; }
+  .caption { font-size: 12.5px; opacity: .75; text-align: center; margin: 4px 0 14px; }
+
+  /* desktop layout */
+  .deskgrid { display: grid; grid-template-columns: 220px 1fr 320px; min-height: 680px; }
+  .side { background: #fff; border-right: 1px solid var(--line); padding: 16px 10px; }
+  .side div { padding: 9px 12px; border-radius: 10px; display: flex; gap: 10px; align-items: center; font-size: 14px; }
+  .side .on { background: var(--plum-soft); color: var(--plum); font-weight: 600; }
+  .side .count { margin-left: auto; background: var(--merah); color: #fff; font-size: 11px; border-radius: 999px; padding: 0 6px; font-weight: 700; }
+  .feed { padding: 20px 28px; }
+  .fake { background: #fff; border: 1px solid var(--line); border-radius: 14px; height: 150px; margin-bottom: 14px; }
+  .panel { position: relative; }
+  .pop { position: absolute; top: 12px; right: 16px; width: 380px; background: #fff; border-radius: 14px; box-shadow: 0 16px 50px #0003; overflow: hidden; border: 1px solid var(--line); }
+  .pop .head { display: flex; padding: 12px 16px; font-weight: 700; align-items: center; }
+  .pop .head span { flex: 1; } .pop .head a { color: var(--plum); font-weight: 600; font-size: 13px; }
+  .toast { position: absolute; right: 18px; bottom: 18px; width: 340px; background: #fff; border-radius: 10px; box-shadow: 0 10px 40px #0004; padding: 12px; display: flex; gap: 10px; font-size: 13.5px; border: 1px solid #ddd; }
+  .toast .ai { width: 32px; height: 32px; border-radius: 8px; background: var(--plum); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 11px; flex: none; }
+  .toast small { color: #777; }
+
+  /* plan doc */
+  .doc-in { padding: 28px 32px 40px; background: #fff; }
+  .doc-in h1 { font-size: 24px; margin: 0 0 4px; color: var(--plum); }
+  .doc-in h2 { font-size: 18px; margin: 28px 0 8px; color: var(--plum); border-top: 1px solid var(--line); padding-top: 18px; }
+  .doc-in h3 { font-size: 15px; margin: 18px 0 6px; }
+  .doc-in table { border-collapse: collapse; width: 100%; font-size: 13.5px; margin: 6px 0; }
+  .doc-in th, .doc-in td { text-align: left; border-bottom: 1px solid var(--line); padding: 7px 8px; vertical-align: top; }
+  .doc-in th { background: var(--bg); }
+  .ok { color: var(--hijau); font-weight: 700; } .no { color: var(--merah); font-weight: 700; } .meh { color: var(--jingga); font-weight: 700; }
+  .rec { background: #E5F2EE; border-left: 4px solid var(--hijau); padding: 10px 14px; border-radius: 8px; margin: 10px 0; }
+  .q { background: var(--plum-soft); border-left: 4px solid var(--plum); padding: 10px 14px; border-radius: 8px; margin: 8px 0; }
+  .doc-in dfn { font-style: normal; font-weight: 700; }
+  .doc-in code { background: var(--bg); padding: 1px 5px; border-radius: 5px; font-size: 12.5px; }
+  .flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; margin: 8px 0; }
+  .flow span { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+  .flow i { color: var(--muted); font-style: normal; }
+  @media (max-width: 700px) { .doc-in { padding: 18px 16px 30px; } .doc-in table { font-size: 12.5px; } }
+</style>
+</head>
+<body>
+<div class="bar" id="bar">
+  <b>Notifications</b>
+  <button data-tab="plan">1 · Audit &amp; plan</button>
+  <button data-tab="bell">2 · Bell list</button>
+  <button data-tab="ask">3 · Asking permission</button>
+  <button data-tab="settings">4 · Settings</button>
+  <button data-tab="lock">5 · Phone lock screen</button>
+  <span class="sp"></span>
+  <button data-w="phone">Phone</button>
+  <button data-w="desktop">Desktop</button>
+</div>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path fill="currentColor" d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5.5-6.84V3a1.5 1.5 0 0 0-3 0v1.16A7 7 0 0 0 5 11v5l-2 2v1h18v-1Z"/></symbol>
+    <symbol id="i-at" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 1 0 5 18.66l-1-1.73A8 8 0 1 1 20 12v1.5a1.5 1.5 0 0 1-3 0V12a5 5 0 1 0-1.46 3.53A3.5 3.5 0 0 0 22 13.5V12A10 10 0 0 0 12 2Zm0 13a3 3 0 1 1 3-3 3 3 0 0 1-3 3Z"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path fill="currentColor" d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2Z"/></symbol>
+    <symbol id="i-cal" viewBox="0 0 24 24"><path fill="currentColor" d="M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2Zm-2 8h14v10H5Z"/></symbol>
+    <symbol id="i-form" viewBox="0 0 24 24"><path fill="currentColor" d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm2 9v2h8v-2Zm0 4v2h5v-2Z"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path fill="currentColor" d="M12 21s-7.5-4.6-9.5-9.2C1 8.2 3.4 4.5 7 4.5c2 0 3.6 1.1 5 3 1.4-1.9 3-3 5-3 3.6 0 6 3.7 4.5 7.3C19.5 16.4 12 21 12 21Z"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5Z"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path fill="currentColor" d="m12 2 3 6.5 7 .8-5.2 4.8 1.4 7L12 17.6 5.8 21l1.4-7L2 9.3l7-.8Z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path fill="currentColor" d="m9 16.2-3.5-3.5L4 14.2l5 5 11-11-1.5-1.4Z"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path fill="currentColor" d="M20 15.3A8 8 0 0 1 8.7 4 8 8 0 1 0 20 15.3Z"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 7.5 6.5l1.4 1.4L11 5.8V15h2V5.8l2.1 2.1 1.4-1.4ZM5 10v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V10h-2v10H7V10Z"/></symbol>
+    <symbol id="i-person" viewBox="0 0 24 24"><path fill="currentColor" d="M12 12a4.5 4.5 0 1 0-4.5-4.5A4.5 4.5 0 0 0 12 12Zm0 2c-4 0-8 2-8 5v2h16v-2c0-3-4-5-8-5Z"/></symbol>
+  </defs>
+</svg>
+
+<!-- ============================================================ 1. PLAN -->
+<section class="page doc" data-page="plan"><div class="stage"><div class="frame"><div class="doc-in">
+<h1>Notifications — audit &amp; proposal</h1>
+<p class="s">MYKerawang · drafted 13 Nov 2026 · design only, nothing built yet</p>
+
+<h2>Words used here</h2>
+<p><dfn>In-app notification</dfn> — a row in the bell list inside the app. Only seen when you open the app.<br>
+<dfn>Push notification</dfn> — a message the phone shows on its lock screen even when the app is closed.<br>
+<dfn>PWA</dfn> (progressive web app) — our website "added to home screen", so it opens like a normal app.<br>
+<dfn>Service worker</dfn> — a small script the browser keeps in the background for a website. It is the only thing that can receive a push while the app is closed.<br>
+<dfn>Web Push</dfn> — the browser standard for push. Chrome, Edge, Firefox and Safari all support it. On <b>iPhone it works only when the app is installed to the home screen</b> (iOS 16.4 or newer).</p>
+
+<h2>Step 1 — What we have today</h2>
+<h3>What creates a bell notification</h3>
+<table>
+<tr><th>Happens</th><th>Who gets it</th><th>Made by</th><th>Notes</th></tr>
+<tr><td>Someone @mentions you in a post or comment</td><td>Person mentioned</td><td>App (<code>mention_service.dart</code>) + RPC for anonymous posts</td><td class="ok">Works. Anonymous posts hide the sender.</td></tr>
+<tr><td>Someone @mentions you in an event</td><td>Person mentioned</td><td>App (<code>create_event_screen.dart</code>)</td><td class="ok">Works.</td></tr>
+<tr><td>Someone follows you</td><td>Person followed</td><td>App (<code>profile_screen.dart</code>)</td><td class="ok">Works.</td></tr>
+<tr><td>An event you joined is cancelled</td><td>Everyone who joined</td><td>Database trigger</td><td class="ok">Works.</td></tr>
+<tr><td>Any new event is created</td><td><b>Every user</b></td><td>Old dashboard trigger <code>notify_new_event</code></td><td class="no">Problem: one row per user per event, no type, no link — tapping does nothing. Will be spammy once people get push.</td></tr>
+<tr><td>Moderation: your report was handled, your post was hidden, you were restricted / warned</td><td>Reporter / owner</td><td>Database (<code>mod_notify</code>)</td><td class="ok">Works.</td></tr>
+<tr><td>Clubs: club approved / rejected, made officer, made president</td><td>Club people</td><td>Database (<code>club_notify</code>)</td><td class="meh">Works, but clubs are switched off on production.</td></tr>
+</table>
+
+<h3>What is missing</h3>
+<table>
+<tr><th>Missing</th><th>Why it matters</th></tr>
+<tr><td>Someone <b>commented on your post</b></td><td>The bell even has a comment icon, but nothing ever creates one. Biggest gap.</td></tr>
+<tr><td>Someone <b>replied to your comment</b></td><td>Conversations die when people don't know there's a reply.</td></tr>
+<tr><td>Someone <b>liked</b> your post</td><td>Nice to have; should be grouped ("Aina and 4 others liked…") and bell-only, never push.</td></tr>
+<tr><td>Someone <b>answered your form</b></td><td>Form owners currently have to keep checking. Group them: "5 new answers".</td></tr>
+<tr><td>An event you joined <b>starts soon</b></td><td>The most useful push for students. Nothing sends it (the old "reminders" toggle was hidden for that reason).</td></tr>
+<tr><td>An event you joined <b>changed time or place</b></td><td>Only cancellation is announced today.</td></tr>
+<tr><td>Someone <b>joined your event</b></td><td>For organisers; grouped.</td></tr>
+<tr><td><b>New app version</b> (What's new)</td><td>Today shown only inside the app. Could be an optional push.</td></tr>
+<tr><td>Market buyer message</td><td><b>Not possible yet</b> — the Market has no in-app chat; buyers contact sellers on WhatsApp. Skip until chat exists.</td></tr>
+</table>
+
+<h3>How the bell and the count work</h3>
+<ul>
+<li><b>The red count is live.</b> <code>unread_notifications.dart</code> listens to the database in real time (Supabase Realtime) and recounts on every change. No refresh needed.</li>
+<li><b>The list is live</b> too (it uses a stream).</li>
+<li><b>Pop-ups don't work on the web.</b> <code>main.dart</code> listens for new rows and calls <code>NotificationService.showNotification</code>, but that function does nothing on web (it is built on <code>flutter_local_notifications</code>, which has no web support). Since the app is web-only, nobody sees a pop-up — the package in <code>pubspec.yaml</code> is unused weight.</li>
+<li><b>Text is stored in English only.</b> Titles are written into the row when it's created, so a Malay or Japanese user reads English notifications.</li>
+<li>No push of any kind exists. Nothing reaches you when the app is closed.</li>
+</ul>
+
+<h2>Step 2 — Proposal</h2>
+<h3>A. How push reaches the phone — three options</h3>
+<table>
+<tr><th></th><th>Option 1 · Plain Web Push <span class="ok">(recommended)</span></th><th>Option 2 · Firebase Cloud Messaging</th><th>Option 3 · No push</th></tr>
+<tr><td>What it is</td><td>Our server talks directly to the browser's push service (Google / Apple / Mozilla) using the Web Push standard.</td><td>Google's service in the middle; it uses Web Push underneath anyway.</td><td>Only fix the bell and in-app pop-ups while the app is open.</td></tr>
+<tr><td>Extra code in the app</td><td>Small: a 40-line service worker + subscribe call.</td><td>Firebase JS SDK (~ +100 KB) and a Firebase-specific worker.</td><td>None.</td></tr>
+<tr><td>Who sends</td><td>Supabase Edge Function</td><td>Supabase Edge Function or our Firebase Functions</td><td>—</td></tr>
+<tr><td>Works on iPhone</td><td>Yes, when added to home screen</td><td>Yes, same rule</td><td>—</td></tr>
+<tr><td>Cost</td><td>Free</td><td>Free</td><td>Free</td></tr>
+<tr><td>Lock-in</td><td>None — standard</td><td>Tied to Firebase</td><td>—</td></tr>
+</table>
+<div class="rec"><b>Recommendation: Option 1.</b> Everything (notifications, users, preferences) already lives in Supabase, so the sender sits next to the data, and no extra Firebase SDK is loaded on students' phones.</div>
+
+<h3>B. How the server sends</h3>
+<div class="flow"><span>Something happens (comment, form answer…)</span><i>→</i><span>row added to <code>notifications</code></span><i>→</i><span>Database Webhook</span><i>→</i><span>Edge Function <code>send-push</code></span><i>→</i><span>checks your settings, quiet hours, grouping</span><i>→</i><span>phone</span></div>
+<ul>
+<li>A <dfn>Database Webhook</dfn> is a Supabase setting that calls a URL whenever a row is inserted. An <dfn>Edge Function</dfn> is a small server program Supabase runs for us.</li>
+<li>The bell keeps working exactly as now; push is an extra copy of the same row. If push fails, nothing is lost.</li>
+<li>A new table <code>push_subscriptions</code> holds each device's push address. Dead addresses (uninstalled app) are deleted automatically when the push service says "gone".</li>
+<li><b>Cost</b> on the free plan: Edge Functions allow 500,000 calls a month. 1,000 active users × 5 notifications a day ≈ 150,000 a month — well inside. Web Push delivery itself is free.</li>
+<li>Text is chosen in the reader's language: we save the language the user picked in Settings to their profile, and the function writes the push in en / ms / ja.</li>
+</ul>
+
+<h3>C. The service worker — without breaking updates</h3>
+<p>Every deploy copies <code>sw_reset.js</code> over <code>flutter_service_worker.js</code>. That old worker deletes itself so phones always load the newest app. A browser allows <b>one worker per folder ("scope")</b>; if the push worker shared the root folder, the reset worker would replace it and push would silently stop after the next deploy.</p>
+<div class="rec">Put the push worker in its own folder: <code>web/push/sw.js</code>, registered with scope <code>/push/</code>. It only handles two things — "a push arrived" (show it) and "a notification was tapped" (open the right page). It caches nothing, so it can never serve old app code, and <code>sw_reset.js</code> and <code>deploy_web.bat</code> stay as they are.</div>
+<p class="s">Risk to check on a real iPhone early in the build: Apple's push with a non-root worker scope. Fallback if it misbehaves: one root worker that does reset-cleanup <i>and</i> push (a bigger change to the update mechanism).</p>
+
+<h3>D. Not spamming people</h3>
+<ul>
+<li><b>Grouping:</b> likes, form answers and event joins are merged in the bell ("Aina and 4 others…") and on the phone (the newer push replaces the older one for the same post/form).</li>
+<li><b>Pace:</b> at most one push per post/form per 15 minutes; at most 8 pushes a day per person (event reminders and safety notices are exempt).</li>
+<li><b>Quiet hours:</b> default 11 pm – 7 am Malaysia time. Pushes are held; the bell still fills. Event reminders still come if the event is inside the quiet hours.</li>
+<li><b>New-event broadcast:</b> stop sending it to every user. Bell-only and off by default (opt-in in Settings).</li>
+<li><b>Likes are never pushed</b> — bell only.</li>
+</ul>
+
+<h3>E. Event reminders</h3>
+<p>A scheduled job inside the database (<dfn>pg_cron</dfn>, free on Supabase) runs every 5 minutes and creates a reminder for people who joined an event starting in about <b>1 hour</b>, plus an optional <b>evening-before</b> reminder (8 pm). Each reminder is sent once only.</p>
+
+<h3>F. Asking for permission</h3>
+<ul>
+<li>Never on first load — browsers punish sites that ask too early, and a "Block" is permanent until the user digs into settings.</li>
+<li>Ask right after a moment where push clearly helps: <b>after joining an event</b> ("Remind me 1 hour before?"), after publishing a form, or from the bell's banner.</li>
+<li>Our own friendly sheet first; the browser's prompt only appears if they tap "Turn on".</li>
+<li>iPhone in Safari (not installed): instead of asking, show "Add MYKerawang to your Home Screen to get alerts" with the 3 steps.</li>
+</ul>
+
+<h2>Suggested order of building</h2>
+<table>
+<tr><th>Phase</th><th>What</th><th>Push needed?</th></tr>
+<tr><td>1</td><td>Fix the bell: comment, reply, form-answer, event-changed, joined-your-event notifications; grouping; fix/limit the new-event broadcast; store type+data so text shows in the reader's language; remove the unused <code>flutter_local_notifications</code>.</td><td>No</td></tr>
+<tr><td>2</td><td>Settings page with per-type switches and quiet hours.</td><td>No</td></tr>
+<tr><td>3</td><td>Web Push: worker, subscribe, <code>push_subscriptions</code> table, Edge Function, permission sheet.</td><td>Yes</td></tr>
+<tr><td>4</td><td>Event reminders (1 hour, evening before).</td><td>Best with push</td></tr>
+</table>
+
+<h2>Decisions for you</h2>
+<div class="q">1. Push route: <b>Plain Web Push</b> (recommended), Firebase, or no push for now?</div>
+<div class="q">2. Which missing types to add: comments on my post, replies, likes (bell only), form answers, event starts soon, event changed, someone joined my event, What's new?</div>
+<div class="q">3. The "new event" broadcast to every user: <b>make it opt-in, bell only</b> (recommended), keep as is, or remove?</div>
+<div class="q">4. Reminder timing: <b>1 hour before</b> only, or also the evening before?</div>
+<div class="q">5. Quiet hours default: <b>11 pm – 7 am</b>, or off by default?</div>
+<div class="q">6. Build all four phases in one go, or Phase 1–2 first and push after?</div>
+</div></div></div></section>
+
+<!-- ============================================================ 2. BELL (phone) -->
+<section class="page" data-page="bell"><div class="stage"><div class="frame">
+ <div class="phone-only">
+  <div class="appbar">
+    <span class="grow">Notifications</span>
+    <svg class="icon"><use href="#i-check"/></svg>
+  </div>
+  <div class="tabs">
+    <span class="chip on">All</span><span class="chip">Mentions</span><span class="chip">Events</span><span class="chip">Forms</span><span class="chip">Account</span>
+  </div>
+  <div class="banner">
+    <div class="ic"><svg class="icon"><use href="#i-bell"/></svg></div>
+    <div class="body"><b>Get these on your phone</b><div class="s">Event reminders and replies, even when MYKerawang is closed.</div>
+      <div class="actions"><button class="btn pri" data-go="ask">Turn on</button><button class="btn ghost">Not now</button></div></div>
+  </div>
+  <div class="sec"><span>Today</span><a>Mark all read</a></div>
+  <div class="row unread">
+    <div class="av" style="background:var(--biru)"><svg class="icon"><use href="#i-cal"/></svg></div>
+    <div class="body"><div class="t"><b>Starts in 1 hour</b><time>9:00</time></div>
+      <div class="s">Gotong-royong Kolej Kerawang · 10:00 at Dewan Seri Kerawang</div>
+      <div class="actions"><button class="btn sec2">Show my QR</button><button class="btn ghost">Directions</button></div></div>
+    <span class="dot"></span>
+  </div>
+  <div class="row unread">
+    <div class="av" style="background:var(--jingga)">A<span class="mini" style="background:var(--hijau)"><svg style="color:#fff"><use href="#i-chat"/></svg></span></div>
+    <div class="body"><div class="t"><b>Aina replied to your comment</b><time>8:42</time></div>
+      <div class="s">"Boleh, saya bawa sarung tangan sekali 👍"</div></div>
+    <span class="dot"></span>
+  </div>
+  <div class="row unread">
+    <div class="stack"><div class="av" style="background:var(--hijau)">H</div><div class="av" style="background:var(--arang)">+4</div></div>
+    <div class="body"><div class="t"><b>5 new answers to your form</b><time>8:10</time></div>
+      <div class="s">Borang Kehadiran Sukarelawan · Hafiz, Mei Ling and 3 others</div></div>
+    <span class="dot"></span>
+  </div>
+  <div class="row">
+    <div class="stack"><div class="av" style="background:var(--merah)">S</div><div class="av" style="background:var(--plum)">+6</div></div>
+    <div class="body"><div class="t"><b>Siti and 6 others liked your post</b><time>7:30</time></div>
+      <div class="s">"Siapa nak join futsal petang ni?"</div></div>
+  </div>
+  <div class="sec"><span>Yesterday</span></div>
+  <div class="row">
+    <div class="av" style="background:var(--jingga)"><svg class="icon"><use href="#i-cal"/></svg></div>
+    <div class="body"><div class="t"><b>Time changed</b><time>Thu</time></div>
+      <div class="s">Ceramah Kerjaya now starts at <b>3:00 pm</b> (was 2:30 pm)</div></div>
+  </div>
+  <div class="row">
+    <div class="av" style="background:var(--biru)">R<span class="mini" style="background:var(--plum)"><svg style="color:#fff"><use href="#i-at"/></svg></span></div>
+    <div class="body"><div class="t"><b>Ravi mentioned you</b><time>Thu</time></div>
+      <div class="s">in a comment: "@you dah submit borang?"</div></div>
+  </div>
+  <div class="row">
+    <div class="av" style="background:var(--arang)"><svg class="icon"><use href="#i-shield"/></svg></div>
+    <div class="body"><div class="t"><b>Your report was reviewed</b><time>Thu</time></div>
+      <div class="s">Thanks — the post was removed.</div></div>
+  </div>
+  <div class="row">
+    <div class="av" style="background:var(--plum)"><svg class="icon"><use href="#i-star"/></svg></div>
+    <div class="body"><div class="t"><b>What's new in 1.17</b><time>Thu</time></div>
+      <div class="s">Event reminders and phone notifications are here.</div></div>
+  </div>
+  <div class="note"><b>Changes from today:</b> grouped rows (stacked avatars), new types (reply, form answers, starts soon, time changed, What's new), action buttons on reminders, filter chips, and the "Turn on" banner (shown only when push is off and the device supports it).</div>
+ </div>
+
+ <!-- desktop -->
+ <div class="desk-only">
+  <div class="appbar"><span class="grow">MYKerawang</span>
+    <span class="bell"><svg class="icon"><use href="#i-bell"/></svg><span class="badge">3</span></span></div>
+  <div class="deskgrid">
+    <div class="side"><div>Home</div><div>Events</div><div>Market</div><div>Forms</div><div class="on">Notifications <span class="count">3</span></div><div>Settings</div></div>
+    <div class="feed"><div class="fake"></div><div class="fake"></div><div class="fake"></div></div>
+    <div class="panel">
+      <div class="pop">
+        <div class="head"><span>Notifications</span><a>Mark all read</a></div>
+        <div class="row unread">
+          <div class="av" style="background:var(--biru)"><svg class="icon"><use href="#i-cal"/></svg></div>
+          <div class="body"><div class="t"><b>Starts in 1 hour</b><time>9:00</time></div><div class="s">Gotong-royong Kolej Kerawang · 10:00</div></div><span class="dot"></span></div>
+        <div class="row unread">
+          <div class="av" style="background:var(--jingga)">A</div>
+          <div class="body"><div class="t"><b>Aina replied to your comment</b><time>8:42</time></div><div class="s">"Boleh, saya bawa sarung tangan…"</div></div><span class="dot"></span></div>
+        <div class="row unread">
+          <div class="stack"><div class="av" style="background:var(--hijau)">H</div><div class="av" style="background:var(--arang)">+4</div></div>
+          <div class="body"><div class="t"><b>5 new answers to your form</b><time>8:10</time></div><div class="s">Borang Kehadiran Sukarelawan</div></div><span class="dot"></span></div>
+        <div class="row"><div class="stack"><div class="av" style="background:var(--merah)">S</div><div class="av" style="background:var(--plum)">+6</div></div>
+          <div class="body"><div class="t"><b>Siti and 6 others liked your post</b><time>7:30</time></div></div></div>
+        <div style="padding:10px 16px;text-align:center"><a style="color:var(--plum);font-weight:600">See all</a></div>
+      </div>
+      <div class="toast"><div class="ai">MYK</div><div><b>Aina replied to your comment</b><br>"Boleh, saya bawa sarung tangan sekali 👍"<br><small>kerawang.my · Chrome</small></div></div>
+    </div>
+  </div>
+  <div class="note">Desktop: the bell opens a drop-down panel instead of a full page; the bottom-right card is how Windows/Chrome shows the push when MYKerawang is in a background tab or closed.</div>
+ </div>
+</div></div></section>
+
+<!-- ============================================================ 3. ASK -->
+<section class="page" data-page="ask"><div class="stage"><div class="frame">
+ <div class="phone-only">
+  <div class="tabs" style="justify-content:center;flex-wrap:wrap">
+    <span class="chip on" data-ask="a">After joining an event</span><span class="chip" data-ask="b">Browser prompt</span><span class="chip" data-ask="c">iPhone, not installed</span>
+  </div>
+  <div style="position:relative;min-height:700px">
+    <div class="appbar"><span class="grow">Gotong-royong Kolej</span></div>
+    <div style="padding:16px"><div class="fake" style="height:180px"></div>
+      <div class="status ok"><svg class="icon"><use href="#i-check"/></svg> You've joined. Your QR is ready.</div>
+      <div class="fake" style="height:120px"></div></div>
+    <div class="dim"></div>
+
+    <div class="sheet" data-askp="a">
+      <div class="grab"></div>
+      <div class="big"><svg class="icon" style="width:32px;height:32px"><use href="#i-bell"/></svg></div>
+      <h3>Remind you before it starts?</h3>
+      <div class="s">We'll send a notification to this phone 1 hour before Gotong-royong Kolej Kerawang.</div>
+      <ul>
+        <li><svg class="icon"><use href="#i-check"/></svg> Event reminders and changes</li>
+        <li><svg class="icon"><use href="#i-check"/></svg> Replies and mentions</li>
+        <li><svg class="icon"><use href="#i-check"/></svg> Quiet from 11 pm to 7 am — change anytime in Settings</li>
+      </ul>
+      <button class="btn pri full">Turn on notifications</button>
+      <button class="btn ghost full" style="margin-top:6px">Not now</button>
+    </div>
+
+    <div data-askp="b" style="display:none">
+      <div class="browserprompt">
+        <div class="host">kerawang.my wants to</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:4px"><svg class="icon"><use href="#i-bell"/></svg> Show notifications</div>
+        <div class="r"><span>Block</span><span>Allow</span></div>
+      </div>
+      <div class="note" style="position:absolute;bottom:20px;left:0;right:0">The browser's own prompt appears <b>only after</b> the student taps "Turn on" in our sheet — so a "Block" (hard to undo) is rare. If they choose Not now, we wait at least 2 weeks before asking again.</div>
+    </div>
+
+    <div class="sheet" data-askp="c" style="display:none">
+      <div class="grab"></div>
+      <div class="big"><svg class="icon" style="width:32px;height:32px"><use href="#i-bell"/></svg></div>
+      <h3>Get reminders on your iPhone</h3>
+      <div class="s">iPhone only allows notifications from apps on your Home Screen. It takes 10 seconds:</div>
+      <ul>
+        <li><b>1.</b>&nbsp;Tap <svg class="icon" style="color:var(--biru)"><use href="#i-share"/></svg> Share at the bottom of Safari</li>
+        <li><b>2.</b>&nbsp;Choose <b>Add to Home Screen</b></li>
+        <li><b>3.</b>&nbsp;Open MYKerawang from the new icon and tap <b>Turn on</b></li>
+      </ul>
+      <button class="btn pri full">Got it</button>
+    </div>
+  </div>
+ </div>
+ <div class="desk-only" style="position:relative;min-height:700px">
+  <div class="appbar"><span class="grow">MYKerawang</span><span class="bell"><svg class="icon"><use href="#i-bell"/></svg></span></div>
+  <div class="deskgrid"><div class="side"><div>Home</div><div class="on">Events</div><div>Market</div><div>Forms</div></div>
+    <div class="feed"><div class="status ok" style="margin:0 0 14px"><svg class="icon"><use href="#i-check"/></svg> You've joined Gotong-royong Kolej Kerawang.</div><div class="fake"></div><div class="fake"></div></div><div></div></div>
+  <div class="dim"></div>
+  <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:440px;background:#fff;border-radius:18px;padding:24px">
+    <div class="big" style="width:56px;height:56px;border-radius:16px;background:var(--plum-soft);color:var(--plum);display:grid;place-items:center"><svg class="icon" style="width:28px;height:28px"><use href="#i-bell"/></svg></div>
+    <h3 style="margin:12px 0 6px">Remind you before it starts?</h3>
+    <div class="s">We'll notify this computer 1 hour before the event, and when someone replies to you.</div>
+    <div class="actions" style="justify-content:flex-end;margin-top:18px"><button class="btn ghost">Not now</button><button class="btn pri">Turn on notifications</button></div>
+  </div>
+ </div>
+</div></div></section>
+
+<!-- ============================================================ 4. SETTINGS -->
+<section class="page" data-page="settings"><div class="stage"><div class="frame">
+  <div class="appbar"><span class="grow">Notifications</span></div>
+  <div style="max-width:640px;margin:0 auto">
+  <div class="status ok"><svg class="icon"><use href="#i-check"/></svg><div class="body"><b>On for this phone</b><br><small>Turn off for this device</small></div></div>
+  <div class="status warn" style="display:none" id="blocked"><svg class="icon"><use href="#i-bell"/></svg> Blocked in your browser — how to allow</div>
+
+  <div class="sec"><span>What to send</span></div>
+  <div class="note" style="margin-top:0">Each type: <b>Phone</b> = push + bell · <b>Bell</b> = in the app only · <b>Off</b></div>
+  <div class="group">
+    <div class="set"><div class="body">Event reminders<small>1 hour before events you joined</small></div><div class="seg"><span class="on">Phone</span><span>Bell</span><span>Off</span></div></div>
+    <div class="set"><div class="body">Event changes<small>Time, place, cancelled</small></div><div class="seg"><span class="on">Phone</span><span>Bell</span><span>Off</span></div></div>
+    <div class="set"><div class="body">Replies &amp; comments<small>On your posts and comments</small></div><div class="seg"><span class="on">Phone</span><span>Bell</span><span>Off</span></div></div>
+    <div class="set"><div class="body">Mentions<small>When someone @mentions you</small></div><div class="seg"><span class="on">Phone</span><span>Bell</span><span>Off</span></div></div>
+    <div class="set"><div class="body">Form answers<small>Grouped, at most every 15 min</small></div><div class="seg"><span class="on">Phone</span><span>Bell</span><span>Off</span></div></div>
+    <div class="set"><div class="body">People joining your event<small>Grouped</small></div><div class="seg"><span>Phone</span><span class="on">Bell</span><span>Off</span></div></div>
+    <div class="set"><div class="body">Likes &amp; new followers</div><div class="seg"><span style="opacity:.35">Phone</span><span class="on">Bell</span><span>Off</span></div></div>
+    <div class="set"><div class="body">New events in MYKerawang</div><div class="seg"><span>Phone</span><span>Bell</span><span class="on">Off</span></div></div>
+    <div class="set"><div class="body">What's new in the app</div><div class="seg"><span>Phone</span><span class="on">Bell</span><span>Off</span></div></div>
+    <div class="set"><div class="body">Account &amp; safety<small>Reports, warnings. Always on.</small></div><div class="sw on lock"></div></div>
+  </div>
+
+  <div class="sec"><span>Quiet hours</span></div>
+  <div class="group">
+    <div class="set"><svg class="icon" style="color:var(--plum)"><use href="#i-moon"/></svg><div class="body">Quiet hours<small>Phone stays silent; bell still fills</small></div><div class="sw on"></div></div>
+    <div class="set"><div class="body">From</div><b>11:00 pm</b></div>
+    <div class="set"><div class="body">Until</div><b>7:00 am</b></div>
+  </div>
+
+  <div class="sec"><span>Devices</span></div>
+  <div class="group">
+    <div class="set"><div class="body">This phone · Chrome on Android<small>Added 13 Nov</small></div><span class="ok">Active</span></div>
+    <div class="set"><div class="body">Laptop · Edge on Windows<small>Added 2 Nov</small></div><a style="color:var(--merah);font-weight:600">Remove</a></div>
+  </div>
+  <div class="note">Reached from Settings → Notifications (today that row only opens the bell list). "Likes" can't be set to Phone on purpose. Toggle the switches to try them.</div>
+  <div style="height:20px"></div>
+  </div>
+</div></div></section>
+
+<!-- ============================================================ 5. LOCK -->
+<section class="page" data-page="lock"><div class="stage"><div class="frame">
+ <div class="phone-only">
+  <div class="lock">
+    <div class="clock">9:00</div>
+    <div class="date">Saturday, 14 November</div>
+    <div class="caption">iPhone (app on Home Screen)</div>
+    <div class="pn"><div class="ai">MYK</div><div style="flex:1"><div class="h"><span>MYKerawang</span>now</div>
+      <b>Starts in 1 hour</b><p>Gotong-royong Kolej Kerawang · 10:00 at Dewan Seri Kerawang. Tap for your QR.</p></div></div>
+    <div class="pn"><div class="ai">MYK</div><div style="flex:1"><div class="h"><span>MYKerawang</span>18m ago</div>
+      <b>Aina replied to your comment</b><p>"Boleh, saya bawa sarung tangan sekali 👍"</p></div></div>
+    <div class="pn behind"></div>
+    <div class="caption" style="margin-top:4px">Grouped: "5 new answers to your form" replaced the earlier "2 new answers"</div>
+
+    <div class="caption" style="margin-top:20px">Android (Chrome)</div>
+    <div class="android">
+      <div class="h"><i></i> MYKerawang · kerawang.my · now</div>
+      <b>Masa ditukar · Ceramah Kerjaya</b>
+      <p>Kini bermula 3:00 ptg (asalnya 2:30 ptg)</p>
+      <div class="a"><span>LIHAT ACARA</span><span>MATIKAN JENIS INI</span></div>
+    </div>
+    <div class="caption" style="margin-top:8px">Written in the reader's language (this student uses Bahasa Melayu)</div>
+  </div>
+ </div>
+ <div class="desk-only">
+  <div style="min-height:700px;background:linear-gradient(135deg,#2c5a8f,#1a2f4f);position:relative">
+    <div class="toast" style="bottom:70px"><div class="ai">MYK</div><div><b>Starts in 1 hour</b><br>Gotong-royong Kolej Kerawang · 10:00<br><small>kerawang.my · Microsoft Edge</small></div></div>
+    <div class="toast" style="bottom:160px"><div class="ai">MYK</div><div><b>5 new answers to your form</b><br>Borang Kehadiran Sukarelawan<br><small>kerawang.my · Microsoft Edge</small></div></div>
+    <div style="position:absolute;bottom:0;left:0;right:0;height:48px;background:#0d1626cc"></div>
+  </div>
+ </div>
+</div></div></section>
+
+<style>
+  .desk-only { display: none; }
+  body.desk .desk-only { display: block; }
+  body.desk .phone-only { display: none; }
+  body.desk .page[data-page="settings"] .frame { width: 1200px; }
+</style>
+<script>
+(function () {
+  var p = new URLSearchParams(location.search);
+  var state = { tab: p.get('tab') || 'plan', w: p.get('w') || (innerWidth > 900 ? 'desktop' : 'phone') };
+  function render() {
+    document.body.classList.toggle('desk', state.w === 'desktop');
+    document.querySelectorAll('.page').forEach(function (s) { s.classList.toggle('on', s.dataset.page === state.tab); });
+    document.querySelectorAll('[data-tab]').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === state.tab); });
+    document.querySelectorAll('[data-w]').forEach(function (b) { b.classList.toggle('on', b.dataset.w === state.w); });
+    try { history.replaceState(null, '', '?tab=' + state.tab + '&w=' + state.w); } catch (e) {}
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-tab],[data-w],[data-go],[data-ask],.sw,.seg span');
+    if (!t) return;
+    if (t.dataset.tab) state.tab = t.dataset.tab;
+    if (t.dataset.w) state.w = t.dataset.w;
+    if (t.dataset.go) state.tab = t.dataset.go;
+    if (t.dataset.ask) {
+      document.querySelectorAll('[data-ask]').forEach(function (c) { c.classList.toggle('on', c === t); });
+      document.querySelectorAll('[data-askp]').forEach(function (s) { s.style.display = s.dataset.askp === t.dataset.ask ? '' : 'none'; });
+    }
+    if (t.classList.contains('sw') && !t.classList.contains('lock')) t.classList.toggle('on');
+    if (t.matches('.seg span') && t.style.opacity === '') {
+      t.parentNode.querySelectorAll('span').forEach(function (x) { x.classList.toggle('on', x === t); });
+    }
+    render();
+  });
+  render();
+})();
+</script>
+</body>
+</html>

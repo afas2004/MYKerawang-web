@@ -6,7 +6,11 @@ import '../l10n/app_strings.dart';
 import '../l10n/shell_strings.dart';
 import '../l10n/social_strings.dart';
 import '../language_cubit.dart';
+import '../l10n/notification_strings.dart';
+import '../services/notification_links.dart';
+import '../services/notification_text.dart';
 import '../services/unread_notifications.dart';
+import '../widgets/push_prompt.dart';
 import '../utils/formatters.dart';
 import '../utils/adaptive.dart';
 import '../utils/roles.dart';
@@ -17,32 +21,22 @@ import '../widgets/app_toast.dart';
 IconData _iconFor(String? type) => switch (type) {
       'mention' => AppIcons.mention,
       'follow' => AppIcons.follow,
-      'comment' => AppIcons.comment,
-      'event' => AppIcons.calendarJoined,
+      'comment' || 'also_commented' => AppIcons.comment,
+      'event_reminder' => AppIcons.clock,
+      'event_join' => AppIcons.people,
+      'event_cancelled' => AppIcons.cancel,
+      'event' || 'event_changed' || 'new_event' => AppIcons.calendarJoined,
+      'form_answer' => AppIcons.formAnswers,
+      'moderation' => AppIcons.moderation,
       'listing' => AppIcons.market,
       _ => AppIcons.notifications,
     };
 
-/// Opens whatever the notification refers to (UI_UX_AUDIT 12.1).
-/// Payload lives in the `data` json column.
+/// Opens exactly what the notification refers to: the comment inside a
+/// post, the event, the form's answers, the profile (UI_UX_AUDIT 12.1).
 void _openTarget(BuildContext context, Map<String, dynamic> notif) {
-  final data = notif['data'];
-  if (data is! Map) return;
-
-  final postId = data['post_id'];
-  final eventId = data['event_id'];
-  final listingId = data['listing_id'] ?? data['item_id'];
-  final actorId = notif['actor_id'];
-
-  if (postId != null) {
-    context.push('/post/$postId');
-  } else if (eventId != null) {
-    context.push('/event/$eventId');
-  } else if (listingId != null) {
-    context.push('/item/$listingId');
-  } else if (notif['type'] == 'follow' && actorId != null) {
-    context.push('/u/$actorId');
-  }
+  final path = notificationPath(notif);
+  if (path != null) context.push(path);
 }
 
 Map _dataOf(Map<String, dynamic> notif) =>
@@ -66,6 +60,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
           .eq('user_id', _userId)
           .order('created_at', ascending: false)
           .limit(100);
+
+  NotifFilter _filter = NotifFilter.all;
 
   /// Actor profiles by id, fetched once per id.
   final Map<String, Map<String, dynamic>> _actors = {};
@@ -158,6 +154,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
     return id is String ? _actors[id] : null;
   }
 
+  (String, String)? _headline(AppStrings s, Map<String, dynamic> n,
+          Map<String, dynamic>? actor) =>
+      notificationHeadline(s, n, actor != null ? displayNameFor(s, actor) : null);
+
   /// Rows store a fragment for some types ("mentioned you in a post");
   /// put the actor (or "Someone") in front so it reads as a sentence.
   String _sentence(AppStrings s, Map<String, dynamic> notif,
@@ -249,9 +249,13 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 );
               }
 
+              final shown = _filter == NotifFilter.all
+                  ? notifications
+                  : notifications.where((n) => notificationFilter(n) == _filter).toList();
+
               // Today / This week / Earlier, newest first within each.
               final groups = <String, List<Map<String, dynamic>>>{};
-              for (final n in notifications) {
+              for (final n in shown) {
                 final when = parseLocal(n['created_at']) ?? DateTime(2000);
                 final label = switch (notificationBucket(when, DateTime.now())) {
                   NotifBucket.today => s.shell.today,
@@ -264,6 +268,17 @@ class _NotificationScreenState extends State<NotificationScreen> {
               return ListView(
                 padding: const EdgeInsets.only(bottom: KSpace.xl),
                 children: [
+                  const PushOfferBanner(),
+                  _filters(context),
+                  if (shown.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(KSpace.xl),
+                      child: Center(
+                        child: Text(s.nfEmpty,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: scheme.onSurfaceVariant)),
+                      ),
+                    ),
                   for (final entry in groups.entries) ...[
                     Padding(
                       padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.l, KSpace.l, KSpace.xs),
@@ -283,6 +298,34 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 
+  Widget _filters(BuildContext context) {
+    final s = context.l10n;
+    final labels = {
+      NotifFilter.all: s.nfAll,
+      NotifFilter.social: s.nfMentions,
+      NotifFilter.events: s.nfEvents,
+      NotifFilter.forms: s.nfForms,
+      NotifFilter.account: s.nfAccount,
+    };
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(KSpace.l, KSpace.s, KSpace.l, 0),
+      child: Row(
+        children: [
+          for (final e in labels.entries)
+            Padding(
+              padding: const EdgeInsets.only(right: KSpace.s),
+              child: ChoiceChip(
+                label: Text(e.value),
+                selected: _filter == e.key,
+                onSelected: (_) => setState(() => _filter = e.key),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _tile(BuildContext context, Map<String, dynamic> notif) {
     final s = context.l10n;
     final theme = Theme.of(context);
@@ -291,7 +334,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     final actor = _actorOf(notif);
     final avatar = actor?['avatar_url'] as String?;
 
-    final leading = actor != null
+    final face = actor != null
         ? CircleAvatar(
             radius: 22,
             backgroundColor: scheme.primaryContainer,
@@ -310,6 +353,37 @@ class _NotificationScreenState extends State<NotificationScreen> {
           );
 
     final time = formatRelative(context, DateTime.parse(notif['created_at']));
+    final headline = _headline(s, notif, actor);
+    final count = (notif['count'] as num?)?.toInt() ?? 1;
+
+    // Grouped rows ("Aina and 4 others"): the latest face with a +N chip.
+    final leading = count <= 1
+        ? face
+        : SizedBox(
+            width: 48,
+            height: 48,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                face,
+                Positioned(
+                  right: -2,
+                  bottom: -2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: scheme.primary,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: scheme.surface, width: 2),
+                    ),
+                    child: Text('+${count - 1}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                            color: scheme.onPrimary, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ],
+            ),
+          );
 
     final tile = Semantics(
       // Read state is otherwise only a colour dot.
@@ -339,7 +413,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              notif['title'] ?? s.notifications,
+                              headline?.$1 ?? notif['title'] ?? s.notifications,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.titleSmall?.copyWith(
@@ -353,7 +427,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                         ],
                       ),
                       const SizedBox(height: 2),
-                      Text(_sentence(s, notif, actor),
+                      Text(headline?.$2 ?? _sentence(s, notif, actor),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodyMedium

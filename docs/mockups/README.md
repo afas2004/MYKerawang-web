@@ -43,3 +43,10 @@ They are outputs, not sources — regenerate them if the screens change.
 **Status:** built. The editor and answer sheet landed in
 `lib/screens/events/form_editor_screen.dart` and `event_form_screen.dart`; see
 `docs/ki-event-reports.md` ("The editor — what 'simple' means").
+
+## `notifications.html`
+
+Audit of today's notifications, the push proposal (Web Push via a Supabase Edge
+Function, a separate `/push/` service worker so `sw_reset.js` is untouched), and
+mockups: bell list, permission prompt, Settings preferences, lock-screen push.
+Tabs along the top; Phone / Desktop toggle. `?tab=bell&w=desktop` links a state.

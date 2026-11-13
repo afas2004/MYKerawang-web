@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import '../widgets/focus_highlight.dart';
+import '../widgets/push_prompt.dart';
 import 'package:go_router/go_router.dart';
 import '../services/comment_pins.dart';
 import '../services/form_service.dart';
@@ -50,7 +53,11 @@ import '../l10n/page_tips_strings.dart';
 class EventDetailScreen extends StatefulWidget {
   final Map<String, dynamic> event;
 
-  const EventDetailScreen({super.key, required this.event});
+  /// From a notification (`/event/:id?c=<comment>`): the comment to scroll
+  /// to and highlight.
+  final String? focusCommentId;
+
+  const EventDetailScreen({super.key, required this.event, this.focusCommentId});
 
   @override
   State<EventDetailScreen> createState() => _EventDetailScreenState();
@@ -649,6 +656,10 @@ class _EventDetailScreenState extends State<EventDetailScreen>
           'event_id': _event['id'],
           'user_id': userId,
         });
+        // A helpful moment to offer phone reminders (never on first load).
+        if (mounted) {
+          unawaited(maybeOfferPushAfterJoin(context, '${_event['title'] ?? ''}'));
+        }
       } else {
         await supabase.from('event_participants').delete().match({
           'event_id': _event['id'],
@@ -2010,14 +2021,18 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                 return Column(
                   children: [
                     for (var i = 0; i < comments.length; i++)
-                      CommentTile(
-                        comment: comments[i],
-                        threadLine: i < comments.length - 1,
-                        highlightUserId: _event['organizer_id'],
-                        highlightLabel: s.organiserBadge,
-                        onTogglePin: canPin
-                            ? () => _toggleCommentPin(comments[i])
-                            : null,
+                      FocusHighlight(
+                        key: ValueKey(comments[i]['id']),
+                        focused: comments[i]['id'] == widget.focusCommentId,
+                        child: CommentTile(
+                          comment: comments[i],
+                          threadLine: i < comments.length - 1,
+                          highlightUserId: _event['organizer_id'],
+                          highlightLabel: s.organiserBadge,
+                          onTogglePin: canPin
+                              ? () => _toggleCommentPin(comments[i])
+                              : null,
+                        ),
                       ),
                   ],
                 );
