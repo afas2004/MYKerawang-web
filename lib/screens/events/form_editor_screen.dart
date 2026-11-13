@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../l10n/form_strings.dart';
+import '../../l10n/gform_import_strings.dart';
 import '../../language_cubit.dart';
 import '../../services/feature_flags.dart';
 import '../../services/form_service.dart';
@@ -20,6 +21,7 @@ import '../../utils/text_rules.dart';
 import '../../widgets/form_style.dart';
 import '../../widgets/restriction_gate.dart';
 import '../../widgets/app_toast.dart';
+import '../../widgets/google_form_import.dart';
 
 /// The form editor: one row per question, and every setting a question has is
 /// on that row.
@@ -232,6 +234,36 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
       if (!mounted) return;
       setState(() => _saving = false);
       showErrorWithRetry(context, e, onRetry: _startPaste);
+    }
+  }
+
+  /// An event form from a Google Form: made, filled and saved at once (event
+  /// forms keep every kind of question, so nothing is left out for safety).
+  Future<void> _startGoogle() async {
+    final draft = await showGoogleFormImport(context, standalone: false);
+    if (draft == null || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      final id = await FormService.instance.createBlank(
+        widget.eventId!,
+        title: draft.title.isEmpty ? null : draft.title,
+      );
+      final view = await FormService.instance.load(id);
+      await FormService.instance.save(
+        view.doc.copyWith(fields: draft.fields, intro: draft.description),
+      );
+      final saved = await FormService.instance.load(id);
+      if (!mounted) return;
+      _apply(saved.doc);
+      setState(() {
+        _choosing = false;
+        _saving = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      showErrorWithRetry(context, e,
+          message: context.l10nRead.formServerError(formErrorCode(e)));
     }
   }
 
@@ -549,6 +581,14 @@ class _FormEditorScreenState extends State<FormEditorScreen> {
               title: s.formStartPaste,
               subtitle: s.formStartPasteSub,
               onTap: _saving ? null : _startPaste,
+            ),
+            const SizedBox(height: KSpace.m),
+            _StartCard(
+              key: const ValueKey('start-gform'),
+              icon: AppIcons.link,
+              title: s.gfImport,
+              subtitle: s.gfImportSub,
+              onTap: _saving ? null : _startGoogle,
             ),
             const SizedBox(height: KSpace.l),
             Text(
@@ -2223,6 +2263,7 @@ class _StartCard extends StatelessWidget {
   final VoidCallback? onTap;
 
   const _StartCard({
+    super.key,
     required this.icon,
     required this.title,
     required this.subtitle,

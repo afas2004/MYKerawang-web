@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../l10n/form_strings.dart';
 import '../services/my_forms_service.dart';
 import '../widgets/form_picker.dart';
+import '../widgets/google_form_import.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -552,11 +553,17 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           if (_isAnon && !_asClub)
             Text(context.l10n.formAttachAnon,
                 style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant))
-          else if (_form == null)
+          else if (_form == null) ...[
+            // A Google Form link in the post: offer to make it an in-app form.
+            GoogleFormSuggestion(
+              sources: [_bodyCtrl],
+              onImported: (f) => setState(() => _form = f),
+            ),
             Align(
               alignment: Alignment.centerLeft,
               child: AttachFormButton(onPicked: (f) => setState(() => _form = f)),
-            )
+            ),
+          ]
           else
             ListTile(
               key: const ValueKey('attached-form'),

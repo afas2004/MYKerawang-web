@@ -18,7 +18,9 @@ import '../widgets/media_picker_grid.dart';
 import '../widgets/restriction_gate.dart';
 import '../l10n/create_strings.dart';
 import '../l10n/form_strings.dart';
+import '../utils/google_form_import.dart';
 import '../widgets/form_picker.dart';
+import '../widgets/google_form_import.dart';
 import '../services/club_service.dart';
 import '../services/moderation_service.dart';
 import '../utils/categories.dart';
@@ -948,6 +950,19 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             ),
           ],
         ),
+      // A Google Form link in the description or a button: offer to make it
+      // an in-app form. The button that pointed at it then points here.
+      GoogleFormSuggestion(
+        sources: [_descController, for (final l in _links) l.url, _linkController],
+        onImported: (f) => setState(() {
+          final row = _links.where((l) => findGoogleFormUrl(l.url.text) != null).firstOrNull;
+          if (row != null) {
+            row.set(s.formLinkLabel, f.path);
+          } else if (_links.length < kActionLinksMax) {
+            _links.add(_LinkRow()..set(s.formLinkLabel, f.path));
+          }
+        }),
+      ),
       if (hasOldLink) ...[
         _label(s.registrationLinkOptional),
         // Launched from the event page, so https only — not `javascript:`.

@@ -5,7 +5,9 @@ import 'package:image_picker/image_picker.dart';
 import '../l10n/announce_strings.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/form_strings.dart';
+import '../utils/google_form_import.dart';
 import '../widgets/form_picker.dart';
+import '../widgets/google_form_import.dart';
 import '../language_cubit.dart';
 import '../services/announcement_service.dart';
 import '../utils/announcement_rules.dart';
@@ -532,6 +534,23 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
               ),
             ],
           ),
+        // A Google Form link in the text or a button: offer an in-app form.
+        GoogleFormSuggestion(
+          sources: [_body, for (final r in _actions) r.url],
+          onImported: (f) => _set(() {
+            final row =
+                _actions.where((r) => findGoogleFormUrl(r.url.text) != null).firstOrNull;
+            if (row != null) {
+              row
+                ..label.text = context.l10nRead.formLinkLabel
+                ..url.text = f.path;
+            } else if (_actions.length < kActionLinksMax) {
+              _actions.add(_ActionRow()
+                ..label.text = context.l10nRead.formLinkLabel
+                ..url.text = f.path);
+            }
+          }),
+        ),
 
         // Linked event
         label(a.linkEvent),

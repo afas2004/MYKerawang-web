@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../l10n/access_strings.dart';
 import '../../l10n/app_strings.dart';
 import '../../l10n/form_strings.dart';
+import '../../l10n/gform_import_strings.dart';
 import '../../language_cubit.dart';
 import '../../services/club_service.dart';
 import '../../services/form_service.dart';
@@ -16,14 +17,15 @@ import '../../utils/form_rules.dart';
 import '../../utils/text_file_picker.dart';
 import '../../utils/text_rules.dart';
 import '../../widgets/brand/brand.dart';
+import '../../widgets/google_form_import.dart';
 
 /// The template gallery (`/forms/new`): where every new form starts.
 ///
 /// Laid out the way template galleries usually are — search on top, categories
 /// to narrow the grid, and a grid of same-sized cards whose picture is a
 /// sketch of the form itself, so a template is recognised before its name is
-/// read. "Blank form" and "Import CSV" come first: they are the two ways to
-/// start without a template.
+/// read. "Blank form", "Import CSV" and "Import from Google Form" come first:
+/// the ways to start without a template.
 ///
 /// Phones: categories are a chip row and the grid is two columns. From 900 px
 /// the categories move to a rail on the left and the grid takes as many
@@ -119,7 +121,12 @@ class _FormGalleryScreenState extends State<FormGalleryScreen> {
 
   /// Makes the form, fills it ([fields] for an import), and swaps this page for
   /// its editor so back goes to wherever the gallery was opened from.
-  Future<void> _create({String? slug, String? title, List<FormFieldSpec>? fields}) async {
+  Future<void> _create({
+    String? slug,
+    String? title,
+    List<FormFieldSpec>? fields,
+    String? intro,
+  }) async {
     if (_busy) return;
     final router = GoRouter.of(context);
     final s = context.l10nRead;
@@ -133,7 +140,7 @@ class _FormGalleryScreenState extends State<FormGalleryScreen> {
       );
       if (fields != null && fields.isNotEmpty) {
         final view = await FormService.instance.load(id);
-        await FormService.instance.save(view.doc.copyWith(fields: fields));
+        await FormService.instance.save(view.doc.copyWith(fields: fields, intro: intro));
       }
       if (!mounted) return;
       setState(() => _busy = false);
@@ -183,6 +190,16 @@ class _FormGalleryScreenState extends State<FormGalleryScreen> {
     );
     if (result == null) return;
     await _create(title: result.$1.isEmpty ? null : result.$1, fields: result.$2);
+  }
+
+  Future<void> _importGoogle() async {
+    final draft = await showGoogleFormImport(context);
+    if (draft == null) return;
+    await _create(
+      title: draft.title.isEmpty ? null : draft.title,
+      fields: draft.fields,
+      intro: draft.description,
+    );
   }
 
   // ------------------------------------------------------------------- build
@@ -289,6 +306,14 @@ class _FormGalleryScreenState extends State<FormGalleryScreen> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: KSpace.m),
+              _StartCard(
+                key: const ValueKey('start-gform'),
+                icon: AppIcons.link,
+                title: s.gfImport,
+                subtitle: s.gfImportSub,
+                onTap: _importGoogle,
               ),
               if (_recent.isNotEmpty) ...[
                 const SizedBox(height: KSpace.l),
@@ -426,6 +451,16 @@ class _FormGalleryScreenState extends State<FormGalleryScreen> {
                                 title: s.galleryCsv,
                                 subtitle: s.galleryCsvSub,
                                 onTap: _importCsv,
+                              ),
+                            ),
+                            SizedBox(
+                              width: 300,
+                              child: _StartCard(
+                                key: const ValueKey('start-gform'),
+                                icon: AppIcons.link,
+                                title: s.gfImport,
+                                subtitle: s.gfImportSub,
+                                onTap: _importGoogle,
                               ),
                             ),
                           ],
