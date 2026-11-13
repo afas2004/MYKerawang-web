@@ -61,11 +61,42 @@ class _FormGalleryScreenState extends State<FormGalleryScreen> {
   bool _busy = false;
   bool _loadFailed = false;
 
+  /// The newest few of the user's forms, for the "Your recent forms" strip.
+  /// Empty while loading, when there are none, or when the list can't be
+  /// read (a guest, or offline): the strip then simply isn't drawn.
+  List<MyForm> _recent = const [];
+
   @override
   void initState() {
     super.initState();
     _search.addListener(() => setState(() {}));
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadOwners());
+    _loadRecent();
+  }
+
+  static const _recentCount = 6;
+
+  Future<void> _loadRecent() async {
+    List<MyForm> forms;
+    try {
+      forms = await MyFormsService.instance.myForms();
+    } catch (_) {
+      forms = const [];
+    }
+    final sorted = [...forms]
+      ..sort((a, b) => (b.updatedAt ?? DateTime(0)).compareTo(a.updatedAt ?? DateTime(0)));
+    if (mounted) setState(() => _recent = sorted.take(_recentCount).toList());
+  }
+
+  /// Opens a form's editor; coming back refreshes the strip.
+  Future<void> _openRecent(MyForm f) async {
+    await context.push('/f/${f.id}/edit');
+    if (mounted) _loadRecent();
+  }
+
+  Future<void> _openMyForms() async {
+    await context.push('/forms');
+    if (mounted) _loadRecent();
   }
 
   @override
@@ -259,6 +290,14 @@ class _FormGalleryScreenState extends State<FormGalleryScreen> {
                   ),
                 ],
               ),
+              if (_recent.isNotEmpty) ...[
+                const SizedBox(height: KSpace.l),
+                _RecentForms(
+                  forms: _recent,
+                  onOpen: _openRecent,
+                  onSeeAll: _openMyForms,
+                ),
+              ],
               const SizedBox(height: KSpace.l),
               _SectionTitle(s.galleryTemplates),
             ],
@@ -328,6 +367,25 @@ class _FormGalleryScreenState extends State<FormGalleryScreen> {
                       selected: _category == c,
                       onTap: () => setState(() => _category = c),
                     ),
+                  // The way back to forms already made, always on the rail
+                  // (even before the first one exists: the list says so).
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: KSpace.s),
+                    child: Divider(height: 1, color: Theme.of(context).colorScheme.outlineVariant),
+                  ),
+                  _RailItem(
+                    key: const ValueKey('rail-my-forms'),
+                    icon: AppIcons.list,
+                    color: null,
+                    label: s.galleryMyForms,
+                    trailing: Icon(
+                      AppIcons.chevronRight,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    selected: false,
+                    onTap: _openMyForms,
+                  ),
                 ],
               ),
             ),
@@ -372,6 +430,14 @@ class _FormGalleryScreenState extends State<FormGalleryScreen> {
                             ),
                           ],
                         ),
+                        if (_recent.isNotEmpty) ...[
+                          const SizedBox(height: KSpace.xl),
+                          _RecentForms(
+                            forms: _recent,
+                            onOpen: _openRecent,
+                            onSeeAll: _openMyForms,
+                          ),
+                        ],
                         const SizedBox(height: KSpace.xl),
                         _SectionTitle(s.galleryCategory(_category)),
                         const SizedBox(height: KSpace.m),
@@ -545,7 +611,10 @@ class _RailItem extends StatelessWidget {
   final IconData icon;
   final Color? color;
   final String label;
-  final int count;
+
+  /// A count on the right, or [trailing] instead (e.g. a chevron for a link).
+  final int? count;
+  final Widget? trailing;
   final bool selected;
   final VoidCallback onTap;
 
@@ -554,7 +623,8 @@ class _RailItem extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.label,
-    required this.count,
+    this.count,
+    this.trailing,
     required this.selected,
     required this.onTap,
   });
@@ -587,14 +657,150 @@ class _RailItem extends StatelessWidget {
                     ),
                   ),
                 ),
-                Text(
-                  '$count',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
-                ),
+                if (count != null)
+                  Text(
+                    '$count',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                if (trailing != null) trailing!,
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Your recent forms": a title with "See all" (to `/forms`), then the newest
+/// forms as a row of small cards that scrolls sideways. Each card shows the
+/// title, its status and how many answers it has; tapping opens its editor.
+class _RecentForms extends StatelessWidget {
+  final List<MyForm> forms;
+  final ValueChanged<MyForm> onOpen;
+  final VoidCallback onSeeAll;
+
+  const _RecentForms({required this.forms, required this.onOpen, required this.onSeeAll});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    return Column(
+      key: const ValueKey('recent-forms'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(child: _SectionTitle(s.galleryRecentTitle)),
+            TextButton(
+              key: const ValueKey('recent-see-all'),
+              onPressed: onSeeAll,
+              child: Text(s.gallerySeeAll),
+            ),
+          ],
+        ),
+        const SizedBox(height: KSpace.xs),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          clipBehavior: Clip.none,
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final (i, f) in forms.indexed) ...[
+                  if (i > 0) const SizedBox(width: KSpace.m),
+                  SizedBox(
+                    width: 200,
+                    child: _RecentCard(form: f, onTap: () => onOpen(f)),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RecentCard extends StatelessWidget {
+  final MyForm form;
+  final VoidCallback onTap;
+
+  const _RecentCard({required this.form, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    // Same words and colours as the My forms list.
+    final (status, color) = form.isHidden
+        ? (s.formsRemoved, scheme.error)
+        : switch (form.status) {
+            'open' => (s.formOpen, scheme.primary),
+            'closed' => (s.formClosed, scheme.onSurfaceVariant),
+            _ => (s.formDraft, scheme.tertiary),
+          };
+    final meta = [status, if (!form.isDraft) s.formsResponses(form.responses)].join(' · ');
+    return Material(
+      color: scheme.surfaceContainerLowest,
+      shape: RoundedRectangleBorder(
+        borderRadius: KRadius.card,
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: ValueKey('recent-${form.id}'),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(KSpace.m),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                form.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, height: 1.25),
+              ),
+              if (form.clubName != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  form.clubName!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ],
+              const Spacer(),
+              const SizedBox(height: KSpace.s),
+              Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: KSpace.xs + 2),
+                  Expanded(
+                    child: Text(
+                      meta,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),

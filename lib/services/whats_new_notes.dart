@@ -36,6 +36,11 @@ class ReleaseNote {
 
 /// Newest first.
 final kReleaseNotes = <ReleaseNote>[
+  ReleaseNote('1.16.3', DateTime(2026, 11, 13), const [
+    NoteLine('The New form page shows your recent forms, with See all to open My forms.',
+        'Halaman Borang baharu tunjuk borang terkini awak, dengan Lihat semua untuk buka Borang saya.',
+        '新しいフォームのページに最近のフォームが表示され、「すべて表示」でマイフォームを開けます。'),
+  ]),
   ReleaseNote('1.16.2', DateTime(2026, 11, 13), const [
     NoteLine('Page tips can be turned off in Settings, or turned back on to see them again.',
         'Tip halaman boleh dimatikan di Tetapan, atau dihidupkan semula untuk lihat sekali lagi.',
