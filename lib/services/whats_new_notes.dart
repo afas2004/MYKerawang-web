@@ -36,6 +36,11 @@ class ReleaseNote {
 
 /// Newest first.
 final kReleaseNotes = <ReleaseNote>[
+  ReleaseNote('1.16.1', DateTime(2026, 11, 13), const [
+    NoteLine('Shorter post cards: long posts show 5 lines with Read more, and photos are smaller, so more posts fit on your screen.',
+        'Kad post lebih pendek: post panjang tunjuk 5 baris dengan Baca lagi, dan gambar lebih kecil, jadi lebih banyak post muat di skrin.',
+        '投稿カードが短くなりました。長い投稿は5行まで表示して「Read more」が付き、写真も小さくなったので、画面により多くの投稿が入ります。'),
+  ]),
   ReleaseNote('1.16.0', DateTime(2026, 11, 13), const [
     NoteLine('Short tips show the first time you open Market, an event, or the Create pages. Bring them back in Settings.',
         'Tip ringkas muncul kali pertama awak buka Pasar, aktiviti, atau halaman Cipta. Boleh tunjuk semula di Tetapan.',
