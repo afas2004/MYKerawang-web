@@ -49,6 +49,16 @@ extension AttendanceFormStrings on AppStrings {
       _t('Form responses', 'Jawapan borang', 'フォームの回答');
   String get afExportResponses =>
       _t('Responses CSV', 'CSV jawapan', '回答CSV');
+  String get afShowFormQr =>
+      _t("Show the form's QR", 'Tunjuk QR borang', 'フォームのQRを表示');
+  String get afShowFormQrHint => _t(
+      'A second QR that opens the form, for people who cannot check in.',
+      'QR kedua yang membuka borang, untuk orang yang tidak dapat daftar masuk.',
+      'チェックインできない人のために、フォームを開く2つ目のQRです。');
+  String get afFormNotPublic => _t(
+      'Only people with an account can answer this form. Make it public in the form to let anyone answer.',
+      'Hanya orang yang ada akaun boleh menjawab borang ini. Jadikannya awam dalam borang supaya sesiapa boleh menjawab.',
+      'このフォームはアカウントのある人だけが回答できます。誰でも回答できるようにするには、フォームで公開にしてください。');
 
   // ---- the success screen
   String get afAnswerNow =>
