@@ -36,6 +36,20 @@ class ReleaseNote {
 
 /// Newest first.
 final kReleaseNotes = <ReleaseNote>[
+  ReleaseNote('1.17.0', DateTime(2026, 11, 13), const [
+    NoteLine('Phone notifications: get event reminders, comments and form answers even when MYKerawang is closed. Turn them on in Settings › Notifications.',
+        'Pemberitahuan telefon: terima peringatan acara, ulasan dan jawapan borang walaupun MYKerawang ditutup. Hidupkan di Tetapan › Pemberitahuan.',
+        'スマホ通知：MYKerawangを閉じていても、イベントのリマインダー、コメント、フォームの回答が届きます。設定 › 通知でオンにできます。'),
+    NoteLine('A reminder about an hour before events you joined, and a notice when their time or place changes.',
+        'Peringatan kira-kira sejam sebelum acara yang awak sertai, dan notis bila masa atau tempatnya berubah.',
+        '参加したイベントの約1時間前にリマインダーが届き、時間や場所が変わったときもお知らせします。'),
+    NoteLine('New notifications for comments on your posts and events, answers to your forms and people joining your events, grouped so they never pile up.',
+        'Pemberitahuan baharu untuk ulasan pada post dan acara awak, jawapan borang dan orang yang sertai acara awak, dikumpul supaya tak bertimbun.',
+        'あなたの投稿やイベントへのコメント、フォームの回答、イベントへの参加をまとめてお知らせします。'),
+    NoteLine('Tap a notification to go straight to that comment, event or form. Choose what reaches your phone and set quiet hours in Settings.',
+        'Ketik pemberitahuan untuk terus ke ulasan, acara atau borang itu. Pilih apa yang sampai ke telefon dan tetapkan waktu senyap di Tetapan.',
+        '通知をタップすると、そのコメント・イベント・フォームに直接移動します。スマホに届く内容とおやすみ時間は設定で選べます。'),
+  ]),
   ReleaseNote('1.16.4', DateTime(2026, 11, 13), const [
     NoteLine("Taking attendance can ask any of your forms after check-in, not only the event's own form.",
         'Ambil kehadiran boleh minta mana-mana borang awak selepas daftar masuk, bukan hanya borang acara itu sendiri.',
