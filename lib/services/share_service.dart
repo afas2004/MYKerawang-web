@@ -71,10 +71,13 @@ class ShareService {
     return '$origin$path';
   }
 
-  /// [text] followed by the page's absolute URL on its own line, so the
-  /// person receiving a chat message can open the exact listing / event.
+  /// [text] with the page's absolute URL on its own line right after the
+  /// first line, so the person receiving a chat message can open the exact
+  /// listing / event and the chat previews our page (see
+  /// [composeShareMessage]). No bold: this is a personal message, not a
+  /// titled share.
   static String withPageLink(String text, String path) =>
-      '$text\n${absoluteUrl(path)}';
+      composeShareMessage(text, absoluteUrl(path), boldTitle: false);
 
   /// Share sheet.
   ///
@@ -124,8 +127,9 @@ class ShareService {
 
     // The link rides inside `text` rather than in a separate uri member:
     // every share target linkifies a bare URL, whereas a distinct member is
-    // one more thing an implementation is free to ignore.
-    final message = link == null ? text : '$text\n\n$link';
+    // one more thing an implementation is free to ignore. It goes right
+    // after the first line, so it is the first link in the message.
+    final message = composeShareMessage(text, link);
 
     // share_plus 13 API: the old static Share.share()/shareXFiles() were
     // removed in favour of SharePlus.instance.share(ShareParams(...)).
@@ -146,7 +150,7 @@ class ShareService {
         text: message,
         // `subject` survives in some targets (email, a few chat apps) even
         // when they drop the body for multi-file shares.
-        subject: message.split('\n').first,
+        subject: _firstLine(text) ?? message.split('\n').first,
         files: files.isEmpty ? null : files,
         sharePositionOrigin: origin,
       ));
@@ -158,6 +162,53 @@ class ShareService {
       );
     }
   }
+}
+
+/// The final text of a share: [link] goes on the line right after the first
+/// line of [text].
+///
+/// Chat apps (WhatsApp above all) build the preview card from the FIRST link
+/// in a message. Putting ours straight after the title means the card shows
+/// our page (picture, title, date) even when the description below holds a
+/// Google Form or Instagram link.
+///
+/// - [text] empty: just the link.
+/// - [link] already somewhere in [text]: that copy is removed, so it is sent
+///   once, in the right place.
+/// - [boldTitle] wraps the first line in `*…*` (WhatsApp bold), but only when
+///   it has no `*` of its own, so the sharer's formatting is never broken.
+/// - [link] null or empty: [text] unchanged.
+String composeShareMessage(String text, String? link, {bool boldTitle = true}) {
+  if (link == null || link.trim().isEmpty) return text;
+  link = link.trim();
+
+  // Drop any copy of our link already in the text. The lookahead leaves a
+  // longer URL alone (…/event/abc123 when ours is …/event/abc).
+  final cleaned = text
+      .replaceAll(RegExp('${RegExp.escape(link)}(?![A-Za-z0-9_/?#&=%-])'), '')
+      .split('\n')
+      .map((l) => l.trimRight())
+      .join('\n')
+      .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+      .trim();
+
+  if (cleaned.isEmpty) return link;
+
+  final cut = cleaned.indexOf('\n');
+  final first = (cut < 0 ? cleaned : cleaned.substring(0, cut)).trim();
+  final rest = cut < 0 ? '' : cleaned.substring(cut + 1).trim();
+
+  final title = boldTitle && !first.contains('*') ? '*$first*' : first;
+  final head = '$title\n$link';
+  return rest.isEmpty ? head : '$head\n\n$rest';
+}
+
+/// First non-empty line of [text], for a share's subject; null if none.
+String? _firstLine(String text) {
+  for (final l in text.split('\n')) {
+    if (l.trim().isNotEmpty) return l.trim();
+  }
+  return null;
 }
 
 class _ShareChoice {
@@ -232,7 +283,7 @@ class _ShareSheetState extends State<_ShareSheet> {
                   alignLabelWithHint: true,
                 ),
               ),
-              // ---- the link that will be appended ----
+              // ---- the link that goes after the first line ----
               if (_hasLink) ...[
                 const SizedBox(height: 12),
                 Container(
@@ -269,6 +320,12 @@ class _ShareSheetState extends State<_ShareSheet> {
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  s.shareLinkAfterTitle,
+                  style:
+                      TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
                 ),
               ],
 
@@ -362,9 +419,7 @@ class _ShareSheetState extends State<_ShareSheet> {
         TextButton.icon(
           onPressed: () async {
             await Clipboard.setData(ClipboardData(
-              text: widget.link == null
-                  ? _ctrl.text
-                  : '${_ctrl.text}\n\n${widget.link}',
+              text: composeShareMessage(_ctrl.text, widget.link),
             ));
             if (context.mounted) {
               showToast(s.textCopied);

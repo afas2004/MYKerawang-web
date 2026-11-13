@@ -202,7 +202,7 @@ class _PostCardState extends State<PostCard> {
       body,
       PostService.photoUrlsOf(post),
       // The route; the sheet makes it absolute (ShareService.absoluteUrl)
-      // and appends it to the message.
+      // and puts it right after the first line of the message.
       link: postSharePath(post['id']),
     );
   }
