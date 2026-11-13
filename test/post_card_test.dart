@@ -122,6 +122,101 @@ void main() {
     expect(find.bySemanticsLabel('Post photo 2 of 2'), findsOneWidget);
   });
 
+  group('compact feed card', () {
+    final long = List.filled(
+            12, 'Patience is a virtue and great leaders let things happen.')
+        .join('\n');
+    final many = [
+      for (var i = 1; i < 5; i++) 'https://example.invalid/$i.jpg',
+    ];
+
+    RichText bodyText(WidgetTester tester) => tester.widget<RichText>(find
+        .descendant(
+            of: find.byType(PostBodyPreview), matching: find.byType(RichText))
+        .first);
+
+    testWidgets('long body stops at 5 lines with Read more', (tester) async {
+      var opened = 0;
+      await pump(
+          tester, PostCard(post: post(body: long), onTap: () => opened++));
+      expect(bodyText(tester).maxLines, 5);
+      expect(bodyText(tester).overflow, TextOverflow.ellipsis);
+      expect(find.text('Read more'), findsOneWidget);
+      await tester.tap(find.text('Read more'));
+      expect(opened, 1);
+    });
+
+    testWidgets('short body: no Read more', (tester) async {
+      await pump(tester, PostCard(post: post()));
+      expect(find.text('Read more'), findsNothing);
+    });
+
+    testWidgets('post page (expanded) shows the whole body', (tester) async {
+      await pump(tester, PostCard(post: post(body: long), expanded: true));
+      expect(find.byType(PostBodyPreview), findsNothing);
+      expect(find.text('Read more'), findsNothing);
+      expect(find.byType(PostPhotoPreview), findsNothing);
+    });
+
+    testWidgets('several photos: one short row with +N', (tester) async {
+      tester.view.physicalSize = const Size(375, 812);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await pump(
+        tester,
+        PostCard(
+            post: post(imageUrl: 'https://example.invalid/0.jpg', gallery: many)),
+      );
+      expect(find.byType(PostPhotoPreview), findsOneWidget);
+      expect(find.text('+2'), findsOneWidget); // 5 photos, 3 shown
+      expect(tester.getSize(find.byType(PostPhotoPreview)).height,
+          lessThanOrEqualTo(140));
+    });
+
+    testWidgets('one photo is at most 190 px tall on a phone', (tester) async {
+      tester.view.physicalSize = const Size(375, 812);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await pump(tester,
+          PostCard(post: post(imageUrl: 'https://example.invalid/0.jpg')));
+      expect(tester.getSize(find.byType(PostPhotoPreview)).height,
+          lessThanOrEqualTo(190));
+    });
+
+    for (final size in const [Size(320, 568), Size(1280, 800)]) {
+      testWidgets('fits at ${size.width.toInt()}×${size.height.toInt()}',
+          (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        for (final photos in [
+          <String>[],
+          ['https://example.invalid/a.jpg'],
+          many,
+        ]) {
+          await pump(
+            tester,
+            PostCard(
+              key: UniqueKey(),
+              post: post(
+                title: 'A very long title ' * 6,
+                body: long,
+                imageUrl: photos.isEmpty ? null : photos.first,
+                gallery: photos.skip(1).toList(),
+                tags: ['question', 'events'],
+              ),
+            ),
+          );
+          expect(tester.takeException(), isNull);
+          expect(find.text('Read more'), findsOneWidget);
+          // The whole card stays shorter than one screen.
+          expect(tester.getSize(find.byType(PostCard)).height,
+              lessThan(size.height));
+        }
+      });
+    }
+  });
+
   testWidgets('tags show as #text, Lost&Found as #lostfound', (tester) async {
     String? tapped;
     await pump(

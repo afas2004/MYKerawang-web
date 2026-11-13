@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -225,6 +226,8 @@ class _PostCardState extends State<PostCard> {
         .map(normalizeTag)
         .where((t) => t.isNotEmpty)
         .toSet();
+    final bodyStyle = theme.textTheme.bodyLarge
+        ?.copyWith(fontSize: 15, height: 1.45, color: scheme.onSurface);
     final sharedIsEvent = post['events'] != null;
     final Map<String, dynamic>? shared =
         (post['events'] ?? post['listings']) as Map<String, dynamic>?;
@@ -264,17 +267,22 @@ class _PostCardState extends State<PostCard> {
               if (title.isNotEmpty) ...[
                 Text(
                   title,
+                  // Feed: two lines at most; the post page shows it all.
+                  maxLines: widget.expanded ? null : 2,
+                  overflow: widget.expanded ? null : TextOverflow.ellipsis,
                   style: theme.textTheme.titleMedium?.copyWith(
                       fontSize: 16, fontWeight: FontWeight.w600, height: 1.35),
                 ),
                 const SizedBox(height: KSpace.xs),
               ],
               if (body.isNotEmpty)
-                MentionText(
-                  body,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                      fontSize: 15, height: 1.45, color: scheme.onSurface),
-                ),
+                widget.expanded
+                    ? MentionText(body, style: bodyStyle)
+                    : PostBodyPreview(
+                        body: body,
+                        style: bodyStyle,
+                        onReadMore: widget.onTap,
+                      ),
               if (tags.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: KSpace.xs),
@@ -312,7 +320,9 @@ class _PostCardState extends State<PostCard> {
               ] else if (photos.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: KSpace.m),
-                  child: PostPhotoLayout(urls: photos),
+                  child: widget.expanded
+                      ? PostPhotoLayout(urls: photos)
+                      : PostPhotoPreview(urls: photos),
                 ),
               PostFormLinks(post: post),
             ],
@@ -767,6 +777,112 @@ class _PhotoTile extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Feed body: at most [maxLines] lines ending in "…", plus a "Read more"
+/// cue only when the text really was cut. The post page shows it all.
+class PostBodyPreview extends StatelessWidget {
+  static const maxLines = 5;
+
+  final String body;
+  final TextStyle? style;
+
+  /// Opens the post (the same as tapping the card).
+  final VoidCallback? onReadMore;
+
+  const PostBodyPreview(
+      {super.key, required this.body, this.style, this.onReadMore});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return LayoutBuilder(builder: (context, box) {
+      // Lay the plain text out once to learn whether 5 lines are enough.
+      // No text scaling: MentionText's RichText doesn't scale either.
+      final painter = TextPainter(
+        text: TextSpan(text: body, style: style),
+        maxLines: maxLines,
+        textDirection: Directionality.of(context),
+        textScaler: TextScaler.noScaling,
+      )..layout(maxWidth: box.maxWidth);
+      final cut = painter.didExceedMaxLines;
+      painter.dispose();
+
+      final readMore = Text(
+        context.feedL10n.readMore,
+        style: theme.textTheme.labelLarge?.copyWith(
+            color: theme.colorScheme.primary, fontWeight: FontWeight.w600),
+      );
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          MentionText(body, style: style, maxLines: maxLines),
+          if (cut)
+            Semantics(
+              button: onReadMore != null,
+              child: GestureDetector(
+                onTap: onReadMore,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: KSpace.xs),
+                  child: readMore,
+                ),
+              ),
+            ),
+        ],
+      );
+    });
+  }
+}
+
+/// Feed photos, kept short so more posts fit on a screen. One photo is a
+/// full-width cover at most 190 px tall (240 on wide cards); several become
+/// one row of up to three tiles, the last showing "+N" when there are more.
+/// Each tile opens the full gallery; the post page keeps [PostPhotoLayout].
+class PostPhotoPreview extends StatelessWidget {
+  final List<String> urls;
+
+  const PostPhotoPreview({super.key, required this.urls});
+
+  static const double _gap = KSpace.xs;
+
+  /// Cards wider than this (tablet / desktop) get a little more height.
+  static const double _wideCard = 480;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, box) {
+      final w = box.maxWidth;
+      final wide = w >= _wideCard;
+      final n = urls.length;
+      final double h;
+      final Widget child;
+      if (n == 1) {
+        h = math.min(w * 3 / 4, wide ? 240.0 : 190.0);
+        child = _PhotoTile(urls: urls, index: 0);
+      } else {
+        final shown = math.min(n, 3);
+        final tileW = (w - _gap * (shown - 1)) / shown;
+        h = math.min(n == 2 ? tileW * 0.8 : tileW, wide ? 200.0 : 140.0);
+        child = Row(children: [
+          for (var i = 0; i < shown; i++) ...[
+            if (i > 0) const SizedBox(width: _gap),
+            Expanded(
+              child: _PhotoTile(
+                  urls: urls,
+                  index: i,
+                  extra: i == shown - 1 ? n - shown : 0),
+            ),
+          ],
+        ]);
+      }
+      return ClipRRect(
+        borderRadius: KRadius.card,
+        child: SizedBox(width: w, height: h, child: child),
+      );
+    });
   }
 }
 
