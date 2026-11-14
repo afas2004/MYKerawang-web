@@ -36,6 +36,11 @@ class ReleaseNote {
 
 /// Newest first.
 final kReleaseNotes = <ReleaseNote>[
+  ReleaseNote('1.18.3', DateTime(2026, 11, 14), const [
+    NoteLine('Every form now has its own QR code. It can be shown or saved from the form editor and from My forms, ready to be printed or displayed.', 'Setiap borang kini mempunyai kod QR tersendiri. Ia boleh dipaparkan atau disimpan dari penyunting borang dan Borang saya, sedia untuk dicetak atau dipaparkan.', 'すべてのフォームに専用のQRコードが付きました。フォーム編集画面と「マイフォーム」から表示・保存でき、印刷や画面表示に使えます。'),
+    NoteLine('Shared messages no longer end with "Check this out on MYKerawang!". Only the title, link and description are sent.', 'Mesej yang dikongsi tidak lagi diakhiri dengan "Tengok ni kat MYKerawang!". Hanya tajuk, pautan dan keterangan dihantar.', '共有メッセージの末尾に「MYKerawangでチェック！」が付かなくなりました。タイトル、リンク、説明だけが送られます。'),
+    NoteLine('Links to kerawang.my can now be opened in the installed app on supported devices.', 'Pautan ke kerawang.my kini boleh dibuka dalam aplikasi yang dipasang pada peranti yang menyokongnya.', '対応する端末では、kerawang.myへのリンクをインストール済みのアプリで開けるようになりました。'),
+  ]),
   ReleaseNote('1.18.2', DateTime(2026, 11, 14), const [
     NoteLine('A Next button has been added to the pin bar. When a pin is opened, the following pin can be viewed without swiping.', 'Butang Seterusnya telah ditambah pada bar pin. Apabila pin dibuka, pin seterusnya boleh dilihat tanpa perlu meleret.', 'ピンバーに「次へ」ボタンが追加されました。ピンを開いたまま、スワイプせずに次のピンを表示できます。'),
     NoteLine('The pattern on the pin bar is now drawn more efficiently, so Home scrolls more smoothly.', 'Corak pada bar pin kini dilukis dengan lebih cekap, menjadikan laman Utama lebih lancar ketika ditatal.', 'ピンバーの模様がより効率よく描画されるようになり、ホームのスクロールがなめらかになりました。'),

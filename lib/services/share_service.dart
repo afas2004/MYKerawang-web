@@ -103,8 +103,9 @@ class ShareService {
 
     final url = link == null ? null : absoluteUrl(link);
 
-    final defaultText =
-        "$title\n\n$body\n\n${context.l10nRead.shareFooter}";
+    // Title and description only: the link (put right after the title)
+    // already says where it's from, so no "Check this out" line.
+    final defaultText = "$title\n\n$body";
 
     final result = await showDialog<_ShareChoice>(
       context: context,

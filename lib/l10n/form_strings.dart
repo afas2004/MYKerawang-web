@@ -357,6 +357,16 @@ extension FormStrings on AppStrings {
       _t("Removed by moderators", "Dibuang oleh moderator", "Removed by moderators");
   String get formsCopyLink => _t("Copy link", "Salin pautan", "Copy link");
   String get formsLinkCopied => _t("Link copied", "Pautan disalin", "Link copied");
+  String get formQrTitle => _t("Form QR code", "Kod QR borang", "フォームのQRコード");
+  String get formQrShow => _t("Show QR code", "Tunjuk kod QR", "QRコードを表示");
+  String get formQrHint => _t(
+      "Scan to open this form. Print it or show it on a screen.",
+      "Imbas untuk buka borang ini. Cetak atau paparkan pada skrin.",
+      "スキャンするとこのフォームが開きます。印刷や画面表示に使えます。");
+  String get formQrSave => _t("Save QR", "Simpan QR", "QRを保存");
+  String get formQrSaved => _t("QR code saved", "Kod QR disimpan", "QRコードを保存しました");
+  String get formQrSaveFailed =>
+      _t("Couldn't save the QR code", "Kod QR tidak dapat disimpan", "QRコードを保存できませんでした");
   String get formsClose => _t("Close form", "Tutup borang", "Close form");
   String get formsCloseTitle => _t("Close this form?", "Tutup borang ini?", "Close this form?");
   String get formsCloseBody => _t(

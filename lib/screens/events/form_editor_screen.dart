@@ -10,6 +10,7 @@ import '../../services/feature_flags.dart';
 import '../../services/form_service.dart';
 import '../../services/my_forms_service.dart';
 import '../../services/share_service.dart';
+import '../../widgets/form_qr_sheet.dart';
 import '../../theme/app_icons.dart';
 import '../../theme/tokens.dart';
 import '../../utils/adaptive.dart';
@@ -2559,6 +2560,13 @@ class _ShareBox extends StatelessWidget {
               onPressed: onResponses,
               icon: const Icon(AppIcons.list, size: 16),
               label: Text(s.formOpenAnswers),
+            ),
+            TextButton.icon(
+              key: const ValueKey('show-form-qr'),
+              onPressed: () => showFormQr(context,
+                  title: doc.title, path: '/f/${doc.slug ?? doc.id}', draft: doc.isDraft),
+              icon: const Icon(AppIcons.qrCode, size: 16),
+              label: Text(s.formQrShow),
             ),
           ],
         ),

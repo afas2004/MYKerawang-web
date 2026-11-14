@@ -1,8 +1,17 @@
 {
     "name": "MYKerawang",
     "short_name": "MYKerawang",
-    "start_url": ".",
+    "id": "/",
+    "start_url": "/",
+    "scope": "/",
     "display": "standalone",
+    "launch_handler": {
+        "client_mode": [
+            "navigate-existing",
+            "auto"
+        ]
+    },
+    "handle_links": "preferred",
     "background_color": "#5E1A4F",
     "theme_color": "#5E1A4F",
     "description": "MYKerawang — community marketplace and events platform.",
