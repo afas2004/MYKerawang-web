@@ -5,10 +5,9 @@ import 'package:mykerawang/services/share_service.dart';
 /// chat apps build the preview card from the first link they see.
 void main() {
   const ours = 'https://kerawang.my/event/abc123';
-  const footer = 'Check this out on MYKerawang!';
 
   /// What the share pop-up starts with (see ShareService.shareContent).
-  String sheetText(String title, String body) => '$title\n\n$body\n\n$footer';
+  String sheetText(String title, String body) => '$title\n\n$body';
 
   List<String> lines(String s) => s.split('\n');
 
@@ -30,9 +29,7 @@ void main() {
       '🗓 Sat 15 Nov · 8:00–10:00pm\n'
       '\n'
       'Register: https://forms.gle/xyz\n'
-      'IG: https://instagram.com/kerawang\n'
-      '\n'
-      '$footer',
+      'IG: https://instagram.com/kerawang',
     );
     expect(msg.indexOf(ours), lessThan(msg.indexOf('https://forms.gle')));
   });

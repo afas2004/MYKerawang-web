@@ -252,7 +252,6 @@ class AppStrings {
   // Share
   final String invalidPhone;
   final String whatsAppFailed;
-  final String shareFooter;
   final String shareLinkAfterTitle;
   final String message;
   final String photosCount;
@@ -563,7 +562,6 @@ class AppStrings {
     required this.priceLine,
     required this.invalidPhone,
     required this.whatsAppFailed,
-    required this.shareFooter,
     required this.shareLinkAfterTitle,
     required this.message,
     required this.photosCount,
@@ -861,7 +859,6 @@ class AppStrings {
     priceLine: "Price: {0}",
     invalidPhone: "Seller's phone number looks invalid: \"{0}\"",
     whatsAppFailed: "Couldn't open WhatsApp. Is it installed?",
-    shareFooter: "Check this out on MYKerawang!",
     shareLinkAfterTitle: "This link is added right after the first line, so the chat shows our preview.",
     message: "Message",
     photosCount: "Photos ({0}/{1})",
@@ -1159,7 +1156,6 @@ class AppStrings {
     priceLine: "Harga: {0}",
     invalidPhone: "Nombor telefon penjual tak sah: \"{0}\"",
     whatsAppFailed: "Tak dapat buka WhatsApp. Dah install?",
-    shareFooter: "Tengok ni kat MYKerawang!",
     shareLinkAfterTitle: "Pautan ini diletak terus selepas baris pertama, supaya chat tunjuk pratonton kita.",
     message: "Mesej",
     photosCount: "Gambar ({0}/{1})",
@@ -1457,7 +1453,6 @@ class AppStrings {
     priceLine: "価格: {0}",
     invalidPhone: "出品者の電話番号が無効です：\"{0}\"",
     whatsAppFailed: "WhatsAppを開けません。インストールされていますか？",
-    shareFooter: "MYKerawangでチェック！",
     shareLinkAfterTitle: "このリンクは1行目のすぐ後に入るので、チャットにこちらのプレビューが表示されます。",
     message: "メッセージ",
     photosCount: "写真 ({0}/{1})",

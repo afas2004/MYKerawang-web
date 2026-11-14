@@ -7,6 +7,7 @@ import '../../l10n/form_strings.dart';
 import '../../language_cubit.dart';
 import '../../services/my_forms_service.dart';
 import '../../services/share_service.dart';
+import '../../widgets/form_qr_sheet.dart';
 import '../../theme/app_icons.dart';
 import '../../theme/tokens.dart';
 import '../../utils/adaptive.dart';
@@ -174,6 +175,10 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
                                 _Action.answer => context.push(forms[i].path),
                                 _Action.responses => context.push('${forms[i].path}/responses'),
                                 _Action.copy => _copyLink(forms[i]),
+                                _Action.qr => showFormQr(context,
+                                    title: forms[i].title,
+                                    path: forms[i].path,
+                                    draft: forms[i].isDraft),
                                 _Action.close => _close(forms[i]),
                                 _Action.delete => _delete(forms[i]),
                               },
@@ -186,7 +191,7 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
   }
 }
 
-enum _Action { answer, responses, copy, close, delete }
+enum _Action { answer, responses, copy, qr, close, delete }
 
 class _FormTile extends StatelessWidget {
   final MyForm form;
@@ -277,6 +282,8 @@ class _FormTile extends StatelessWidget {
                     PopupMenuItem(value: _Action.responses, child: Text(s.formOpenAnswers)),
                   if (!form.isHidden)
                     PopupMenuItem(value: _Action.copy, child: Text(s.formsCopyLink)),
+                  if (!form.isHidden)
+                    PopupMenuItem(value: _Action.qr, child: Text(s.formQrShow)),
                   if (form.isOpen)
                     PopupMenuItem(value: _Action.close, child: Text(s.formsClose)),
                   PopupMenuItem(
