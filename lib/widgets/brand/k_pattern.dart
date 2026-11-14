@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -46,10 +47,12 @@ class KPattern extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1;
     return ExcludeSemantics(
       excluding: child == null,
-      // Its own layer: the pattern is cached instead of redrawn whenever
-      // something nearby repaints (a pinned header over a scrolling list).
+      // Its own layer, so nearby repaints don't re-record it. On the web that
+      // is not enough: every frame is rasterised again, so the motif itself
+      // is one cached tile image filled as a shader (see [KPatternPainter]).
       child: RepaintBoundary(
         child: CustomPaint(
           isComplex: true,
@@ -59,6 +62,8 @@ class KPattern extends StatelessWidget {
             background: background,
             cell: cell,
             angle: angle,
+            tile: KPatternPainter.tileImage(kind, color, cell, dpr),
+            dpr: dpr,
           ),
           child: child ?? const SizedBox.expand(),
         ),
@@ -74,13 +79,62 @@ class KPatternPainter extends CustomPainter {
   final double cell;
   final double angle;
 
+  /// One tile of the motif at device resolution. When given, the box is
+  /// filled with it as a repeating shader: one draw per frame instead of
+  /// three anti-aliased paths per tile (about 130 for the Home pin bar,
+  /// replayed on every scroll frame because the web keeps no raster cache).
+  final ui.Image? tile;
+  final double dpr;
+
   const KPatternPainter({
     required this.kind,
     required this.color,
     this.background,
     this.cell = 36,
     this.angle = 0,
+    this.tile,
+    this.dpr = 1,
   });
+
+  /// Rendered tiles, shared by every pattern with the same look. A handful
+  /// at most (the pin bar's star, brand covers).
+  static final _tiles = <String, ui.Image>{};
+
+  /// The tile for this look, drawn once. The 3×3 neighbourhood is painted
+  /// and clipped to one cell, so motifs that cross a cell edge (the star's
+  /// corner dots, the pucuk's base line) wrap seamlessly when repeated.
+  /// Null if this renderer can't snapshot a picture.
+  static ui.Image? tileImage(KPatternKind kind, Color color, double cell, double dpr) {
+    final px = (cell * dpr).round();
+    if (px <= 0 || px > 1024) return null;
+    final key = '${kind.name}|${color.toARGB32()}|$cell|$px';
+    final hit = _tiles[key];
+    if (hit != null) return hit;
+    try {
+      final rec = ui.PictureRecorder();
+      final canvas = Canvas(rec)..scale(px / cell);
+      canvas.clipRect(Rect.fromLTWH(0, 0, cell, cell));
+      final drawer = KPatternPainter(kind: kind, color: color, cell: cell);
+      final stroke = drawer._stroke(), fill = Paint()..color = color;
+      for (var i = -1; i <= 1; i++) {
+        for (var j = -1; j <= 1; j++) {
+          drawer._tile(canvas, Offset(i * cell, j * cell), stroke, fill);
+        }
+      }
+      final picture = rec.endRecording();
+      final image = picture.toImageSync(px, px);
+      picture.dispose();
+      return _tiles[key] = image;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Paint _stroke() => Paint()
+    ..color = color
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = math.max(1, cell / 28)
+    ..isAntiAlias = true;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -92,11 +146,7 @@ class KPatternPainter extends CustomPainter {
       canvas.drawRect(bounds, Paint()..color = background!);
     }
 
-    final stroke = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(1, cell / 28)
-      ..isAntiAlias = true;
+    final stroke = _stroke();
     final fill = Paint()..color = color;
 
     // Tiles sit on a grid centred on the box. Unrotated, only the tiles that
@@ -112,6 +162,22 @@ class KPatternPainter extends CustomPainter {
         ? size.bottomRight(Offset.zero).distance / 2
         : size.width / 2;
     final reachY = rotated ? reachX : size.height / 2;
+    final image = tile;
+    if (image != null) {
+      // Tile (0,0) sits at the centre, as in the loop below.
+      // Scale by cell/width, not 1/dpr: the tile's pixel size was rounded,
+      // and the repeat must stay exactly one cell.
+      final k = cell / image.width;
+      final m = Matrix4.diagonal3Values(k, k, 1).storage;
+      canvas.drawRect(
+        Rect.fromLTRB(-reachX - cell, -reachY - cell, reachX + cell, reachY + cell),
+        Paint()
+          ..shader = ImageShader(image, TileMode.repeated, TileMode.repeated, m)
+          ..filterQuality = FilterQuality.low,
+      );
+      canvas.restore();
+      return;
+    }
     for (var i = (-reachX / cell).floor() - 1; i * cell <= reachX; i++) {
       for (var j = (-reachY / cell).floor() - 1; j * cell <= reachY; j++) {
         _tile(canvas, Offset(i * cell, j * cell), stroke, fill);
@@ -175,5 +241,7 @@ class KPatternPainter extends CustomPainter {
       old.color != color ||
       old.background != background ||
       old.cell != cell ||
-      old.angle != angle;
+      old.angle != angle ||
+      old.tile != tile ||
+      old.dpr != dpr;
 }
