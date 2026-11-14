@@ -318,11 +318,16 @@ class _HeroCarouselState extends State<_HeroCarousel> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Gentle auto-advance, never under reduced motion.
+    // Gentle auto-advance, never under reduced motion. TickerMode is off
+    // while this page sits behind another tab or route, so the slideshow
+    // stops instead of animating unseen (this re-runs when it comes back).
     _auto?.cancel();
-    if (widget.items.length > 1 && !KMotion.reduced(context)) {
+    if (widget.items.length > 1 && !KMotion.reduced(context) && TickerMode.of(context)) {
       _auto = Timer.periodic(const Duration(seconds: 6), (_) {
-        if (!_controller.hasClients) return;
+        if (!mounted || !_controller.hasClients) return;
+        // Browser tab hidden or app in the background: skip this turn.
+        final life = WidgetsBinding.instance.lifecycleState;
+        if (life != null && life != AppLifecycleState.resumed) return;
         final next = (_page + 1) % widget.items.length;
         _controller.animateToPage(next,
             duration: const Duration(milliseconds: 400), curve: KMotion.curve);

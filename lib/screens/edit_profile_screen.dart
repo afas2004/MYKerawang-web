@@ -234,7 +234,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         await supabase.storage.from('images').uploadBinary(
               path,
               bytesToUpload,
-              fileOptions: FileOptions(contentType: imageContentType(bytesToUpload)),
+              fileOptions: photoUploadOptions(bytesToUpload),
             );
         newAvatarUrl = supabase.storage.from('images').getPublicUrl(path);
       }
@@ -245,7 +245,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         await supabase.storage.from('images').uploadBinary(
               uniquePath,
               bytesToUpload,
-              fileOptions: FileOptions(contentType: imageContentType(bytesToUpload)),
+              fileOptions: photoUploadOptions(bytesToUpload),
             );
         newQrUrl = supabase.storage.from('images').getPublicUrl(uniquePath);
       }

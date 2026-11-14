@@ -190,7 +190,7 @@ class PostService {
       await _db.storage.from('images').uploadBinary(
             path,
             bytes,
-            fileOptions: FileOptions(contentType: imageContentType(bytes)),
+            fileOptions: photoUploadOptions(bytes),
           );
       urls.add(_db.storage.from('images').getPublicUrl(path));
     }

@@ -266,7 +266,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
           await _supabase.storage.from('images').uploadBinary(
                 path,
                 compressed,
-                fileOptions: FileOptions(contentType: imageContentType(compressed)),
+                fileOptions: photoUploadOptions(compressed),
               );
           url = _supabase.storage.from('images').getPublicUrl(path);
         } else {
