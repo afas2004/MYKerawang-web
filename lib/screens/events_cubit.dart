@@ -63,6 +63,15 @@ class EventsCubit extends Cubit<EventsState> {
 
   StreamSubscription? _subscription;
 
+  /// Live updates arrive for ANY change to any of the 200 events (someone
+  /// edits a title, a check-in flips a flag). Each one used to re-fetch the
+  /// going counts and organisers for all 200 cards. Now the first load is
+  /// immediate and later ones wait for a quiet moment, so a burst of
+  /// changes costs one refresh.
+  Timer? _extrasTimer;
+  bool _extrasLoadedOnce = false;
+  static const extrasQuietPeriod = Duration(seconds: 2);
+
   // Looked up on use, so tests can build the cubit without Supabase.
   SupabaseClient get _supabase => Supabase.instance.client;
 
@@ -110,6 +119,8 @@ class EventsCubit extends Cubit<EventsState> {
 
     _subscription?.cancel(); // drop the previous stream before resubscribing
     _subscription = null;
+    _extrasTimer?.cancel();
+    _extrasLoadedOnce = false; // a fresh load shows its extras straight away
 
     // 2a. GUEST: one read, no realtime connection.
     if (!_signedIn) {
@@ -154,7 +165,13 @@ class EventsCubit extends Cubit<EventsState> {
       displayedEvents: _applyFilters(items, state.selectedTag, state.searchQuery),
       isLoading: false,
     ));
-    _loadCardExtras(items);
+    if (!_extrasLoadedOnce) {
+      _extrasLoadedOnce = true;
+      _loadCardExtras(items);
+    } else {
+      _extrasTimer?.cancel();
+      _extrasTimer = Timer(extrasQuietPeriod, () => _loadCardExtras(state.allEvents));
+    }
   }
 
   void _onError(Object error) {
@@ -234,6 +251,7 @@ class EventsCubit extends Cubit<EventsState> {
   @override
   Future<void> close() {
     _subscription?.cancel();
+    _extrasTimer?.cancel();
     return super.close();
   }
 }

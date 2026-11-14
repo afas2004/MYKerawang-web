@@ -419,7 +419,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           await supabase.storage.from('images').uploadBinary(
                 path,
                 compressed,
-                fileOptions: FileOptions(contentType: imageContentType(compressed)),
+                fileOptions: photoUploadOptions(compressed),
               );
           url = supabase.storage.from('images').getPublicUrl(path);
         } else {

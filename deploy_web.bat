@@ -27,6 +27,9 @@ REM Same stamp in the standalone bootstrap (index.html inlines it, but keep
 REM the file consistent for anything that requests it directly).
 powershell -NoProfile -Command "$f='build\web\flutter_bootstrap.js'; [IO.File]::WriteAllText($f, [IO.File]::ReadAllText($f).Replace('__BUILD_ID__','%BUILD_ID%'))"
 if errorlevel 1 goto :error
+REM Drop icon-font weights the app never uses (~900 KB off every first visit).
+powershell -NoProfile -ExecutionPolicy Bypass -File trim_web_fonts.ps1
+if errorlevel 1 goto :error
 REM Self-removing worker: frees phones still running the old offline cache.
 copy /y build\web\sw_reset.js build\web\flutter_service_worker.js > nul
 

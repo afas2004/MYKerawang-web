@@ -36,6 +36,11 @@ class ReleaseNote {
 
 /// Newest first.
 final kReleaseNotes = <ReleaseNote>[
+  ReleaseNote('1.18.1', DateTime(2026, 11, 14), const [
+    NoteLine('Unused files have been removed, so the app now loads faster, especially on mobile data.', 'Fail yang tidak digunakan telah dibuang. Aplikasi kini dibuka lebih cepat, terutamanya dengan data mudah alih.', '使われていないファイルが削除され、特にモバイルデータでアプリの起動が速くなりました。'),
+    NoteLine('Posts, events and Market items without images are now shown with a lighter placeholder pattern, so those pages scroll more smoothly.', 'Post, acara dan barangan tanpa gambar dipaparkan dengan corak yang kini dilukis dengan lebih ringan. Laman Pasar dan Acara kini lebih lancar.', '画像のない投稿・イベント・マーケットの商品は、より軽い模様で表示されるようになり、スクロールがなめらかになりました。'),
+    NoteLine('All uploaded images are now compressed in the same way before they are saved, so uploads and downloads are faster.', 'Gambar yang dimuat naik akan dimampatkan sebelum disimpan, menjadikan muat naik dan muat turun lebih cepat.', 'アップロードされた画像は保存前に同じ方法で圧縮されるようになり、アップロードと表示が速くなりました。'),
+  ]),
   ReleaseNote('1.18.0', DateTime(2026, 11, 14), const [
     NoteLine('Import a Google Form: paste its link and get the same questions as a MYKerawang form you can edit.',
         'Import Borang Google: tampal pautannya dan dapatkan soalan yang sama sebagai borang MYKerawang yang boleh disunting.',
