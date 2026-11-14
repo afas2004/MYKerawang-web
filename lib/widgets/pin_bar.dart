@@ -11,8 +11,9 @@ import 'pin_controls.dart';
 
 /// Home's pins, in their own layer under the header: one row at a time,
 /// swipe between them. The first tap expands a preview, the second opens
-/// the post, and the chevron folds it back. Mandatory pins have no close
-/// button.
+/// the post, and the chevron folds it back. While a preview is open and
+/// there is more than one pin, Next steps to the following pin (wrapping
+/// round) and keeps its preview open. Mandatory pins have no close button.
 const _fg = KBand.onBand;
 
 class PinBar extends StatefulWidget {
@@ -40,6 +41,10 @@ class _PinBarState extends State<PinBar> {
   int _page = 0;
   bool _expanded = false;
   bool _canManage = false;
+
+  /// Set while Next moves the pages, so the new pin stays unfolded (a swipe
+  /// folds it, as before).
+  bool _stepping = false;
 
   @override
   void initState() {
@@ -75,6 +80,23 @@ class _PinBarState extends State<PinBar> {
     }
   }
 
+  Future<void> _next() async {
+    final count = widget.pins.length;
+    if (count < 2 || !_pages.hasClients) return;
+    _stepping = true;
+    final target = (_page + 1) % count;
+    if (target == 0) {
+      _pages.jumpToPage(0); // wrapping: no long slide back across every pin
+    } else {
+      await _pages.animateToPage(
+        target,
+        duration: KMotion.of(context).fast,
+        curve: KMotion.curve,
+      );
+    }
+    _stepping = false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final desktop = Responsive.isDesktop(context);
@@ -83,7 +105,9 @@ class _PinBarState extends State<PinBar> {
     final s = context.l10n;
     final radius = desktop
         ? KRadius.card
-        : const BorderRadius.vertical(bottom: Radius.circular(KBand.footRadius));
+        : const BorderRadius.vertical(
+            bottom: Radius.circular(KBand.footRadius),
+          );
     final height = _expanded
         ? (_canManage ? _manageHeight : _previewHeight)
         : _rowHeight;
@@ -103,7 +127,10 @@ class _PinBarState extends State<PinBar> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: _rowHeight, child: Center(child: _PinBadge())),
+          const SizedBox(
+            height: _rowHeight,
+            child: Center(child: _PinBadge()),
+          ),
           const SizedBox(width: KSpace.s + 2),
           Expanded(
             child: PageView.builder(
@@ -111,7 +138,7 @@ class _PinBarState extends State<PinBar> {
               itemCount: count,
               onPageChanged: (i) => setState(() {
                 _page = i;
-                _expanded = false;
+                if (!_stepping) _expanded = false;
               }),
               itemBuilder: (context, i) => _PinPage(
                 post: widget.pins[i],
@@ -121,26 +148,64 @@ class _PinBarState extends State<PinBar> {
               ),
             ),
           ),
-          SizedBox(
-            height: _rowHeight,
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              if (count > 1)
-                Padding(
-                  padding: const EdgeInsets.only(left: KSpace.s),
-                  child: Text('${_page + 1}/$count',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: _fg,
-                          fontFeatures: const [FontFeature.tabularFigures()])),
+          // Unconstrained and clipped: while the bar animates open, Next is
+          // briefly taller than the bar and must not report an overflow.
+          UnconstrainedBox(
+            alignment: Alignment.topRight,
+            clipBehavior: Clip.hardEdge,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                SizedBox(
+                  height: _rowHeight,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (count > 1)
+                        Padding(
+                          padding: const EdgeInsets.only(left: KSpace.s),
+                          child: Text(
+                            '${_page + 1}/$count',
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: _fg,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                          ),
+                        ),
+                      control(
+                        _expanded ? AppIcons.up : AppIcons.down,
+                        _expanded ? s.pinCollapse : s.pinExpand,
+                        () => setState(() => _expanded = !_expanded),
+                      ),
+                      if (current['pin_mandatory'] != true)
+                        control(
+                          AppIcons.close,
+                          s.pinClose,
+                          () => widget.onDismiss(current),
+                        ),
+                    ],
+                  ),
                 ),
-              control(
-                _expanded ? AppIcons.up : AppIcons.down,
-                _expanded ? s.pinCollapse : s.pinExpand,
-                () => setState(() => _expanded = !_expanded),
-              ),
-              if (current['pin_mandatory'] != true)
-                control(AppIcons.close, s.pinClose,
-                    () => widget.onDismiss(current)),
-            ]),
+                // Under the controls, so it never crowds the preview text.
+                if (_expanded && count > 1)
+                  TextButton.icon(
+                    onPressed: _next,
+                    style: TextButton.styleFrom(
+                      foregroundColor: _fg,
+                      minimumSize: const Size(0, 32),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: const EdgeInsets.symmetric(horizontal: KSpace.s),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    iconAlignment: IconAlignment.end,
+                    icon: const Icon(AppIcons.chevronRight, size: 16),
+                    label: Text(s.next),
+                  ),
+              ],
+            ),
           ),
         ],
       ),
@@ -149,7 +214,8 @@ class _PinBarState extends State<PinBar> {
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(
-            maxWidth: desktop ? Responsive.feedMaxWidth : double.infinity),
+          maxWidth: desktop ? Responsive.feedMaxWidth : double.infinity,
+        ),
         child: Material(
           type: MaterialType.transparency,
           child: ClipRRect(
@@ -169,7 +235,8 @@ class _PinBarState extends State<PinBar> {
                         decoration: BoxDecoration(
                           color: KBand.colorOf(context, KBand.home),
                           borderRadius: const BorderRadius.vertical(
-                              bottom: Radius.circular(KBand.footRadius)),
+                            bottom: Radius.circular(KBand.footRadius),
+                          ),
                         ),
                       ),
                     row,
@@ -256,8 +323,8 @@ class _PinPage extends StatelessWidget {
     final name = club is Map
         ? club['name']
         : profile is Map
-            ? (profile['display_name'] ?? profile['username'])
-            : null;
+        ? (profile['display_name'] ?? profile['username'])
+        : null;
     final event = post['events'];
     return [
       if (event is Map<String, dynamic> && isEventCancelled(event)) s.cancelled,
@@ -291,25 +358,34 @@ class _PinPage extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(_title(),
+                      Text(
+                        _title(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: color,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (source.isNotEmpty)
+                        Text(
+                          source,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                              color: color, fontWeight: FontWeight.w600)),
-                      if (source.isNotEmpty)
-                        Text(source,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.labelSmall
-                                ?.copyWith(color: color.withValues(alpha: 0.8))),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: color.withValues(alpha: 0.8),
+                          ),
+                        ),
                     ],
                   ),
                 ),
                 if (expanded) ...[
-                  Text(body,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(color: color)),
+                  Text(
+                    body,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(color: color),
+                  ),
                   _ManageRow(post: post, color: color),
                 ],
               ],
@@ -341,18 +417,21 @@ class _ManageRow extends StatelessWidget {
       future: ModerationService.myRole(),
       builder: (context, snap) {
         if (!PinActions.canPin(post, snap.data)) return const SizedBox.shrink();
-        return Row(children: [
-          TextButton(
-            style: style,
-            onPressed: () => PinActions.toggle(context, post, pinned: true),
-            child: Text(s.mod.unpin),
-          ),
-          TextButton(
-            style: style,
-            onPressed: () => PinActions.setMandatory(context, post, !mandatory),
-            child: Text(mandatory ? s.pinMakeNormal : s.pinMakeMandatory),
-          ),
-        ]);
+        return Row(
+          children: [
+            TextButton(
+              style: style,
+              onPressed: () => PinActions.toggle(context, post, pinned: true),
+              child: Text(s.mod.unpin),
+            ),
+            TextButton(
+              style: style,
+              onPressed: () =>
+                  PinActions.setMandatory(context, post, !mandatory),
+              child: Text(mandatory ? s.pinMakeNormal : s.pinMakeMandatory),
+            ),
+          ],
+        );
       },
     );
   }

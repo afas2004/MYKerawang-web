@@ -70,6 +70,33 @@ void main() {
     expect(find.text('Pin b'), findsOneWidget);
   });
 
+  testWidgets('Next shows only when unfolded, keeps the preview open and wraps', (t) async {
+    await pumpAt(t, kCompact, bar([pin('a'), pin('b')]));
+    expect(find.text('Next'), findsNothing);
+
+    await t.tap(find.text('Pin a'));
+    await t.pumpAndSettle();
+    expect(find.text('Next'), findsOneWidget);
+
+    await t.tap(find.text('Next'));
+    await t.pumpAndSettle();
+    expect(find.text('2/2'), findsOneWidget);
+    expect(find.text('Body of b'), findsOneWidget); // still unfolded
+
+    await t.tap(find.text('Next'));
+    await t.pumpAndSettle();
+    expect(find.text('1/2'), findsOneWidget);
+    expect(find.text('Body of a'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets('a single pin has no Next button', (t) async {
+    await pumpAt(t, kCompact, bar([pin('a')]));
+    await t.tap(find.text('Pin a'));
+    await t.pumpAndSettle();
+    expect(find.text('Next'), findsNothing);
+  });
+
   testWidgets('a mandatory pin has no close button', (t) async {
     await pumpAt(t, kCompact, bar([pin('a', mandatory: true)]));
     expect(find.byTooltip('Close pin'), findsNothing);

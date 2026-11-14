@@ -36,6 +36,10 @@ class ReleaseNote {
 
 /// Newest first.
 final kReleaseNotes = <ReleaseNote>[
+  ReleaseNote('1.18.2', DateTime(2026, 11, 14), const [
+    NoteLine('A Next button has been added to the pin bar. When a pin is opened, the following pin can be viewed without swiping.', 'Butang Seterusnya telah ditambah pada bar pin. Apabila pin dibuka, pin seterusnya boleh dilihat tanpa perlu meleret.', 'ピンバーに「次へ」ボタンが追加されました。ピンを開いたまま、スワイプせずに次のピンを表示できます。'),
+    NoteLine('The pattern on the pin bar is now drawn more efficiently, so Home scrolls more smoothly.', 'Corak pada bar pin kini dilukis dengan lebih cekap, menjadikan laman Utama lebih lancar ketika ditatal.', 'ピンバーの模様がより効率よく描画されるようになり、ホームのスクロールがなめらかになりました。'),
+  ]),
   ReleaseNote('1.18.1', DateTime(2026, 11, 14), const [
     NoteLine('Unused files have been removed, so the app now loads faster, especially on mobile data.', 'Fail yang tidak digunakan telah dibuang. Aplikasi kini dibuka lebih cepat, terutamanya dengan data mudah alih.', '使われていないファイルが削除され、特にモバイルデータでアプリの起動が速くなりました。'),
     NoteLine('Posts, events and Market items without images are now shown with a lighter placeholder pattern, so those pages scroll more smoothly.', 'Post, acara dan barangan tanpa gambar dipaparkan dengan corak yang kini dilukis dengan lebih ringan. Laman Pasar dan Acara kini lebih lancar.', '画像のない投稿・イベント・マーケットの商品は、より軽い模様で表示されるようになり、スクロールがなめらかになりました。'),
